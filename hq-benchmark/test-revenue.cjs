@@ -48,19 +48,29 @@ test('Summarizes only dated final invoices and subtracts credit notes',()=>{
   assert.equal(r.counts.skippedType,1);assert.equal(r.counts.outsidePeriod,1);
   assert.equal(r.counts.excludedCompanyDocuments,1);
   assert.equal(r.customers[0].name,'Kunde A');assert.equal(r.customers[0].revenueCents,8000);
-  assert.equal(r.metrics.requests,2);assert.ok(r.durationMs>=2000);
+  assert.equal(r.metrics.requests,2);assert.equal(r.metrics.pageSize,1000);assert.equal(r.metrics.pacingMs,0);
+  assert.equal(e.calls[1].at-e.calls[0].at,25);
   e.calls.forEach(call=>{assert.equal(call.settings.method,'get');assert.equal(call.settings.followRedirects,false);assert.ok(call.url.startsWith('https://api.hellohq.io/v2/'));});
   assert.ok(!JSON.stringify(r).includes('private-token'));
 });
 test('Checks a second page after exactly one full page',()=>{
-  const many=Array.from({length:500},(_,i)=>({id:i+1,name:'Customer '+i,companyTypes:[{name:'Kunde'}]}));
+  const many=Array.from({length:1000},(_,i)=>({id:i+1,name:'Customer '+i,companyTypes:[{name:'Kunde'}]}));
   const e=environment(many,[]);const r=e.context.runRevenueTest(cfg);
-  assert.equal(r.counts.customerCount,500);assert.equal(r.metrics.companiesPages,2);assert.equal(r.metrics.requests,3);
+  assert.equal(r.counts.customerCount,1000);assert.equal(r.metrics.companiesPages,2);assert.equal(r.metrics.requests,3);
 });
 test('Uses HQ count header to finish an exactly full last page',()=>{
-  const many=Array.from({length:500},(_,i)=>({id:i+1,name:'Customer '+i,companyTypes:[{name:'Kunde'}]}));
+  const many=Array.from({length:1000},(_,i)=>({id:i+1,name:'Customer '+i,companyTypes:[{name:'Kunde'}]}));
   const e=environment(many,[],{countHeader:true});const r=e.context.runRevenueTest(cfg);
-  assert.equal(r.counts.customerCount,500);assert.equal(r.metrics.companiesPages,1);
+  assert.equal(r.counts.customerCount,1000);assert.equal(r.metrics.companiesPages,1);
+});
+test('Current HQ collection sizes need ten pages at 1000 records each',()=>{
+  const manyCompanies=Array.from({length:3174},(_,i)=>({id:i+1,name:'Customer '+i,companyTypes:[{name:'Kunde'}]}));
+  const manyDocuments=Array.from({length:5779},(_,i)=>({id:i+1,type:'Offer'}));
+  const e=environment(manyCompanies,manyDocuments,{countHeader:true});const r=e.context.runRevenueTest(cfg);
+  assert.equal(r.metrics.companiesPages,4);
+  assert.equal(r.metrics.documentsPages,6);
+  assert.equal(r.metrics.requests,10);
+  assert.ok(e.calls.every(call=>new URL(call.url).searchParams.get('top')==='1000'));
 });
 test('Rejects unauthorized access and HTTP errors; counts unusable documents',()=>{
   const outsider=environment(companies,documents,{email:'other@example.test'});

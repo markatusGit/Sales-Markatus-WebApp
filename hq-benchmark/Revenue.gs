@@ -4,7 +4,7 @@
  * v2-Anleitung beschreibt die konkreten Belegfelder nicht verbindlich.
  * Es werden ausschließlich GET-Aufrufe an zwei feste HQ-v2-Endpunkte gesendet.
  */
-const HQ_REVENUE = Object.freeze({origin: 'https://api.hellohq.io', pageSize: 500, maxPagesPerCollection: 25, minIntervalMs: 2000, maxDurationMs: 210000});
+const HQ_REVENUE = Object.freeze({origin: 'https://api.hellohq.io', pageSize: 1000, maxPagesPerCollection: 25, maxDurationMs: 210000});
 
 function inspectRevenueFields() {
   requireBenchUser_();
@@ -32,19 +32,15 @@ function runRevenueTest(input) {
   const token = revenueToken_();
   const cfg = revenueConfig_(input);
   const began = Date.now();
-  const metrics = {requests: 0, bytes: 0, requestTimesMs: [], companiesPages: 0, documentsPages: 0, companiesMs: 0, documentsMs: 0, processingMs: 0};
-  // Absichtlich kein globales Script-Lock: Zwei angemeldete PCs sollen dieselbe
-  // Ansicht tatsächlich gleichzeitig abrufen können. Je Lauf höchstens 30/min.
-  let lastStarted = 0;
+  const metrics = {requests: 0, bytes: 0, requestTimesMs: [], pageSize: HQ_REVENUE.pageSize, pacingMs: 0, companiesPages: 0, documentsPages: 0, companiesMs: 0, documentsMs: 0, processingMs: 0};
+  // Kein globales Script-Lock und keine künstliche Wartezeit: Die frische
+  // Vertriebsansicht soll auch auf zwei PCs die wirkliche Abrufdauer messen.
   function collect(collection) {
     const records = [];
     const phaseStart = Date.now();
     let skip = 0;
     for (let page = 0; page < HQ_REVENUE.maxPagesPerCollection; page++) {
       if (Date.now() - began >= HQ_REVENUE.maxDurationMs) throw new Error('Zeitbudget erreicht. Die Ergebnisliste wäre unvollständig und wird nicht angezeigt.');
-      const wait = lastStarted + HQ_REVENUE.minIntervalMs - Date.now();
-      if (wait > 0) Utilities.sleep(wait);
-      lastStarted = Date.now();
       const path = '/v2/' + collection + '?top=' + HQ_REVENUE.pageSize + '&skip=' + skip;
       const result = revenueFetch_(path, token);
       metrics.requests++;
@@ -120,7 +116,7 @@ function runRevenueTest(input) {
     counts: {loadedCompanies: companies.length, customerCount: customers.length, excludedCompanies: excludedCompanies, excludedCompanyDocuments: excludedCompanyDocuments, loadedDocuments: documents.length, matchedDocuments: matchedDocuments, skippedType: skippedType, skippedStatus: skippedStatus, outsidePeriod: outsidePeriod, missingDate: missingDate, missingStatus: missingStatus, missingDocumentId: missingDocumentId, missingCompany: missingCompany, missingAmount: missingAmount, unsupportedCurrency: unsupportedCurrency},
     metrics: metrics,
     revenueIncomplete: Boolean(missingDate || missingStatus || missingDocumentId || missingCompany || missingAmount || unsupportedCurrency),
-    note: 'Vorläufige Testauswertung aus HQ-v2-Dokumenten. Nur die ausgewählten Belegarten und Statuswerte zählen. Belege mit fehlenden Pflichtfeldern werden ausgelassen und gezählt. Alle Belegseiten wurden frisch gelesen; kein App-Cache.'
+    note: 'Vorläufige Testauswertung aus HQ-v2-Dokumenten. Nur die ausgewählten Belegarten und Statuswerte zählen. Belege mit fehlenden Pflichtfeldern werden ausgelassen und gezählt. Alle Belegseiten wurden frisch gelesen; kein App-Cache und keine künstliche Abfragepause.'
   };
 }
 
