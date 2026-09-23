@@ -62,13 +62,24 @@ test('Uses HQ count header to finish an exactly full last page',()=>{
   const e=environment(many,[],{countHeader:true});const r=e.context.runRevenueTest(cfg);
   assert.equal(r.counts.customerCount,500);assert.equal(r.metrics.companiesPages,1);
 });
-test('Rejects missing identity and incomplete or ambiguous revenue data',()=>{
+test('Rejects unauthorized access and HTTP errors; counts unusable documents',()=>{
   const outsider=environment(companies,documents,{email:'other@example.test'});
   assert.throws(()=>outsider.context.runRevenueTest(cfg),/freigeschalteter/);assert.equal(outsider.calls.length,0);
-  const missing=environment(companies,[{...documents[0],status:null}]);assert.throws(()=>missing.context.runRevenueTest(cfg),/Belegstatus/);
-  const currency=environment(companies,[{...documents[0],currency:'USD'}]);assert.throws(()=>currency.context.runRevenueTest(cfg),/Währung/);
-  const orphan=environment(companies,[{...documents[0],companyId:999}]);assert.throws(()=>orphan.context.runRevenueTest(cfg),/keinen zugeordneten Kunden/);
+  const gaps=[{status:null},{currency:'USD'},{companyId:999},{netAmount:null},{id:null},{documentDate:null}];
+  const expected=['missingStatus','unsupportedCurrency','missingCompany','missingAmount','missingDocumentId','missingDate'];
+  gaps.forEach((gap,index)=>{
+    const result=environment(companies,[{...documents[0],...gap}]).context.runRevenueTest(cfg);
+    assert.equal(result.revenueIncomplete,true);
+    assert.equal(result.counts[expected[index]],1);
+    assert.equal(result.counts.matchedDocuments,0);
+  });
   const failed=environment(companies,documents,{status:429});assert.throws(()=>failed.context.runRevenueTest(cfg),/HTTP 429/);
+});
+test('An out-of-period document with no status does not make current revenue incomplete',()=>{
+  const result=environment(companies,[{...documents[3],status:null}]).context.runRevenueTest(cfg);
+  assert.equal(result.counts.outsidePeriod,1);
+  assert.equal(result.counts.missingStatus,0);
+  assert.equal(result.revenueIncomplete,false);
 });
 test('Two live runs do not use the single-run benchmark lock',()=>{
   const a=environment(companies,documents),b=environment(companies,documents);

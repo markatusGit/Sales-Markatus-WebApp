@@ -80,21 +80,22 @@ function runRevenueTest(input) {
   });
   const from = cfg.from, untilExclusive = revenueNextDate_(cfg.to);
   let matchedDocuments = 0, skippedType = 0, skippedStatus = 0, outsidePeriod = 0, missingCompany = 0, excludedCompanyDocuments = 0;
+  let missingDate = 0, missingStatus = 0, missingDocumentId = 0, missingAmount = 0, unsupportedCurrency = 0;
   const seenDocuments = {};
   documents.forEach(doc => {
     const type = revenueSingle_(doc, cfg.documentType);
     const isInvoice = cfg.invoiceTypes.some(value => revenueEqual_(type, value));
     const isCredit = cfg.creditTypes.some(value => revenueEqual_(type, value));
     if (!isInvoice && !isCredit) { skippedType++; return; }
-    const status = revenueSingle_(doc, cfg.documentStatus);
-    if (status === null) throw new Error('Belegstatus fehlt. Feldzuordnung prüfen.');
-    if (!cfg.includedStatuses.some(value => revenueEqual_(status, value))) { skippedStatus++; return; }
     const date = revenueSingle_(doc, cfg.documentDate);
     const day = typeof date === 'string' ? date.slice(0,10) : '';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('Belegdatum fehlt oder hat ein unbekanntes Format.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { missingDate++; return; }
     if (day < from || day >= untilExclusive) { outsidePeriod++; return; }
+    const status = revenueSingle_(doc, cfg.documentStatus);
+    if (status === null) { missingStatus++; return; }
+    if (!cfg.includedStatuses.some(value => revenueEqual_(status, value))) { skippedStatus++; return; }
     const docId = revenueSingle_(doc, cfg.documentId);
-    if (docId === null) throw new Error('Beleg-ID fehlt. Feldzuordnung prüfen.');
+    if (docId === null) { missingDocumentId++; return; }
     if (seenDocuments[String(docId)]) throw new Error('Doppelte Beleg-ID in der Antwort. Seitennavigation prüfen.');
     seenDocuments[String(docId)] = true;
     const companyId = revenueSingle_(doc, cfg.documentCompanyId);
@@ -102,24 +103,24 @@ function runRevenueTest(input) {
     if (!target) { if (allCompanyIds[String(companyId)]) excludedCompanyDocuments++; else missingCompany++; return; }
     if (cfg.currencyPath) {
       const currency = revenueSingle_(doc, cfg.currencyPath);
-      if (!revenueEqual_(currency, 'EUR')) throw new Error('Beleg mit anderer oder fehlender Währung. Umsatz wird nicht gemischt.');
+      if (!revenueEqual_(currency, 'EUR')) { unsupportedCurrency++; return; }
     }
     const amount = revenueAmountCents_(revenueSingle_(doc, cfg.netAmount));
-    if (amount === null) throw new Error('Netto-Betrag fehlt oder ist nicht eindeutig numerisch. Feldzuordnung prüfen.');
+    if (amount === null) { missingAmount++; return; }
     target.revenueCents += isCredit ? -Math.abs(amount) : amount;
     target.documents++;
     matchedDocuments++;
   });
-  if (missingCompany) throw new Error(missingCompany + ' Belege haben keinen zugeordneten Kunden in der geladenen Firmenliste. Umsatzliste wäre unvollständig.');
   metrics.processingMs = Date.now() - processingStart;
   const customers = Object.keys(byId).map(id => byId[id]).sort((a,b) => b.revenueCents-a.revenueCents || a.name.localeCompare(b.name,'de'));
   const totalCents = customers.reduce((sum, item) => sum + item.revenueCents, 0);
   return {
     startedAt: new Date(began).toISOString(), durationMs: Date.now() - began, from: cfg.from, to: cfg.to,
     customers: customers, totalCents: totalCents,
-    counts: {loadedCompanies: companies.length, customerCount: customers.length, excludedCompanies: excludedCompanies, excludedCompanyDocuments: excludedCompanyDocuments, loadedDocuments: documents.length, matchedDocuments: matchedDocuments, skippedType: skippedType, skippedStatus: skippedStatus, outsidePeriod: outsidePeriod},
+    counts: {loadedCompanies: companies.length, customerCount: customers.length, excludedCompanies: excludedCompanies, excludedCompanyDocuments: excludedCompanyDocuments, loadedDocuments: documents.length, matchedDocuments: matchedDocuments, skippedType: skippedType, skippedStatus: skippedStatus, outsidePeriod: outsidePeriod, missingDate: missingDate, missingStatus: missingStatus, missingDocumentId: missingDocumentId, missingCompany: missingCompany, missingAmount: missingAmount, unsupportedCurrency: unsupportedCurrency},
     metrics: metrics,
-    note: 'Testauswertung aus HQ-v2-Dokumenten. Nur die ausdrücklich ausgewählten Belegarten und Statuswerte zählen. Alle Belegseiten wurden frisch gelesen; kein App-Cache.'
+    revenueIncomplete: Boolean(missingDate || missingStatus || missingDocumentId || missingCompany || missingAmount || unsupportedCurrency),
+    note: 'Vorläufige Testauswertung aus HQ-v2-Dokumenten. Nur die ausgewählten Belegarten und Statuswerte zählen. Belege mit fehlenden Pflichtfeldern werden ausgelassen und gezählt. Alle Belegseiten wurden frisch gelesen; kein App-Cache.'
   };
 }
 

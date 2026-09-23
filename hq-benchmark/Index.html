@@ -78,7 +78,7 @@
     </div>
     <p id="revenueProgress" role="status" aria-live="polite" hidden></p>
     <div id="revenueResult" hidden>
-      <div class="metrics"><div><span class="muted">Bis zur fertigen Liste</span><strong id="revDuration"></strong></div><div><span class="muted">HQ-Abfragen</span><strong id="revRequests"></strong></div><div><span class="muted">Kunden</span><strong id="revCustomers"></strong></div></div>
+      <div class="metrics"><div><span class="muted">Bis zur Ergebnisliste</span><strong id="revDuration"></strong></div><div><span class="muted">HQ-Abfragen</span><strong id="revRequests"></strong></div><div><span class="muted">Kunden</span><strong id="revCustomers"></strong></div></div>
       <p id="revenueSummary" class="status"></p>
       <div class="field-grid"><label>Name suchen<input id="revSearch" type="search" placeholder="Kundenname"></label><label>Mindestumsatz netto in EUR<input id="revMin" type="number" step="0.01" placeholder="z. B. 1000"></label><label>Höchstumsatz netto in EUR<input id="revMax" type="number" step="0.01" placeholder="optional"></label><label>Sortierung<select id="revSort"><option value="revenueDesc">Umsatz absteigend</option><option value="revenueAsc">Umsatz aufsteigend</option><option value="name">Name</option></select></label></div>
       <p id="revenueCount" class="muted"></p>
@@ -166,13 +166,14 @@
     timer=setInterval(()=>$('revenueProgress').textContent='Live-Laden läuft seit '+Math.round((Date.now()-start)/1000)+' Sekunden. Zwei PCs können diesen Ablauf gleichzeitig starten.',1000);
     google.script.run.withSuccessHandler(data=>{
       clearInterval(timer);$('runRevenue').disabled=false;$('inspectRevenue').disabled=false;report=data;rows=data.customers;
-      $('revenueProgress').textContent='Liste vollständig geladen.';$('revenueResult').hidden=false;
+      $('revenueProgress').textContent=data.revenueIncomplete?'HQ-Seiten vollständig geladen; Umsatzliste enthält Lücken.':'Liste vollständig geladen.';$('revenueResult').hidden=false;
       $('revRequests').textContent=data.metrics.requests;$('revCustomers').textContent=data.counts.customerCount;
       showRows();
       const browserMs=Date.now()-start;
       $('revDuration').textContent=(browserMs/1000).toFixed(1)+' s';
-      $('revenueSummary').textContent='Zeitraum '+data.from+' bis '+data.to+' · vorläufiger Netto-Umsatz '+money(data.totalCents)+' · '+data.counts.matchedDocuments+' zählende Belege · '+data.counts.skippedType+' andere Belegarten · '+data.counts.skippedStatus+' andere Statuswerte · '+data.counts.loadedDocuments+' Belege geladen · '+data.counts.loadedCompanies+' Firmen geladen. Server '+(data.durationMs/1000).toFixed(1)+' s, Browser gesamt '+(browserMs/1000).toFixed(1)+' s. '+(input.customerTypePath?'Kundentyp gefiltert.':'Kein Kundentyp gefiltert: auch andere Firmen möglich.')+(input.currencyPath?' Währung EUR geprüft.':' Währung nicht geprüft.')+(data.counts.matchedDocuments===0?' Kein Beleg gezählt: bitte die Diagnose und den Zeitraum prüfen.':'');
-      const timing={startedAt:data.startedAt,from:data.from,to:data.to,mapping:input,durationMs:data.durationMs,browserMs:browserMs,counts:data.counts,metrics:data.metrics,note:data.note};
+      const gaps=[['ohne Datum',data.counts.missingDate],['ohne Status',data.counts.missingStatus],['ohne Beleg-ID',data.counts.missingDocumentId],['ohne passende Firma',data.counts.missingCompany],['ohne gültigen Netto-Betrag',data.counts.missingAmount],['ohne EUR-Währung',data.counts.unsupportedCurrency]].filter(item=>item[1]>0).map(item=>item[1]+' '+item[0]);
+      $('revenueSummary').textContent=(data.revenueIncomplete?'ACHTUNG: Umsatz unvollständig. Nur die Geschwindigkeit beurteilen; Umsatzwerte und Umsatzfilter beruhen auf ausgelassenen Belegen. '+gaps.join(' · ')+'. ':'')+'Zeitraum '+data.from+' bis '+data.to+' · '+(data.revenueIncomplete?'bisher gezählter':'vorläufiger')+' Netto-Umsatz '+money(data.totalCents)+' · '+data.counts.matchedDocuments+' zählende Belege · '+data.counts.skippedType+' andere Belegarten · '+data.counts.skippedStatus+' andere Statuswerte · '+data.counts.loadedDocuments+' Belege geladen · '+data.counts.loadedCompanies+' Firmen geladen. Server '+(data.durationMs/1000).toFixed(1)+' s, Browser gesamt '+(browserMs/1000).toFixed(1)+' s. '+(input.customerTypePath?'Kundentyp gefiltert.':'Kein Kundentyp gefiltert: auch andere Firmen möglich.')+(input.currencyPath?' Währung EUR geprüft.':' Währung nicht geprüft.')+(data.counts.matchedDocuments===0?' Kein Beleg gezählt: bitte die Diagnose und den Zeitraum prüfen.':'');
+      const timing={startedAt:data.startedAt,from:data.from,to:data.to,mapping:input,durationMs:data.durationMs,browserMs:browserMs,revenueIncomplete:data.revenueIncomplete,counts:data.counts,metrics:data.metrics,note:data.note};
       if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(new Blob([JSON.stringify(timing,null,2)],{type:'application/json'}));$('revenueDownload').href=downloadUrl;
       $('revenueDownload').download='hq-umsatz-messung-'+Date.now()+'.json';
     }).withFailureHandler(error=>{clearInterval(timer);$('runRevenue').disabled=false;$('inspectRevenue').disabled=false;$('revenueProgress').textContent='Live-Liste nicht abgeschlossen: '+String(error.message||error);}).runRevenueTest(input);
