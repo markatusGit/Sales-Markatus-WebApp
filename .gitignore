@@ -10,6 +10,7 @@ hq-umsatz-messung-*.json
 
 # Lokale Werkzeuge und Betriebssystemdateien.
 node_modules/
+.firebase/
 *.log
 .DS_Store
 Thumbs.db

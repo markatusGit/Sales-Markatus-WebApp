@@ -192,7 +192,7 @@ Der Pilotcode ist vorbereitet. Für die erste echte Messung muss dein Firebase-P
 
 ### B. Zugriff für den HQ-Abgleich
 
-1. Öffne für dasselbe Projekt die [Google-Cloud-Konsole für Dienstkonten](https://console.cloud.google.com/iam-admin/serviceaccounts). Lege ein neues Dienstkonto namens **hq-firestore-sync** an.
+1. Öffne die [Google-Cloud-Konsole für Dienstkonten](https://console.cloud.google.com/iam-admin/serviceaccounts) und wähle oben ausdrücklich das **Projekt `sales-markatus`**. Lege **innerhalb dieses Projekts** ein neues Dienstkonto namens **hq-firestore-sync** an. Falls du zuvor stattdessen ein eigenes Google-Cloud-Projekt `hq-firestore-sync` angelegt hast, verwende dessen Dienstkontoschlüssel für diesen Piloten nicht: Der aktuelle Sync-Code erwartet ein Dienstkonto mit `project_id = sales-markatus`.
 2. Gib diesem Dienstkonto im Projekt die Rolle **Cloud Datastore User**. Es braucht weder Projektinhaber- noch Editor-Rechte.
 3. Öffne das Dienstkonto → **Schlüssel → Schlüssel hinzufügen → Neuen Schlüssel erstellen → JSON**. Die heruntergeladene JSON-Datei enthält einen privaten Schlüssel. Bewahre sie nur lokal sicher auf.
 4. Öffne dein bisheriges Apps-Script-Projekt **Magazinvertrieb – HQ-Test**. Füge den vollständigen Inhalt von [FirebaseSync.gs](../hq-benchmark/FirebaseSync.gs) als neue Scriptdatei mit Namen `FirebaseSync` ein. Ersetze auch [appsscript.json](../hq-benchmark/appsscript.json) mit der neuen Version.
@@ -200,6 +200,8 @@ Der Pilotcode ist vorbereitet. Für die erste echte Messung muss dein Firebase-P
 6. Speichere das Script. Öffne **Bereitstellen → Bereitstellungen verwalten**, bearbeite die bestehende Web-App und wähle eine **neue Version**. Danach hat die bekannte HQ-Testseite den zusätzlichen Bereich **Firebase-Vergleich**. Starte den Abgleich erst nach Schritt C.2, wenn die Firestore-Zugriffsregeln bereitgestellt sind.
 
 ### C. Testseite und interne Nutzer
+
+**Stand 23.09.2026:** Für `sales-markatus` sind Regeln und Testseite veröffentlicht: [sales-markatus.web.app](https://sales-markatus.web.app). Ein anonymer Leseversuch auf `pilot/current` wurde mit HTTP 403 abgewiesen. Anmeldung, UID-Freischaltung und erster HQ-Abgleich sind erfolgt. Der erste Firebase-Seitenaufruf dauerte im bereitgestellten Messprotokoll 1,35 s, ein erneuter Abruf 0,61 s. Als Nächstes denselben Zeitraum fachlich mit HQ abgleichen und den gleichzeitigen Zwei-PC-Test ausführen. Die vollständige Einordnung steht im [Projekttagebuch](PROJEKTTAGEBUCH-UND-ROADMAP.md).
 
 1. Auf deinem PC muss die [Firebase CLI](https://firebase.google.com/docs/cli) verfügbar sein. Falls sie fehlt, können wir sie zusammen einrichten. Im Projektordner einmal `firebase login` ausführen.
 2. Danach im Projektordner `firebase deploy --project DEINE_PROJEKT_ID --only firestore:rules,hosting` ausführen. Dies veröffentlicht die vorbereiteten Leseregeln und die Testseite unter `https://DEINE_PROJEKT_ID.web.app`.
