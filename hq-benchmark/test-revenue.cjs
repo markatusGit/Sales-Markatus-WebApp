@@ -110,4 +110,20 @@ test('Auto setup recognizes nested labels and a numeric net-amount string',()=>{
   const result=e.context.runRevenueTest({...cfg,...shape.suggestion});
   assert.equal(result.totalCents,12000);
 });
+test('Auto setup uses actual HQ document type and status instead of related address or project fields',()=>{
+  const hqDocuments=documents.map(doc=>({...doc,documentType:doc.type,documentStatusEntity:{documentStatusType:doc.status},companyAddress:{standardForDocumentType:'Invoice'},project:{status:'Projekt offen'}}));
+  hqDocuments.push({...hqDocuments[0],id:19,documentStatusEntity:{documentStatusType:'Declined'}});
+  const shape=environment(companies,hqDocuments).context.inspectRevenueFields();
+  assert.equal(shape.ready,true);
+  assert.equal(shape.suggestion.documentType,'documentType');
+  assert.equal(shape.suggestion.documentStatus,'documentStatusEntity.documentStatusType');
+  assert.ok(!shape.suggestion.includedStatuses.split(',').includes('Declined'));
+  assert.equal(shape.documentFields.find(field=>field.path==='project.status').values.length,0);
+  assert.equal(shape.documentFields.find(field=>field.path==='companyAddress.standardForDocumentType').values.length,0);
+  assert.ok(!JSON.stringify(shape).includes('Projekt offen'));
+  const result=environment(companies,hqDocuments).context.runRevenueTest({...cfg,...shape.suggestion});
+  assert.equal(result.counts.missingStatus,0);
+  assert.equal(result.counts.matchedDocuments,4);
+  assert.equal(result.totalCents,12000);
+});
 console.log(`${passed} revenue tests passed. No network requests were made.`);

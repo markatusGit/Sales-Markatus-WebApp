@@ -12,8 +12,8 @@ function inspectRevenueFields() {
   const start = Date.now();
   const company = revenueFetch_('/v2/Companies?top=20', token);
   const document = revenueFetch_('/v2/Documents?top=100', token);
-  const companyFields = revenueDescribe_(company.records);
-  const documentFields = revenueDescribe_(document.records);
+  const companyFields = revenueDescribe_(company.records, 'company');
+  const documentFields = revenueDescribe_(document.records, 'document');
   const suggestion = revenueSuggest_(companyFields, documentFields);
   return {
     companyFields: companyFields,
@@ -149,8 +149,11 @@ function revenueFetch_(path, token) {
   return {records: records, ms: Date.now() - began, bytes: response.getBlob().getBytes().length, total: Number.isInteger(count) && count >= 0 ? count : null};
 }
 
-function revenueDescribe_(records) {
+function revenueDescribe_(records, kind) {
   const found = {};
+  const enumPath = kind === 'company'
+    ? /^(?:companyTypes\[\]|companyType|customerType)\.(?:name|code)$/i
+    : /^(?:(?:type|documentType|invoiceType|status|documentStatus|state|currency|currencyCode)(?:\.(?:name|code))?|documentStatusEntity\.(?:documentStatusType|documentType|name)|documentTemplateEntity\.documentType)$/i;
   function walk(value, path, depth) {
     if (depth > 3 || value === null || value === undefined) return;
     if (Array.isArray(value)) { value.slice(0,3).forEach(item => walk(item, path + '[]', depth + 1)); return; }
@@ -158,7 +161,7 @@ function revenueDescribe_(records) {
     if (!path) return;
     if (!found[path]) found[path] = {path:path, type:typeof value, numeric:false, values:[]};
     if (typeof value === 'number' || (typeof value === 'string' && /^-?\d+(?:\.\d{1,2})?$/.test(value.trim()))) found[path].numeric = true;
-    if (/(type|status|state|currency|währung|waehrung)/i.test(path) && found[path].values.length < 20) {
+    if (enumPath.test(path) && found[path].values.length < 20) {
       const sample = String(value).slice(0,80);
       if (!found[path].values.includes(sample)) found[path].values.push(sample);
     }
@@ -184,15 +187,15 @@ function revenueSuggest_(companyFields, documentFields) {
   const documentCompanyId = pick(documentFields,['companyId','recipientCompanyId','customerId','recipient.id','company.id','recipientCompany.id','invoiceRecipient.id'],/(company|customer|recipient).*id$/i,false);
   const documentDate = pick(documentFields,['invoiceDate','documentDate','date','issuedDate','billingDate'],/(invoice|document|issued|billing).*date$/i,false);
   const netAmount = pick(documentFields,['totalNet','netTotal','netAmount','totalNetAmount','netTotalAmount','amountNet','sumNet','netSum','netValue','amountWithoutTax'],/(net|withoutTax).*(total|amount|sum|value)|(total|amount|sum|value).*net/i,true);
-  const typeFields = documentFields.filter(field => !field.path.includes('[]') && /(documentType|invoiceType|type)(\.|$)/i.test(field.path));
-  const typed = typeFields.find(field => field.values.some(value => /(invoice|rechnung|credit|gutschrift|storno)/i.test(value)));
-  const documentType = typed || pick(documentFields,['documentType.name','type.name','documentType','type','documentType.code','type.code'],/(documentType|invoiceType)(\.name|\.code)?$/i,false);
-  const documentStatus = pick(documentFields,['status.name','documentStatus.name','status','documentStatus','state.name','state'],/(documentStatus|status|state)(\.name|\.code)?$/i,false);
+  // Nur Felder des Belegs selbst wählen: companyAddress.standardForDocumentType
+  // und project.status beschreiben andere Objekte und können zufällig passen.
+  const documentType = pick(documentFields,['documentType','documentType.name','documentType.code','type','type.name','type.code','invoiceType','invoiceType.name','invoiceType.code','documentStatusEntity.documentType','documentTemplateEntity.documentType'],/^(documentType|type|invoiceType)(\.(name|code))?$/i,false);
+  const documentStatus = pick(documentFields,['documentStatusEntity.documentStatusType','documentStatus.name','documentStatus.code','documentStatus','status.name','status.code','status','state.name','state.code','state','documentStatusEntity.name'],/^(documentStatus|status|state)(\.(name|code))?$|^documentStatusEntity\.(documentStatusType|name)$/i,false);
   const currencyPath = pick(documentFields,['currency.code','currency','currencyCode'],/(currency|waehrung|währung)(\.code)?$/i,false);
   const customerType = companyFields.find(field => /(companyTypes|customerType|companyType).*\.(name|code)$/i.test(field.path) && field.values.some(value => /^(kunde|customer)$/i.test(value)));
   const invoiceValues = documentType ? documentType.values.filter(value => /(invoice|rechnung)/i.test(value) && !/(credit|gutschrift|storno)/i.test(value)) : [];
   const creditValues = documentType ? documentType.values.filter(value => /(credit|gutschrift|storno)/i.test(value)) : [];
-  const statusValues = documentStatus ? documentStatus.values.filter(value => !/(draft|entwurf|cancel|storn|void|deleted|gelöscht|geloescht|rejected|abgelehnt|created|pending|inprogress)/i.test(value)) : [];
+  const statusValues = documentStatus ? documentStatus.values.filter(value => !/(draft|entwurf|cancel|storn|void|deleted|gelöscht|geloescht|rejected|declined|abgelehnt|created|pending|inprogress)/i.test(value)) : [];
   const mapping = {
     companyId:companyId ? companyId.path : '', companyName:companyName ? companyName.path : '',
     customerTypePath:customerType ? customerType.path : '', customerTypeValue:customerType ? customerType.values.find(value => /^(kunde|customer)$/i.test(value)) : '',
