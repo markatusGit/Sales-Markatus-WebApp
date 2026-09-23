@@ -78,6 +78,25 @@ test('Field probe returns paths and type/status hints, no names or amounts',()=>
   const e=environment(companies,documents);const shape=e.context.inspectRevenueFields();
   assert.ok(shape.companyFields.some(field=>field.path==='companyTypes[].name'));
   assert.ok(shape.documentFields.some(field=>field.path==='type'&&field.values.includes('CreditNote')));
+  assert.equal(shape.ready,true);assert.equal(shape.suggestion.netAmount,'netAmount');
+  assert.equal(shape.suggestion.customerTypeValue,'Kunde');
+  assert.match(shape.suggestion.invoiceTypes,/Invoice/);assert.match(shape.suggestion.creditTypes,/CreditNote/);
   assert.ok(!JSON.stringify(shape).includes('Kunde A'));
+});
+test('Auto setup refuses a unit price or numeric document type guess',()=>{
+  const priceOnly=documents.map(({netAmount,...rest})=>({...rest,netPrice:10}));
+  const e=environment(companies,priceOnly);const shape=e.context.inspectRevenueFields();
+  assert.equal(shape.ready,false);assert.equal(shape.suggestion.netAmount,'');
+  const numbered=documents.map(doc=>({...doc,type:1}));
+  const n=environment(companies,numbered);const numeric=n.context.inspectRevenueFields();
+  assert.equal(numeric.ready,false);assert.ok(numeric.issues.some(issue=>/Rechnungsart|numerische Codes/.test(issue)));
+});
+test('Auto setup recognizes nested labels and a numeric net-amount string',()=>{
+  const nested=documents.map(doc=>({id:doc.id,companyId:doc.companyId,invoiceDate:doc.documentDate,totals:{netAmount:String(doc.netAmount)},documentType:{name:doc.type},documentStatus:{name:doc.status},currency:{code:doc.currency}}));
+  const e=environment(companies,nested);const shape=e.context.inspectRevenueFields();
+  assert.equal(shape.ready,true);assert.equal(shape.suggestion.netAmount,'totals.netAmount');
+  assert.equal(shape.suggestion.documentType,'documentType.name');assert.equal(shape.suggestion.documentStatus,'documentStatus.name');
+  const result=e.context.runRevenueTest({...cfg,...shape.suggestion});
+  assert.equal(result.totalCents,12000);
 });
 console.log(`${passed} revenue tests passed. No network requests were made.`);

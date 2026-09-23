@@ -97,8 +97,8 @@ Das sind fachliche Anforderungen und Vorschläge aus dem Konzept; nicht jeder Fi
 | Begrenztes HQ-Lesetestmodul | [hq-benchmark](../hq-benchmark/README.md) | Am 23.09.2026 gegen HQ ausgeführt; bisher nur derselbe kleine Firmenabruf, keine vollständigen App-Abläufe |
 | Erste echte HQ-v2-Messungen | Vier vom Nutzer bereitgestellte Messprotokolle vom 23.09.2026 zu `/v2/Companies?top=20` | 90 erfolgreiche HTTP-200-Antworten; nur kleine Stichprobe und wiederholte identische Abfrage |
 | Erweiterte Live-Testansicht für Kunden und Netto-Umsatz | [Revenue.gs](../hq-benchmark/Revenue.gs) und aktualisierte [Index.html](../hq-benchmark/Index.html) | Lokal implementiert und mit nachgebildeten HQ-Antworten geprüft; noch nicht in Google bereitgestellt oder mit echten Belegfeldern abgeglichen |
-| Lokale Prüfungen des Testmoduls | Elf Tests mit nachgebildeten Google-Diensten bestanden; Syntax und Manifest geprüft | Keine gemessenen HQ-Antwortzeiten |
-| Verständliche Einrichtungshilfe | [START-HIER.md](START-HIER.md) | Tatsächliche Google-/HQ-Einrichtung steht aus |
+| Lokale Prüfungen des Testmoduls | Elf Benchmark- und acht Umsatztests mit nachgebildeten Google-Diensten bestanden; Syntax und Manifest geprüft | Neue Umsatzansicht noch nicht real gegen HQ geprüft |
+| Verständliche Einrichtungshilfe | [START-HIER.md](START-HIER.md) | Erster HQ-Test eingerichtet; neue automatische Umsatzansicht muss noch als Version bereitgestellt werden |
 
 ## 6. Offene Entscheidungen und benötigte Angaben
 
@@ -145,3 +145,9 @@ Einordnung: Für diesen kleinen, wiederholt identischen Leseabruf wirkt die Verb
 ### 23.09.2026 – Einmaliger GitHub-Abgleich abgeschlossen
 
 Der Nutzer hat ausdrücklich darum gebeten, den aktuellen Projektstand auf das bereits eingerichtete GitHub-Repository hochzuladen. Dies ist ein einmaliger Auftrag; daraus folgt noch keine automatische Veröffentlichung aller künftigen Änderungen. Vor dem Hochladen wurden die Projektdateien auf Zugangsdaten geprüft, die lokalen Tests bestanden und eine `.gitignore` für lokale Geheimnisse und Messprotokolle ergänzt. Der Projektstand wurde mit Commit `af4e404` nach `origin/main` gepusht; dieser Tagebucheintrag wird in einem anschließenden kleinen Dokumentations-Commit ergänzt.
+
+### 23.09.2026 – Umsatztest vereinfacht: automatische Feldvorschläge
+
+**Nutzerkorrektur:** Der Nutzer kann und soll die technischen HQ-Feldnamen für Firmen, Belege und Netto-Beträge nicht selbst bestimmen müssen. Gewünscht ist eine erste funktionsfähige Annahme, die wir anhand der echten HQ-Antworten nachbessern. Der Nutzer bietet nötigenfalls Nachforschungen in HQ an, möchte aber zunächst eine von uns vorbereitete Version.
+
+**Umgesetzt:** Die Testoberfläche liest eine kleine Firmen- und Belegprobe, schlägt Feldpfade und Belegart-/Statuswerte vor und füllt das technische Formular selbst. Sichtbar bleiben im Normalfall Zeitraum und Startbutton; technische Details sind einklappbar. Bei unklaren Kernfeldern oder rein numerischen Belegartcodes wird kein scheinbar sicherer Umsatz berechnet. Stattdessen ist eine Diagnose mit Feldnamen, Datentypen und möglichen Typ-/Statuswerten herunterladbar, ohne Kundennamen, Beträge oder Token. Einzelpreise/Positionsfelder werden nicht als Netto-Gesamtbetrag vorgeschlagen. Acht lokale Umsatztests bestanden. Die automatische Zuordnung ist eine vorläufige Annahme; sie muss mit mindestens einer echten Rechnung und Gutschrift abgeglichen werden. Google-Bereitstellung und realer Zwei-PC-Test stehen aus.

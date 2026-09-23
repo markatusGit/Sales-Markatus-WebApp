@@ -39,16 +39,16 @@
     <div class="actions"><a id="download" class="download" download="hq-messung.json">Messprotokoll herunterladen</a></div>
   </section>
   <section class="panel" id="revenue-panel">
-    <h2>Kunden und Netto-Umsatz live laden</h2>
+    <h2>Kunden und vorläufigen Netto-Umsatz live laden</h2>
     <p>Dieser Ablauf liest alle Firmenseiten und Belegseiten frisch aus HQ, ordnet Rechnungen und Gutschriften zu und misst die Zeit bis zur fertigen Liste. Die Filter unter der fertigen Liste arbeiten anschließend im Browser.</p>
-    <p class="muted">Die Belegfelder unterscheiden sich je nach HQ-Prozess. Bitte zuerst die Felder prüfen und die Zuordnung anhand eines bekannten Kunden und Belegs bestätigen. Vorher werden keine Beträge berechnet.</p>
-    <div class="actions"><button id="inspectRevenue" type="button">HQ-Felder prüfen</button></div>
+    <p class="muted">Du musst keine technischen Feldnamen eingeben. Die Seite macht einen Vorschlag aus den Daten deines HQ. Die Umsatzwerte sind zunächst eine Testauswertung und sollten später mit einer bekannten Rechnung und Gutschrift abgeglichen werden.</p>
+    <div class="actions"><button id="inspectRevenue" type="button" class="primary">Felder automatisch einrichten</button><a id="revenueDiagnostic" class="download" hidden>Diagnose ohne Kundendaten herunterladen</a></div>
     <p id="revenueProbeStatus" role="status" class="status" hidden></p>
     <div id="revenueMapping" hidden>
-      <details><summary>Erkannte HQ-Felder ansehen</summary><div class="table-wrap"><table class="compact"><thead><tr><th>Bereich</th><th>Feld</th><th>Typ / mögliche Statuswerte</th></tr></thead><tbody id="revenueFields"></tbody></table></div></details>
       <form id="revenueForm">
         <h3 class="subhead">Zeitraum</h3>
         <div class="field-grid"><label>Von<input id="revFrom" type="date" required></label><label>Bis (einschließlich)<input id="revTo" type="date" required></label></div>
+        <details id="revenueAdvanced"><summary>Automatisch erkannte technische Zuordnung ansehen</summary>
         <h3 class="subhead">Firmen zuordnen</h3>
         <div class="field-grid">
           <label>Firmen-ID<input id="revCompanyId" list="companyFieldList" required></label>
@@ -70,7 +70,9 @@
           <label>Währungsfeld (empfohlen)<input id="revCurrencyPath" list="documentFieldList" placeholder="Bei leerem Feld EUR nicht geprüft"></label>
         </div>
         <datalist id="companyFieldList"></datalist><datalist id="documentFieldList"></datalist>
-        <p class="muted">Rechnungen zählen mit ihrem Vorzeichen, Gutschriften und eigene Stornobelege negativ. Entwürfe, stornierte Originalbelege und Angebote zählen nur dann, wenn ihre Werte versehentlich als gültig eingetragen werden. Die Beträge sind eine Testauswertung und müssen mit HQ abgeglichen werden.</p>
+        <p class="muted">Rechnungen zählen mit ihrem Vorzeichen, Gutschriften und eigene Stornobelege negativ. Entwürfe, stornierte Originalbelege und Angebote zählen nur dann, wenn ihre Werte versehentlich als gültig eingetragen werden.</p>
+        <div class="table-wrap"><table class="compact"><thead><tr><th>Bereich</th><th>Erkanntes Feld</th><th>Typ / mögliche Werte</th></tr></thead><tbody id="revenueFields"></tbody></table></div>
+        </details>
         <div class="actions"><button id="runRevenue" type="submit" class="primary">Live-Liste laden</button></div>
       </form>
     </div>
@@ -124,21 +126,23 @@
   const $=id=>document.getElementById(id);
   const hasServer=Boolean(window.google&&google.script&&google.script.run);
   const mapIds={companyId:'revCompanyId',companyName:'revCompanyName',customerTypePath:'revCustomerTypePath',customerTypeValue:'revCustomerTypeValue',documentId:'revDocumentId',documentCompanyId:'revDocumentCompanyId',documentDate:'revDocumentDate',netAmount:'revNetAmount',documentType:'revDocumentType',invoiceTypes:'revInvoiceTypes',creditTypes:'revCreditTypes',documentStatus:'revDocumentStatus',includedStatuses:'revIncludedStatuses',currencyPath:'revCurrencyPath'};
-  let rows=[],report=null,timer=null,downloadUrl=null;
+  let rows=[],report=null,timer=null,downloadUrl=null,diagnosticUrl=null;
   const today=new Date(),day=today.toISOString().slice(0,10);
   $('revFrom').value=today.getFullYear()+'-01-01';$('revTo').value=day;
   if(!hasServer){$('inspectRevenue').disabled=true;return;}
-  const preferred={companyId:['id'],companyName:['name'],customerTypePath:['companyTypes[].name','companyTypes[].id'],documentId:['id'],documentCompanyId:['companyId','company.id','recipientCompanyId','customerId'],documentDate:['invoiceDate','documentDate','date'],netAmount:['netAmount','netTotal','totalNet','netPrice'],documentType:['documentType.name','documentType','type.name','type'],documentStatus:['status.name','status','documentStatus.name','documentStatus'],currencyPath:['currency','currency.code']};
-  function suggest(key,fields){const candidates=preferred[key]||[];return candidates.find(name=>fields.some(field=>field.path.toLowerCase()===name.toLowerCase()))||'';}
   function addList(id,fields){$(id).replaceChildren();fields.forEach(field=>{const option=document.createElement('option');option.value=field.path;$(id).append(option);});}
   $('inspectRevenue').onclick=()=>{
     $('inspectRevenue').disabled=true;$('revenueProbeStatus').hidden=false;$('revenueProbeStatus').textContent='Lese je eine kleine Firmen- und Belegseite …';
     google.script.run.withSuccessHandler(data=>{
       $('inspectRevenue').disabled=false;$('revenueMapping').hidden=false;
-      $('revenueProbeStatus').textContent='Felder erkannt: '+data.companyRecords+' Firmen und '+data.documentRecords+' Belege geprüft. Firmen '+data.timings.companiesMs+' ms, Belege '+data.timings.documentsMs+' ms.';
+      $('revenueProbeStatus').textContent=(data.ready?'Technische Felder automatisch ausgefüllt. Wähle jetzt nur noch den Zeitraum und starte die Live-Liste.':'Einige HQ-Felder konnte ich nicht eindeutig erkennen. Bitte lade die Diagnose herunter und schicke sie mir; du musst keine Werte erraten.')+(data.issues.length?' Hinweise: '+data.issues.join(' '):'');
       addList('companyFieldList',data.companyFields);addList('documentFieldList',data.documentFields);
       $('revenueFields').replaceChildren();[['Firma',data.companyFields],['Beleg',data.documentFields]].forEach(([area,fields])=>fields.forEach(field=>{const tr=document.createElement('tr');[area,field.path,field.type+(field.values.length?' · '+field.values.join(', '):'')].forEach(value=>{const td=document.createElement('td');td.textContent=value;tr.append(td);});$('revenueFields').append(tr);}));
-      Object.entries(mapIds).forEach(([key,id])=>{const fields=key.startsWith('company')||key==='customerTypePath'?data.companyFields:data.documentFields;if(!$(''+id).value && preferred[key]) $(id).value=suggest(key,fields);});
+      Object.entries(mapIds).forEach(([key,id])=>$(id).value=data.suggestion[key]||'');
+      $('runRevenue').disabled=!data.ready;
+      if(diagnosticUrl)URL.revokeObjectURL(diagnosticUrl);
+      diagnosticUrl=URL.createObjectURL(new Blob([JSON.stringify({createdAt:new Date().toISOString(),companyFields:data.companyFields,documentFields:data.documentFields,suggestion:data.suggestion,issues:data.issues,ready:data.ready,timings:data.timings},null,2)],{type:'application/json'}));
+      $('revenueDiagnostic').href=diagnosticUrl;$('revenueDiagnostic').download='hq-feld-diagnose-'+Date.now()+'.json';$('revenueDiagnostic').hidden=false;
     }).withFailureHandler(error=>{$('inspectRevenue').disabled=false;$('revenueProbeStatus').textContent='Feldprüfung fehlgeschlagen: '+String(error.message||error);}).inspectRevenueFields();
   };
   const money=cents=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(cents/100);
@@ -167,7 +171,7 @@
       showRows();
       const browserMs=Date.now()-start;
       $('revDuration').textContent=(browserMs/1000).toFixed(1)+' s';
-      $('revenueSummary').textContent='Zeitraum '+data.from+' bis '+data.to+' · Netto-Umsatz '+money(data.totalCents)+' · '+data.counts.matchedDocuments+' zählende Belege · '+data.counts.loadedDocuments+' Belege geladen · '+data.counts.loadedCompanies+' Firmen geladen. Server '+(data.durationMs/1000).toFixed(1)+' s, Browser gesamt '+(browserMs/1000).toFixed(1)+' s. '+(input.customerTypePath?'Kundentyp gefiltert.':'Kein Kundentyp gefiltert: auch andere Firmen möglich.')+(input.currencyPath?' Währung EUR geprüft.':' Währung nicht geprüft.');
+      $('revenueSummary').textContent='Zeitraum '+data.from+' bis '+data.to+' · vorläufiger Netto-Umsatz '+money(data.totalCents)+' · '+data.counts.matchedDocuments+' zählende Belege · '+data.counts.skippedType+' andere Belegarten · '+data.counts.skippedStatus+' andere Statuswerte · '+data.counts.loadedDocuments+' Belege geladen · '+data.counts.loadedCompanies+' Firmen geladen. Server '+(data.durationMs/1000).toFixed(1)+' s, Browser gesamt '+(browserMs/1000).toFixed(1)+' s. '+(input.customerTypePath?'Kundentyp gefiltert.':'Kein Kundentyp gefiltert: auch andere Firmen möglich.')+(input.currencyPath?' Währung EUR geprüft.':' Währung nicht geprüft.')+(data.counts.matchedDocuments===0?' Kein Beleg gezählt: bitte die Diagnose und den Zeitraum prüfen.':'');
       const timing={startedAt:data.startedAt,from:data.from,to:data.to,mapping:input,durationMs:data.durationMs,browserMs:browserMs,counts:data.counts,metrics:data.metrics,note:data.note};
       if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(new Blob([JSON.stringify(timing,null,2)],{type:'application/json'}));$('revenueDownload').href=downloadUrl;
       $('revenueDownload').download='hq-umsatz-messung-'+Date.now()+'.json';

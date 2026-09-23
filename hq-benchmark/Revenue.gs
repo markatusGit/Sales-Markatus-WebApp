@@ -10,11 +10,17 @@ function inspectRevenueFields() {
   requireBenchUser_();
   const token = revenueToken_();
   const start = Date.now();
-  const company = revenueFetch_('/v2/Companies?top=5', token);
-  const document = revenueFetch_('/v2/Documents?top=30', token);
+  const company = revenueFetch_('/v2/Companies?top=20', token);
+  const document = revenueFetch_('/v2/Documents?top=100', token);
+  const companyFields = revenueDescribe_(company.records);
+  const documentFields = revenueDescribe_(document.records);
+  const suggestion = revenueSuggest_(companyFields, documentFields);
   return {
-    companyFields: revenueDescribe_(company.records),
-    documentFields: revenueDescribe_(document.records),
+    companyFields: companyFields,
+    documentFields: documentFields,
+    suggestion: suggestion.mapping,
+    issues: suggestion.issues,
+    ready: suggestion.ready,
     companyRecords: company.records.length,
     documentRecords: document.records.length,
     timings: {companiesMs: company.ms, documentsMs: document.ms, totalMs: Date.now() - start}
@@ -149,14 +155,70 @@ function revenueDescribe_(records) {
     if (Array.isArray(value)) { value.slice(0,3).forEach(item => walk(item, path + '[]', depth + 1)); return; }
     if (typeof value === 'object') { Object.keys(value).slice(0,60).forEach(key => walk(value[key], path ? path + '.' + key : key, depth + 1)); return; }
     if (!path) return;
-    if (!found[path]) found[path] = {path:path, type:typeof value, values:[]};
-    if (/(type|status|state|currency|währung|waehrung)/i.test(path) && found[path].values.length < 8) {
+    if (!found[path]) found[path] = {path:path, type:typeof value, numeric:false, values:[]};
+    if (typeof value === 'number' || (typeof value === 'string' && /^-?\d+(?:\.\d{1,2})?$/.test(value.trim()))) found[path].numeric = true;
+    if (/(type|status|state|currency|währung|waehrung)/i.test(path) && found[path].values.length < 20) {
       const sample = String(value).slice(0,80);
       if (!found[path].values.includes(sample)) found[path].values.push(sample);
     }
   }
-  records.slice(0,30).forEach(record => walk(record,'',0));
+  records.slice(0,100).forEach(record => walk(record,'',0));
   return Object.keys(found).sort().map(path => found[path]);
+}
+
+function revenueSuggest_(companyFields, documentFields) {
+  const issues = [];
+  let ready = true;
+  function pick(fields, names, pattern, numeric) {
+    const usable = fields.filter(field => !field.path.includes('[]') && (!numeric || field.numeric));
+    for (const name of names) {
+      const field = usable.find(item => item.path.toLowerCase() === name.toLowerCase());
+      if (field) return field;
+    }
+    return pattern ? usable.find(item => pattern.test(item.path)) || null : null;
+  }
+  const companyId = pick(companyFields,['id','companyId'],/(^|\.)companyId$/i,false);
+  const companyName = pick(companyFields,['name','companyName'],/(^|\.)(companyName|name)$/i,false);
+  const documentId = pick(documentFields,['id','documentId'],/(^|\.)documentId$/i,false);
+  const documentCompanyId = pick(documentFields,['companyId','recipientCompanyId','customerId','recipient.id','company.id','recipientCompany.id','invoiceRecipient.id'],/(company|customer|recipient).*id$/i,false);
+  const documentDate = pick(documentFields,['invoiceDate','documentDate','date','issuedDate','billingDate'],/(invoice|document|issued|billing).*date$/i,false);
+  const netAmount = pick(documentFields,['totalNet','netTotal','netAmount','totalNetAmount','netTotalAmount','amountNet','sumNet','netSum','netValue','amountWithoutTax'],/(net|withoutTax).*(total|amount|sum|value)|(total|amount|sum|value).*net/i,true);
+  const typeFields = documentFields.filter(field => !field.path.includes('[]') && /(documentType|invoiceType|type)(\.|$)/i.test(field.path));
+  const typed = typeFields.find(field => field.values.some(value => /(invoice|rechnung|credit|gutschrift|storno)/i.test(value)));
+  const documentType = typed || pick(documentFields,['documentType.name','type.name','documentType','type','documentType.code','type.code'],/(documentType|invoiceType)(\.name|\.code)?$/i,false);
+  const documentStatus = pick(documentFields,['status.name','documentStatus.name','status','documentStatus','state.name','state'],/(documentStatus|status|state)(\.name|\.code)?$/i,false);
+  const currencyPath = pick(documentFields,['currency.code','currency','currencyCode'],/(currency|waehrung|währung)(\.code)?$/i,false);
+  const customerType = companyFields.find(field => /(companyTypes|customerType|companyType).*\.(name|code)$/i.test(field.path) && field.values.some(value => /^(kunde|customer)$/i.test(value)));
+  const invoiceValues = documentType ? documentType.values.filter(value => /(invoice|rechnung)/i.test(value) && !/(credit|gutschrift|storno)/i.test(value)) : [];
+  const creditValues = documentType ? documentType.values.filter(value => /(credit|gutschrift|storno)/i.test(value)) : [];
+  const statusValues = documentStatus ? documentStatus.values.filter(value => !/(draft|entwurf|cancel|storn|void|deleted|gelöscht|geloescht|rejected|abgelehnt|created|pending|inprogress)/i.test(value)) : [];
+  const mapping = {
+    companyId:companyId ? companyId.path : '', companyName:companyName ? companyName.path : '',
+    customerTypePath:customerType ? customerType.path : '', customerTypeValue:customerType ? customerType.values.find(value => /^(kunde|customer)$/i.test(value)) : '',
+    documentId:documentId ? documentId.path : '', documentCompanyId:documentCompanyId ? documentCompanyId.path : '',
+    documentDate:documentDate ? documentDate.path : '', netAmount:netAmount ? netAmount.path : '',
+    documentType:documentType ? documentType.path : '',
+    invoiceTypes:revenueUnique_(invoiceValues.concat(['Invoice','Rechnung','Ausgangsrechnung'])).slice(0,20).join(','),
+    creditTypes:revenueUnique_(creditValues.concat(['CreditNote','Credit Note','Gutschrift','Storno','Stornorechnung'])).slice(0,20).join(','),
+    documentStatus:documentStatus ? documentStatus.path : '',
+    includedStatuses:revenueUnique_(statusValues.concat(['Sent','Paid','Final','Approved','Booked','Issued','Versendet','Bezahlt','Gebucht','Abgeschlossen','Offen'])).slice(0,20).join(','),
+    currencyPath:currencyPath ? currencyPath.path : ''
+  };
+  for (const [key,label] of [['companyId','Firmen-ID'],['companyName','Firmenname'],['documentId','Beleg-ID'],['documentCompanyId','Firmenbezug im Beleg'],['documentDate','Belegdatum'],['netAmount','Netto-Gesamtbetrag'],['documentType','Belegart'],['documentStatus','Belegstatus']]) {
+    if (!mapping[key]) { issues.push(label + ' konnte nicht sicher als Feld erkannt werden.'); ready = false; }
+  }
+  if (documentType && !invoiceValues.length) { issues.push('In der Belegprobe wurde keine klar benannte Rechnungsart gefunden.'); ready = false; }
+  if (documentType && documentType.values.length && documentType.values.every(value => /^\d+$/.test(value))) { issues.push('Belegarten sind nur numerische Codes; ihre Bedeutung ist noch unbekannt.'); ready = false; }
+  if (netAmount && /(price|position|unit|gross|brutto|tax|steuer)/i.test(netAmount.path)) { issues.push('Der vorgeschlagene Betragswert könnte ein Einzelpreis oder Bruttobetrag sein.'); ready = false; }
+  if (documentStatus && documentStatus.values.length && documentStatus.values.every(value => /^\d+$/.test(value))) { issues.push('Belegstatus sind numerische Codes; Entwürfe/Stornos können noch nicht zuverlässig ausgeschlossen werden.'); ready = false; }
+  if (!mapping.customerTypePath) issues.push('Kundentyp nicht erkannt; die Liste enthält möglicherweise auch andere Firmen.');
+  if (!mapping.currencyPath) issues.push('Währungsfeld nicht erkannt; EUR kann nicht geprüft werden.');
+  return {mapping:mapping,issues:issues,ready:ready};
+}
+
+function revenueUnique_(values) {
+  const seen = {};
+  return values.filter(value => {const key=String(value).trim().toLowerCase();if (!key || seen[key]) return false;seen[key]=true;return true;});
 }
 
 function revenueValues_(object, path) {
@@ -212,6 +274,7 @@ function revenueConfig_(input) {
     customerTypePath:data.customerTypePath ? path('customerTypePath') : '',customerTypeValue:String(data.customerTypeValue || '').trim(),currencyPath:data.currencyPath ? path('currencyPath') : ''
   };
   if (config.customerTypePath && !config.customerTypeValue) throw new Error('Bitte den HQ-Wert für den Kundentyp eintragen.');
+  if (config.netAmount.includes('[]') || /(price|position|unit|gross|brutto|tax|steuer)/i.test(config.netAmount)) throw new Error('Bitte den Netto-Gesamtbetrag des ganzen Belegs wählen, keinen Positions- oder Einzelpreis.');
   if (config.invoiceTypes.some(value => config.creditTypes.some(other => revenueEqual_(value,other)))) throw new Error('Rechnungs- und Gutschriftarten dürfen sich nicht überschneiden.');
   return config;
 }
