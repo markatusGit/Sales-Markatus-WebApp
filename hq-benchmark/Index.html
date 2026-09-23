@@ -38,6 +38,14 @@
     <div class="table-wrap"><table><thead><tr><th>Batch</th><th>Requests</th><th>Dauer</th><th>HTTP-Status</th><th>Daten</th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="actions"><a id="download" class="download" download="hq-messung.json">Messprotokoll herunterladen</a></div>
   </section>
+  <section class="panel" id="firebase-panel">
+    <h2>Firebase-Vergleich: erst HQ-Abgleich, dann Vertriebsansicht</h2>
+    <p>Schritt 1 liest alle benötigten Firmen und Belege einmal aus HQ und schreibt einen vollständigen Datenstand nach Firebase. Das entspricht dem geplanten Nachtlauf. Schritt 2 öffnet die separate Vertriebsseite: Dort werden die Kunden direkt aus Firebase geladen und die Zeiten gemessen.</p>
+    <p class="muted">Vor dem ersten Abgleich müssen Firestore im gesperrten Modus, die Zugriffsregeln und das Firebase-Dienstkonto eingerichtet sein. Das Programm prüft vor dem HQ-Abruf, dass die Pilotdaten nicht öffentlich lesbar sind. Der Abgleich verändert keine Daten in HQ. Er lädt echte Kundennamen und Umsätze nach Firestore; Telefonnummern werden in diesem Pilot nicht übertragen.</p>
+    <div class="actions"><button id="syncFirebase" type="button" class="primary" disabled>1 · HQ nach Firebase synchronisieren</button><a id="openFirebase" class="download" target="_blank" rel="noopener noreferrer" hidden>2 · Firebase-Vertriebsansicht öffnen</a></div>
+    <p id="firebaseStatus" class="status" role="status">Firebase-Einrichtung wird geprüft …</p>
+    <div id="firebaseResult" hidden><div class="metrics"><div><span class="muted">HQ-Abgleich gesamt</span><strong id="firebaseDuration"></strong></div><div><span class="muted">Kunden</span><strong id="firebaseCustomers"></strong></div><div><span class="muted">Datenblöcke</span><strong id="firebaseChunks"></strong></div></div><p id="firebaseDetails" class="muted"></p></div>
+  </section>
   <section class="panel" id="revenue-panel">
     <h2>Vertriebsablauf testen: Kunden und Netto-Umsatz</h2>
     <p>„Vertriebsansicht frisch laden“ misst den ersten Aufruf oder einen neuen Zeitraum mit direkten HQ-Daten. Danach kannst du wie im Arbeitsalltag suchen, nach Umsatz filtern, sortieren und durch die Treffer blättern. Die Seite misst diese Bedienung getrennt vom HQ-Abruf. Für einen zweiten PC starte denselben Ablauf dort gleichzeitig.</p>
@@ -122,6 +130,40 @@
     }).withFailureHandler(fail).runBenchmark({runId:runId,caseId:$('scenario').value,count:count,parallel:parallel,rpm:rpm});
   };
   $('stop').onclick=()=>{if(!runId)return;$('stop').disabled=true;google.script.run.withSuccessHandler(data=>{$('progress').textContent=data.requested?'Stopp angefordert. Ein bereits laufender HTTP-Aufruf wird noch beendet.':'Der Lauf ist bereits beendet oder nicht mehr aktiv.';clearInterval(timer);}).withFailureHandler(error=>{$('progress').textContent='Stopp konnte nicht bestätigt werden: '+String(error.message||error);}).requestBenchmarkStop(runId);};
+})();
+</script>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  if(!(window.google&&google.script&&google.script.run)){$('firebaseStatus').textContent='Für den echten Firebase-Abgleich die bereitgestellte Apps-Script-Web-App öffnen.';return;}
+  google.script.run.withSuccessHandler(data=>{
+    if(data.projectId){$('openFirebase').href='https://'+data.projectId+'.web.app';$('openFirebase').hidden=false;}
+    const missing=[];
+    if(!data.projectId)missing.push('FIREBASE_PROJECT_ID');
+    if(!data.accountPresent)missing.push('FIREBASE_SERVICE_ACCOUNT_JSON');
+    if(!data.hqTokenPresent)missing.push('HQ_API_TOKEN');
+    $('syncFirebase').disabled=missing.length>0;
+    $('firebaseStatus').textContent=missing.length?'Einrichtung fehlt noch: '+missing.join(', ')+'.':'Konfiguration vorhanden. Nach Bereitstellung der Firestore-Regeln kannst du den HQ-Abgleich starten.';
+  }).withFailureHandler(error=>{$('firebaseStatus').textContent='Firebase-Einrichtung konnte nicht geprüft werden: '+String(error.message||error);}).getFirebasePilotSetup();
+  let timer=null;
+  $('syncFirebase').onclick=()=>{
+    $('syncFirebase').disabled=true;$('firebaseResult').hidden=true;
+    const began=Date.now();
+    timer=setInterval(()=>$('firebaseStatus').textContent='HQ-Abgleich läuft seit '+Math.round((Date.now()-began)/1000)+' Sekunden …',1000);
+    $('firebaseStatus').textContent='HQ-Abgleich gestartet …';
+    google.script.run.withSuccessHandler(data=>{
+      clearInterval(timer);$('syncFirebase').disabled=false;
+      $('firebaseDuration').textContent=(data.durationMs/1000).toFixed(1)+' s';
+      $('firebaseCustomers').textContent=String(data.counts.customers);
+      $('firebaseChunks').textContent=String(data.chunkCount);
+      $('firebaseDetails').textContent=data.counts.loadedCompanies+' Firmen und '+data.counts.loadedDocuments+' Belege aus HQ gelesen; '+data.counts.countedDocuments+' Belege gezählt.'+(data.incomplete?' ACHTUNG: einzelne HQ-Belege wurden ausgelassen; Umsatz vorläufig.':'')+(data.cleanupPending?' Ein alter Datenstand konnte noch nicht entfernt werden.':'');
+      $('firebaseResult').hidden=false;
+      $('firebaseStatus').textContent='HQ-Abgleich abgeschlossen. Öffne jetzt die Firebase-Vertriebsansicht und miss dort den frischen Listenaufruf.';
+    }).withFailureHandler(error=>{
+      clearInterval(timer);$('syncFirebase').disabled=false;
+      $('firebaseStatus').textContent='HQ-Abgleich fehlgeschlagen: '+String(error.message||error)+'. Der bisherige Firebase-Datenstand bleibt aktiv.';
+    }).syncFirebasePilot();
+  };
 })();
 </script>
 <script>

@@ -1,6 +1,17 @@
 /** HQ -> Firestore: manuell oder per Zeittrigger ausführen. Keine Kundendaten im Log. */
 const PILOT_SYNC = Object.freeze({maxChunkBytes: 180000, maxPages: 25, pageSize: 1000});
 
+function getFirebasePilotSetup() {
+  requireBenchUser_();
+  const props=PropertiesService.getScriptProperties();
+  const projectId=String(props.getProperty('FIREBASE_PROJECT_ID') || '').trim();
+  return {
+    projectId:/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)?projectId:'',
+    accountPresent:Boolean(props.getProperty('FIREBASE_SERVICE_ACCOUNT_JSON')),
+    hqTokenPresent:Boolean(props.getProperty('HQ_API_TOKEN'))
+  };
+}
+
 function syncFirebasePilot() {
   requireBenchUser_();
   return pilotSync_();
@@ -15,6 +26,7 @@ function pilotSync_() {
     if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId)) throw new Error('FIREBASE_PROJECT_ID fehlt oder ist ungültig.');
     const account = JSON.parse(props.getProperty('FIREBASE_SERVICE_ACCOUNT_JSON') || '{}');
     if (account.project_id !== projectId || !account.client_email || !account.private_key || account.type !== 'service_account') throw new Error('Firebase-Dienstkonto passt nicht zum Projekt.');
+    pilotAssertNoPublicReads_(projectId);
     const accessToken = pilotGoogleToken_(account);
     const hqToken = revenueToken_();
     const started = Date.now();
@@ -122,6 +134,13 @@ function pilotGoogleToken_(account) {
 }
 
 function pilotUrl_(projectId,path) {return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(projectId)+'/databases/(default)/documents/'+path;}
+function pilotAssertNoPublicReads_(projectId) {
+  for (const path of ['pilot/current','pilot_snapshots/security-probe/chunks/0000']) {
+    const response=UrlFetchApp.fetch(pilotUrl_(projectId,path),{method:'get',muteHttpExceptions:true,followRedirects:false});
+    const status=response.getResponseCode();
+    if (status!==401 && status!==403) throw new Error('Firestore-Sicherheitsprüfung fehlgeschlagen (HTTP '+status+'). Gesperrte Regeln bereitstellen und prüfen, bevor HQ-Daten synchronisiert werden.');
+  }
+}
 function pilotCall_(url,options) {
   const response=UrlFetchApp.fetch(url,Object.assign({muteHttpExceptions:true},options));
   const status=response.getResponseCode();

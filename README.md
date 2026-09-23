@@ -12,4 +12,4 @@ Pilotphase für eine Sales-App mit Google-Anmeldung und helloHQ-Anbindung. Der d
 
 Der erste interaktive Entwurf wird in der zugehörigen Codex-Unterhaltung angezeigt. Er nutzt erfundene Beispieldaten und demonstriert dunkle/helle Ansichten, Arbeitslisten, Kundenverknüpfungen, Kontaktdokumentation, Buchungserfassung und Redaktionsvorschau. Eingaben lösen keine externen Aktionen aus.
 
-Nächster technischer Schritt: Firebase-Projekt einrichten, den ersten HQ-Abgleich ausführen und die Firebase-Testseite an einem und zwei PCs messen. Die fachliche Umsatzberechnung muss mit bekannten HQ-Rechnungen und Gutschriften abgeglichen werden.
+Nächster technischer Schritt: Firebase-Projekt fertig einrichten, in der vorhandenen HQ-Testseite den ersten Firebase-Abgleich starten und anschließend die Firebase-Testseite an einem und zwei PCs messen. Die fachliche Umsatzberechnung muss mit bekannten HQ-Rechnungen und Gutschriften abgeglichen werden.

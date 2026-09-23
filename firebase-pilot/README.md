@@ -21,6 +21,12 @@ Konfiguration:
 
 Der Dienstkontoschlüssel gehört nur in Apps-Script-Skripteigenschaften. Nie in Chat, GitHub, Browser-Konfiguration oder Messprotokolle kopieren. Das Konto benötigt in Google Cloud die Rolle **Cloud Datastore User** für dieses Projekt.
 
+Die bestehende HQ-Testseite enthält nun einen **Firebase-Vergleich**: nach Bereitstellung der Firestore-Regeln startet ein Button den einmaligen HQ-Abgleich, zeigt Dauer und Zähler und führt danach zur Firebase-Vertriebsansicht. Derselbe private `pilotSync_`-Ablauf kann später nachts per Trigger laufen. In der Testseite selbst wird keine Dienstkontoinformation ausgegeben.
+
+Vor jedem Abgleich fragt das Script den aktiven Zeiger und einen Test-Datenblock **ohne Anmeldung** ab. Nur HTTP 401/403 gilt als gesperrt. Öffentlich lesbare, fehlende oder anders antwortende Pfade blockieren den HQ-Import. Zusätzlich die veröffentlichten Regeln in der Firebase-Konsole mit dem Regelsimulator prüfen; die automatische Probe ersetzt diese Prüfung nicht.
+
+**Sicherheitsgrenze:** Aktuell bekommt jeder freigeschaltete Nutzer die gesamte Pilotliste mit Namen und Tagesumsätzen. Es gibt noch keine Rechte je Vertriebler oder Kunde und keine Telefonnummern im Datenbestand. Vor einer Erweiterung auf Kontaktdaten müssen diese Rechte und die benötigten Felder festgelegt werden. Firestore-Regeln begrenzen Browserzugriffe; das Dienstkonto mit IAM-Rolle kann sie umgehen und muss deshalb besonders geschützt sein.
+
 Der HTML-Erstaufruf, die Firebase-Anmeldung und der Firestore-Abruf hängen von Netzwerk und Gerät ab. Die Seite misst „Bis zur Liste“ und „Firebase-Abruf“, kann aber vor dem echten Zwei-PC-Test keine Zielzeit garantieren. Ein Zeitraumwechsel ist nach dem Laden schnell, zeigt aber den zuletzt synchronisierten HQ-Stand.
 
 Lokale Prüfungen: `node firebase-pilot/test-pilot.cjs` und die bisherigen drei `hq-benchmark/test-*.cjs` einzeln mit `node` ausführen.

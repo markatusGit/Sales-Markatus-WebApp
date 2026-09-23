@@ -12,12 +12,13 @@ const path=require('node:path');
   console.log('PASS Zeiträume, Gutschriften und Umsatzfilter');
 
   const writes=[];
-  let failDocuments=false;
+  let failDocuments=false,publicRead=false;
   const context=vm.createContext({
     console,Date,JSON,Object,String,Number,Math,Boolean,Array,RegExp,encodeURIComponent,
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>({FIREBASE_PROJECT_ID:'pilot-project-1',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({type:'service_account',project_id:'pilot-project-1',client_email:'service@example.org',private_key:'private'})})[key]})},
     LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},
     Utilities:{getUuid:()=> '12345678-1234-1234-1234-123456789abc',newBlob:text=>({getBytes:()=>Buffer.from(text,'utf8')})},
+    UrlFetchApp:{fetch:()=>({getResponseCode:()=>publicRead?404:403})},
     requireBenchUser_:()=> 'owner@example.org'
   });
   const root=path.resolve(__dirname,'../hq-benchmark');
@@ -27,6 +28,11 @@ const path=require('node:path');
   context.pilotGoogleToken_=()=> 'firebase-token';
   context.pilotReadDocument_=()=>null;
   context.pilotWriteDocument_=(_project,key,value)=>{writes.push({key,value});};
+  const setup=context.getFirebasePilotSetup();
+  assert.equal(setup.projectId,'pilot-project-1');
+  assert.equal(setup.accountPresent,true);
+  assert.equal(JSON.stringify(setup).includes('private'),false);
+  console.log('PASS Testoberfläche erhält nur Konfigurationsstatus, keinen Dienstkontoschlüssel');
   context.revenueFetch_=(url)=>{
     if (url.includes('Companies')) return {records:[{id:1,name:'Alpha',companyTypes:[{name:'Kunde'}]},{id:2,name:'Lieferant',companyTypes:[{name:'Lieferant'}]}],total:2};
     if (failDocuments) throw new Error('HQ-Fehler');
@@ -54,4 +60,8 @@ const path=require('node:path');
   assert.throws(()=>context.pilotSync_(),/HQ-Fehler/);
   assert.equal(writes.length,0);
   console.log('PASS HQ-Fehler publiziert keinen Datenstand');
+  failDocuments=false;publicRead=true;
+  assert.throws(()=>context.pilotSync_(),/Sicherheitsprüfung fehlgeschlagen/);
+  assert.equal(writes.length,0);
+  console.log('PASS öffentlich lesbare Firestore-Pfade sperren den HQ-Abgleich');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, 'Index.html'), 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-assert.equal(scripts.length, 2);
+assert.equal(scripts.length, 3);
 
 class Element {
   constructor(id = '') { this.id = id; this.value = ''; this.children = []; this.listeners = {}; this.disabled = false; this.hidden = false; this.textContent = ''; }
@@ -37,7 +37,7 @@ const context = vm.createContext({
   URL: {createObjectURL: () => 'blob:test', revokeObjectURL: () => {}},
   Date, Intl, performance, setInterval: () => 1, clearInterval: () => {}
 });
-vm.runInContext(scripts[1][1], context);
+vm.runInContext(scripts[2][1], context);
 const el = getElementById;
 assert.equal(el('revDocumentType').value, 'documentType');
 assert.equal(el('revDocumentStatus').value, 'documentStatusEntity.documentStatusType');
@@ -65,3 +65,20 @@ el('revFrom').value = '2026-01-01';
 el('revenueForm').onsubmit({preventDefault() {}});
 assert.equal(serverCalls, 2);
 console.log('PASS Vertriebssicht: 100 Zeilen je Seite, lokale Filter ohne HQ, anonymes Protokoll und frischer Zeitraum-Abruf.');
+
+const firebaseElements = new Map();
+const firebaseGet = id => {if (!firebaseElements.has(id)) firebaseElements.set(id,new Element(id));return firebaseElements.get(id);};
+let syncCalls=0;
+const firebaseRun = {withSuccessHandler(handler) {return {withFailureHandler() {return {
+  getFirebasePilotSetup() {handler({projectId:'sales-markatus',accountPresent:true,hqTokenPresent:true});},
+  syncFirebasePilot() {syncCalls++;handler({durationMs:25100,chunkCount:3,counts:{customers:3025,loadedCompanies:3174,loadedDocuments:5779,countedDocuments:3486},incomplete:false,cleanupPending:false});}
+};}};}};
+const firebaseContext=vm.createContext({document:{getElementById:firebaseGet},window:{google:{script:{run:firebaseRun}}},google:{script:{run:firebaseRun}},Date,setInterval:()=>1,clearInterval:()=>{}});
+vm.runInContext(scripts[1][1],firebaseContext);
+assert.equal(firebaseGet('syncFirebase').disabled,false);
+firebaseGet('syncFirebase').onclick();
+assert.equal(syncCalls,1);
+assert.equal(firebaseGet('firebaseCustomers').textContent,'3025');
+assert.equal(firebaseGet('openFirebase').href,'https://sales-markatus.web.app');
+assert.match(firebaseGet('firebaseStatus').textContent,/abgeschlossen/);
+console.log('PASS Firebase-Test startet zuerst den HQ-Abgleich und zeigt danach den Datenbank-Link.');
