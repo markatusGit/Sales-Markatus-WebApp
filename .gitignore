@@ -1,0 +1,14 @@
+# Lokale Zugangsdaten und Testausgaben gehören nicht ins Repository.
+.env
+.env.*
+!.env.example
+secrets/
+credentials*.json
+hq-run_*.json
+hq-umsatz-messung-*.json
+
+# Lokale Werkzeuge und Betriebssystemdateien.
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

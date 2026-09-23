@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HQ-Geschwindigkeitstest</title>
+  <style>
+    :root{color-scheme:dark;--bg:#121416;--surface:#202328;--text:#f4f2ed;--muted:#b9bec5;--line:#3c424a;--yellow:#ffbf00}
+    :root[data-theme=light]{color-scheme:light;--bg:#f5f3ed;--surface:#fff;--text:#202224;--muted:#595e66;--line:#d6d2c8}
+    *{box-sizing:border-box}body{font:16px/1.5 Arial,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:26px}main{max-width:980px;margin:auto}header{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:30px}.brand{font:italic 30px Georgia,serif;color:var(--yellow)}html[data-theme=light] .brand{color:var(--text)}h1{font:normal 34px/1.2 Georgia,serif;margin:0 0 12px}h2{font-size:20px;margin:0 0 15px}p{margin:8px 0 15px}.muted,small{color:var(--muted)}.panel{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:24px;margin:20px 0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.wide{grid-column:1/-1}label{display:grid;gap:7px}button,input,select{font:inherit;color:inherit;min-width:0}input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:11px}button,.download{padding:11px 17px;background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer;color:inherit;text-decoration:none;display:inline-block}.primary{background:var(--yellow);border-color:var(--yellow);color:#171717;font-weight:bold}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.status{padding:14px 17px;border-left:4px solid var(--yellow);background:var(--surface)}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}.metrics strong{font-size:26px;font-weight:normal;display:block}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:normal}code{overflow-wrap:anywhere}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--yellow);outline-offset:3px}[hidden]{display:none!important}.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.subhead{margin:22px 0 10px}.compact td,.compact th{padding:6px 8px}.right{text-align:right}#revenueRows tr:hover{background:rgba(255,191,0,.08)}@media(max-width:650px){body{padding:16px}.grid,.metrics,.field-grid{grid-template-columns:1fr}.panel{padding:18px}h1{font-size:29px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="brand">das magazin. <span style="font:14px Arial,sans-serif">/ HQ-Test</span></div><button id="theme" type="button">Helle Ansicht</button></header>
+  <h1>Wie schnell antwortet HQ?</h1>
+  <p class="muted">Begrenzte Leseabfragen mit echten Messwerten. Keine Änderungen an HQ-Daten.</p>
+  <p id="setup" class="status" role="status">Verbindung zum Testmodul wird geprüft …</p>
+  <section class="panel">
+    <h2>Messung vorbereiten</h2>
+    <form id="form">
+      <div class="grid">
+        <label class="wide">Szenario<select id="scenario" name="scenario" required></select><small id="path"></small></label>
+        <label>Requests insgesamt<input id="count" type="number" min="1" max="60" step="1" value="10" required></label>
+        <label>Parallelität<select id="parallel"><option value="1">1 · einzeln</option><option value="3">3 gleichzeitig</option><option value="5">5 gleichzeitig</option><option value="10">10 gleichzeitig</option></select></label>
+        <label>Maximale angebotene Rate<select id="rpm"><option value="30">30 Requests / Minute</option><option value="60">60 Requests / Minute</option></select></label>
+      </div>
+      <p class="muted" style="margin-top:17px">Startempfehlung: 10 Requests einzeln. Paralleltests messen die Dauer eines ganzen Batches, keine individuellen Antwortzeiten jedes Requests.</p>
+      <div class="actions"><button id="start" type="submit" class="primary" disabled>Lesetest starten</button><button id="stop" type="button" disabled>Nach aktuellem Batch stoppen</button></div>
+    </form>
+  </section>
+  <p id="progress" role="status" aria-live="polite" hidden></p>
+  <section class="panel" id="results" hidden>
+    <h2>Ergebnis</h2><p id="result-title"></p><p id="result-note" class="muted"></p>
+    <div class="metrics"><div><span class="muted">Median</span><strong id="median"></strong></div><div><span class="muted">p95 · vorläufig</span><strong id="p95"></strong></div><div><span class="muted">Fehler / unbekannt</span><strong id="errors"></strong></div></div>
+    <p id="sample" class="status" style="margin-top:20px"></p>
+    <div class="table-wrap"><table><thead><tr><th>Batch</th><th>Requests</th><th>Dauer</th><th>HTTP-Status</th><th>Daten</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="actions"><a id="download" class="download" download="hq-messung.json">Messprotokoll herunterladen</a></div>
+  </section>
+  <section class="panel" id="revenue-panel">
+    <h2>Kunden und Netto-Umsatz live laden</h2>
+    <p>Dieser Ablauf liest alle Firmenseiten und Belegseiten frisch aus HQ, ordnet Rechnungen und Gutschriften zu und misst die Zeit bis zur fertigen Liste. Die Filter unter der fertigen Liste arbeiten anschließend im Browser.</p>
+    <p class="muted">Die Belegfelder unterscheiden sich je nach HQ-Prozess. Bitte zuerst die Felder prüfen und die Zuordnung anhand eines bekannten Kunden und Belegs bestätigen. Vorher werden keine Beträge berechnet.</p>
+    <div class="actions"><button id="inspectRevenue" type="button">HQ-Felder prüfen</button></div>
+    <p id="revenueProbeStatus" role="status" class="status" hidden></p>
+    <div id="revenueMapping" hidden>
+      <details><summary>Erkannte HQ-Felder ansehen</summary><div class="table-wrap"><table class="compact"><thead><tr><th>Bereich</th><th>Feld</th><th>Typ / mögliche Statuswerte</th></tr></thead><tbody id="revenueFields"></tbody></table></div></details>
+      <form id="revenueForm">
+        <h3 class="subhead">Zeitraum</h3>
+        <div class="field-grid"><label>Von<input id="revFrom" type="date" required></label><label>Bis (einschließlich)<input id="revTo" type="date" required></label></div>
+        <h3 class="subhead">Firmen zuordnen</h3>
+        <div class="field-grid">
+          <label>Firmen-ID<input id="revCompanyId" list="companyFieldList" required></label>
+          <label>Firmenname<input id="revCompanyName" list="companyFieldList" required></label>
+          <label>Kundentyp-Feld (optional)<input id="revCustomerTypePath" list="companyFieldList" placeholder="z. B. companyTypes[].name"></label>
+          <label>Wert für „Kunde“ (falls Typ-Feld gesetzt)<input id="revCustomerTypeValue" placeholder="z. B. Kunde"></label>
+        </div>
+        <h3 class="subhead">Rechnungen und Gutschriften zuordnen</h3>
+        <div class="field-grid">
+          <label>Beleg-ID<input id="revDocumentId" list="documentFieldList" required></label>
+          <label>Firmen-ID im Beleg<input id="revDocumentCompanyId" list="documentFieldList" required></label>
+          <label>Rechnungsdatum<input id="revDocumentDate" list="documentFieldList" required></label>
+          <label>Netto-Gesamtbetrag des Belegs<input id="revNetAmount" list="documentFieldList" required></label>
+          <label>Belegart-Feld<input id="revDocumentType" list="documentFieldList" required></label>
+          <label>Werte für Rechnungen (kommagetrennt)<input id="revInvoiceTypes" placeholder="z. B. Invoice" required></label>
+          <label>Werte für Gutschriften / Stornobelege (kommagetrennt)<input id="revCreditTypes" placeholder="z. B. CreditNote" required></label>
+          <label>Belegstatus-Feld<input id="revDocumentStatus" list="documentFieldList" required></label>
+          <label>Zählende Statuswerte (kommagetrennt)<input id="revIncludedStatuses" placeholder="Nur endgültige/gebuchte Statuswerte" required></label>
+          <label>Währungsfeld (empfohlen)<input id="revCurrencyPath" list="documentFieldList" placeholder="Bei leerem Feld EUR nicht geprüft"></label>
+        </div>
+        <datalist id="companyFieldList"></datalist><datalist id="documentFieldList"></datalist>
+        <p class="muted">Rechnungen zählen mit ihrem Vorzeichen, Gutschriften und eigene Stornobelege negativ. Entwürfe, stornierte Originalbelege und Angebote zählen nur dann, wenn ihre Werte versehentlich als gültig eingetragen werden. Die Beträge sind eine Testauswertung und müssen mit HQ abgeglichen werden.</p>
+        <div class="actions"><button id="runRevenue" type="submit" class="primary">Live-Liste laden</button></div>
+      </form>
+    </div>
+    <p id="revenueProgress" role="status" aria-live="polite" hidden></p>
+    <div id="revenueResult" hidden>
+      <div class="metrics"><div><span class="muted">Bis zur fertigen Liste</span><strong id="revDuration"></strong></div><div><span class="muted">HQ-Abfragen</span><strong id="revRequests"></strong></div><div><span class="muted">Kunden</span><strong id="revCustomers"></strong></div></div>
+      <p id="revenueSummary" class="status"></p>
+      <div class="field-grid"><label>Name suchen<input id="revSearch" type="search" placeholder="Kundenname"></label><label>Mindestumsatz netto in EUR<input id="revMin" type="number" step="0.01" placeholder="z. B. 1000"></label><label>Höchstumsatz netto in EUR<input id="revMax" type="number" step="0.01" placeholder="optional"></label><label>Sortierung<select id="revSort"><option value="revenueDesc">Umsatz absteigend</option><option value="revenueAsc">Umsatz aufsteigend</option><option value="name">Name</option></select></label></div>
+      <p id="revenueCount" class="muted"></p>
+      <div class="table-wrap"><table><thead><tr><th>Kunde / Firma</th><th class="right">Netto-Umsatz</th><th class="right">Belege</th></tr></thead><tbody id="revenueRows"></tbody></table></div>
+      <div class="actions"><a id="revenueDownload" class="download" download="hq-umsatz-messung.json">Messprotokoll ohne Kundennamen herunterladen</a></div>
+    </div>
+  </section>
+  <p class="muted">Gemessen wird der HTTP-Abruf über Apps Script einschließlich Netzwerk. Der Test ersetzt keinen späteren Browser- und Mehrbenutzertest der gesamten Sales-App. Zugangsschlüssel und Kundeninhalte erscheinen nicht im Bericht.</p>
+</main>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  let cases=[],runId=null,timer=null,downloadUrl=null;
+  const hasServer=Boolean(window.google&&google.script&&google.script.run);
+  function fail(error){clearInterval(timer);setBusy(false);$('progress').hidden=false;$('progress').textContent='Test nicht abgeschlossen: '+String(error.message||error);$('start').disabled=!cases.length;$('stop').disabled=true;runId=null;}
+  function setBusy(busy){['scenario','count','parallel','rpm','start'].forEach(id=>$(id).disabled=busy);$('stop').disabled=!busy;}
+  $('theme').onclick=()=>{const light=document.documentElement.dataset.theme!=='light';document.documentElement.dataset.theme=light?'light':'dark';$('theme').textContent=light?'Dunkle Ansicht':'Helle Ansicht';};
+  $('scenario').onchange=()=>{$('path').textContent=cases.find(c=>c.id===$('scenario').value)?.path||'';};
+  $('parallel').onchange=()=>{$('count').min=$('parallel').value;if(Number($('count').value)<Number($('parallel').value))$('count').value=$('parallel').value;};
+  if(!hasServer){$('setup').textContent='Lokale Vorschau: Dieses Modul muss als Google-Apps-Script-WebApp bereitgestellt werden, bevor echte Messungen möglich sind.';return;}
+  google.script.run.withSuccessHandler(data=>{
+    cases=data.cases;$('scenario').replaceChildren();cases.forEach(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=c.label;$('scenario').append(option);});$('scenario').onchange();
+    $('setup').textContent=data.configured?'Konfiguration vorhanden. Beginne mit einer kleinen Einzelabfrage.':'Konfiguration fehlt: '+(!data.tokenPresent?'HQ_API_TOKEN. ':'')+(!cases.length?'HQ_BENCH_CASES.':'');$('start').disabled=!data.configured;
+  }).withFailureHandler(error=>{$('setup').textContent=String(error.message||error);}).getBenchmarkSetup();
+  $('form').onsubmit=event=>{
+    event.preventDefault();if(!$('form').reportValidity()||runId)return;
+    runId='run_'+Date.now()+'_'+Math.random().toString(36).slice(2,10);setBusy(true);$('results').hidden=true;$('progress').hidden=false;
+    const began=Date.now();const count=Number($('count').value),parallel=Number($('parallel').value),rpm=Number($('rpm').value);
+    $('progress').textContent='Leseabfragen laufen …';timer=setInterval(()=>{$('progress').textContent='Messung läuft seit '+Math.round((Date.now()-began)/1000)+' Sekunden. HQ wird nur lesend abgefragt.';},1000);
+    google.script.run.withSuccessHandler(report=>{
+      clearInterval(timer);runId=null;setBusy(false);$('progress').textContent=report.stopReason||'Messlauf abgeschlossen.';
+      $('result-title').textContent=report.caseLabel+' · '+report.sent+' gestartete Requests · '+report.parallel+' parallel';
+      $('result-note').textContent=report.summary.metric+'. '+report.summary.measurementIncludes+'.';
+      const ms=n=>n===null?'–':Math.round(n)+' ms';$('median').textContent=ms(report.summary.medianMs);$('p95').textContent=ms(report.summary.p95Ms);$('errors').textContent=report.summary.knownHttpErrors+' / '+report.summary.unknownRequests;
+      $('sample').textContent=report.summary.measurements+' vergleichbare Messungen. Kleine Stichprobe: p95 dient nur zur Orientierung. Bei Parallelität > 1 sind dies Batch-Zeiten; ein kleiner Rest-Batch wird nicht mit den vollständigen Batches vermischt.';
+      $('rows').replaceChildren();report.batches.forEach(b=>{const row=document.createElement('tr');[b.index,b.requests,ms(b.elapsedMs),b.transportError?'Transportfehler':b.statuses.join(', '),(b.bytes/1024).toFixed(1)+' KiB'].forEach(value=>{const cell=document.createElement('td');cell.textContent=String(value);row.append(cell);});$('rows').append(row);});
+      if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));$('download').href=downloadUrl;$('download').download='hq-'+report.id+'.json';$('results').hidden=false;
+    }).withFailureHandler(fail).runBenchmark({runId:runId,caseId:$('scenario').value,count:count,parallel:parallel,rpm:rpm});
+  };
+  $('stop').onclick=()=>{if(!runId)return;$('stop').disabled=true;google.script.run.withSuccessHandler(data=>{$('progress').textContent=data.requested?'Stopp angefordert. Ein bereits laufender HTTP-Aufruf wird noch beendet.':'Der Lauf ist bereits beendet oder nicht mehr aktiv.';clearInterval(timer);}).withFailureHandler(error=>{$('progress').textContent='Stopp konnte nicht bestätigt werden: '+String(error.message||error);}).requestBenchmarkStop(runId);};
+})();
+</script>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  const hasServer=Boolean(window.google&&google.script&&google.script.run);
+  const mapIds={companyId:'revCompanyId',companyName:'revCompanyName',customerTypePath:'revCustomerTypePath',customerTypeValue:'revCustomerTypeValue',documentId:'revDocumentId',documentCompanyId:'revDocumentCompanyId',documentDate:'revDocumentDate',netAmount:'revNetAmount',documentType:'revDocumentType',invoiceTypes:'revInvoiceTypes',creditTypes:'revCreditTypes',documentStatus:'revDocumentStatus',includedStatuses:'revIncludedStatuses',currencyPath:'revCurrencyPath'};
+  let rows=[],report=null,timer=null,downloadUrl=null;
+  const today=new Date(),day=today.toISOString().slice(0,10);
+  $('revFrom').value=today.getFullYear()+'-01-01';$('revTo').value=day;
+  if(!hasServer){$('inspectRevenue').disabled=true;return;}
+  const preferred={companyId:['id'],companyName:['name'],customerTypePath:['companyTypes[].name','companyTypes[].id'],documentId:['id'],documentCompanyId:['companyId','company.id','recipientCompanyId','customerId'],documentDate:['invoiceDate','documentDate','date'],netAmount:['netAmount','netTotal','totalNet','netPrice'],documentType:['documentType.name','documentType','type.name','type'],documentStatus:['status.name','status','documentStatus.name','documentStatus'],currencyPath:['currency','currency.code']};
+  function suggest(key,fields){const candidates=preferred[key]||[];return candidates.find(name=>fields.some(field=>field.path.toLowerCase()===name.toLowerCase()))||'';}
+  function addList(id,fields){$(id).replaceChildren();fields.forEach(field=>{const option=document.createElement('option');option.value=field.path;$(id).append(option);});}
+  $('inspectRevenue').onclick=()=>{
+    $('inspectRevenue').disabled=true;$('revenueProbeStatus').hidden=false;$('revenueProbeStatus').textContent='Lese je eine kleine Firmen- und Belegseite …';
+    google.script.run.withSuccessHandler(data=>{
+      $('inspectRevenue').disabled=false;$('revenueMapping').hidden=false;
+      $('revenueProbeStatus').textContent='Felder erkannt: '+data.companyRecords+' Firmen und '+data.documentRecords+' Belege geprüft. Firmen '+data.timings.companiesMs+' ms, Belege '+data.timings.documentsMs+' ms.';
+      addList('companyFieldList',data.companyFields);addList('documentFieldList',data.documentFields);
+      $('revenueFields').replaceChildren();[['Firma',data.companyFields],['Beleg',data.documentFields]].forEach(([area,fields])=>fields.forEach(field=>{const tr=document.createElement('tr');[area,field.path,field.type+(field.values.length?' · '+field.values.join(', '):'')].forEach(value=>{const td=document.createElement('td');td.textContent=value;tr.append(td);});$('revenueFields').append(tr);}));
+      Object.entries(mapIds).forEach(([key,id])=>{const fields=key.startsWith('company')||key==='customerTypePath'?data.companyFields:data.documentFields;if(!$(''+id).value && preferred[key]) $(id).value=suggest(key,fields);});
+    }).withFailureHandler(error=>{$('inspectRevenue').disabled=false;$('revenueProbeStatus').textContent='Feldprüfung fehlgeschlagen: '+String(error.message||error);}).inspectRevenueFields();
+  };
+  const money=cents=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(cents/100);
+  function showRows(){
+    if(!report)return;
+    const search=$('revSearch').value.trim().toLocaleLowerCase('de');
+    const min=$('revMin').value===''?null:Number($('revMin').value)*100,max=$('revMax').value===''?null:Number($('revMax').value)*100;
+    const shown=rows.filter(item=>(!search||item.name.toLocaleLowerCase('de').includes(search))&&(min===null||item.revenueCents>=min)&&(max===null||item.revenueCents<=max));
+    if($('revSort').value==='name')shown.sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    else shown.sort((a,b)=>($('revSort').value==='revenueAsc'?a.revenueCents-b.revenueCents:b.revenueCents-a.revenueCents)||a.name.localeCompare(b.name,'de'));
+    $('revenueRows').replaceChildren();shown.forEach(item=>{const tr=document.createElement('tr');[item.name,money(item.revenueCents),item.documents].forEach((value,i)=>{const td=document.createElement('td');td.textContent=String(value);if(i)td.className='right';tr.append(td);});$('revenueRows').append(tr);});
+    $('revenueCount').textContent=shown.length+' von '+rows.length+' Kunden/Firmen angezeigt. Filter und Sortierung erfolgen ohne erneuten HQ-Abruf.';
+  }
+  ['revSearch','revMin','revMax','revSort'].forEach(id=>$(id).addEventListener('input',showRows));
+  $('revenueForm').onsubmit=event=>{
+    event.preventDefault();if(!$('revenueForm').reportValidity())return;
+    const input={from:$('revFrom').value,to:$('revTo').value};Object.entries(mapIds).forEach(([key,id])=>input[key]=$(id).value.trim());
+    if(input.customerTypePath&&!input.customerTypeValue){$('revenueProgress').hidden=false;$('revenueProgress').textContent='Bitte den Wert für den Kundentyp eintragen.';return;}
+    $('runRevenue').disabled=true;$('inspectRevenue').disabled=true;$('revenueResult').hidden=true;$('revenueProgress').hidden=false;
+    const start=Date.now();$('revenueProgress').textContent='HQ-Daten werden frisch geladen …';
+    timer=setInterval(()=>$('revenueProgress').textContent='Live-Laden läuft seit '+Math.round((Date.now()-start)/1000)+' Sekunden. Zwei PCs können diesen Ablauf gleichzeitig starten.',1000);
+    google.script.run.withSuccessHandler(data=>{
+      clearInterval(timer);$('runRevenue').disabled=false;$('inspectRevenue').disabled=false;report=data;rows=data.customers;
+      $('revenueProgress').textContent='Liste vollständig geladen.';$('revenueResult').hidden=false;
+      $('revRequests').textContent=data.metrics.requests;$('revCustomers').textContent=data.counts.customerCount;
+      showRows();
+      const browserMs=Date.now()-start;
+      $('revDuration').textContent=(browserMs/1000).toFixed(1)+' s';
+      $('revenueSummary').textContent='Zeitraum '+data.from+' bis '+data.to+' · Netto-Umsatz '+money(data.totalCents)+' · '+data.counts.matchedDocuments+' zählende Belege · '+data.counts.loadedDocuments+' Belege geladen · '+data.counts.loadedCompanies+' Firmen geladen. Server '+(data.durationMs/1000).toFixed(1)+' s, Browser gesamt '+(browserMs/1000).toFixed(1)+' s. '+(input.customerTypePath?'Kundentyp gefiltert.':'Kein Kundentyp gefiltert: auch andere Firmen möglich.')+(input.currencyPath?' Währung EUR geprüft.':' Währung nicht geprüft.');
+      const timing={startedAt:data.startedAt,from:data.from,to:data.to,mapping:input,durationMs:data.durationMs,browserMs:browserMs,counts:data.counts,metrics:data.metrics,note:data.note};
+      if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(new Blob([JSON.stringify(timing,null,2)],{type:'application/json'}));$('revenueDownload').href=downloadUrl;
+      $('revenueDownload').download='hq-umsatz-messung-'+Date.now()+'.json';
+    }).withFailureHandler(error=>{clearInterval(timer);$('runRevenue').disabled=false;$('inspectRevenue').disabled=false;$('revenueProgress').textContent='Live-Liste nicht abgeschlossen: '+String(error.message||error);}).runRevenueTest(input);
+  };
+})();
+</script>
+</body>
+</html>

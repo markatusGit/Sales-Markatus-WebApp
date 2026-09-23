@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": "Bereitgestellte Mediadaten 2026/27, Stand 04/2026, Seite 2",
+  "currency": "EUR",
+  "pricesAreNet": true,
+  "status": "Referenz zur manuellen Prüfung vor produktiver Übernahme",
+  "priceGroups": {"BA": ["Bamberger"], "CO_KC_LIF": ["Coburger", "Kronacher", "Lichtenfelser"]},
+  "products": [
+    {"id":"page_full","label":"1/1 Seite","pricesCents":{"BA":119000,"CO_KC_LIF":89000},"dimensionsMm":{"bleed":[240,320],"typeArea":[215,288]}},
+    {"id":"page_half_portrait","label":"1/2 Seite hoch","pricesCents":{"BA":79000,"CO_KC_LIF":59000},"dimensionsMm":{"bleed":[118,320],"typeArea":[105,288]}},
+    {"id":"page_half_landscape","label":"1/2 Seite quer","pricesCents":{"BA":79000,"CO_KC_LIF":59000},"dimensionsMm":{"bleed":[240,160],"typeArea":[215,142]}},
+    {"id":"page_third_portrait","label":"1/3 Seite hoch","pricesCents":{"BA":59000,"CO_KC_LIF":49000},"dimensionsMm":{"typeArea":[69,288]}},
+    {"id":"spread","label":"2/1 Seite","pricesCents":{"BA":179000,"CO_KC_LIF":129000},"dimensionsMm":{"bleed":[480,320],"typeArea":[454,288]}},
+    {"id":"advertorial_2","label":"Advertorial 2 Seiten","pricesCents":{"BA":199000,"CO_KC_LIF":179000}},
+    {"id":"advertorial_4","label":"Advertorial 4 Seiten","pricesCents":{"BA":299000,"CO_KC_LIF":279000}},
+    {"id":"native_1","label":"Native Advertising 1 Seite","pricesCents":{"BA":139000,"CO_KC_LIF":119000}},
+    {"id":"back_cover","label":"Rückseite","pricesCents":{"BA":189000,"CO_KC_LIF":145000},"placementWarning":true},
+    {"id":"u2_s3","label":"U2 mit S3","pricesCents":{"BA":189000,"CO_KC_LIF":145000},"placementWarning":true},
+    {"id":"u3","label":"U3","pricesCents":{"BA":139000,"CO_KC_LIF":109000},"placementWarning":true},
+    {"id":"insert_a4","label":"Beileger bis A4","pricesCents":{"BA":139000,"CO_KC_LIF":89000}}
+  ],
+  "additionalRightsReference": [
+    {"label":"Nutzungsrecht ein Foto","priceCents":10000},
+    {"label":"Nutzungsrechte alle Fotos","priceCents":50000},
+    {"label":"Text- und/oder Layoutnutzung für andere Zwecke","priceCents":20000}
+  ],
+  "discountReference": {
+    "description":"Ab 5/7/10 Schaltungen einer Werbung in einem Vertragsjahr laut Mediadaten",
+    "steps":[{"minimumPlacements":5,"percent":10},{"minimumPlacements":7,"percent":15},{"minimumPlacements":10,"percent":20}],
+    "automaticApplication":false
+  },
+  "crossMagazineAdvertorialReference": {
+    "description":"Grundpreis für eine Ausgabe plus jede zusätzlich gebuchte Seite in anderen Magazinen zu 600 EUR netto laut Mediadaten",
+    "additionalPageCents":60000,
+    "automaticApplication":false
+  },
+  "technicalReference":{"magazineSizeMm":[240,320],"typeAreaMm":[215,288],"bleedMm":3,"fileFormat":"PDF/X-3","colorProfile":"ISOCoated v2","colorMode":"CMYK","imageDpi":300},
+  "notes":["Preisversion und vereinbarten Preis je Buchung einfrieren.","Ausgaben, Erscheinungstermine und Anzeigenschlüsse separat manuell pflegen.","In der PDF sind Advertorials und Native Advertisings mit Online-Veröffentlichung, Social-Post und Verlinkung beschrieben. Konkreten Leistungsumfang je Buchung festhalten.","Rabatte, Zusatzrechte und Kombinationen dienen vorerst als Referenz; keine automatische Vertragsauslegung."]
+}

@@ -1,0 +1,7 @@
+[
+  {
+    "id": "companies_small",
+    "label": "Firmen – erste 20 Datensätze",
+    "path": "/v2/Companies?top=20"
+  }
+]
