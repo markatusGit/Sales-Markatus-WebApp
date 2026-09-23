@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isPilotUser() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/pilot_access/$(request.auth.uid));
+    }
+    match /pilot/current { allow get: if isPilotUser(); allow list, write: if false; }
+    match /pilot_snapshots/{snapshotId}/chunks/{chunkId} { allow get: if isPilotUser(); allow list, write: if false; }
+    match /pilot_access/{uid} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

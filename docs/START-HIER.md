@@ -159,8 +159,6 @@ Wiederholte Einzelabrufe und vorsichtige Parallelabrufe wurden am 23.09.2026 gem
 
 Das fortlaufende [Projekttagebuch und die Roadmap](PROJEKTTAGEBUCH-UND-ROADMAP.md) enthält den erreichten Stand, Entscheidungen, ausdrückliche Wünsche, Vorschläge und offene Fragen. Nach größeren Arbeitsschritten oder neuen Roadmap-Wünschen wird es aktualisiert. Es ist eine Arbeitszusammenfassung, kein vollständiges Wortprotokoll des Chats.
 
-Für eine neue Unterhaltung zum Projekt genügt der Hinweis: „Bitte zuerst START-HIER.md und PROJEKTTAGEBUCH-UND-ROADMAP.md lesen.“
-
 ## 8. Neue Live-Ansicht für Kunden und Netto-Umsatz
 
 Diese Erweiterung ist im lokalen Projekt vorbereitet. Sie muss noch in dein bereits eingerichtetes Google-Apps-Script-Testprojekt kopiert und dort als neue Version bereitgestellt werden. Der bisherige Geschwindigkeitstest bleibt auf derselben Seite.
@@ -179,3 +177,36 @@ Wenn eine zweite Person mit einem eigenen Google-Konto testen soll, muss ihre Ad
 **Nach der Meldung „Belegstatus fehlt“:** Ersetze im Apps-Script-Projekt `Revenue.gs` und `Index.html` durch die aktuellen Dateien aus diesem Projekt und stelle wie in Schritt 4 eine neue Version bereit. Die Seite soll nun trotz einzelner Belege ohne Status die Ladezeit anzeigen und die Umsatzwerte als unvollständig kennzeichnen. Lade anschließend **Diagnose ohne Kundendaten herunterladen** und **Messprotokoll ohne Kundennamen herunterladen** herunter und schicke beide Dateien zur Prüfung der HQ-Feldzuordnung. Bitte keinen Token oder vollständige Belege schicken.
 
 Die inzwischen ausgewertete HQ-Diagnose zeigte außerdem, dass die frühere Automatik Projektstatus und Adress-Belegart verwechselte. In der aktuellen Fassung steht unter **Automatisch erkannte technische Zuordnung ansehen** als Belegart `documentType` und als Belegstatus `documentStatusEntity.documentStatusType`. Falls andere Werte erscheinen, klicke **HQ-Felder erneut prüfen** und schicke die neue Diagnose zur Prüfung.
+
+## 9. Firebase-Pilot einrichten
+
+Der Pilotcode ist vorbereitet. Für die erste echte Messung braucht er noch ein Firebase-Projekt unter deinem Google-Konto. Wir können die Schritte zusammen durchführen; sende **keinen HQ-Token und keinen Dienstkontoschlüssel** im Chat.
+
+### A. Firebase-Projekt und Web-App
+
+1. Öffne die [Firebase-Konsole](https://console.firebase.google.com/) mit deinem beruflichen Google-Konto und lege ein neues Projekt an, z. B. **Magazinvertrieb-Pilot**. Google Analytics ist für diesen Test nicht nötig. Starte möglichst mit dem kostenlosen **Spark-Tarif**.
+2. Notiere die **Projekt-ID** aus **Projekteinstellungen → Allgemein**. Sie ist eine technische Kennung und darfst du mir nennen.
+3. Klicke in der Projektübersicht auf **Web-App hinzufügen** (`</>`) und registriere eine Web-App, z. B. **Vertriebstest**. Kopiere die vier Werte `apiKey`, `authDomain`, `projectId` und `appId` aus der angezeigten Web-Konfiguration in eine Kopie von [config.example.js](../firebase-pilot/public/config.example.js), die du `config.js` nennst. Der Browser-API-Key ist eine Projektkennung, **kein Dienstkontoschlüssel**. Die Datei wird nicht auf GitHub gespeichert.
+4. Öffne **Build → Firestore Database**, lege die Standard-Datenbank `(default)` an und wähle nach Möglichkeit **europe-west3 (Frankfurt)**. Wähle zu Beginn den gesperrten/Produktionsmodus; unsere Regeln werden danach gezielt veröffentlicht. Der Datenbankstandort lässt sich später nicht einfach umstellen.
+5. Öffne **Authentication → Sign-in method**, aktiviere **Google**. Unter **Settings → Authorized domains** muss nach der Bereitstellung auch `PROJEKT_ID.web.app` stehen; ergänze die Domain, falls sie fehlt.
+
+### B. Zugriff für den HQ-Abgleich
+
+1. Öffne für dasselbe Projekt die [Google-Cloud-Konsole für Dienstkonten](https://console.cloud.google.com/iam-admin/serviceaccounts). Lege ein neues Dienstkonto namens **hq-firestore-sync** an.
+2. Gib diesem Dienstkonto im Projekt die Rolle **Cloud Datastore User**. Es braucht weder Projektinhaber- noch Editor-Rechte.
+3. Öffne das Dienstkonto → **Schlüssel → Schlüssel hinzufügen → Neuen Schlüssel erstellen → JSON**. Die heruntergeladene JSON-Datei enthält einen privaten Schlüssel. Bewahre sie nur lokal sicher auf.
+4. Öffne dein bisheriges Apps-Script-Projekt **Magazinvertrieb – HQ-Test**. Füge den vollständigen Inhalt von [FirebaseSync.gs](../hq-benchmark/FirebaseSync.gs) als neue Scriptdatei mit Namen `FirebaseSync` ein. Ersetze auch [appsscript.json](../hq-benchmark/appsscript.json) mit der neuen Version.
+5. Unter **Projekteinstellungen → Skripteigenschaften** füge `FIREBASE_PROJECT_ID` mit der Projekt-ID hinzu. Füge `FIREBASE_SERVICE_ACCOUNT_JSON` mit dem **gesamten Inhalt** der heruntergeladenen JSON-Datei hinzu. Der vorhandene `HQ_API_TOKEN` bleibt wie bisher. Den privaten JSON-Inhalt nirgendwo sonst einfügen oder an uns schicken.
+6. Wähle im Apps-Script-Editor die Funktion `syncFirebasePilot` und klicke einmal **Ausführen**. Google kann erneut um Berechtigungen bitten. Im Ausführungsprotokoll soll **Abgeschlossen** stehen. Ein fehlgeschlagener Lauf schaltet keinen unvollständigen Datenstand frei.
+
+### C. Testseite und interne Nutzer
+
+1. Auf deinem PC muss die [Firebase CLI](https://firebase.google.com/docs/cli) verfügbar sein. Falls sie fehlt, können wir sie zusammen einrichten. Im Projektordner einmal `firebase login` ausführen.
+2. Danach im Projektordner `firebase deploy --project DEINE_PROJEKT_ID --only firestore:rules,hosting` ausführen. Dies veröffentlicht die vorbereiteten Leseregeln und die Testseite unter `https://DEINE_PROJEKT_ID.web.app`.
+3. Öffne die Testseite und klicke auf **Mit Google anmelden**. Zunächst erscheint erwartbar **Kein Zugriff**. Die Seite zeigt deine **Nutzer-ID (UID)** an; diese ID kannst du mir nennen.
+4. In der Firebase-Konsole unter **Firestore Database → Daten** die Sammlung `pilot_access` erstellen und darin ein Dokument mit **genau dieser UID als Dokument-ID** anlegen. Ein beliebiges harmloses Feld, z. B. `enabled = true`, genügt. Diese Sammlung kann die Testseite weder lesen noch ändern; nur Projekt-Administratoren pflegen sie. Für einen zweiten Vertriebler dessen UID genauso eintragen. Dieselbe Google-Anmeldung an zwei PCs verwendet dieselbe UID.
+5. Testseite auf beiden PCs frisch öffnen, denselben Zeitraum einstellen, jeweils **Frisch aus Firebase laden** klicken und das **Messprotokoll** herunterladen. Die Protokolle enthalten Zeiten und Zähler, keine Kundennamen oder Beträge. Wenn der Abgleich fachlich und technisch stimmt, im Apps-Script-Editor einmal `installFirebasePilotNightlySync` ausführen. Der tägliche Lauf ist ungefähr um 03:00 Uhr, nicht minutengenau.
+
+**Kosten und Grenze:** Für einen kleinen Test kann der Spark-Tarif reichen; Firestore bietet derzeit 1 GiB Speicher, 50.000 Lese- und 20.000 Schreibvorgänge pro Tag ohne Berechnung. Hosting und Anmeldung haben eigene Grenzen. Der Pilot liest pro neuem Seitenaufruf einen Zeiger und mehrere Datenblöcke; die tatsächliche Zahl zeigt er an. Diese Werte und die aktuelle Preisliste vor einer breiten Nutzung nochmals prüfen. Firebase beschleunigt den Vertriebsabruf nur, wenn der HQ-Abgleich zuvor erfolgreich lief und der Datenstand aktuell genug ist. [Firestore-Kontingente](https://firebase.google.com/docs/firestore/quotas) · [Firebase-Preise](https://firebase.google.com/pricing)
+
+Für eine neue Unterhaltung zum Projekt genügt der Hinweis: „Bitte zuerst START-HIER.md und PROJEKTTAGEBUCH-UND-ROADMAP.md lesen.“

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Firebase-Vertriebstest</title><link rel="stylesheet" href="style.css"></head>
+<body><main>
+  <header><div><h1>Kunden und Netto-Umsatz</h1><p>Vertriebstest mit synchronisiertem HQ-Datenstand</p></div><div class="actions"><button id="login">Mit Google anmelden</button><button id="logout" hidden>Abmelden</button><button id="reload" hidden>Frisch aus Firebase laden</button></div></header>
+  <p id="identity" class="subtle"></p><p id="status" role="status">Anmeldung wird geprüft …</p>
+  <section class="metrics"><strong id="timing">Noch keine Messung</strong><span id="meta"></span><span id="filtertime"></span></section>
+  <section class="filters" aria-label="Filter"><label>Von<input id="from" type="date"></label><label>Bis<input id="to" type="date"></label><label>Kundenname<input id="search" type="search" placeholder="Name suchen"></label><label>Umsatz mindestens (€)<input id="min" type="number" step="0.01" inputmode="decimal"></label><label>Umsatz höchstens (€)<input id="max" type="number" step="0.01" inputmode="decimal"></label><label>Sortieren<select id="sort"><option value="revenue-desc">Umsatz absteigend</option><option value="revenue-asc">Umsatz aufsteigend</option><option value="name">Name</option></select></label></section>
+  <div class="bar"><strong id="count"></strong><button id="download">Messprotokoll herunterladen</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Nr.</th><th>Kunde</th><th>Netto-Umsatz</th></tr></thead><tbody id="body"></tbody></table></div>
+  <nav><button id="prev" disabled>Zurück</button><span id="page"></span><button id="next" disabled>Weiter</button></nav>
+  <p class="foot">Rechnungen zählen positiv, Gutschriften negativ. Die bisherige HQ-Feldzuordnung ist vorläufig und muss mit bekannten Belegen abgeglichen werden. Ein Zeitraumwechsel filtert den bereits geladenen Datenstand; „Frisch aus Firebase laden“ misst den erneuten Abruf.</p>
+</main><script type="module" src="app.mjs"></script></body></html>

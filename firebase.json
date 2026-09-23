@@ -1,0 +1,4 @@
+{
+  "firestore": {"rules": "firebase-pilot/firestore.rules"},
+  "hosting": {"public": "firebase-pilot/public", "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "config.example.js"], "headers": [{"source": "**", "headers": [{"key": "Cache-Control", "value": "no-cache"}]}]}
+}

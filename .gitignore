@@ -4,6 +4,7 @@
 !.env.example
 secrets/
 credentials*.json
+firebase-pilot/public/config.js
 hq-run_*.json
 hq-umsatz-messung-*.json
 
