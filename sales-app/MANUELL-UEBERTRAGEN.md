@@ -4,21 +4,34 @@ Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer übertr
 
 ## Aktueller Stand
 
-Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Die anschließend bereitgestellte Oberfläche `r4` scheitert laut Nutzer in der echten `/exec`-Web-App mit einem JavaScript-Syntaxfehler. Dessen Position entspricht exakt der Homepage-Normalisierung (Skriptzeile 86, Spalte 244). Die aktuelle lokale HTML-Korrektur trägt **Stand 2026-09-25-r4.1** und arbeitet mit dem vorhandenen Backend `r4`. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält einen alten Stand.
+**Aktuelles Update r5 (25.09.2026):** Die App startet laut Nutzer mit r4.1; Homepage und Anzeige der Kontakt-Historie funktionieren im Live-Test. Der jüngste Testfirmenauftrag steht auf „Fortsetzung vorbereitet“. Die HQ-Firma wurde gefunden, der Auftrag ist aber noch nicht vollständig abgeschlossen. Das erklärt die noch sichtbare technische Kennzeichnung und den fehlenden Ansprechpartner, sofern er im Entwurf eingetragen war. Für r5 **beide** Dateien ersetzen:
+
+1. [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) vollständig in die gleichnamige Apps-Script-Datei kopieren.
+2. [Sales.html](../hq-benchmark/Sales.html) vollständig in die gleichnamige HTML-Datei kopieren.
+3. Speichern und die **bestehende** Web-App über **Bereitstellungen verwalten → Stift → Neue Version** aktualisieren. Die Oberflächenkennung muss `2026-09-25-r5` sein. „Dateien haben unterschiedliche Stände“ bedeutet: beide Dateien nochmals vollständig ersetzen und wieder eine neue Version bereitstellen.
+4. In **Daten-Testseite → Synchronisationsaufträge** den bisherigen Auftrag mit „Fortsetzung vorbereitet“ öffnen. In der Vorschau kontrollieren, ob unter `contact` ein Ansprechpartner steht. Dann **Jetzt nach HQ übertragen und prüfen** klicken. Die App liest die vorhandene Firma zurück und legt nur den offenen Ansprechpartner an. Der Auftrag sollte danach „Ansprechpartner angelegt · Abschluss offen“ anzeigen. Nach kurzer Wartezeit **Ansprechpartner prüfen und abschließen** klicken. Erst bei „Bestätigt“ sind Kontakt und bereinigte Firmenbeschreibung zurückgeprüft. Unter **Homepage in HQ prüfen** sind der Auftragsstatus und der Kontaktstatus sichtbar.
+
+Falls `contact` in der Vorschau `null` ist, war im gespeicherten Entwurf kein Ansprechpartner vorhanden. Dann diesen Auftrag **nicht** durch eine neue Testfirma ersetzen; die separate nachträgliche Kontaktanlage ist noch offen. Falls „Ausgang unklar“ erscheint, **Ergebnis nur in HQ prüfen** verwenden und keinen erneuten Anlageversuch auslösen. Bei nicht bestätigter HQ-Rücklesung dieselbe Phase später erneut prüfen. Erst nach Abschluss der vorhandenen Testfirma eine weitere eigene Testfirma anlegen und den Ablauf einmal vollständig durchspielen.
+
+Für r5 gibt es **keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Bereitstellungseinstellungen**. Den bisherigen Ausführen-als-/Zugriffsmodus beibehalten. `pp@markatus.de` benötigt weiterhin einen gesondert funktionierenden Google-Zugang zur Web-App; die App-interne E-Mail-Freigabe allein genügt dafür nicht. Codex hat keine Dateien in Google übertragen und keinen HQ-Live-Schreibtest ausgeführt.
+
+Die Abschnitte darunter dokumentieren frühere Stände. Für den aktuellen Austausch und Test gilt die r5-Anleitung unmittelbar oben.
+
+Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Der frühere Syntaxfehler in `r4` wurde mit `r4.1` behoben und der App-Start vom Nutzer bestätigt. Die aktuellen lokalen Dateien stehen im Projektordner `hq-benchmark`; frühere ZIP-Dateien enthalten ältere Stände.
 
 Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. HQ-Schreibtests bleiben auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Der Nutzer hat eine eigene Testfirma bereits nach HQ übertragen und dort geprüft.
 
-## Aktuelles Update: Startfehler in r4 beheben
+## Früheres Update: Startfehler in r4 beheben
 
-Wenn `SalesBackend.gs` bereits aus dem letzten `r4`-Update übernommen wurde, **nur `hq-benchmark/Sales.html` vollständig in der gleichnamigen Google-Datei ersetzen**. Speichern und unter **Bereitstellen → Bereitstellungen verwalten → Stift → Neue Version → Bereitstellen** die bestehende Web-App aktualisieren. Danach die `/exec`-Adresse mit dem freigegebenen Konto neu laden. Erwartete Oberflächenkennung: **2026-09-25-r4.1**. `SalesBackend.gs` bleibt bei `r4`; die Kompatibilitätsprüfung berücksichtigt das. Skripteigenschaften, Manifest und Zugriff bleiben unverändert.
+Für den damaligen Startfix genügte `Sales.html` mit Oberflächenkennung `2026-09-25-r4.1` und Backend `r4`. **Für den aktuellen Stand gilt die r5-Anleitung oben mit zwei Dateien.**
 
 Der Homepage-Ausdruck verwendet jetzt getrennte Schrägstriche und einen vereinfachten regulären Ausdruck. Eine bloße Domain wird weiterhin um das HTTPS-Schema ergänzt. Bei einem weiteren Startfehler zeigt die Seite die eigentliche technische Fehlermeldung einschließlich Zeile/Spalte als Text; der spätere Zeitwächter überschreibt sie nicht mehr. Die iframe-Sandbox-Warnung in der Konsole war nicht die gemeldete JavaScript-Syntaxfehlerstelle. Die neue Datei ist lokal geprüft; der erfolgreiche Google-Lauf muss nach diesem manuellen Update bestätigt werden. Zunächst nur den App-Start prüfen, danach die unten dokumentierten Kundendetailtests fortsetzen.
 
-Die folgenden Abschnitte bewahren auch ältere Updates mit zwei zu ersetzenden Dateien. Für **diesen Startfix auf Basis r4** gilt ausschließlich die einzelne HTML-Datei oben.
+Die folgenden Abschnitte bewahren ältere Updates als Projektverlauf; für die aktuelle Übertragung gelten ausschließlich die r5-Schritte oben.
 
 ## 1. Lokale Dateien öffnen
 
-Für den aktuellen Startfix nur `Sales.html` aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung.
+Für r5 `SalesBackend.gs` und `Sales.html` aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung.
 
 ## 2. Bestehendes Projekt öffnen
 
