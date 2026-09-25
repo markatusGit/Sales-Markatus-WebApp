@@ -18,6 +18,6 @@ Zu Beginn jeder Folgearbeit dieses Dokument und das Projekttagebuch lesen. Diese
 - Nutzerwünsche, Konzeptvorschläge, offene Entscheidungen und tatsächlich implementierte Funktionen klar trennen. Zurückgestellte Wünsche behalten, Änderungen mit Datum vermerken.
 - Keine Bedeutung aus A/B/C-Antworten ohne die zugehörige Frage erfinden. Bei Unklarheit den dokumentierten Stand als vorläufig kennzeichnen.
 - Zugangsdaten und echte Kundeninhalte nicht in Projektdokumentation oder Zusammenfassungen übernehmen.
-- Verständlich und schrittweise auf Deutsch erklären; Nutzer hat begrenzte Programmierkenntnisse. Konkreten nächsten Handlungsschritt nennen.
+- Verständlich auf Deutsch erklären; Nutzer hat begrenzte Programmierkenntnisse. **Alle Anleitungen dazu, was der Nutzer als Nächstes tun soll, immer stichpunktartig, möglichst kleinschrittig und genau beschreiben.** Pro Stichpunkt nur eine konkrete Handlung nennen, nötige Menüwege und Schaltflächen wörtlich benennen und bei Tests das erwartete Ergebnis sowie den Schritt bei Abweichungen angeben. Keine wichtigen Zwischenschritte als bekannt voraussetzen.
 - Keine Hintergrundautomation allein für diese Dokumentationspflege einrichten; die Pflege erfolgt im Rahmen der aktiven Projektarbeit.
 - Seit 25.09.2026: Apps-Script-Dateien lokal erzeugen und mit einer verständlichen Anleitung übergeben. Der Nutzer übernimmt Upload und Bereitstellung selbst. Keine weiteren automatischen Apps-Script-Uploads oder Bereitstellungsänderungen ohne erneuten ausdrücklichen Auftrag.

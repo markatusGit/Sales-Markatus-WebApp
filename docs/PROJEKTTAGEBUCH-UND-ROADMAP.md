@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 25. September 2026.
+Zuletzt aktualisiert: 26. September 2026.
 
 ## Zweck und Pflege
 
@@ -453,3 +453,9 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 **Roadmap danach:** Zuerst diesen Schreibweg und eine neue eigene Testfirma vollständig prüfen, danach Änderungen und Kontakthistorie Firebase → HQ nur an eigenen Testfirmen validieren. Der Zugang für freigegebene weitere Google-Konten bleibt offen. Danach kommen die belastbare nächtliche HQ-/Firebase-Synchronisation, Magazinausgaben mit redaktionellen Ziel-/Terminwerten und Benachrichtigung, Magazinverkaufsfilter, Rollen und die späteren Produktabläufe. Die genannten späteren Punkte sind Wünsche bzw. Planung, noch nicht mit r5 implementiert. GitHub-Sicherung wird getrennt vom lokalen Stand und von der Live-Bereitstellung dokumentiert.
 
 **Sicherung:** Die sieben zu diesem Schritt gehörenden Dateien wurden im lokalen Commit `0750a07` versioniert und erfolgreich nach `origin/main` auf GitHub übertragen. Andere vorhandene Arbeitsdateien wurden nicht in den Commit aufgenommen. Dieser Sicherungsnachtrag wird separat versioniert. Der Google-Apps-Script-Stand bleibt bis zur manuellen Übernahme durch den Nutzer unverändert.
+
+### 26.09.2026 – Dauerhafte Form für Nutzeranleitungen
+
+**Ausdrücklicher Nutzerwunsch:** Erklärungen dazu, was der Nutzer als Nächstes tun soll, sollen immer aus Stichpunkten bestehen, möglichst kleine Schritte enthalten und genau beschrieben sein. Dieser Wunsch ist als verbindliche Regel in `AGENTS.md` hinterlegt und gilt auch für neue Chats. Bei Bedien- und Testanleitungen sollen konkrete Klickwege, sichtbare Schaltflächen und erwartete Ergebnisse genannt werden; wichtige Zwischenschritte werden nicht vorausgesetzt.
+
+**Umsetzung und Grenze:** Nur Projektanweisungen und Tagebuch wurden geändert; keine App-Dateien, Google-Bereitstellung, HQ- oder Firebase-Daten. Künftige Antworten und Übergaben folgen dieser Darstellungsform. Für den Nutzer ist wegen dieser Dokumentationsänderung kein Einrichtungsschritt nötig.
