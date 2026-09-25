@@ -12,6 +12,7 @@ Zu Beginn jeder Folgearbeit dieses Dokument und das Projekttagebuch lesen. Diese
 
 ## Weitere Projektregeln
 
+- Bei jeder Apps-Script-Übergabe neben geänderten Dateien auch neue/geänderte Skripteigenschaften und nötige Bereitstellungseinstellungen ausdrücklich nennen; falls nichts davon geändert werden muss, dies kurz sagen. Code-Upload legt nicht automatisch Skripteigenschaften an. Bereitstellerkonto, App-Administrator und weitere Nutzer nicht gleichsetzen. Erfolgreiche Bereitstellung nicht als erfolgreiche Einrichtung oder Live-Funktionsprüfung darstellen.
 - Zu Beginn von Folgearbeiten `docs/PROJEKTTAGEBUCH-UND-ROADMAP.md` lesen; bei Einrichtungsfragen zusätzlich `docs/START-HIER.md`.
 - Tagebuchpflege nach dem verbindlichen Ablauf oben durchführen; wichtige Entscheidungen und neue Roadmap-Wünsche ebenfalls festhalten.
 - Nutzerwünsche, Konzeptvorschläge, offene Entscheidungen und tatsächlich implementierte Funktionen klar trennen. Zurückgestellte Wünsche behalten, Änderungen mit Datum vermerken.

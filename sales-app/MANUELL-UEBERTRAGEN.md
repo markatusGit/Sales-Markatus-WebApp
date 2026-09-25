@@ -54,7 +54,27 @@ Falls `appsscript.json` nicht sichtbar ist: links **Projekteinstellungen** öffn
 
 Nur das Speichern der Programmdateien aktualisiert eine bestehende `/exec`-Web-App nicht. Die vorhandene Bereitstellung bearbeiten, damit dieselbe Adresse erhalten bleibt.
 
-## 5. Erster Test
+## 5. Skripteigenschaften vollständig prüfen
+
+**Diese Übersicht fehlte in der ursprünglichen Übergabe.** Die beiden `SALES_`-Eigenschaften werden vom Code gelesen, aber beim Datei-Upload nicht automatisch angelegt. Der zunächst eingebaute Standardwert passte nicht zum tatsächlichen Bereitstellerkonto. Ihr Fehlen ist damit eine ausgelassene Einrichtung und kein Beleg für gelöschte Einstellungen.
+
+Unter **Projekteinstellungen → Skripteigenschaften** sind für die neue App diese fünf Einträge vorgesehen:
+
+| Eigenschaft | Was jetzt zu tun ist | Zweck |
+| --- | --- | --- |
+| `SALES_ADMIN_EMAIL` | Neu anlegen: `info@markatus.de` | App-Administrator passend zum Bereitstellerkonto |
+| `SALES_ALLOWED_EMAILS` | Neu anlegen: `info@markatus.de,pp@markatus.de` | Ausdrücklich erlaubte App-Konten; Googles zusätzliche Bereitstellungsfreigabe bleibt erforderlich |
+| `FIREBASE_PROJECT_ID` | Bestehenden Wert `sales-markatus` beibehalten | Datenbankprojekt |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Vorhandenen geheimen Wert beibehalten, nicht teilen oder hier ersetzen | Serverseitiger Datenbankzugriff |
+| `HQ_API_TOKEN` | Vorhandenen geheimen Wert beibehalten, nicht teilen oder hier ersetzen | HQ-Abrufe und begrenzte Testaufträge |
+
+Falls die beiden neuen Eigenschaften inzwischen angelegt wurden, keine doppelten Einträge erstellen; nur ihre Werte prüfen. Der jetzige Inhalt der entfernten Skripteigenschaften wurde nicht ausgelesen. Der erfolgreiche ältere Firebase-Pilot ist ein Hinweis auf eine frühere funktionierende Einrichtung, keine neue Prüfung ihrer heutigen Werte.
+
+Für die **alte Benchmark-Seite** kommen `HQ_BENCH_ALLOWED_EMAILS` (bisherige freigegebene Benchmark-Nutzer) und `HQ_BENCH_CASES` (bestehende Testszenarien) hinzu. Diese alten Einstellungen vorerst beibehalten; sie steuern nicht den Zugang zur neuen Sales-Startseite. `HQ_BENCH_ACTIVE_RUN` ist ein interner vorübergehender Laufstatus und wird nicht von Hand angelegt.
+
+Die Google-Bereitstellung bleibt vorerst **Ausführen als: Ich** und **Zugriff: Nur ich**. Zunächst mit dem tatsächlichen Bereitstellerkonto testen. Die Aufnahme des zweiten Kontos in `SALES_ALLOWED_EMAILS` allein öffnet die Google-Bereitstellung nicht für dieses Konto.
+
+## 6. Erster Test
 
 Öffne die [bestehende Sales-App](https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec) mit deinem freigegebenen Google-Konto.
 
@@ -87,4 +107,4 @@ Für manuelles Kopieren im Editor ist keine Bereitstellung über die lokale Komm
 
 ## Künftige Updates
 
-Codex liefert jeweils ein aktualisiertes Paket und nennt die tatsächlich geänderten Dateien. Du ersetzt diese Dateien und veröffentlichst eine neue Version. Erfolgreicher Upload, erfolgreicher App-Start und erfolgreicher HQ-Datentest bleiben getrennte Prüfschritte.
+Codex nennt die tatsächlich geänderten Dateien im Projektordner und separat neue/geänderte Skripteigenschaften sowie nötige Bereitstellungseinstellungen. ZIP-Pakete gibt es nur auf Wunsch. Du ersetzt die genannten Dateien und veröffentlichst bei Codeänderungen eine neue Version. Bei ausschließlich geänderten Skripteigenschaften genügt deren Speicherung. Erfolgreicher Upload, vollständige Einrichtung, erfolgreicher App-Start und erfolgreicher HQ-Datentest bleiben getrennte Prüfschritte.
