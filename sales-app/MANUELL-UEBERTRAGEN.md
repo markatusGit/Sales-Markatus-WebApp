@@ -4,13 +4,21 @@ Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer übertr
 
 ## Aktueller Stand
 
-Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Bei der jüngsten Bereitstellung blieb die Startanzeige „Verbinde mit Firebase …“ dauerhaft stehen. Die genaue Ursache im Google-Lauf ist noch nicht belegt. Das aktuelle lokale Diagnose-Update trägt **Stand 2026-09-25-r4**. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält einen alten Stand.
+Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Die anschließend bereitgestellte Oberfläche `r4` scheitert laut Nutzer in der echten `/exec`-Web-App mit einem JavaScript-Syntaxfehler. Dessen Position entspricht exakt der Homepage-Normalisierung (Skriptzeile 86, Spalte 244). Die aktuelle lokale HTML-Korrektur trägt **Stand 2026-09-25-r4.1** und arbeitet mit dem vorhandenen Backend `r4`. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält einen alten Stand.
 
 Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. HQ-Schreibtests bleiben auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Der Nutzer hat eine eigene Testfirma bereits nach HQ übertragen und dort geprüft.
 
+## Aktuelles Update: Startfehler in r4 beheben
+
+Wenn `SalesBackend.gs` bereits aus dem letzten `r4`-Update übernommen wurde, **nur `hq-benchmark/Sales.html` vollständig in der gleichnamigen Google-Datei ersetzen**. Speichern und unter **Bereitstellen → Bereitstellungen verwalten → Stift → Neue Version → Bereitstellen** die bestehende Web-App aktualisieren. Danach die `/exec`-Adresse mit dem freigegebenen Konto neu laden. Erwartete Oberflächenkennung: **2026-09-25-r4.1**. `SalesBackend.gs` bleibt bei `r4`; die Kompatibilitätsprüfung berücksichtigt das. Skripteigenschaften, Manifest und Zugriff bleiben unverändert.
+
+Der Homepage-Ausdruck verwendet jetzt getrennte Schrägstriche und einen vereinfachten regulären Ausdruck. Eine bloße Domain wird weiterhin um das HTTPS-Schema ergänzt. Bei einem weiteren Startfehler zeigt die Seite die eigentliche technische Fehlermeldung einschließlich Zeile/Spalte als Text; der spätere Zeitwächter überschreibt sie nicht mehr. Die iframe-Sandbox-Warnung in der Konsole war nicht die gemeldete JavaScript-Syntaxfehlerstelle. Die neue Datei ist lokal geprüft; der erfolgreiche Google-Lauf muss nach diesem manuellen Update bestätigt werden. Zunächst nur den App-Start prüfen, danach die unten dokumentierten Kundendetailtests fortsetzen.
+
+Die folgenden Abschnitte bewahren auch ältere Updates mit zwei zu ersetzenden Dateien. Für **diesen Startfix auf Basis r4** gilt ausschließlich die einzelne HTML-Datei oben.
+
 ## 1. Lokale Dateien öffnen
 
-Für dieses Update direkt die zwei unten genannten Dateien aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung; bei diesem Update bleiben die anderen fünf Dateien unverändert.
+Für den aktuellen Startfix nur `Sales.html` aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung.
 
 ## 2. Bestehendes Projekt öffnen
 
@@ -18,7 +26,7 @@ Für dieses Update direkt die zwei unten genannten Dateien aus `hq-benchmark` ve
 
 Benutze dieses bestehende Projekt, damit die hinterlegten HQ-/Firebase-Einstellungen und die Web-App-Adresse erhalten bleiben. Die Script Properties mit Token und Dienstkontoschlüssel bleiben unverändert. Sie sind nicht Bestandteil des Pakets.
 
-## Aktuelles Update: Live-Rückmeldung zu Ansicht und Testfirma
+## Vorheriges Update r3/r4: Live-Rückmeldung zu Ansicht und Testfirma
 
 **Startproblem vom 25.09.2026:** Die bisherige feste Ladezeile konnte ohne Hinweis stehen bleiben, wenn das Hauptskript nicht startete. Mit Stand `2026-09-25-r4` zeigt die HTML-Datei schon vor dem Start ihre Versionskennung. Ein unabhängiger Startwächter meldet nach acht Sekunden einen fehlenden Skriptstart; eine unbeantwortete Firebase-Startabfrage zeigt nach 45 Sekunden eine Fehlermeldung und **Erneut versuchen**. Das sind Diagnose und Bedienkorrekturen; ob in Google eine unvollständige Datei, eine alte Bereitstellung oder ein hängender Serveraufruf vorliegt, wird erst durch die Anzeige nach dem manuellen Update geklärt. Dieser Startabruf liest nur Firebase und schreibt weder in HQ noch in Firebase.
 

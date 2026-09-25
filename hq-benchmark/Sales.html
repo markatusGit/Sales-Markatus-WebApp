@@ -19,26 +19,35 @@
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Stand 2026-09-25-r4</p><p>Falls diese Anzeige stehen bleibt: Sales.html vollständig übertragen und die bestehende Web-App mit „Neue Version“ aktualisieren.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-09-25-r4.1</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
-window.addEventListener('error',function(event){
-  if(window.__salesStarted)return;
-  var root=document.getElementById('magazin-vertrieb');
-  if(root)root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Der JavaScript-Teil konnte nicht starten. Bitte Sales.html vollständig übertragen und die bestehende Bereitstellung auf eine neue Version setzen.</p><p>Stand 2026-09-25-r4</p></div>';
-});
-window.setTimeout(function(){
-  if(window.__salesStarted)return;
-  var root=document.getElementById('magazin-vertrieb');
-  if(root)root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Der JavaScript-Teil hat nicht gestartet. Bitte Sales.html vollständig übertragen und die bestehende Bereitstellung auf eine neue Version setzen.</p><p>Stand 2026-09-25-r4</p></div>';
-},8000);
+(function(){
+  var reported=false;
+  function report(message){
+    if(window.__salesStarted||reported)return;
+    var root=document.getElementById('magazin-vertrieb');
+    if(!root)return;
+    reported=true;
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-09-25-r4.1</p></div>';
+    root.querySelector('pre').textContent=message;
+  }
+  window.addEventListener('error',function(event){
+    if(!event.message)return;
+    report(String(event.message).slice(0,500)+(event.lineno?' · Zeile '+event.lineno+', Spalte '+(event.colno||0):''));
+  });
+  window.setTimeout(function(){report('Das Hauptskript wurde innerhalb von 8 Sekunden nicht gestartet. Es wurde keine JavaScript-Fehlermeldung übermittelt.');},8000);
+})();
 </script>
 <script>
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
   const APP_RELEASE='2026-09-25-r4';
+  const UI_BUILD='2026-09-25-r4.1';
+  // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
+  function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>c===null||c===undefined?'Noch nicht hinterlegt':new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(c/100);
   const dateLabel=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'')?v.slice(0,10).split('-').reverse().join('.'):'Datum nicht geliefert';
@@ -96,9 +105,9 @@ window.setTimeout(function(){
   function changeForm(){return head('Änderung testen',formDraft?.company.name||'')+`<div class="m-note">Erster Änderungstest: Branche und Homepage. HQ wird vor dem Schreiben mit dem zuletzt importierten Firebase-Stand verglichen. Weitere Stammdatenänderungen folgen nach Prüfung dieses Weges.</div><section class="m-panel m-section"><div class="m-panel-body"><form data-form="change" class="m-form">${select('Branche','industrialSector',[{id:'',name:'Bitte wählen'},...Array.from(new Set([...(state.catalog?.industries||[]),detail?.company.industrialSector].filter(Boolean))).map(v=>({id:v,name:v}))],detail?.company.industrialSector||'')}${field('Homepage','homepage',detail?.company.homepageDisplay||detail?.company.homepage||'','text')}<button class="m-button m-primary" ${busy?'disabled':''}>Änderung in Firebase speichern</button></form></div></section>`;}
   function admin(){const e=state.edition,s=e?.settings;return head('Verwaltung','Ausgabeziele, Termine und Zugang')+`<section class="m-panel"><div class="m-panel-head"><h2>COBURGER #70 · Ziel und Termine</h2></div><div class="m-panel-body">${s?`<form data-form="edition" class="m-form">${field('Zielumsatz netto (€)','target',s.targetCents===null?'':s.targetCents/100,'number',true)}${field('Anzeigenschluss','adDeadline',s.adDeadline,'date')}${field('Drucktermin','printDate',s.printDate,'date')}${field('Veröffentlichungsdatum','releaseDate',s.releaseDate,'date')}<div class="m-full"><button class="m-button m-primary" ${busy?'disabled':''}>Für alle in Firebase speichern</button></div></form>`:'Zuerst die Ausgabe importieren.'}</div></section>${state.user.admin?`<section class="m-panel m-section"><div class="m-panel-head"><h2>Freigegebene E-Mail-Adressen</h2></div><div class="m-panel-body"><form data-form="access"><label class="m-field">Eine Adresse pro Zeile<textarea name="emails" required>${esc(state.access.emails.join('\n'))}</textarea></label><p class="m-muted">Nur diese Konten erhalten Zugriff. Deine Administratoradresse bleibt freigegeben. Die Freigabe sendet keine E-Mail.</p><button class="m-button m-primary" ${busy?'disabled':''}>Freigaben speichern</button></form></div></section>`:''}`;}
   const nav=[['home','Mein Tag'],['magazine','Magazinverkauf'],['customers','Kunden'],['contacts','Ansprechpartner'],['invoices','Buchungshistorie'],['reminders','Wiedervorlagen'],['test','Daten-Testseite'],['admin','Verwaltung']];
-  function render(){root.dataset.theme=theme;if(state&&state.release!==APP_RELEASE){root.innerHTML=`<div class="m-login"><h1>Dateien haben unterschiedliche Stände</h1><p>Bitte SalesBackend.gs und Sales.html vollständig ersetzen und eine neue Version der bestehenden Web-App bereitstellen.</p><p>Oberfläche: ${esc(APP_RELEASE)} · Server: ${esc(state.release||'alter Stand')}</p></div>`;return;}if(!state){root.innerHTML=`<div class="m-login"><h1>Sales Markatus</h1><p>${esc(error||'Lade Firebase-Daten …')}</p>${error?button('Erneut versuchen','reload'):''}</div>`;return;}
+  function render(){root.dataset.theme=theme;if(state&&state.release!==APP_RELEASE){root.innerHTML=`<div class="m-login"><h1>Dateien haben unterschiedliche Stände</h1><p>Bitte SalesBackend.gs und Sales.html vollständig ersetzen und eine neue Version der bestehenden Web-App bereitstellen.</p><p>Oberfläche: ${esc(UI_BUILD)} · Server: ${esc(state.release||'alter Stand')}</p></div>`;return;}if(!state){root.innerHTML=`<div class="m-login"><h1>Sales Markatus</h1><p>${esc(error||'Lade Firebase-Daten …')}</p>${error?button('Erneut versuchen','reload'):''}</div>`;return;}
     const pages={home,customers:customerList,company,magazine,invoices,test,preview:previewPage,new:newCompany,history:historyForm,change:changeForm,admin,contacts:()=>head('Ansprechpartner','Alle importierten Ansprechpartner stehen in der jeweiligen Kundenansicht.')+`<section class="m-panel">${companies().map(c=>`<div class="m-row">${button(c.name,'company',c.id)}</div>`).join('')||empty('Noch keine Unternehmen importiert.')}</section>`,reminders:()=>head('Wiedervorlagen')+empty('Die gemeinsame Wiedervorlagenverwaltung wird nach dem ersten Kontakt-Historien-Test angebunden.')};
-    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(APP_RELEASE)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Pilot · COBURGER #70<br>Lesedaten aus HQ<br>Schreibtests separat</p></div></aside><main class="m-main">${(pages[view]||home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
+    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Pilot · COBURGER #70<br>Lesedaten aus HQ<br>Schreibtests separat</p></div></aside><main class="m-main">${(pages[view]||home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
   }
   async function act(fn,{reload=false,preserve=false}={}){if(busy)return;busy=true;error='';if(preserve){root.querySelectorAll('button').forEach(b=>b.disabled=true);}else render();try{const result=await fn();if(result?.message)message=result.message;if(reload)state=await rpc('getSalesState');}catch(e){error=e.message;if(preserve){busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const status=root.querySelector('.m-status');if(status){status.textContent=error;status.classList.add('m-error');}return;}}finally{busy=false;}render();}
   root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||busy)return;const a=b.dataset.action,id=b.dataset.id;if(a==='theme'){theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;b.textContent=theme==='dark'?'Helle Ansicht':'Dunkle Ansicht';try{localStorage.setItem('sales-theme',theme);}catch(_){}return;}if(a==='nav'){view=id;search='';message='';error='';render();return;}
@@ -119,7 +128,7 @@ window.setTimeout(function(){
   });
   root.addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value;root.querySelector('#customer-rows').innerHTML=customerRows();}});
   root.addEventListener('change',e=>{if(e.target.name==='addressOrigin'){const label=root.querySelector('#origin-other');label.hidden=e.target.value!=='Sonstige';label.querySelector('input').required=e.target.value==='Sonstige';}});
-  root.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const form=e.target;if(form.elements.homepage&&form.elements.homepage.value.trim()&&!/^https?:\/\//i.test(form.elements.homepage.value.trim()))form.elements.homepage.value='https://'+form.elements.homepage.value.trim();if(!form.reportValidity())return;const input=Object.fromEntries(new FormData(form)),kind=form.dataset.form;
+  root.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const form=e.target;if(form.elements.homepage)form.elements.homepage.value=normalizeHomepageInput(form.elements.homepage.value);if(!form.reportValidity())return;const input=Object.fromEntries(new FormData(form)),kind=form.dataset.form;
     act(async()=>{let r;if(kind==='company'){r=await rpc('saveSalesTestCompany',input);preview=await rpc('getSalesJobPreview',r.id);view='preview';}
       if(kind==='history'){r=await rpc('saveSalesHistory',{...input,draftId:formDraft.id});view='test';}
       if(kind==='change'){r=await rpc('saveSalesCompanyChange',{...input,draftId:formDraft.id});view='test';}

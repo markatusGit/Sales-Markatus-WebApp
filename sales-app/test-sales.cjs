@@ -178,7 +178,7 @@ test('UI script compiles and has no demo storage or customer fixtures',()=>{cons
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
   const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
-  const root={innerHTML:'App startet'},timers=[],listeners={};
+  const pre={textContent:''},root={innerHTML:'App startet',querySelector:()=>pre},timers=[],listeners={};
   const window={addEventListener:(name,fn)=>listeners[name]=fn,setTimeout:fn=>timers.push(fn)};
   vm.runInNewContext(guard,{window,document:{getElementById:()=>root}});
   assert.equal(timers.length,1);
@@ -187,5 +187,22 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.ok(root.innerHTML.includes('2026-09-25-r4'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
+});
+test('startup guard preserves the original syntax error as text through the timeout',()=>{
+  const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
+  const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
+  const pre={textContent:''},root={innerHTML:'',querySelector:()=>pre},timers=[],listeners={};
+  const window={addEventListener:(name,fn)=>listeners[name]=fn,setTimeout:fn=>timers.push(fn)};
+  vm.runInNewContext(guard,{window,document:{getElementById:()=>root}});
+  listeners.error({message:'Invalid token <img src=x>',lineno:86,colno:244});
+  assert.equal(pre.textContent,'Invalid token <img src=x> · Zeile 86, Spalte 244');
+  assert.ok(!root.innerHTML.includes('<img'));
+  timers[0]();assert.ok(pre.textContent.startsWith('Invalid token'));
+});
+test('browser homepage normalization handles bare domains, whitespace and existing schemes',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const helpers=script.slice(0,script.indexOf('  let state='))+'globalThis.normalize=normalizeHomepageInput;})();';
+  const sandbox={document:{getElementById:()=>({})}};vm.runInNewContext(helpers,sandbox);
+  for(const [input,expected] of [['  test.de  ','https://test.de'],['www.test.de','https://www.test.de'],['https://test.de/path','https://test.de/path'],['http://test.de','http://test.de'],['   ','']])assert.equal(sandbox.normalize(input),expected);
 });
 console.log(`${count} meaningful checks passed.`);
