@@ -84,9 +84,35 @@ Die Google-Bereitstellung bleibt vorerst **Ausführen als: Ich** und **Zugriff: 
 4. **3 · Erneut aus Firebase lesen** anklicken.
 5. Bei einer Fehlermeldung den genauen Meldungstext mitteilen. Keine Tokens, Schlüssel oder vollständigen Kundeninhalte senden.
 
-Als Nächstes Firmendetails und Auswahllisten lesen. Echte Schreibtests erst danach mit einer eigens angelegten Testfirma durchführen.
+**Erwartetes Ergebnis:** Nach Schritt 4 zeigt die Testseite einen Importzeitpunkt und die Zahl der Unternehmen. Unter Kunden und Buchungshistorie sollen Daten der Ausgabe #70 erscheinen. Ein leerer Firebase-Stand vor dem ersten Import ist erwartbar; eine technische Fehlermeldung ist es nicht. Der erfolgreiche App-Start allein bestätigt noch keinen erfolgreichen Datenimport.
+
+### Danach: Eine Firma genauer prüfen
+
+1. Unter **Kunden** eine Firma der Ausgabe #70 öffnen.
+2. **1 · Firebase abfragen** anklicken. Ansprechpartner, Kontakt-Historie und Projekte können noch fehlen, da diese separat importiert werden.
+3. **2 · Details HQ → Firebase** anklicken und die Rückmeldung abwarten.
+4. **3 · Erneut aus Firebase lesen** anklicken.
+5. Direkt mit HQ vergleichen: Firmenname/Kundennummer, Standardadresse (ersatzweise Rechnungsadresse), eigene Felder, Ansprechpartner, Kontakt-Historie und direkt zugeordnete Projekte. Fehlende Daten oder falsche Zuordnungen festhalten. Projektumsätze und Ausgabeumsatz anhand bekannter Belege einschließlich Gutschriften prüfen; angezeigte Hinweise auf vorläufige Summen beachten.
+
+### Danach: Auswahllisten und Ausgabe-Einstellungen
+
+Auf der **Daten-Testseite** zuerst **Auswahllisten HQ → Firebase**, danach **Firebase erneut abfragen** anklicken. Benutzer, Firmenarten und Unternehmensbereiche sollen geladen sein. Auch dieser Schritt liest HQ nur.
+
+Unter **Verwaltung** können Zielumsatz und Termine der Pilotausgabe gespeichert werden. Diese Änderung betrifft ausschließlich Firebase. Anschließend unter **Mein Tag** frisch aus Firebase laden und die Werte prüfen. Für die historische Ausgabe nachvollziehbare Werte verwenden; versehentliche Testwerte wieder korrigieren. Der Test mit mehreren angemeldeten Nutzern wartet auf die Mehrnutzer-Anmeldung.
+
+### Erst nach erfolgreichen Lesetests: Eigene Testfirma
+
+**Testfirma anlegen** öffnen, einen Namen beginnend mit `TEST` und ausschließlich erfundene Testdaten verwenden, den Verantwortlichen und Unternehmensbereich bewusst auswählen. Standard ist **Interessent**. Optional einen erfundenen Ansprechpartner mit erfassen. Mit **In Firebase speichern** entsteht zunächst ein Entwurf mit Übertragungsauftrag; in HQ wird dabei noch keine Firma angelegt.
+
+Über **Auftrag ansehen** die Werte prüfen. Erst **Jetzt nach HQ übertragen und prüfen** erzeugt echte Einträge in HQ: zunächst die Testfirma, anschließend gegebenenfalls den zugehörigen Ansprechpartner. Danach die bestätigte HQ-ID und die Zuordnung in HQ prüfen. Bei **Ausgang unklar** keine zweite Testanlage starten, sondern **Ergebnis nur in HQ prüfen** verwenden und die Meldung auswerten. Firmen aus Ausgabe #70 bleiben reine Leseziele.
+
+Kontakt-Historie und Änderungen von Branche/Homepage an dieser eigenen Testfirma sind nach erfolgreicher Anlage weitere Tests. Vollständige Bearbeitung aller Stammdaten, weitere Ausgaben und ausgabenübergreifende Filter sind noch nicht fertig.
 
 ## Hinweise zum Zugang
+
+**Bestätigter Stand vom 25.09.2026:** Der Nutzer kann die App mit `info@markatus.de` öffnen. Mit `pp@markatus.de` erscheint auch in einem nur mit diesem Konto angemeldeten Inkognito-Fenster weiterhin die Google-Fehlerseite. Der letzte bestätigte Bereitstellungszugriff „Nur ich“ schließt dieses zweite Konto weiterhin aus. Der genaue Fehlertext allein erlaubt keine zusätzliche Diagnose.
+
+**Noch offen:** Reguläre Google-Anmeldung für ausdrücklich freigegebene App-Nutzer, ohne Zugriff auf den Skripteditor und unabhängig von einem HQ-Konto. Die bestehende App verwendet die Apps-Script-Sitzung und eine E-Mail-Freigabeliste; ein eigener Google-Login ist noch nicht eingebaut. Firebase Authentication mit Google ist ein möglicher Baustein, dessen Einbindung einschließlich serverseitiger Identitätsprüfung noch geplant und getestet werden muss. Ein Login-Knopf allein löst die vorgeschaltete Google-Bereitstellungssperre nicht. Keine Hosting-Umstellung oder Erweiterung des Bereitstellungszugriffs vorgenommen.
 
 **Korrektur vom 25.09.2026:** Laut Nutzer läuft das Apps-Script-Projekt unter `info@markatus.de`; `pp@markatus.de` ist ein anderes Testkonto. Der ursprüngliche Code setzte ohne Konfiguration fälschlich das Testkonto als einzigen App-Administrator voraus. Zusammen mit der Google-Bereitstellung „Nur ich“ führte dies zu widersprüchlichen Zugangshürden.
 
