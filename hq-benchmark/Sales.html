@@ -19,12 +19,26 @@
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login">Verbinde mit Firebase …</div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Stand 2026-09-25-r4</p><p>Falls diese Anzeige stehen bleibt: Sales.html vollständig übertragen und die bestehende Web-App mit „Neue Version“ aktualisieren.</p></div></div>
+<script>
+// This small, independent guard remains usable when the main application script fails to start.
+window.__salesStarted=false;
+window.addEventListener('error',function(event){
+  if(window.__salesStarted)return;
+  var root=document.getElementById('magazin-vertrieb');
+  if(root)root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Der JavaScript-Teil konnte nicht starten. Bitte Sales.html vollständig übertragen und die bestehende Bereitstellung auf eine neue Version setzen.</p><p>Stand 2026-09-25-r4</p></div>';
+});
+window.setTimeout(function(){
+  if(window.__salesStarted)return;
+  var root=document.getElementById('magazin-vertrieb');
+  if(root)root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Der JavaScript-Teil hat nicht gestartet. Bitte Sales.html vollständig übertragen und die bestehende Bereitstellung auf eine neue Version setzen.</p><p>Stand 2026-09-25-r4</p></div>';
+},8000);
+</script>
 <script>
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-09-25-r3';
+  const APP_RELEASE='2026-09-25-r4';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>c===null||c===undefined?'Noch nicht hinterlegt':new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(c/100);
   const dateLabel=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'')?v.slice(0,10).split('-').reverse().join('.'):'Datum nicht geliefert';
@@ -50,7 +64,14 @@ details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summa
   function projectRow(p){return `<div class="m-row"><h3>${esc(p.number)} · ${esc(p.name)}</h3><p>${esc(p.status)} · Fakturiert: ${money(p.revenueCents)} netto${p.complete?'':' · vorläufig'}</p>${p.completed||p.actualFinishDate?`<p>Abgeschlossen: ${esc(p.actualFinishDate?dateLabel(p.actualFinishDate):'Abschlussdatum von HQ nicht geliefert')}</p>`:`${p.plannedFinishDate?`<p>Geplanter Projektabschluss: ${esc(dateLabel(p.plannedFinishDate))}</p>`:''}<h4>Planumsätze</h4>${Array.isArray(p.plannedRevenues)?p.plannedRevenues.map(plannedRevenueRow).join('')||'<p>Keine Planumsätze von HQ geliefert.</p>':'<p>Bitte Firmendetails erneut importieren, um Abschlussdatum und Planumsätze zu laden.</p>'}`}</div>`;}
   let state=null,view='home',selected=null,detail=null,preview=null,audit=null,auditId=null,busy=false,message='',error='',search='',theme='dark';
   try{theme=localStorage.getItem('sales-theme')==='light'?'light':'dark';}catch(_){}
-  function rpc(name,...args){return new Promise((resolve,reject)=>{if(!window.google?.script?.run){reject(new Error('Diese Datei läuft als bereitgestellte Apps-Script-Web-App. Bitte die Google-Web-App-Adresse öffnen.'));return;}google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(new Error(e.message||'Anfrage fehlgeschlagen.')))[name](...args);});}
+  function rpc(name,...args){return new Promise((resolve,reject)=>{
+    if(!window.google?.script?.run){reject(new Error('Diese Datei läuft als bereitgestellte Apps-Script-Web-App. Bitte die Google-Web-App-Adresse öffnen.'));return;}
+    let done=false;
+    const finish=(ok,value)=>{if(done)return;done=true;if(timer)clearTimeout(timer);(ok?resolve:reject)(value);};
+    const timer=name==='getSalesState'?setTimeout(()=>finish(false,new Error('Die Firebase-Startabfrage hat nach 45 Sekunden keine Antwort erhalten. Bitte erneut versuchen und ggf. die Apps-Script-Ausführungen prüfen.')),45000):null;
+    try{google.script.run.withSuccessHandler(value=>finish(true,value)).withFailureHandler(e=>finish(false,new Error(e?.message||'Anfrage fehlgeschlagen.')))[name](...args);}
+    catch(e){finish(false,new Error(e?.message||'Google Apps Script konnte nicht aufgerufen werden.'));}
+  });}
   const button=(label,action,id='',primary=false)=>`<button type="button" class="m-button ${primary?'m-primary':''}" data-action="${action}" data-id="${esc(id)}" ${busy?'disabled':''}>${esc(label)}</button>`;
   const tag=(text,type='')=>`<span class="m-tag ${type?'m-tag-'+type:''}">${esc(text)}</span>`;
   const head=(title,text='',actions='')=>`<div class="m-pagehead"><div><div class="m-eye">Sales Markatus</div><h1>${esc(title)}</h1><p>${esc(text)}</p></div><div class="m-actions">${actions}</div></div>`;
@@ -108,5 +129,6 @@ details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summa
   // Refresh dashboards only; never interrupt a form or invoke HQ in the background.
   setInterval(()=>{if(!busy&&state&&view==='home')act(async()=>{state=await rpc('getSalesState');});},60000);
   act(async()=>{state=await rpc('getSalesState');});
+  window.__salesStarted=true;
 })();
 </script></body></html>

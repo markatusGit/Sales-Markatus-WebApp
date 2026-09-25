@@ -143,7 +143,7 @@ test('failed or foreign plan import leaves the last Firebase snapshot intact',()
   }
 });
 test('UI keeps sent email collapsed and separates billed and projected planning entries',()=>{
-  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const helpers=script.slice(0,script.indexOf('  let state='))+'globalThis.rows={historyRow,projectRow,plannedRevenueRow};})();';
   const sandbox={document:{getElementById:()=>({})}};vm.runInNewContext(helpers,sandbox);
   const h=sandbox.rows.historyRow({contactHistoryChannel:'SentDocument',projectName:'Test',content:'<img src=x onerror=alert(1)>',contactOn:'2026-02-01',invoice:{number:'RE-1',currency:'EUR',netCents:10000}});
@@ -152,7 +152,7 @@ test('UI keeps sent email collapsed and separates billed and projected planning 
   assert.ok(p.includes('01.11.2026'));assert.ok(p.indexOf('01.10.2026')>p.indexOf('<details'));assert.ok(p.includes('250,00 EUR netto'));assert.ok(!p.includes('450,00'));
 });
 test('UI detects an old backend and displays its release before permitting actions',()=>{
-  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   assert.ok(preboot.length>1000);
   const root={dataset:{},innerHTML:'',addEventListener(){}};
@@ -163,7 +163,7 @@ test('UI detects an old backend and displays its release before permitting actio
   assert.ok(!root.innerHTML.includes('data-action="run-job"'));
 });
 test('UI uses catalog dropdowns for industry and salutation and hides deferred custom fields',()=>{
-  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
@@ -175,4 +175,17 @@ test('UI uses catalog dropdowns for industry and salutation and hides deferred c
   assert.ok(!sandbox.form.includes('type="url"'));
 });
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
+test('startup guard replaces a stalled static screen with a useful release hint',()=>{
+  const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
+  const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
+  const root={innerHTML:'App startet'},timers=[],listeners={};
+  const window={addEventListener:(name,fn)=>listeners[name]=fn,setTimeout:fn=>timers.push(fn)};
+  vm.runInNewContext(guard,{window,document:{getElementById:()=>root}});
+  assert.equal(timers.length,1);
+  timers[0]();
+  assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
+  assert.ok(root.innerHTML.includes('2026-09-25-r4'));
+  window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
+  assert.equal(root.innerHTML,'App läuft');
+});
 console.log(`${count} meaningful checks passed.`);
