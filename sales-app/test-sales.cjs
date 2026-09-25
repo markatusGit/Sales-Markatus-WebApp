@@ -1,0 +1,113 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(__dirname+'/Sales.gs','utf8');
+let count=0;
+function test(name,fn){fn();console.log('PASS',name);count++;}
+function fixture(){
+  const db={},props={},remote={Companies:{},ContactPersons:{},ContactHistories:{}},calls=[];let seq=0,email='pp@markatus.de',failAfterCreate=false;
+  const clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
+  const ctx={console,Set,Date,JSON,Number,String,Object,Array,Math,Error,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},Session:{getActiveUser:()=>({getEmail:()=>email})},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{getUuid:()=>`test-${++seq}`,newBlob:x=>({getBytes:()=>Buffer.from(x)})},revenueToken_:()=> 'secret',revenueAmountCents_:x=>typeof x==='number'&&Number.isFinite(x)?Math.round(x*100):null};
+  vm.createContext(ctx);vm.runInContext(source,ctx);
+  ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{db[p]=clone(v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
+  ctx.salesHqGet_=path=>{
+    calls.push({method:'get',path});const m=path.match(/^\/v2\/(\w+)(?:\/(\d+))?/),entity=m[1];
+    if(m[2])return {data:clone(remote[entity][m[2]]),headers:{}};
+    let rows=Object.values(remote[entity]||{}).map(clone);const q=new URL('https://hq'+path).searchParams,filter=q.get('filter')||q.get('$filter')||'';
+    const company=/companyId eq (\d+)/.exec(filter),name=/name eq '(.*)'/.exec(filter);if(company)rows=rows.filter(x=>Number(x.companyId)===Number(company[1]));if(name)rows=rows.filter(x=>x.name===name[1].replace(/''/g,"'"));
+    const project=/projectId eq (\d+)/.exec(filter);if(project)rows=rows.filter(x=>Number(x.projectId)===Number(project[1]));
+    return {data:rows,headers:{'helloHQ-Count':rows.length}};
+  };
+  ctx.UrlFetchApp={fetch:(url,opt)=>{const path=url.replace('https://api.hellohq.io',''),body=JSON.parse(opt.payload);calls.push({method:opt.method,path,body});let result;
+    if(path==='/v2/Companies'&&opt.method==='post') {const id=101;result={...clone(body),id,companyTypes:body.companyTypes,responsibleUsers:body.responsibleUserIds.map(userId=>({userId})),subsystems:body.subsystemIds.map(id=>({id}))};remote.Companies[id]=result;if(failAfterCreate)throw new Error('Simulated lost response');}
+    else if(path==='/v2/ContactPersons') {result={...body,id:202};remote.ContactPersons[202]=result;}
+    else if(path==='/v2/ContactHistories') {result={...body,id:303};remote.ContactHistories[303]=result;}
+    else if(path==='/v2/Companies/101'&&opt.method==='put') {result={...remote.Companies[101],...body};remote.Companies[101]=result;}
+    else throw new Error('Unexpected external mutation '+path);
+    return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(result)};
+  }};
+  db['sales_meta/catalog']={users:[{id:1,name:'Test User'}],types:[{id:2,name:'Interessent'},{id:3,name:'Kunde'}],subsystems:[{id:4,name:'Testbereich'}],fields:[]};
+  const input={name:'TEST Integration',kind:'Interessent',responsibleUserId:'1',subsystemId:'4',street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE',firstName:'Test',lastName:'Kontakt',addressOrigin:'Sonstige',addressOriginOther:'Manueller Test'};
+  return {ctx,db,props,remote,calls,input,setEmail:x=>email=x,loseResponse:()=>failAfterCreate=true};
+}
+test('all public RPCs enforce the allowlist before accessing data',()=>{
+  const f=fixture();f.setEmail('outsider@example.invalid');
+  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+  assert.equal(f.calls.length,0);
+});
+test('Google identity must be present even for a configured account',()=>{const f=fixture();f.setEmail('');assert.throws(()=>f.ctx.getSalesState(),/Zugriff/);});
+test('ordinary Firebase state request never contacts HQ',()=>{const f=fixture();f.ctx.getSalesState();assert.equal(f.calls.length,0);});
+test('only admin edits access; removal of admin prohibited; case normalized',()=>{const f=fixture();assert.throws(()=>f.ctx.saveSalesAccess('x@example.invalid'),/Administrator/);f.ctx.saveSalesAccess('pp@markatus.de\nTEST@example.invalid');f.setEmail('test@example.invalid');assert.equal(f.ctx.getSalesState().user.admin,false);assert.throws(()=>f.ctx.saveSalesAccess('test@example.invalid'),/Zugriff/);});
+test('real pilot firms cannot become write targets via client supplied IDs',()=>{const f=fixture();assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,name:'Real company'}),/TEST/);assert.throws(()=>f.ctx.saveSalesCompanyChange({draftId:'real',hqId:999}),/Testfirmen/);assert.equal(f.calls.length,0);});
+test('Sonstige requires free text, valid responsible and subsystem IDs required',()=>{const f=fixture();assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,addressOriginOther:''}),/Pflichtfeld/);assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,responsibleUserId:999}),/Benutzer/);assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,subsystemId:999}),/Unternehmensbereich/);});
+test('save writes Firebase draft and pending job but never HQ',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);assert.equal(f.db['sales_jobs/'+r.id].state,'pending');assert.equal(f.db['sales_drafts/'+r.id].kind,'Interessent');assert.equal(f.calls.length,0);});
+test('creation sequences company then contact with returned ID and verifies them',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);const done=f.ctx.runSalesJob(r.id);assert.equal(done.state,'synced');const writes=f.calls.filter(x=>x.method==='post');assert.deepEqual(writes.map(x=>x.path),['/v2/Companies','/v2/ContactPersons']);assert.equal(writes[1].body.companyId,101);assert.equal(f.db['sales_drafts/'+r.id].hqId,101);assert.equal(f.db['sales_companies/101'].contacts[0].id,202);assert.ok(!('addressOrigin' in writes[0].body));});
+test('repeating completed creation is idempotent',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id);const n=f.calls.length;f.ctx.runSalesJob(r.id);assert.equal(f.calls.length,n);});
+test('lost response is blocked and reconciled by unique marker before resuming',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.loseResponse();assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.throws(()=>f.ctx.runSalesJob(r.id),/gesperrt/);assert.equal(f.ctx.reconcileSalesJob(r.id).state,'ready');assert.equal(f.ctx.runSalesJob(r.id).state,'synced');assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
+test('reconciliation never adopts a same-name unrelated company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.db['sales_jobs/'+r.id].state='uncertain';f.remote.Companies[99]={id:99,name:f.input.name,description:'unrelated'};assert.throws(()=>f.ctx.reconcileSalesJob(r.id),/Keine eindeutige/);assert.equal(f.db['sales_drafts/'+r.id].hqId,null);});
+test('wrong returned address keeps creation uncertain instead of claiming success',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),orig=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{const v=orig(entity,id);if(entity==='Companies')v.defaultAddress.city='Wrong';return v;};assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,0);});
+test('central writer rejects project/invoice/foreign-company paths',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);const j=f.db['sales_jobs/'+r.id];j.state='running';for(const path of ['/v2/Documents','/v2/Projects','/v2/Companies/999'])assert.throws(()=>f.ctx.salesWriteHq_(j,path,'post',{}),/gesperrt/);assert.equal(f.calls.length,0);});
+test('contact history is queued then written only to the own test company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id);const n=f.calls.length,h=f.ctx.saveSalesHistory({draftId:r.id,reason:'Call',content:'Test only',channel:'Call'});assert.equal(f.calls.length,n);assert.equal(f.ctx.runSalesJob(h.id).state,'synced');assert.equal(f.remote.ContactHistories[303].companyId,101);assert.equal(f.db['sales_companies/101'].histories.length,1);});
+test('concurrent HQ change surfaces conflict and prevents PUT',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id);const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'App',homepage:''});f.remote.Companies[101].industrialSector='HQ';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');assert.equal(f.calls.filter(x=>x.method==='put').length,0);f.ctx.resolveSalesConflict(j.id,'app');f.remote.Companies[101].industrialSector='HQ again';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');});
+test('resolved edit preserves unrelated HQ fields and verifies result',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id);f.remote.Companies[101].iban='unchanged';const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'New',homepage:''});assert.equal(f.ctx.runSalesJob(j.id).state,'synced');assert.equal(f.remote.Companies[101].iban,'unchanged');assert.equal(f.db['sales_companies/101'].company.industrialSector,'New');});
+test('net revenue includes unpaid sent invoices and subtracts credit notes once',()=>{const f=fixture();const base={companyId:1,projectId:10,currency:'EUR',date:'2026-01-01',documentStatusEntity:{documentStatusType:'Sent'},documentType:'Invoice',netValue:100};const r=f.ctx.salesBelegs_([{...base,id:1},{...base,id:2,documentType:'CreditNote',netValue:-20},{...base,id:3,documentStatusEntity:{documentStatusType:'Draft'}}]);assert.equal(r.accepted.reduce((n,d)=>n+d.cents,0),8000);assert.equal(r.ignored.draft,1);assert.equal(r.complete,true);});
+test('unknown status, foreign currency and canceled credit link flag incomplete data',()=>{const f=fixture(),base={id:1,companyId:1,currency:'EUR',date:'2026-01-01',documentType:'Invoice',netValue:100,documentStatusEntity:{documentStatusType:'Canceled'}};const r=f.ctx.salesBelegs_([base,{...base,id:2,documentType:'CreditNote',createdFromId:1,documentStatusEntity:{documentStatusType:'Sent'}},{...base,id:3,documentStatusEntity:{documentStatusType:'Delivered'}}]);assert.equal(r.complete,false);assert.equal(r.issues.length,2);});
+test('edition settings use revision check and record before/after changes',()=>{const f=fixture();f.db['sales_editions/coburger-70']={settings:{revision:0,targetCents:null},changes:[]};const input={revision:0,target:'10000',adDeadline:'2026-10-01',printDate:'2026-10-02',releaseDate:'2026-10-03'};f.ctx.saveSalesEditionSettings(input);assert.equal(f.db['sales_editions/coburger-70'].settings.targetCents,1000000);assert.equal(f.db['sales_editions/coburger-70'].changes.length,1);assert.throws(()=>f.ctx.saveSalesEditionSettings(input),/inzwischen/);assert.throws(()=>f.ctx.saveSalesEditionSettings({...input,revision:1,printDate:'2026-09-01'}),/Reihenfolge/);});
+test('homepage prefers firm then standard address without changing the writable source field',()=>{
+  const {ctx}=fixture(),base={id:1,homepage:'',defaultAddress:{id:10},addresses:[{id:10,website:'https://standard.invalid'},{id:11,website:'https://billing.invalid',standardForDocumentType:'Invoice'}]};
+  let c=ctx.salesCompany_(base);assert.equal(c.homepageDisplay,'https://standard.invalid');assert.equal(c.homepage,'');assert.equal(c.homepageSource,'Standardadresse');
+  c=ctx.salesCompany_({...base,homepage:' https://company.invalid '});assert.equal(c.homepageDisplay,'https://company.invalid');
+  c=ctx.salesCompany_({...base,defaultAddress:null});assert.equal(c.homepageDisplay,'https://billing.invalid');
+  c=ctx.salesCompany_({...base,defaultAddress:null,addresses:[{website:'https://a.invalid',standardForDocumentType:'Invoice'},{website:'https://b.invalid',standardForDocumentType:'Invoice'}]});assert.equal(c.homepageDisplay,'');
+});
+test('dispatch matches only the exact document number and recipient; body stays available',()=>{
+  const {ctx}=fixture(),h={id:1,companyId:1,projectId:8,reason:'Rechnung RE-42',content:'Standard-E-Mail',contactHistoryChannel:'SentDocument'},d={id:2,companyId:1,projectId:8,number:'RE-42',documentType:'Invoice',netValue:125,date:'2026-04-01',currency:'EUR'};
+  const row=ctx.salesHistory_(h,[d,{...d,id:3,number:'RE-420'},{...d,id:4,companyId:2}],{'8':{name:'Testprojekt'}});
+  assert.equal(row.invoice.id,'2');assert.equal(row.invoice.netCents,12500);assert.equal(row.projectName,'Testprojekt');assert.equal(row.content,h.content);
+  assert.equal(ctx.salesHistory_({...h,reason:'Rechnung RE-4200'},[d],{}).invoice,undefined);
+  assert.equal(ctx.salesHistory_({...h,reason:'Rechnung RE-42. Vielen Dank.'},[d],{}).invoice.id,'2');
+  assert.equal(ctx.salesHistory_({...h,reason:'Rechnung RE-42.1'},[d],{}).invoice,undefined);
+  assert.equal(ctx.salesHistory_(h,[{...d,projectId:9}],{}).invoice,undefined);
+});
+test('ambiguous or absent invoice references never borrow the project total',()=>{
+  const {ctx}=fixture(),h={companyId:1,projectId:8,reason:'Rechnung RE-42',contactHistoryChannel:'SentDocument'},d={id:1,companyId:1,projectId:8,number:'RE-42',documentType:'Invoice',netValue:100};
+  assert.equal(ctx.salesHistory_(h,[d,{...d,id:2}],{}).documentMatch,'ambiguous');
+  assert.equal(ctx.salesHistory_({...h,reason:'Rechnungsversand'},[d],{}).invoice,undefined);
+  assert.equal(ctx.salesHistory_({...h,reason:'Telefonat',contactHistoryChannel:'Call'},[d],{}).documentDispatch,false);
+  assert.equal(ctx.salesHistory_({...h,reason:'Versand',content:'Rechnung Nr. RE-42'},[d],{}).invoice.id,'1');
+});
+test('planned revenues preserve currencies and distinguish projection, billed and unknown rows',()=>{
+  const {ctx}=fixture(),r=ctx.salesPlannedRevenue_({id:1,netTotal:200,currency:'USD',status:'Planned',interval:'Monthly',startDate:'2026-01-01',invoiceDate:'DueDate',estimations:[{estimatedDueDate:'2026-02-10',estimatedNetValue:200,documentId:0,documentStatus:'Planned'},{estimatedDueDate:'2026-01-10',estimatedNetValue:190,documentId:15,documentStatus:'Paid'},{estimatedNetValue:null}]});
+  assert.equal(r.currency,'USD');assert.equal(r.estimations[0].cents,20000);assert.equal(r.estimations[0].documentId,0);assert.equal(r.estimations[1].documentId,15);assert.equal(r.estimations[2].documentId,null);assert.equal(r.estimations[2].cents,null);assert.equal(r.invoiceDateRule,'DueDate');
+  assert.equal(ctx.salesDate_('2026-02-30'),null);assert.equal(ctx.salesDate_('0001-01-01T00:00:00'),null);
+});
+function importFixture(){
+  const f=fixture();f.db['sales_editions/coburger-70']={companies:[{id:'1'}]};f.remote.Companies[1]={id:1,name:'Synthetic only',defaultAddress:{website:'https://synthetic.invalid'}};
+  f.remote.Projects={8:{id:8,companyId:1,name:'Completed test',number:'8',status:'Abgeschlossen',actualFinishDate:'2026-02-03T00:00:00Z'},9:{id:9,companyId:1,name:'Open test',number:'9',status:'Läuft',plannedFinishDate:'2026-12-01'},10:{id:10,companyId:99,name:'Shared test'}};
+  f.remote.Documents={21:{id:21,companyId:1,projectId:10,number:'RE-21',documentType:'Invoice',date:'2026-02-01',netValue:100,currency:'EUR',documentStatusEntity:{documentStatusType:'Paid'}}};
+  f.remote.ContactHistories[31]={id:31,companyId:1,projectId:10,reason:'Rechnung RE-21',content:'Test mail',contactHistoryChannel:'SentDocument'};
+  f.remote.PlannedRevenues={41:{id:41,companyId:1,projectId:9,netTotal:250,currency:'EUR',status:'Planned',estimations:[{documentId:0,documentStatus:'Planned',estimatedDueDate:'2026-11-01',estimatedNetValue:250}]}};
+  return f;
+}
+test('detail import keeps shared invoice projects and fetches plans only for open direct projects',()=>{
+  const f=importFixture();f.ctx.syncSalesCompany('1');const value=f.db['sales_companies/1'];
+  assert.equal(value.company.homepageDisplay,'https://synthetic.invalid');assert.equal(value.histories[0].projectName,'Shared test');assert.equal(value.histories[0].invoice.netCents,10000);
+  assert.equal(value.projects[0].actualFinishDate,'2026-02-03');assert.equal(value.projects[1].plannedRevenues[0].estimations[0].date,'2026-11-01');assert.equal(value.projects.length,2);
+  const paths=f.calls.filter(c=>c.path.includes('PlannedRevenues')).map(c=>decodeURIComponent(c.path));assert.equal(paths.length,1);assert.ok(paths[0].includes('$filter=projectId eq 9'));assert.ok(paths[0].includes('expand=Estimations'));assert.ok(f.calls.every(c=>c.method==='get'));
+  const n=f.calls.length;f.ctx.getSalesCompany('1');assert.equal(f.calls.length,n);
+});
+test('failed or foreign plan import leaves the last Firebase snapshot intact',()=>{
+  for(const mode of ['failure','foreign']){const f=importFixture(),old={sentinel:true};f.db['sales_companies/1']=old;const original=f.ctx.salesHqGet_;
+    f.ctx.salesHqGet_=path=>{if(path.includes('PlannedRevenues')){if(mode==='failure')throw new Error('HTTP 403');return {data:[{id:999,projectId:999}],headers:{}};}return original(path);};
+    assert.throws(()=>f.ctx.syncSalesCompany('1'),/Planumsätze/);assert.deepEqual(f.db['sales_companies/1'],old);
+  }
+});
+test('UI keeps sent email collapsed and separates billed and projected planning entries',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const helpers=script.slice(0,script.indexOf('  let state='))+'globalThis.rows={historyRow,projectRow,plannedRevenueRow};})();';
+  const sandbox={document:{getElementById:()=>({})}};vm.runInNewContext(helpers,sandbox);
+  const h=sandbox.rows.historyRow({contactHistoryChannel:'SentDocument',projectName:'Test',content:'<img src=x onerror=alert(1)>',contactOn:'2026-02-01',invoice:{number:'RE-1',currency:'EUR',netCents:10000}});
+  assert.ok(h.includes('<details>'));assert.ok(!h.includes('<details open'));assert.ok(h.indexOf('&lt;img')>h.indexOf('<details>'));assert.ok(!h.includes('<img'));
+  const p=sandbox.rows.projectRow({id:'1',name:'Test',status:'Läuft',complete:true,revenueCents:5000,plannedRevenues:[{status:'Planned',currency:'EUR',interval:'Monthly',estimations:[{documentId:0,status:'Planned',date:'2026-11-01',cents:25000},{documentId:12,status:'Paid',date:'2026-10-01',cents:20000}]}]});
+  assert.ok(p.includes('01.11.2026'));assert.ok(p.indexOf('01.10.2026')>p.indexOf('<details'));assert.ok(p.includes('250,00 EUR netto'));assert.ok(!p.includes('450,00'));
+});
+test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
+console.log(`${count} meaningful checks passed.`);

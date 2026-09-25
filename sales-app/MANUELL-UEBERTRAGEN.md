@@ -4,19 +4,34 @@ Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer übertr
 
 ## Aktueller Stand
 
-Der letzte automatische Upload war bereits erfolgreich. Die bestehende Web-App wurde auf **Version 8** aktualisiert. Dieses erste Übergabepaket enthält denselben Programmstand; du musst ihn daher jetzt nicht erneut übertragen. Der echte Start-/Datenwegtest ist noch offen. Spätere Pakete werden nach der folgenden Anleitung übernommen.
+Die bereitgestellte **Version 8** wurde inzwischen vom Nutzer getestet: App-Start, 21 Firmen mit Rechnungen und ein Kundendetailimport funktionieren. Das neue Detailupdate ist lokal vorbereitet und noch manuell zu übernehmen. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält noch den alten Stand.
 
 Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. Neue HQ-Schreibtests sind auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Bisher wurde mit der neuen App noch kein echter HQ-Schreibtest durchgeführt.
 
-## 1. Paket entpacken
+## 1. Lokale Dateien öffnen
 
-Die ZIP-Datei auf dem PC entpacken. Die sieben Programmdateien liegen anschließend neben dieser Anleitung. Die ZIP-Datei selbst wird nicht in den Apps-Script-Editor hochgeladen: Du kopierst die Inhalte der einzelnen Dateien.
+Für dieses Update direkt die zwei unten genannten Dateien aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung; bei diesem Update bleiben die anderen fünf Dateien unverändert.
 
 ## 2. Bestehendes Projekt öffnen
 
 Öffne das vorhandene Projekt **Magazinvertrieb – HQ-Test** im [Apps-Script-Editor](https://script.google.com/home/projects/1QWMae8m5upOmPusbq2bS_IkIqRm8fVZHnjo-7U7ea6K0RglzOR4y7ZkJ/edit).
 
 Benutze dieses bestehende Projekt, damit die hinterlegten HQ-/Firebase-Einstellungen und die Web-App-Adresse erhalten bleiben. Die Script Properties mit Token und Dienstkontoschlüssel bleiben unverändert. Sie sind nicht Bestandteil des Pakets.
+
+## Update vom 25.09.2026: Kundendetails nach dem ersten Live-Test
+
+**Für dieses Update nur zwei Dateien ersetzen:** `hq-benchmark/SalesBackend.gs` → `SalesBackend.gs` und `hq-benchmark/Sales.html` → `Sales.html`. Jeweils den gesamten Inhalt übernehmen und die vorhandene Bereitstellung auf **Neue Version** setzen (Schritte unten). Keine neuen oder geänderten Skripteigenschaften, keine Änderung des Manifests oder des Bereitstellungszugriffs erforderlich. Der Zugang mit weiteren Konten ist durch dieses Update noch nicht gelöst.
+
+Danach mit dem funktionierenden Bereitstellerkonto:
+
+1. Den bereits geprüften Kunden öffnen.
+2. **2 · Details HQ → Firebase** starten und Erfolgsmeldung abwarten; danach **3 · Erneut aus Firebase lesen**. Nur Neuladen ohne erneuten HQ-Import ergänzt die neuen Felder nicht.
+3. Homepage vergleichen. Der Import verwendet zuerst die Homepage der Firma, dann die Website der Standardadresse und ersatzweise eine eindeutige Website der Rechnungsadresse. Die verwendete Adressquelle wird angezeigt. Falls weiterhin nichts erscheint, ist die tatsächliche HQ-Antwort noch zu untersuchen; der Adress-Fallback allein ist kein bestätigter Fix für den betroffenen Kunden.
+4. In der Kontakt-Historie einen Rechnungsversand prüfen: Projektname, Versanddatum und Nettobetrag sollen kompakt erscheinen. **Versanddetails und E-Mail anzeigen** klappt Betreff, Belegdatum und vollständigen Text auf. Normale Gesprächsnotizen bleiben lesbar. Die Zuordnung nutzt eindeutige Rechnungsnummern desselben Kunden; bei fehlender oder mehrdeutiger Nummer erscheint ein Hinweis statt eines geratenen Betrags. Gemeinsame Magazinprojekte werden über die Beleg-/Historienbezüge berücksichtigt.
+5. Unter Projekte einen abgeschlossenen und einen offenen Eintrag vergleichen. Abgeschlossene Projekte zeigen das tatsächliche Abschlussdatum, offene Projekte die **Planumsätze aus HQ**, keine Angebote. Plantermine stammen aus den HQ-Schätzungen (`Estimations`); bereits mit Belegen verknüpfte oder anders eingestufte Einträge sind separat aufklappbar. Planungsbeginn und Wiederholungsintervall ersetzen keine fehlenden Plantermine. Fakturierte Umsätze bleiben getrennt. Fehlt eine Quelle, steht das ausdrücklich dabei.
+6. Wenn der neue Planumsatzabruf scheitert, bleibt der vorherige komplette Firebase-Stand erhalten. Den genauen Fehlertext mitteilen. Erst nach erfolgreichem Vergleich die eigene Testfirma anlegen.
+
+Der Ausgabeimport mit 21 Unternehmen wurde vom Nutzer bereits bestätigt. Er muss für diese Detailprüfung nicht wiederholt werden. Die neuen Änderungen sind lokal mit synthetischen Daten geprüft; die Prüfung in eurem HQ erfolgt mit diesem Ablauf.
 
 ## 3. Dateien übernehmen
 
