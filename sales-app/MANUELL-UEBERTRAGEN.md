@@ -4,9 +4,9 @@ Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer übertr
 
 ## Aktueller Stand
 
-Die bereitgestellte **Version 8** wurde inzwischen vom Nutzer getestet: App-Start, 21 Firmen mit Rechnungen und ein Kundendetailimport funktionieren. Das neue Detailupdate ist lokal vorbereitet und noch manuell zu übernehmen. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält noch den alten Stand.
+Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Bei den zuletzt bereitgestellten Dateien blieben die erwarteten Detailänderungen sichtbar aus; die aktive Programmversion ist deshalb noch zu prüfen. Dieses neue Update trägt sichtbar **Stand 2026-09-25-r3**. Aktuelle Dateien stehen im Projektordner `hq-benchmark`; das frühere ZIP enthält einen alten Stand.
 
-Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. Neue HQ-Schreibtests sind auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Bisher wurde mit der neuen App noch kein echter HQ-Schreibtest durchgeführt.
+Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. HQ-Schreibtests bleiben auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Der Nutzer hat eine eigene Testfirma bereits nach HQ übertragen und dort geprüft.
 
 ## 1. Lokale Dateien öffnen
 
@@ -18,9 +18,23 @@ Für dieses Update direkt die zwei unten genannten Dateien aus `hq-benchmark` ve
 
 Benutze dieses bestehende Projekt, damit die hinterlegten HQ-/Firebase-Einstellungen und die Web-App-Adresse erhalten bleiben. Die Script Properties mit Token und Dienstkontoschlüssel bleiben unverändert. Sie sind nicht Bestandteil des Pakets.
 
-## Update vom 25.09.2026: Kundendetails nach dem ersten Live-Test
+## Aktuelles Update: Live-Rückmeldung zu Ansicht und Testfirma
 
-**Für dieses Update nur zwei Dateien ersetzen:** `hq-benchmark/SalesBackend.gs` → `SalesBackend.gs` und `hq-benchmark/Sales.html` → `Sales.html`. Jeweils den gesamten Inhalt übernehmen und die vorhandene Bereitstellung auf **Neue Version** setzen (Schritte unten). Keine neuen oder geänderten Skripteigenschaften, keine Änderung des Manifests oder des Bereitstellungszugriffs erforderlich. Der Zugang mit weiteren Konten ist durch dieses Update noch nicht gelöst.
+**Nur diese zwei aktuellen Dateien ersetzen:** `hq-benchmark/SalesBackend.gs` → `SalesBackend.gs` und `hq-benchmark/Sales.html` → `Sales.html`. Gesamten Inhalt der beiden Dateien übernehmen, speichern und die **bestehende** Web-App-Bereitstellung auf **Neue Version** setzen (Abschnitt 4). Die anderen fünf Programmdateien, das Manifest, die Skripteigenschaften und der Zugriffsmodus bleiben gleich.
+
+Danach die vorhandene `/exec`-Adresse neu öffnen. Oben muss **Stand 2026-09-25-r3** stehen. Fehlt das, läuft noch eine alte Oberfläche: die vorhandene Bereitstellung und Browser-Neuladung prüfen. Bei **„Dateien haben unterschiedliche Stände“** stimmen HTML- und Serverdatei nicht überein; beide erneut vollständig ersetzen und eine neue Version bereitstellen. Solange diese Meldung erscheint, keine Schreibtests starten.
+
+1. Einen bereits importierten Kunden öffnen. Wenn ein Hinweis auf ältere Firmendaten erscheint, **2 · Details HQ → Firebase** anklicken. Die App liest anschließend selbst erneut aus Firebase. Homepage, Kontakt-Historie und Projekte mit HQ vergleichen. Bei fehlgeschlagenem Import den sichtbaren Fehlertext melden; ein alter Firebase-Stand bleibt erhalten.
+2. Auf der **Daten-Testseite** **Auswahllisten HQ → Firebase** anklicken. Die App lädt danach automatisch neu und zeigt nun auch die Zahl der **Branchen** und **Anreden**. Die Werte stammen aus tatsächlich bei HQ-Firmen beziehungsweise Ansprechpartnern verwendeten Bezeichnungen; HQ v2 bietet hierfür im vorliegenden API-Schema keinen eigenen Auswahllisten-Endpunkt. Dadurch können noch nie verwendete HQ-UI-Optionen fehlen. Die Formularfelder sind Dropdowns, keine freie Eingabe. Kundenklassifizierung und Kundenherkunft sind bei der Neuanlage vorerst ausgeblendet.
+3. Für eine neue Testfirma genügt bei **Homepage** etwa `www.test.de` oder `test.de`. Die App ergänzt `https://` selbst, speichert die Adresse zuerst in Firebase und schreibt sie beim bestätigten Auftrag in das Firmenfeld **und** die HQ-Standardadresse. Die Rückprüfung kontrolliert beide Werte. Eine neue Testfirma wird erst nach vollständiger Prüfung als bestätigt angezeigt. Die technische Kennzeichnung wird dabei nach dem Abgleich aus der Firmenbeschreibung entfernt.
+4. Bei der **bereits angelegten Testfirma** auf der Testseite **Homepage in HQ prüfen** anklicken. Dort siehst du getrennt die ursprünglich in Firebase gespeicherte Homepage, das HQ-Firmenfeld, die HQ-Standardadresse und den gespeicherten App-Wert. Fehlt sie in HQ, **Änderung testen** öffnen, die Homepage eingeben und in Firebase speichern. Dann unter **Synchronisationsaufträge → Auftrag ansehen** Ziel und Werte prüfen und bewusst **Jetzt nach HQ übertragen und prüfen** ausführen. Bei einem Konflikt die HQ-/App-Werte zuerst vergleichen und dann entscheiden. Diese Änderung schreibt ausschließlich in die eigene Testfirma und gleicht beide HQ-Felder ab.
+5. Zeigt die Prüfung **„Technische Kennzeichnung: Noch vorhanden“**, erscheint bei dieser Firma **Testmarkierung entfernen**. Dies erzeugt zunächst nur einen überprüfbaren Auftrag. Nach **Auftrag ansehen** und bewusstem Start entfernt er den Zusatz aus der HQ-Beschreibung und liest sie zurück. Der Marker war bisher für die eindeutige Wiederaufnahme nach einer unterbrochenen Firmenanlage nötig. Bei neuen bestätigten Anlagen wird er nach der Rückprüfung automatisch entfernt.
+
+Wenn HQ bei einer bestehenden Testfirma keine eindeutige Standardadress-ID liefert, wird vor der Homepage-Änderung abgebrochen. Den angezeigten Hinweis mitteilen; keine weitere Testfirma als Ersatz anlegen. Die Versionsanzeige und diese Änderungen sind lokal mit synthetischen Daten geprüft, noch nicht live mit dem Markatus-HQ bestätigt.
+
+## Vorheriges Update vom 25.09.2026: Kundendetails nach dem ersten Live-Test
+
+Für dieses frühere Update galten ebenfalls zwei Dateien. Die **aktuellen** Dateien und Schritte stehen unmittelbar oben. Der Zugang mit weiteren Konten ist weiterhin nicht gelöst.
 
 Danach mit dem funktionierenden Bereitstellerkonto:
 

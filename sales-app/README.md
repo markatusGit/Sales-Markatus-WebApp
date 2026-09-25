@@ -1,14 +1,22 @@
 # Apps-Script-Datenpilot
 
-Stand: 25.09.2026. Version 8 wurde bereitgestellt. Der Nutzer hat den App-Start mit dem Bereitstellerkonto, 21 importierte Firmen mit Rechnungen der Ausgabe #70 und einen Kundendetailimport bestätigt. Kein HQ-Schreibtest erfolgt. Das neue Detailupdate liegt lokal bereit und muss vom Nutzer als neue Version übernommen und geprüft werden.
+Stand: 25.09.2026. Der Nutzer hat App-Start, 21 importierte Firmen mit Rechnungen der Ausgabe #70, einen Kundendetailimport und die HQ-Anlage einer eigenen Testfirma bestätigt. Das sichtbare Kundendetailupdate blieb in seiner Web-App aus; der konkrete laufende Code-Stand wurde nicht bestätigt. Das neue Update mit sichtbarer Kennung `2026-09-25-r3` liegt lokal bereit und muss vom Nutzer selbst übertragen und live geprüft werden.
 
 **Neuer Nutzerwunsch:** Ab jetzt nur lokale Dateien vorbereiten. Der Nutzer übernimmt Übertragung und Veröffentlichung selbst. Keine weiteren automatischen Uploads oder Bereitstellungsänderungen ohne erneuten ausdrücklichen Auftrag. Anleitung: [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md).
 
 ## Nächster Schritt für den Nutzer
 
 1. `SalesBackend.gs` und `Sales.html` anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen und eine neue Version der vorhandenen Bereitstellung veröffentlichen. Keine neuen Skripteigenschaften oder Bereitstellungsrechte nötig.
-2. Den bereits geprüften Kunden öffnen, Details erneut HQ → Firebase importieren und danach Firebase erneut lesen. Homepage, kompakte Versandhistorie, tatsächlichen Projektabschluss und Planumsätze mit HQ vergleichen.
-3. Erst danach eine eigene Testfirma anlegen. Keine Zugangsdaten in den Chat schreiben.
+2. Nach Veröffentlichung die Kennung `2026-09-25-r3` prüfen, dann denselben Kunden öffnen und **Details HQ → Firebase** starten. Die App liest Firebase danach automatisch erneut. Homepage, kompakte Versandhistorie, Projektabschluss und Planumsätze mit HQ vergleichen.
+3. HQ-Auswahllisten erneut importieren, damit Branchen und Anreden im Dropdown erscheinen. Die bereits angelegte Testfirma über **Homepage in HQ prüfen** untersuchen; bei Bedarf Homepage und technische Kennzeichnung mit getrennten Vorschauaufträgen korrigieren. Keine Zugangsdaten in den Chat schreiben.
+
+## Update nach der ersten eigenen Testfirma
+
+- Oberfläche und Server melden dieselbe Release-Kennung; bei unterschiedlichen Ständen wird die normale Bedienung angehalten. Die Kennung steht sichtbar oben. Alte Firebase-Firmendetails werden als solche gekennzeichnet; ein erfolgreicher Detailimport liest automatisch aus Firebase zurück.
+- Branchen und Anreden sind Auswahlfelder. Ihre Werte werden beim bewusst gestarteten Auswahllistenimport aus tatsächlich in HQ verwendeten Firmen- und Ansprechpartnerangaben gesammelt. Die HQ-v2-Modelle liefern diese Felder als freie Zeichenfolge ohne eigenen Katalog-Endpunkt, daher sind noch nie verwendete UI-Werte nicht automatisch verfügbar. Nur die unterschiedlichen Bezeichnungen werden in Firebase gespeichert. Kundenklassifizierung und Kundenherkunft sind bei der Neuanlage ausgeblendet.
+- Homepage-Eingaben wie `test.de` und `www.test.de` werden serverseitig zu `https://...` ergänzt; das Browserformular nimmt sie ebenfalls an. Neue Testfirmen speichern denselben Wert im HQ-Firmenfeld und an der Standardadresse, danach wird beides zurückgelesen. Für die schon angelegte eigene Testfirma gibt es einen gezielten Prüfknopf und den bisherigen Änderungsauftrag, der jetzt auch die eindeutig identifizierte HQ-Standardadresse prüft und aktualisiert. Abweichende HQ-Werte erzeugen einen Konflikt; fehlende Adresszuordnung stoppt vor dem Schreiben. Verlorene Antworten werden anhand der HQ-ID zurückgeprüft, ohne eine zweite Firma anzulegen.
+- Die technische Kennzeichnung in der Beschreibung war der Wiederaufnahmemarker für einen möglichen Abbruch beim Anlegen. Nach vollständig bestätigter Neuanlage wird sie aus der Beschreibung entfernt und der bereinigte Wert rückgelesen. Für die schon angelegte Testfirma kann nach einer reinen HQ-Prüfung ein separater Vorschauauftrag die Kennzeichnung entfernen. Ein bestehender anderer Beschreibungstext wird nicht überschrieben.
+- Programmdateien und synthetische Tests lokal aktualisiert. Noch nicht bestätigt ist die Ausführung der zusätzlichen HQ-Adressschreibroute im echten Mandanten. Nur eigene Testfirmen sind Schreibziele. Der aktuelle bereitgestellte Code-Stand muss anhand der neuen sichtbaren Kennung geprüft werden.
 
 ## Detailupdate nach erstem Live-Test
 
@@ -28,7 +36,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 - Import einer genau identifizierten Pilotausgabe mit Unternehmen und einzelnen Rechnungen/Gutschriften. Name und Projektnummer müssen zusammen passen, falsche Filterergebnisse werden verworfen. Firmen sind dauerhaft nur lesbare Ziele dieses Imports.
 - Je Firma eigener Detailimport mit Standard-/Rechnungsadresse, eigenen Feldern, Ansprechpartnern, Kontakt-Historie sowie direkt zugeordneten Projekten und deren Netto-Umsatz. Details werden erst nach abgeschlossenem Abruf in Firebase ersetzt.
 - Umsatzprüfung mit Warnungen bei unbekannten Statuswerten, fehlenden Angaben, anderer Währung und potenzieller doppelter Stornokürzung. Eine technische Vollständigkeitsanzeige ersetzt keinen Vergleich mit bekannten HQ-Belegen.
-- Manuell importierte Auswahllisten für HQ-Verantwortliche, Firmentypen, Unternehmensbereiche und relevante eigene Felder.
+- Manuell importierte Auswahllisten für HQ-Verantwortliche, Firmentypen, Unternehmensbereiche sowie beobachtete Branchen und Anreden; relevante eigene Felder bleiben für spätere Schritte verfügbar.
 - Eigene Testfirma mit Standardadresse, Firmentyp (Interessent als Vorgabe), verantwortlichem HQ-Benutzer, ausdrücklich gewähltem HQ-Unternehmensbereich, eigenen Feldern und optionalem erstem Ansprechpartner in Firebase erfassen.
 - Adressherkunft mit den drei vereinbarten Auswahlen und Pflicht-Freitext bei Sonstige. Bis zur HQ-Feldentscheidung ausschließlich in Firebase speichern.
 - Auftragsvorschau und bewusste Ausführung. Firma zuerst anlegen, zurücklesen, zurückgegebene ID sichern, danach Ansprechpartner anlegen und zurücklesen. Zielprüfung ausschließlich über serverseitige Testfirmen-/Auftragszuordnung; ein frei übergebener Firmenname oder eine HQ-ID schaltet kein Bestandsunternehmen frei.
@@ -39,7 +47,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 
 ## Bewusste Grenzen dieses ersten Testschritts
 
-- Keine echte HQ-Schreibprüfung erfolgt. Keine Testfirma in HQ wurde durch diese Arbeit bereits angelegt.
+- Die eigene Testfirma wurde vom Nutzer in HQ angelegt und dort geprüft. Der neue Adressabgleich und die Kennzeichnungsbereinigung sind noch nicht live abgenommen.
 - Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
 - Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
 - Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.
@@ -76,7 +84,7 @@ Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein
 
 ## Prüfung
 
-27 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
+38 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
 
 Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
 
