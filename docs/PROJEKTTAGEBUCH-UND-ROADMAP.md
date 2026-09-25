@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 23. September 2026.
+Zuletzt aktualisiert: 25. September 2026.
 
 ## Zweck und Pflege
 
@@ -8,11 +8,13 @@ Dieses Dokument bewahrt den Arbeitsstand über längere Chats und mehrere Sitzun
 
 Die Pflege erfolgt während der gemeinsamen Projektarbeit, besonders bei neuen Roadmap-Wünschen, wichtigen Entscheidungen und zum Abschluss größerer Schritte. Es ist keine zeitgesteuerte Hintergrundaufgabe eingerichtet.
 
+**Verbindlicher Arbeitsablauf seit 25.09.2026:** Codex pflegt fertige Dateien lokal und nennt die konkret zu ersetzenden Dateien; der Nutzer überträgt sie selbst nach Apps Script. ZIP-Pakete sind optional, kein notwendiger Übergabeweg. Nach abgeschlossenen Arbeitsschritten sichert Codex die zugehörigen geprüften Änderungen einschließlich Dokumentation per Commit und Push im konfigurierten GitHub-Repository. Jeder abgeschlossene Arbeitsschritt wird hier mit Ergebnis, Prüfung, offenen Punkten und nächstem Schritt dokumentiert. Die vollständigen Regeln stehen am Anfang von [AGENTS.md](../AGENTS.md) und gelten für neue Chats ohne erneute Aufforderung.
+
 ## 1. Projekt in wenigen Sätzen
 
 Die Agentur hat ungefähr 30 Mitarbeiter und verkauft Film-, Social-Media-, Marketing-, Online- und Werbetechnikleistungen. Hinzu kommen iTV Coburg und werbefinanzierte Magazine. helloHQ wird für Kunden, Rechnungen, Zeiterfassung und weitere kaufmännische Abläufe genutzt; awork für Projekte und Aufgaben.
 
-Die geplante Sales-App soll für Vertriebler eine einfache, schnelle gemeinsame Arbeitsoberfläche schaffen. Kunden, Ansprechpartner, Gesprächsverlauf, Ausgaben und Verkäufe müssen miteinander verknüpft sein. Zunächst konzentrieren wir uns auf Magazine. Google Apps Script ist die bevorzugte Ausgangsbasis wegen Kosten und vorhandener Script-Erfahrung; die endgültige Datenhaltung ist noch nicht entschieden.
+Die geplante Sales-App soll für Vertriebler eine einfache, schnelle gemeinsame Arbeitsoberfläche schaffen. Kunden, Ansprechpartner, Gesprächsverlauf, Ausgaben und Verkäufe müssen miteinander verknüpft sein. Zunächst konzentrieren wir uns auf Magazine. Seit der Anforderungsrunde vom 24.09.2026 ist für den nächsten Ausbau eine Google-Apps-Script-Web-App mit Firebase/Cloud Firestore als gemeinsamer Datenbank und HQ-Abgleich ausdrücklich gewünscht. Frühere Architekturvermerke weiter unten dokumentieren den damaligen Entscheidungsstand.
 
 ## 2. Ausdrücklich genannte Rahmenbedingungen
 
@@ -69,8 +71,37 @@ Keine der folgenden späteren Funktionen erhält durch diesen Eintrag bereits ei
 | R09 | Erweiterte Paket- und Rabattberechnung | Konzeptvorschlag für später | Regeln über mehrere Ausgaben/Magazine verbindlich definieren |
 | R10 | Reservierungen und Produktionsabläufe | Konzeptvorschlag, noch nicht gesondert beauftragt | Tatsächlichen Bedarf mit Vertrieb und Redaktion bewerten |
 | R11 | Erweiterte Teamansichten, Priorisierung und Auswertungen | Konzeptvorschlag, noch nicht gesondert beauftragt | Pilotfeedback abwarten |
+| R12 | App-Nutzer ohne eigenes HQ-Konto | Am 24.09.2026 ausdrücklich als spätere Nutzergruppe bestätigt | Verantwortlichen HQ-Benutzer zunächst auswählen; spätere Zuordnungs- und Autorenregel klären |
+| R13 | Rechnungen über mehrere Magazinausgaben aufteilen | Am 24.09.2026 als real vorkommend bestätigt, für den aktuellen Test ausdrücklich zurückgestellt | Rechnungspositionen oder fachliche Zuordnung je Ausgabe prüfen; keine ungeprüfte anteilige Verteilung |
 
-### Wichtige Funktionen für den ersten nutzbaren Stand
+### Ergänzende Ideen vom 23.09.2026 – noch nicht beauftragt
+
+Auf Wunsch des Nutzers nach einer einfachen visuellen Übersicht wurden zusätzlich drei mögliche Alltagshilfen vorgeschlagen. Diese ergänzen die bestehende Roadmap; R01–R11 bleiben erhalten. Es handelt sich um neue Vorschläge des Assistenten, nicht um bestätigte Produktentscheidungen:
+
+- **N01 – Buchungsvorlage für Wiederbucher:** Kunde, Kontakt und Format aus der letzten Buchung übernehmen; neue Ausgabe und Preis vor dem Speichern prüfen.
+- **N02 – Urlaubsübergabe:** Ausgewählte Wiedervorlagen samt Gesprächskontext vorübergehend an eine Vertretung übergeben, ohne den festen Betreuer dauerhaft zu ändern.
+- **N03 – Mediadaten griffbereit:** Zur Ausgabe passende freigegebene Unterlagen und vorbereiteten Mailtext anbieten; der Vertriebler entscheidet über den Versand.
+
+Beschreibung von aktuellem Demoumfang und Grenzen: [APP-UEBERSICHT.md](APP-UEBERSICHT.md). Empfohlene Reihenfolge: zunächst verlässlicher interner Pilot, danach beispielsweise N01. Keine Termin- oder Umsetzungszusage.
+
+### Weitere Vorschläge vom 24.09.2026 – Ideensammlung, nicht beauftragt
+
+Der Nutzer bittet um zusätzliche Zukunftsideen als einfache Liste direkt in der Unterhaltung. Die folgenden Vorschläge sind weder beschlossen noch implementiert; die HTML-Übersicht wird für diese Ideensammlung nicht verändert. N01–N03 und R01–R11 bleiben bestehen.
+
+- **N04 – Kompakte Gesprächsvorbereitung:** Letzte Schaltung, vereinbarter Preis, letzte Gesprächsnotiz und offener nächster Schritt zusammen vor dem Kontakt zeigen. Ergänzt die geplante Kundenkarte.
+- **N05 – Telefonmodus:** Eine ausgewählte Arbeitsliste nacheinander abarbeiten, Gesprächsergebnis festhalten und direkt zum nächsten Kunden wechseln.
+- **N06 – Nächsten Schritt anbieten:** Nach einem Gespräch einfache Auswahl wie Rückruf, Unterlagen vorbereiten oder Entscheidung nachfassen; mit passender Wiedervorlage. Keine unbeauftragten automatischen Nachrichten.
+- **N07 – Fristenampel:** Zur Ausgabe anzeigen, wie lange bis zum Anzeigenschluss bleibt und welche Gespräche oder Buchungsentscheidungen noch offen sind. Konkretisiert die geplante Terminverwaltung.
+- **N08 – Themenbezogene Kundenlisten:** Sonderthemen einer Ausgabe mit gepflegten Branchen/Interessen verbinden, zum Beispiel Bauen und Wohnen mit passenden Firmen. Vorschläge durch Vertrieb prüfen lassen; Erweiterung von R11.
+- **N09 – Saisonale Wiederansprache:** Kunden vor passenden wiederkehrenden Anlässen wie Weihnachtsgeschäft oder Frühjahr auf Grundlage bisheriger Buchungen zur erneuten Ansprache vorschlagen. Ergänzt N01, löst keine automatische Buchung aus.
+- **N10 – Eigene Sprachnotiz nach einem Termin:** Vom Vertriebler eingesprochene Zusammenfassung in einen bearbeitbaren Notizentwurf umwandeln und vor Speicherung prüfen; keine Aufzeichnung des Kundengesprächs.
+- **Konkretisierung R11 – Weitere Magazinpotenziale:** Sichtbare Vorschläge für passende zusätzliche Magazine, begründet durch Region/Branche und bisherige Buchungen; fachliche Prüfung durch Vertrieb. Bereits im Fachkonzept angelegt.
+- **Konkretisierung R05 – Absagegründe auswerten:** Freiwillig gepflegte Gründe wie Preis, Zeitpunkt oder Format zusammenfassen, um Produktangebot und Ansprache zu verbessern.
+- **Konkretisierung R02/R10 – Unterlagenstatus:** Pro Buchung kenntlich machen, ob Anzeigenmotiv, Text, Bilder und Freigabe vorliegen; vermeidet Rückfragen zwischen Vertrieb und Redaktion.
+
+Empfehlung des Assistenten für die spätere Priorisierung nach dem verlässlichen Kernpilot: N04, N05 und N07. Keine Zusage zu Reihenfolge oder Termin durch den Nutzer.
+
+### Wichtige Funktionen für den ersten nutzbaren Stand – Pilotumfang
 
 Kunden-/Personenansicht, Buchungshistorie, Magazin-/Ausgabenfilter, Kontaktprotokolle, Wiedervorlagen, persönliche Ansichten, Sonderpreise, einfache Paketzusammengehörigkeit, Redaktionsmeldung, Google-Anmeldung und verlässliche Datenanbindung bleiben Bestandteil der Pilotplanung. Excel-Übernahme, Konfliktbehandlung und Sicherung sind im Konzept als Vorbereitung auf den Alltag enthalten. Die Reihenfolge wird beim Bau anhand eines kleinen realen Piloten konkretisiert.
 
@@ -106,7 +137,7 @@ Das sind fachliche Anforderungen und Vorschläge aus dem Konzept; nicht jeder Fi
 1. API v2 ist als Ausgangspunkt bestätigt. Gültigen v2-Token direkt in Apps Script hinterlegen und den vorbereiteten Firmenabruf zunächst mit einer Anfrage prüfen. Nur bei Unklarheiten zur Anmeldung das vorhandene Script ohne Geheimnisse heranziehen.
 2. Ein repräsentatives Magazinprojekt, zugehörige Rechnungspositionen und eine bisherige Excel-Liste untersuchen. Die im Konzept angenommene Zuordnung pro Ausgabe praktisch bestätigen.
 3. Der direkte Kunden-/Umsatzablauf wurde gemessen. Als Nächstes den Firebase-Pilot live messen; Kontakt-, Projekt- und Rechnungsdetails bleiben zusätzliche offene Pfade.
-4. Firebase ist für den Vergleichspiloten gewählt. Die endgültige Architektur und realistische Zusatzkosten nach erstem Abgleich und Zwei-PC-Test entscheiden.
+4. Seit 24.09.2026 ist Firebase auch für den nächsten Ausbau der Apps-Script-App ausdrücklich gewählt. Zusatzkosten, Kontenanmeldung, sichere Schreibwege und Zwei-PC-Verhalten müssen für den erweiterten Umfang geprüft werden.
 5. Reale Pilot-Ausgabe, Termine, interne Nutzer und Redaktions-Empfänger festlegen.
 6. Vor externem Start klären, welche Kunden, Kontaktnotizen und finanziellen Angaben externe Nutzer sehen dürfen.
 7. Praktisch bestätigen, welche Stammdatenänderungen bis zum Nachtlauf warten dürfen; für neue App-Aktivitäten und Buchungen gemeinsame zeitnahe Sichtbarkeit vorsehen.
@@ -220,3 +251,89 @@ Die korrigierte lokale `firebase-pilot/public/config.js` enthält eine vollstän
 **Gemessen:** Der Nutzer hat den HQ-Abgleich erfolgreich durchgeführt und das inhaltsarme Performanceprotokoll der Firebase-Vertriebsseite bereitgestellt. Der Datenstand wurde am 23.09.2026 um 15:50:44 lokaler Zeit erzeugt und enthält 3026 Kunden sowie 4326 zählende Belege in zwei Datenblöcken; `incomplete` ist `false`. Das Protokoll enthält zwei frische Firebase-Abrufe: Beim ersten Seitenstart 1354 ms bis zur Liste, davon 611 ms Datenabruf und rund 5 ms Tabellenaufbau; beim manuellen erneuten Abruf 614 ms bis zur Liste, davon 608 ms Datenabruf und rund 5 ms Tabellenaufbau. 43 protokollierte Filtervorgänge dauerten 1,9–8,1 ms, Median 4,1 ms; bei 24 Vorgängen änderte sich die Trefferzahl. Diese Messung zeigt einen einzelnen Browser; ein gleichzeitiger Zwei-PC-Test und die Dauer des HQ-Synchronisationslaufs liegen noch nicht vor.
 
 **Einordnung:** Gegenüber dem zuletzt gemessenen direkten HQ-Erstabruf von 25,1 s war der erste Firebase-Listenaufbau in diesem Test etwa 19-mal schneller. Die Messungen sind fachlich nicht identisch: Der Firebase-Sync zählt alle berücksichtigten Belege des geladenen HQ-Bestands, während die frühere Zahl von 3486 zählenden Belegen aus einem gewählten Zeitraum stammte. Die Differenz bei der Kundenzahl (3026 statt 3025) ist aus dem inhaltsarmen Protokoll allein nicht erklärbar. Für eine fachliche Freigabe müssen derselbe Zeitraum und bekannte Rechnungen/Gutschriften verglichen werden. Die Aktualität hängt vom nächsten erfolgreichen HQ-Abgleich ab; der Pilot lädt alle Kundenblöcke in den Browser und filtert danach lokal.
+
+### 23.09.2026 – Visueller App-Wegweiser und Roadmap-Übersicht
+
+**Nutzerwunsch:** Eine einfache Übersicht im gleichen Stil wie die App erstellen: vorhandene Fake-Daten-Funktionen, Klickmöglichkeiten, sichtbare Inhalte und Verknüpfungen erklären; alle bisherigen Roadmap-Punkte sowie zusätzliche sinnvolle Ideen aufführen.
+
+**Erstellt:** Interaktiver Wegweiser in der Codex-Unterhaltung mit „Klickwege“, „Verknüpfungen“ und „Roadmap“, sieben Navigationseinstiegen, den zugehörigen Detail-/Formularansichten und dunkler/heller Darstellung. Grundlage ist der geprüfte Code der vorhandenen `Sales-Markatus-Demo.html`. Eine dauerhafte textliche Übersicht liegt in [APP-UEBERSICHT.md](APP-UEBERSICHT.md). Die elf bisherigen Roadmap-Punkte sind vollständig übernommen; N01–N03 sind ausdrücklich neue, noch nicht beauftragte Vorschläge. Bestehende Projektdateien der Demo wurden nicht verändert.
+
+**Abgrenzung:** Die klickbare Demo speichert nur lokal; der separate bereits gemessene Firebase-Lesepilot ist noch nicht mit dem vollständigen Vertriebsablauf verbunden. Platzhalter für Tagesdatum, zuletzt bearbeitete Kunden, Statusfortschreibung, Rechte und HQ-Zuordnung werden nicht als fertige Produktfunktionen dargestellt. Keine echten Kundeninhalte wurden in die Übersicht übernommen.
+
+**Prüfung:** Kontakt- und Buchungsweg, Verknüpfungsauswahl, 14 Roadmap-/Ideeneinträge und Theme-Wechsel im Testbrowser geprüft, keine JavaScript-Laufzeitfehler. Alle drei Bereiche bei vier Fensterbreiten von 336 bis 1040 Pixeln ohne seitlichen Inhaltsüberlauf geprüft; Ansichten zusätzlich visuell kontrolliert.
+
+**Nächster Schritt:** Den Wegweiser gemeinsam zur fachlichen Priorisierung nutzen; danach den internen Pilot mit gemeinsamem Datenbestand und verlässlicher Statuslogik weiterführen. Die neuen Ideen sind bis zur Entscheidung lediglich Vorschläge.
+
+### 23.09.2026 – Wegweiser als einzelne Offline-HTML exportiert
+
+**Nutzerwunsch und Fehlerhinweis:** Die vollständige Übersicht soll als einzelne HTML jederzeit per Doppelklick vom PC aus geöffnet werden können. Der Nutzer meldet, dass die aufklappbaren Einträge unter Roadmap-Punkt 3 in der eingebetteten Übersicht nicht aufgehen. Die frühere Prüfung hatte den Klick ausgeführt, den sichtbaren geöffneten Inhalt jedoch nicht ausdrücklich geprüft.
+
+**Umgesetzt:** [Sales-Markatus-Uebersicht.html](../Sales-Markatus-Uebersicht.html) im Projektordner erstellt. Alle Inhalte, Gestaltung und Bedienlogik sind eingebettet; keine Internetverbindung, Zusatzdateien oder laufender Server erforderlich. Die exportierte Fassung verwendet native HTML-Aufklappelemente und ist unabhängig von Codex-Zustandsereignissen, die eine Ansicht neu aufbauen können. Offene Roadmap-Punkte werden im lokalen Zustand erhalten und nach Bereichswechsel sowie nach Möglichkeit nach Neuladen wiederhergestellt. Die konkrete Ursache des gemeldeten Fehlers in der Codex-Einbettung ist damit nicht abschließend nachgewiesen; die ausgelieferte Browserdatei wurde direkt geprüft. Die ursprüngliche Inline-Fassung bleibt unverändert.
+
+**Geprüft:** Fertige Datei direkt über einen lokalen Dateipfad in Edge mit abgeschaltetem Netzwerk geöffnet. Alle 14 Roadmap-/Ideenpunkte einzeln auf- und zugeklappt und Sichtbarkeit der Inhalte geprüft; Enter und Leertaste, Erhalt nach Bereichswechsel/Neuladen, heller Modus, schmale Darstellung und Kunden-/Buchungsklickweg geprüft. Keine JavaScript-Fehler oder Netzwerkanfragen.
+
+**Nächste Aktion für den Nutzer:** `Sales-Markatus-Uebersicht.html` im Projektordner per Doppelklick öffnen oder an einen gewünschten Ort auf dem PC kopieren.
+
+### 24.09.2026 – Lokale Roadmap um eigene Punkte und Priorisierung erweitert
+
+**Ausdrücklicher Nutzerauftrag:** Alle zehn zuletzt vorgeschlagenen Zukunftsideen in die lokale HTML-Roadmap aufnehmen; darunter eigene Roadmap-Punkte erfassen können; jedem Punkt eine Priorität zuweisen und automatisch von höchster zu niedrigster Priorität sortieren, um Updates zu planen.
+
+**Implementiert in `Sales-Markatus-Uebersicht.html`:** Eine gemeinsame Liste aller 24 bisherigen und neuen Punkte. N04–N10 behalten ihre dokumentierten Bedeutungen. Die drei bisherigen Konkretisierungen erhalten zusätzlich eigene Kennungen: **N11** weitere Magazinpotenziale (R11), **N12** Absagegründe (R05), **N13** Unterlagenstatus (R02/R10). Damit sind alle zehn Vorschläge einzeln priorisierbar, ohne die übergeordneten R-Punkte zu entfernen. Herkunft und Konzeptstatus bleiben sichtbar; die Aufnahme ist keine Beauftragung ihrer Umsetzung in der Sales-App.
+
+Jeder Eintrag erhält „Priorität“ mit höchster/hoher/mittlerer/niedriger bzw. noch offener Einstufung sowie „Geplantes Update“ (1–5, später, offen). Alle starten unpriorisiert. Änderungen sortieren sofort über die gesamte Liste hinweg; bei gleicher Priorität bleibt die ursprüngliche Reihenfolge erhalten. Die Update-Zuordnung beeinflusst die Prioritätssortierung nicht. Stand und Pilotvoraussetzungen bleiben separat aufklappbar erhalten.
+
+Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und beiden Einstufungen angelegt sowie später bearbeitet oder nach Bestätigung entfernt werden. Änderungen bleiben lokal im Browser. „HTML mit Planung speichern“ exportiert zusätzlich eine eigenständige HTML-Kopie einschließlich eigener Punkte, Prioritäten und Update-Zuordnungen für Sicherung/Weitergabe. Die Ursprungsdatei wird durch Browserbedienung nicht automatisch verändert. Blockierte Browserspeicherung wird sichtbar gemeldet.
+
+**Verifikation:** Alle 24 Aufklappelemente, globale Sofortsortierung samt Gleichständen, Update-Zuordnung, Erhalt offener Details und laufender Formulareingaben beim Sortieren, Anlage/Bearbeitung/Löschung eigener Punkte, Pflichtfeldprüfung, Textausgabe ohne HTML-Ausführung, Wiederherstellung nach Neuladen und Übernahme alter gespeicherter Ansichten geprüft. Export in einem frischen Offline-Browser geöffnet: eigene Einträge und Planung vollständig vorhanden. Speicherfehler und Breiten 320/360/760/1280 Pixel geprüft, keine JavaScript-Fehler oder externen Netzwerkanfragen. Getestete Fassung identisch in die lokale Zieldatei übernommen.
+
+**Nächste Aktion:** Lokale HTML neu laden, „Roadmap“ öffnen und erste Prioritäten setzen. Zum Mitnehmen der Planung den HTML-Export verwenden.
+
+### 24.09.2026 – Anforderungen für Apps-Script-App mit echten Daten aufgenommen
+
+**Ausdrücklicher Nutzerwunsch:** Die lokale HTML-App mit bestehender Gestaltung als Apps-Script-Web-App betreiben, Fake-Daten entfernen und Firebase als gemeinsame Datenbank verwenden. Eine integrierte Testseite soll zuerst Firebase abfragen, danach einen gezielten HQ-Import auslösen und anschließend wieder Firebase lesen. Ebenso App→Firebase→HQ testen; manuelle Testläufe ersetzen später die nächtliche Ausführung. Der Nutzer fragt vor Umsetzung nach offenen Fragen und eigenen Vorbereitungsschritten.
+
+**Vollständig dokumentierter Umfang:** [ECHTDATEN-PILOT.md](ECHTDATEN-PILOT.md) enthält Unternehmensfelder, beide Adresstypen, eigene Felder, Adressherkunft mit Sonstige-Freitext, Kunden-/Interessentenstatus (Standard Interessent), sämtliche Ansprechpartner, bidirektionale Kontakt-Historie, Projekt-/Umsatzübersicht, Magazin-Historie aus Sammelprojektrechnungen, änderbare Ausgabeziele/Termine, Google-Anmeldung und historische Magazinfilter. Neue Firmen mit abhängigen Ansprechpartnern müssen zuverlässig und ohne Dubletten synchronisierbar werden. Besondere Sorgfalt bei jedem HQ-Schreibziel ist ausdrücklich gefordert. Bestehende Roadmap-Wünsche bleiben erhalten.
+
+**Vorschläge, noch nicht entschieden:** Einzelbelege als nachvollziehbare Quelle plus Zusammenfassung je Firma/Ausgabe; getrennte Adress- und HQ-IDs; Synchronisationsaufträge mit Wiederaufnahme; Konflikte sichtbar zurückhalten; zunächst Schreibvorschau, dann begrenzte Testobjekte mit Rücklesen aus HQ. Ziele/Termine zunächst in Firebase. Rechnungen weiterhin nur lesen ist ein Vorschlag zur Klärung, keine stillschweigende Einschränkung des allgemein formulierten Schreibwunsches.
+
+**Offen:** Kontoarten und Pilotzugang, HQ-Testumgebung, Finanz-/Projekt-Schreibumfang, Umsatz-/Teilnahmedefinition, Sonderfälle bei Rechnungsempfängern, Konfliktregel, HQ-Ziel für Ausgabedaten und Benutzer-/Nummernzuordnung. HQ-API v2 bleibt Ausgangspunkt; Schreibfähigkeit, Pflichtfelder und Kontakthistorien-Zuordnung sind noch nicht geprüft.
+
+**Tatsächlich erledigt:** Bestehende Dokumentation, lokale Demo und Pilot-Zugriffsregeln geprüft; aktuelle offizielle HQ-/Apps-Script-Dokumentation gelesen; Anforderungen und Vorbereitungen dauerhaft festgehalten. In diesem Schritt keine App-Funktionen implementiert, keine Bereitstellung und keine HQ- oder Firebase-Datenänderung ausgeführt.
+
+**Nächste Aktion:** Fachliche Fragen beantworten; anschließend Apps-Script-Anbindung und integrierten Lese-Testpfad bauen. Echte Schreibtests erst mit festgelegten Testobjekten und geprüften Feldzuordnungen.
+
+### 24.09.2026 – Fachliche Antworten bestätigt und erster App-Datenpilot implementiert
+
+**Bestätigte Entscheidungen:** Nur ausdrücklich freigegebene E-Mail-Adressen; selbst anzulegende Testfirmen für HQ-Schreibtests; Firmen der gewählten COBURGER-Ausgabe ausschließlich lesen. Rechnungen und Projekte bleiben reine Lesequellen. Umsatz netto aus ausgestellten auch unbezahlten Rechnungen, ohne Entwürfe, Gutschriften/Stornos berücksichtigen. Rechnungsempfänger zunächst als Inserent behandeln. Rechnungen über mehrere Ausgaben existieren, ihre Aufteilung ist ausdrücklich zurückgestellt. Konflikte anzeigen und entscheiden lassen. Ausgabeziele/Termine nur in App/Firebase. HQ-Verantwortlichen manuell wählen. Spätere App-Nutzer ohne HQ-Konto als zusätzliche offene Roadmap-Anforderung erhalten. Übrige Vorschläge grundsätzlich akzeptiert. Die Antworten sind in [ECHTDATEN-PILOT.md](ECHTDATEN-PILOT.md) als vorrangiger Entscheidungsstand ergänzt.
+
+**Lokal implementiert:** [sales-app](../sales-app/README.md) enthält die neue Oberfläche im bisherigen Stil ohne Demo-Kundendaten und den Serverteil. Neue getrennte Firebase-Sammlungen für Ausgabe, Firmendetails, Auswahllisten, Testfirmen und Übertragungsaufträge. Integrierter manueller Datenweg Firebase→HQ-Import→erneuter Firebase-Abruf; begrenzter Ausgabeimport und separate Firmendetails mit Kontakten, Historie und Projektumsatz. Eigene Testfirma einschließlich Standardadresse, Verantwortlichem, Firmentyp und erstem Kontakt zunächst in Firebase erfassen, dann kontrolliert in HQ anlegen und zurücklesen. Eindeutige Zielzuordnung, Vorschau, Sperre bei unklarem Ausgang, Markerprüfung und Wiederaufnahme. Kontakt-Historie und erster Änderungstest für Branche/Homepage eigener Testfirmen. Konfliktentscheidung und Versionsschutz für Ausgabeziele/Termine. E-Mail-Freigaben über Verwaltung. Details und Grenzen stehen im Modul-README.
+
+**Verifikation:** 20 neue automatisierte Prüfungen sowie bestehende Benchmark-/Umsatz-/Firebase-Tests erfolgreich. Oberfläche lokal im Browser, Sonstige-Freitext, Themewechsel und schmale Darstellung geprüft. Keine echten Kundendaten für diese Prüfungen verwendet. Öffentliche HQ-v2-Schemata zu Firmen, Adressen, Kontakten und Kontakt-Historie geprüft. Der aktuelle Code des bestehenden Apps-Script-Projekts wurde lokal gesichert; dessen HQ-/Firebase-Module stimmen mit dem lokalen Ausgangsstand überein.
+
+**Bereitstellungsstand und Blocker:** Bestehendes Projekt und bisherige Web-App-Bereitstellung identifiziert. Erster Upload an einer Dateinamenskollision gescheitert; Quell-/Ausgabename danach korrigiert (`SalesBackend.gs` versus `Sales.html`). Weiterer Upload von Google abgewiesen: Apps Script API im Benutzerkonto nicht aktiviert. Deshalb noch keine erfolgreiche Veröffentlichung der neuen App, kein echter Ausgabe-/Detailimport und kein HQ-Schreibtest. Der Browser-Livetest wartet zusätzlich auf die persönliche Google-Anmeldung im Codex-Browser. Keine geheimen Script Properties ausgelesen oder dokumentiert.
+
+**Zugriff:** Die automatische Freigabeprüfung lehnte die geplante Erweiterung der Google-Bereitstellung auf die Firmendomäne ab. Sicherere Alternative umgesetzt: Manifest behält `MYSELF`/„Nur ich“ bei. Die serverseitige E-Mail-Liste beschränkt den App-Zugriff zusätzlich, ersetzt aber die Google-Bereitstellungsfreigabe nicht. Weitere Nutzer können unter dem unveränderten Bereitstellungszugriff noch nicht praktisch zugreifen. Mehrnutzerfreigabe später ausdrücklich klären; keine Umgehung der Ablehnung.
+
+**Noch nicht implementiert bzw. nicht abgenommen:** Vollständige Bearbeitung aller Stammdaten-/Adress-/Kontaktfelder, weitere Ausgaben, Historienfilter über mehrere Ausgaben, produktive App-Buchungen/Wiedervorlagen, externe Google-Identitäten, durchgängige Rollen und fortsetzbarer Nachtimport. Diese Anforderungen bleiben erhalten. Der neue Stand ist ein erster Daten-/Schreibtestpilot, keine fertige produktive Vertriebs-App. Keine neuen automatischen Nachtläufe eingerichtet.
+
+**Nächste Nutzeraktion:** Apps Script API in den Google-Benutzereinstellungen aktivieren und im Codex-Browser mit dem freigegebenen Konto anmelden. Danach bestehenden App-Code hochladen, gleiche Web-App-Adresse auf neue Version setzen und zuerst ausschließlich Lesetests an der gewählten Ausgabe durchführen. Eigene Testfirmen erst nach Prüfung der echten Auswahllisten und Zielzuordnung erstellen.
+
+### 25.09.2026 – Bereitstellung bestätigt und auf manuelle Dateiübergabe umgestellt
+
+**Tatsächlich erfolgt nach der Rückmeldung „aktiviert“:** Die sieben Apps-Script-Dateien wurden erfolgreich in das bestehende Projekt hochgeladen. Die vorhandene Web-App-Bereitstellung wurde erfolgreich auf Version 8 aktualisiert. Der frühere API-Aktivierungsblocker ist damit erledigt; App-Adresse und Bereitstellungszugriff „Nur ich“ blieben erhalten. Der anschließende Browserzugriff auf die Google-Anmeldung wurde von der automatischen Prüfung wegen fehlender Workspace-Credits nicht ausgeführt. Dies war ein Fehler der Freigabeprüfung, keine Feststellung, dass die Aktion unsicher sei. App-Start, Ausgabeimport, Detailimport und HQ-Schreibtest sind daher weiterhin nicht live bestätigt.
+
+**Neue ausdrückliche Arbeitsweise:** Der Nutzer möchte die Dateien selbst nach Apps Script übertragen. Codex erzeugt und prüft künftig lokale Dateien und liefert eine verständliche Anleitung, ohne selbst hochzuladen oder Bereitstellungen zu ändern. Ein neuer ausdrücklicher Auftrag wäre nötig, um diese Arbeitsweise wieder zu ändern. Vorgabe in AGENTS.md festgehalten.
+
+**Übergabe:** Sieben unveränderte Programmdateien des bereits hochgeladenen Stands werden als Ordner und ZIP unter `output/apps-script/` mit [MANUELL-UEBERTRAGEN.md](../sales-app/MANUELL-UEBERTRAGEN.md) bereitgestellt. Keine Geheimnisse, Kundeninhalte oder lokale CLI-Anmeldedaten enthalten. Der Nutzer muss denselben Stand nicht nochmals übertragen; das Paket dient als vollständige lokale Übergabe und Grundlage kommender manueller Updates.
+
+**Nächste Aktion:** Bestehende Web-App öffnen und den ersten Firebase-/HQ-Lesetest über die Daten-Testseite durchführen. Künftige Änderungen manuell anhand der Anleitung übernehmen und anschließend eine neue Version der vorhandenen Bereitstellung veröffentlichen.
+
+### 25.09.2026 – Drei dauerhafte Arbeitsregeln für alle Folgechats verankert
+
+**Ausdrücklicher Nutzerauftrag:** (1) Fertige Dateien im Projektordner pflegen und genau benennen, welche der Nutzer selbst in Apps Script ersetzt; (2) anschließend die zugehörigen Änderungen nach GitHub hochladen; (3) alles Erledigte im Projekttagebuch festhalten. Diese Regeln sollen jedem neuen Chat sofort bekannt sein.
+
+**Umgesetzt:** Die drei Regeln stehen nun prominent am Anfang von `AGENTS.md` und zusätzlich im Zweck-/Pflegeabschnitt dieses Tagebuchs. Die Apps-Script-Übertragung bleibt manuell; ZIP-Dateien werden nur auf Wunsch benötigt. Der GitHub-Abgleich ist dauerhaft beauftragt und umfasst gezielte Commits mit Dokumentation, ohne Geheimnisse/Kundeninhalte oder ungeprüfte fremde Änderungen. Fehlgeschlagene Uploads müssen als offen gemeldet werden. Jeder abgeschlossene Arbeitsschritt erhält eine nachvollziehbare Tagebuchnotiz; lokale Umsetzung, GitHub-Sicherung, Google-Bereitstellung und Live-Prüfung bleiben getrennt.
+
+**Prüfung und Übergabe:** Bestehenden GitHub-Remote und aktiven Branch geprüft. Für diesen Arbeitsschritt werden ausschließlich `AGENTS.md` und das Projekttagebuch versioniert; übrige bereits vorhandene App-/Dokumentänderungen bleiben im Arbeitsordner erhalten. Keine Apps-Script-Bereitstellung und keine HQ-/Firebase-Datenänderung vorgenommen.
+
+**Nächster Schritt:** Bei den folgenden Änderungen automatisch nach diesem Ablauf arbeiten. Der erste echte Datenwegtest der bereits bereitgestellten Version 8 bleibt offen.
