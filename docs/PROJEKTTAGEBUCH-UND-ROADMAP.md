@@ -538,3 +538,5 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Unter **Schreiben · nur eigene Testfirmen** bei derselben Firma **Homepage in HQ prüfen** anklicken.
 - Den Text unter **Ansprechpartner** ab **Kontaktprüfung 2026-09-26-r8.1** mitteilen; keine Firma oder Kontakt-ID und keine anderen Daten aus der Tabelle mitschicken.
 - Keine neue Firma oder zweiten Ansprechpartner anlegen. Nach Auswertung wird die gezielte E-Mail-Korrektur fortgesetzt.
+
+**GitHub-Sicherung:** Die sechs zugehörigen Dateien wurden im Commit `eb520d2` gezielt versioniert und erfolgreich nach `origin/main` übertragen. Andere vorhandene Änderungen blieben unberührt. Dieser Sicherungsnachtrag wird separat versioniert. Der Live-Lesetest und die daraus abzuleitende E-Mail-Korrektur stehen weiterhin aus.
