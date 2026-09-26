@@ -4,7 +4,32 @@ Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer übertr
 
 ## Aktueller Stand
 
-**Aktuelles Update r5 (25.09.2026):** Die App startet laut Nutzer mit r4.1; Homepage und Anzeige der Kontakt-Historie funktionieren im Live-Test. Der jüngste Testfirmenauftrag steht auf „Fortsetzung vorbereitet“. Die HQ-Firma wurde gefunden, der Auftrag ist aber noch nicht vollständig abgeschlossen. Das erklärt die noch sichtbare technische Kennzeichnung und den fehlenden Ansprechpartner, sofern er im Entwurf eingetragen war. Für r5 **beide** Dateien ersetzen:
+**Aktuelles Update r6 (26.09.2026): neue Testfirma mit Ansprechpartner.** Der Nutzer möchte den früheren Auftrag nicht weiter als Testfall verwenden. Neue Firmen und ihr erster Ansprechpartner werden gemeinsam in Firebase gespeichert und sind dort sofort in **Kunden** und **Ansprechpartner** sichtbar, auch ohne HQ-ID. Erst ein bewusster Klick startet den HQ-Abgleich. Die App sendet zunächst die Firma, speichert deren HQ-ID und sendet danach den Ansprechpartner mit genau dieser ID. Bei verzögerter Rücklesung versucht die geöffnete App die ausstehende Prüfung bis zu sechs Mal im Abstand von 30 Sekunden erneut. Der gespeicherte Zwischenstand bleibt bei einem Seitenwechsel oder Schließen erhalten; dann kann der Auftrag später erneut gestartet werden. Bei **„Ausgang unklar“** wird kein Schreibaufruf automatisch wiederholt.
+
+Für **r6** diese beiden Dateien vollständig ersetzen:
+
+- [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) → Datei `SalesBackend.gs` im vorhandenen Apps-Script-Projekt.
+- [Sales.html](../hq-benchmark/Sales.html) → Datei `Sales.html` im vorhandenen Apps-Script-Projekt.
+
+Danach den Live-Test mit **einer neuen, selbst angelegten TEST-Firma und erfundenen Kontaktdaten** durchführen:
+
+1. Im Apps-Script-Editor beide genannten Dateien nacheinander öffnen und jeweils den gesamten bisherigen Inhalt durch die entsprechende lokale Datei ersetzen.
+2. Beide Dateien speichern.
+3. **Bereitstellen → Bereitstellungen verwalten → bestehende Web-App → Stift → Neue Version → Bereitstellen** öffnen. Die bisherige `/exec`-Adresse bleibt der Einstieg.
+4. Die Web-App neu laden. Oben muss **Stand 2026-09-26-r6** stehen. Bei „Dateien haben unterschiedliche Stände“ beide Dateien und die neue Bereitstellung prüfen; keine HQ-Schreibtests ausführen.
+5. **Daten-Testseite → Testfirma anlegen** öffnen. Falls keine HQ-Auswahllisten vorhanden sind, zuerst **Auswahllisten HQ → Firebase** starten.
+6. Für die Firma einen neuen Namen mit `TEST ` am Anfang und ausschließlich erfundene Testdaten eingeben. **Vorname und Nachname** des ersten Ansprechpartners sind für diesen Test Pflichtfelder; weitere Kontaktdaten nach Wunsch ausfüllen.
+7. **In Firebase speichern** klicken. Erwartung: Die Kundenkarte öffnet sich sofort und zeigt Firma und Ansprechpartner mit dem Hinweis **„Nur in Firebase“**. Zu diesem Zeitpunkt darf in HQ noch keiner der beiden Datensätze neu angelegt sein.
+8. Links **Kunden** öffnen und dieselbe Testfirma suchen. Sie muss dort auch nach **Frisch aus Firebase laden** sichtbar bleiben. Unter **Ansprechpartner** muss der neue Kontakt ebenfalls erscheinen.
+9. Die Testfirma öffnen und **Firma und Ansprechpartner nach HQ synchronisieren** klicken. Die Web-App während der Prüfung geöffnet lassen. Erwartung: Am Ende steht **„In HQ bestätigt“**; in HQ sind genau eine neue Firma und genau ein Ansprechpartner dieser Firma vorhanden. Die Firmenbeschreibung darf keine technische `[Sales-Test …]`-Kennzeichnung mehr enthalten.
+10. Wenn stattdessen **„Firma in HQ · Kontakt offen“** oder **„Kontakt in HQ · Prüfung offen“** erscheint, die automatischen Prüfungen abwarten. Nach etwa drei Minuten den sichtbaren Status notieren. Falls die Seite zwischenzeitlich geschlossen wurde, den gespeicherten Auftrag über die Firmenkarte fortsetzen.
+11. Wenn **„HQ-Ausgang prüfen“** erscheint, **HQ-Ausgang nur prüfen** verwenden und den angezeigten Status beziehungsweise den HTTP-Fehler mitteilen. Keine zweite Testfirma mit denselben Daten anlegen und den Auftrag nicht blind wiederholen.
+
+Für r6 sind **keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Bereitstellungseinstellungen** nötig. Die Freigabe für weitere Google-Konten ist davon getrennt und bleibt offen. Der HQ-Live-Schreibweg wurde von Codex nicht ausgeführt; die lokale Prüfung nutzt nur synthetische Daten. Der Abgleich läuft in diesem Pilot nach dem bewussten Start und bei Verzögerungen nur automatisch weiter, solange die Web-App geöffnet bleibt. Ein serverseitiger nächtlicher Hintergrundabgleich gehört zum späteren Ausbau.
+
+Die folgenden r5/r4-Abschnitte sind Projektverlauf. Für die aktuelle Übertragung und den neuen Test gilt die r6-Anleitung oben.
+
+**Früheres Update r5 (25.09.2026):** Die App startet laut Nutzer mit r4.1; Homepage und Anzeige der Kontakt-Historie funktionieren im Live-Test. Der damalige Testfirmenauftrag stand auf „Fortsetzung vorbereitet“. Die HQ-Firma wurde gefunden, der Auftrag war aber noch nicht vollständig abgeschlossen. Der Nutzer hat danach entschieden, den Ablauf stattdessen mit einer neuen Firma samt Ansprechpartner zu prüfen. Die damalige r5-Anleitung bleibt nachfolgend als Verlauf erhalten; für den aktuellen Austausch gilt r6 oben.
 
 1. [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) vollständig in die gleichnamige Apps-Script-Datei kopieren.
 2. [Sales.html](../hq-benchmark/Sales.html) vollständig in die gleichnamige HTML-Datei kopieren.
