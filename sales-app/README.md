@@ -1,16 +1,17 @@
 # Apps-Script-Datenpilot
 
-Stand: 26.09.2026, lokal vorbereitete Version `2026-09-26-r7`. Der Nutzer hat App-Start, 21 importierte Firmen mit Rechnungen der Ausgabe #70, einen Kundendetailimport sowie Homepage und kompakte Kontakt-Historie im Live-Test bestätigt. Der frühere Versuch, eine bereits in HQ angelegte Testfirma nachträglich zu vervollständigen, hat nicht wie erwartet funktioniert. Der nächste Test konzentriert sich deshalb auf **eine neue Firma mit direkt erfasstem Ansprechpartner**. Die Firmenanlage aus r6 wurde live bestätigt, der Ansprechpartner fehlt jedoch weiterhin; der gespeicherte Auftrag meldet HTTP 400. Die konkrete Ursache ist noch offen. r7 trennt die beiden Aufrufe ausdrücklich und ergänzt datensparsame Fehlerdiagnosen. Diese neue Version muss der Nutzer noch selbst nach Apps Script übertragen und live prüfen.
+Stand: 26.09.2026, lokal vorbereitet **2026-09-26-r8**. Der Kontakt-POST aus r7 wird live weiterhin mit HTTP 400 abgelehnt; erstmals nennt die Meldung salutation und salutationForm. Die separate Ansprache fehlte im bisherigen Payload. r8 ergänzt sie mit dem Standard Formal und einer Auswahl für neue Kontakte. Die drei Werte Formal/Informal/Neutral entsprechen der öffentlichen HQ-v2-Spezifikation. Die tatsächliche Annahme durch HQ steht noch aus. Die bisher nur erfolgreiche Firmenanlage ist kein Nachweis für den Kontaktweg.
 
 **Neuer Nutzerwunsch:** Ab jetzt nur lokale Dateien vorbereiten. Der Nutzer übernimmt Übertragung und Veröffentlichung selbst. Keine weiteren automatischen Uploads oder Bereitstellungsänderungen ohne erneuten ausdrücklichen Auftrag. Anleitung: [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md).
 
 ## Nächster Schritt für den Nutzer
 
-1. `SalesBackend.gs` und `Sales.html` anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen und bei der vorhandenen Bereitstellung **Neue Version** wählen. Keine neuen Skripteigenschaften oder Bereitstellungsrechte nötig.
-2. Die sichtbare Kennung `2026-09-26-r7` prüfen.
-3. Eine neue Firma mit `TEST ` am Namensanfang und erfundenem Ansprechpartner in Firebase speichern. Sofortige Anzeige in **Kunden** und **Ansprechpartner** prüfen, bevor ein HQ-Schreibauftrag gestartet wird.
-4. Auf der Firebase-Kundenkarte **1. Firma in HQ anlegen und bestätigen** starten. Die bestätigte Firma in HQ prüfen.
-5. Nach einer bewussten Testpause **2. Ansprechpartner nach HQ übertragen** starten. In HQ genau einen Ansprechpartner bei dieser Firma prüfen. Bei unklarem Ausgang den technischen Status melden; keine neue Testfirma mit denselben Daten anlegen.
+1. Die beiden Dateien nach [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) ersetzen und eine neue Version der bestehenden Bereitstellung veröffentlichen. Keine neuen Skripteigenschaften oder Zugriffsrechte.
+2. Die sichtbare Kennung **2026-09-26-r8** prüfen.
+3. Die vorhandene fehlgeschlagene Testfirma unter **Kunden** öffnen; keine neue Firma anlegen.
+4. **HQ-Ausgang nur prüfen** anklicken. Nur beim bekannten 400-Fehler mit fehlender Ansprache und einer bestätigten leeren HQ-Kontaktliste wird der Firebase-Entwurf auf Formal ergänzt und Schritt 2 freigegeben. HQ wird dabei nur gelesen.
+5. Nach der entsprechenden Bestätigung **2. Ansprechpartner nach HQ übertragen** anklicken.
+6. Den Kontakt bei derselben Firma in HQ prüfen. Bei erneutem Fehler den technischen Auftragstext melden; nicht erneut anlegen.
 
 ## Update nach der ersten eigenen Testfirma
 
@@ -49,7 +50,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 
 ## Bewusste Grenzen dieses ersten Testschritts
 
-- Firma in HQ live bestätigt; Kontaktanlage weiterhin ohne Live-Erfolgsnachweis. Der HTTP-400-Grund ist nicht eindeutig bekannt. Leere optionale Kontaktwerte werden jetzt ausgelassen; künftige Fehler zeigen Endpunkt und erkannte Feldnamen ohne rohe Kundenwerte. r7 hat noch keinen automatischen Nachtlauf.
+- Firma in HQ live bestätigt; Kontaktanlage weiterhin ohne Live-Erfolgsnachweis. Der Fehler ist auf die Anrede/Ansprache eingegrenzt; die fehlende Ansprache wurde korrigiert. r8 muss vom Nutzer noch bereitgestellt und live geprüft werden. Es gibt keinen automatischen Nachtlauf.
 - Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
 - Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
 - Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.
@@ -86,7 +87,7 @@ Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein
 
 ## Prüfung
 
-53 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
+61 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
 
 Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
 

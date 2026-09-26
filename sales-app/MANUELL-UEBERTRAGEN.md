@@ -1,6 +1,6 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 26.09.2026 · **2026-09-26-r7**. Dateien lokal vorbereitet; Übertragung und Bereitstellung übernimmt der Nutzer. Der HQ-Live-Test dieser Version steht noch aus. Frühere Updateanleitungen sind durch diese Anleitung ersetzt; der Verlauf bleibt im Projekttagebuch erhalten.
+Stand: 26.09.2026 · **2026-09-26-r8**. Dateien lokal vorbereitet; Übertragung und Bereitstellung übernimmt der Nutzer. Der HQ-Live-Test dieser Version steht noch aus. Frühere Updateanleitungen sind durch diese Anleitung ersetzt; der Verlauf bleibt im Projekttagebuch erhalten.
 
 ## Was sich ändert
 
@@ -9,9 +9,11 @@ Firma und Ansprechpartner werden weiterhin gemeinsam in Firebase gespeichert und
 - **Schritt 1:** Firma anlegen, HQ-ID speichern, Firma zurücklesen und ihre Identität bestätigen. Danach hält die App an. Auch ein zweiter Klick auf Schritt 1 sendet keinen Ansprechpartner.
 - **Schritt 2:** Die bestätigte Firma erneut über ihre gespeicherte ID lesen, den Ansprechpartner mit dieser ID anlegen und zurückprüfen. Danach die technische Firmenkennzeichnung entfernen und den bestätigten Stand in Firebase ablegen.
 
-Beide Schritte können zeitlich getrennt und auch nach Schließen der App ausgeführt werden. Es gibt in r7 keine automatische Fortsetzung und noch keinen nächtlichen Hintergrundlauf. Ein unklarer Schreibausgang sperrt die Wiederholung.
+Beide Schritte können zeitlich getrennt und auch nach Schließen der App ausgeführt werden. Es gibt in r8 keine automatische Fortsetzung und noch keinen nächtlichen Hintergrundlauf. Ein unklarer Schreibausgang sperrt die Wiederholung.
 
-Die bisherige HTTP-400-Meldung enthielt weder den betroffenen Endpunkt noch die HQ-Feldhinweise. Deshalb ist die konkrete Ursache noch offen. r7 lässt leere optionale Kontaktfelder weg und speichert bei weiteren Fehlern Methode, Endpunkt, HTTP-Code und erkannte Feldnamen. Rohe Fehlerantworten oder darin enthaltene Kundenwerte werden nicht gespeichert oder angezeigt. Grundlage des Feldabgleichs: [offizielle HQ-v2-Spezifikation](https://developer.hellohq.io/swagger20.json).
+**Konkrete r8-Korrektur:** Der Nutzer meldet jetzt HTTP 400 am Kontakt-POST mit den Feldhinweisen salutation und salutationForm. Der bisherige Code übertrug die Anrede, ließ aber die separate Ansprache weg. r8 speichert und sendet salutationForm als Formal, Informal oder Neutral, standardmäßig Formal. Das neue Auswahlfeld heißt **Ansprache**. Anrede und Ansprache werden getrennt behandelt und zurückgeprüft. Das ist eine gezielte Korrektur passend zur Fehlermeldung; die Annahme durch den echten HQ-Mandanten bleibt live zu bestätigen. Grundlage: [offizielle HQ-v2-Spezifikation](https://developer.hellohq.io/swagger20.json).
+
+**Für den jetzt gemeldeten Fehler keine weitere Testfirma anlegen.** Die bestehende Firma und ihr Firebase-Kontakt können nach der unten beschriebenen Prüfung weiterverwendet werden. Nur der dokumentierte alte Kontakt-POST mit HTTP 400 und fehlender salutationForm erhält diesen Korrekturweg. Andere Fehler bleiben gesperrt.
 
 ## Die zwei Dateien ersetzen
 
@@ -35,14 +37,31 @@ Nur diese zwei Dateien ersetzen. Keine zusätzliche Datei Sales.gs anlegen. Code
 2. Die bisher verwendete Web-App auswählen.
 3. Auf das **Stiftsymbol** klicken.
 4. Unter **Version** den Eintrag **Neue Version** auswählen.
-5. Optional als Beschreibung **Sales r7 – Firma und Kontakt getrennt** eingeben.
+5. Optional als Beschreibung **Sales r8 – Firma und Kontakt getrennt** eingeben.
 6. Auf **Bereitstellen** klicken.
 7. Die bisherige Web-App-Adresse mit dem Ende **/exec** öffnen und neu laden.
-8. Oben in der App **Stand 2026-09-26-r7** prüfen. Bei einer anderen Kennung oder „Dateien haben unterschiedliche Stände“ zunächst beide Dateien und die ausgewählte Bereitstellung prüfen; noch keinen Schreibtest starten.
+8. Oben in der App **Stand 2026-09-26-r8** prüfen. Bei einer anderen Kennung oder „Dateien haben unterschiedliche Stände“ zunächst beide Dateien und die ausgewählte Bereitstellung prüfen; noch keinen Schreibtest starten.
 
-**Für r7 keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte.** Die vorhandenen Einstellungen bleiben bestehen. Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht.
+**Für r8 keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte.** Die vorhandenen Einstellungen bleiben bestehen. Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht.
 
-## Genau einen neuen Test durchführen
+## Jetzt testen: den bestehenden fehlgeschlagenen Auftrag fortsetzen
+
+1. Links **Kunden** öffnen.
+2. Die bereits angelegte eigene Testfirma aus der aktuellen Fehlermeldung öffnen.
+3. **HQ-Ausgang nur prüfen** anklicken. Alternativ steht unter **Daten-Testseite → Synchronisationsaufträge** beim selben Auftrag **Ergebnis nur in HQ prüfen**.
+4. Die Meldung abwarten. Erwartung: **„HQ geprüft: Firma bestätigt, keine Kontakte vorhanden. Fehlende Ansprache in Firebase auf Formell ergänzt.“** Bei dieser Prüfung wird in HQ nichts geschrieben.
+5. Wenn die Prüfung blockiert oder einen anderen Fehler meldet, diesen technischen Text mitteilen und nicht fortfahren. Die Freigabe erfordert die bekannte eigene HQ-Firma, unveränderte Testkennung und eine vollständig gelesene leere Kontaktliste.
+6. Nach erfolgreicher Prüfung **2. Ansprechpartner nach HQ übertragen** anklicken. Die App prüft die Firma und die weiterhin leere Kontaktliste noch einmal und überträgt dann den Kontakt mit ergänzter Ansprache. Die Firma wird nicht erneut angelegt.
+7. Die Meldung abwarten. Erwartung: **„In HQ bestätigt“** beziehungsweise **„Bestätigt“**.
+8. In HQ dieselbe Firma neu laden.
+9. Den Bereich **Kontakte** öffnen. Erwartung: Genau der eingegebene Ansprechpartner ist dieser Firma zugeordnet.
+10. Falls erneut ein Fehler erscheint, unter **Daten-Testseite → Synchronisationsaufträge** den vollständigen technischen Text ablesen und mitteilen, ohne Firmenname, IDs oder Kontaktwerte. Keinen weiteren Anlageversuch starten.
+
+Der Korrekturweg wird nicht für Timeouts, andere HTTP-Fehler, unbekannte frühere Ausgänge oder bereits vorhandene Ansprechpartner freigegeben. Auch ein zweiter Fehler mit bereits ergänzter Ansprache wird nicht automatisch erneut freigeschaltet. Ein vorhandener Kontakt wird weder gelöscht noch überschrieben.
+
+## Späterer Neuanlagetest nach erfolgreicher Kontaktprüfung
+
+
 
 1. Mit dem bereits funktionierenden Konto **info@markatus.de** die Web-App öffnen.
 2. Links **Daten-Testseite** auswählen.
@@ -69,7 +88,7 @@ Bei Abweichung:
 
 ## Bestehende Einrichtung und weitere Google-Konten
 
-Diese Übersicht dient zur Orientierung; für r7 müssen diese Werte nicht erneut eingetragen werden:
+Diese Übersicht dient zur Orientierung; für r8 müssen diese Werte nicht erneut eingetragen werden:
 
 | Skripteigenschaft | Vorhandene Konfiguration / Zweck |
 | --- | --- |

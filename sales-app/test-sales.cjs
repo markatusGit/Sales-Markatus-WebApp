@@ -19,7 +19,12 @@ function fixture(){
   };
   ctx.UrlFetchApp={fetch:(url,opt)=>{const path=url.replace('https://api.hellohq.io',''),body=JSON.parse(opt.payload);calls.push({method:opt.method,path,body});let result;
     if(path==='/v2/Companies'&&opt.method==='post') {const id=101;result={...clone(body),id,defaultAddress:{...body.defaultAddress,id:501},companyTypes:body.companyTypes,responsibleUsers:body.responsibleUserIds.map(userId=>({userId})),subsystems:body.subsystemIds.map(id=>({id}))};remote.Companies[id]=result;if(failAfterCreate)throw new Error('Simulated lost response');}
-    else if(path==='/v2/ContactPersons') {result={...body,id:202};remote.ContactPersons[202]=result;}
+    else if(path==='/v2/ContactPersons') {
+      // Model the observed salutation validation failure; the enum values come
+      // from HQ ContactPersonPost/SalutationForm, not from our payload builder.
+      if(!['Formal','Informal','Neutral'].includes(body.salutationForm))return {getResponseCode:()=>400,getContentText:()=>JSON.stringify({errors:{salutationForm:['Required for salutation']}})};
+      result={...body,id:202};remote.ContactPersons[202]=result;
+    }
     else if(path==='/v2/ContactHistories') {result={...body,id:303};remote.ContactHistories[303]=result;}
     else if(path==='/v2/Companies/101'&&opt.method==='put') {result={...remote.Companies[101],...body};remote.Companies[101]=result;}
     else if(path==='/v2/Companies/101/Addresses/501'&&opt.method==='put') {result={...remote.Companies[101].defaultAddress,...body,id:501};remote.Companies[101].defaultAddress=result;}
@@ -55,6 +60,65 @@ test('creation sequences company then contact with returned ID and verifies them
 test('HQ company read delay keeps a confirmed company phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{if(entity==='Companies')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id);assert.equal(first.state,'companyCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,1);f.ctx.salesOne_=original;assert.equal(finishCreate(f,r.id).state,'synced');});
 test('HQ contact read delay keeps a confirmed contact phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.runSalesJob(r.id,'company');f.ctx.salesOne_=(entity,id)=>{if(entity==='ContactPersons')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id,'contact');assert.equal(first.state,'contactCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,2);f.ctx.salesOne_=original;assert.equal(finishCreate(f,r.id).state,'synced');});
 test('repeating completed creation is idempotent',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const n=f.calls.length;f.ctx.runSalesJob(r.id);assert.equal(f.calls.length,n);});
+test('HQ fixture rejects the old missing salutationForm and accepts all documented forms',()=>{
+  const f=fixture(),response=f.ctx.UrlFetchApp.fetch('https://api.hellohq.io/v2/ContactPersons',{method:'post',payload:JSON.stringify({companyId:101,firstName:'Test',lastName:'Contact',salutation:'Herr'})});
+  assert.equal(response.getResponseCode(),400);assert.equal(Object.keys(f.remote.ContactPersons).length,0);
+  for(const form of ['Formal','Informal','Neutral']){
+    const n=fixture(),r=n.ctx.saveSalesTestCompany({...n.input,salutation:'Herr',salutationForm:form});finishCreate(n,r.id);
+    assert.equal(n.remote.ContactPersons[202].salutationForm,form);assert.equal(n.remote.ContactPersons[202].salutation,'Herr');
+    assert.equal(n.db['sales_companies/101'].contacts[0].salutationForm,form);
+  }
+  assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,salutationForm:'Herr'}),/Ansprache/);
+});
+function oldSalutationFailure(){
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,salutation:'Herr'});f.ctx.runSalesJob(r.id,'company');
+  const j=f.db['sales_jobs/'+r.id];delete f.db['sales_drafts/'+r.id].contact.salutationForm;
+  Object.assign(j,{state:'uncertain',contactAttempted:true,lastWrite:{method:'POST',resource:'/v2/ContactPersons',status:400,fields:['salutation','salutationForm']}});
+  return {f,id:r.id,j};
+}
+test('existing rejected contact is repaired in Firebase after read-only HQ checks, then synced without a new company',()=>{
+  const {f,id,j}=oldSalutationFailure(),writes=f.calls.filter(x=>x.method==='post'||x.method==='put').length;
+  assert.equal(f.ctx.reconcileSalesJob(id).state,'companyConfirmed');
+  assert.equal(f.calls.filter(x=>x.method==='post'||x.method==='put').length,writes);
+  assert.equal(f.db['sales_drafts/'+id].contact.salutationForm,'Formal');
+  assert.equal(f.db['sales_jobs/'+id].previousContactRejection.status,400);
+  assert.equal(f.ctx.runSalesJob(id,'contact').state,'synced');
+  assert.equal(f.calls.filter(x=>x.method==='post'&&x.path==='/v2/Companies').length,1);
+  assert.equal(f.calls.filter(x=>x.method==='post'&&x.path==='/v2/ContactPersons').length,1);
+});
+test('salutation repair never unlocks unknown writes, other endpoints, statuses or already corrected payloads',()=>{
+  for(const mutate of [j=>j.lastWrite.status=null,j=>j.lastWrite.status=500,j=>j.lastWrite.resource='/v2/Companies',j=>j.lastWrite.fields=['eMail'],j=>j.contactId=202,j=>j.state='running']){
+    const {f,id,j}=oldSalutationFailure();mutate(j);assert.throws(()=>f.ctx.reconcileSalesJob(id),/gesperrt/);assert.equal(f.db['sales_drafts/'+id].contact.salutationForm,undefined);
+  }
+  const {f,id}=oldSalutationFailure();f.db['sales_drafts/'+id].contact.salutationForm='Formal';assert.throws(()=>f.ctx.reconcileSalesJob(id),/gesperrt/);
+});
+test('salutation repair blocks any existing contact, a foreign result or a changed company',()=>{
+  for(const companyId of [101,999]){
+    const {f,id}=oldSalutationFailure();f.remote.ContactPersons[202]={id:202,companyId,firstName:'Existing'};
+    if(companyId===999){const original=f.ctx.salesCollect_;f.ctx.salesCollect_=(entity,...args)=>entity==='ContactPersons'?[f.remote.ContactPersons[202]]:original(entity,...args);}
+    assert.throws(()=>f.ctx.reconcileSalesJob(id),/gesperrt|Keine erneute/);assert.equal(f.db['sales_jobs/'+id].state,'uncertain');
+  }
+  const {f,id}=oldSalutationFailure();f.remote.Companies[101].name='TEST Changed';assert.throws(()=>f.ctx.reconcileSalesJob(id),/verändert/);
+});
+test('a contact appearing after repair prevents the corrected POST',()=>{
+  const {f,id}=oldSalutationFailure();f.ctx.reconcileSalesJob(id);f.remote.ContactPersons[202]={id:202,companyId:101};
+  assert.equal(f.ctx.runSalesJob(id,'contact').state,'companyConfirmed');assert.equal(f.calls.filter(x=>x.method==='post'&&x.path==='/v2/ContactPersons').length,0);
+});
+test('older unattempted drafts gain the default form before their first contact POST',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);delete f.db['sales_drafts/'+r.id].contact.salutationForm;
+  finishCreate(f,r.id);assert.equal(f.remote.ContactPersons[202].salutationForm,'Formal');
+  assert.equal(f.db['sales_drafts/'+r.id].contact.salutationForm,'Formal');
+});
+test('failed contact read cannot unlock or modify the rejected draft',()=>{
+  const {f,id}=oldSalutationFailure();f.ctx.salesCollect_=()=>{throw Error('HQ unavailable');};
+  assert.throws(()=>f.ctx.reconcileSalesJob(id),/unavailable/);assert.equal(f.db['sales_jobs/'+id].state,'uncertain');
+  assert.equal(f.db['sales_drafts/'+id].contact.salutationForm,undefined);
+});
+test('readback must confirm the requested salutation form',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id,'company');
+  const one=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{const value=one(entity,id);if(entity==='ContactPersons')value.salutationForm='Informal';return value;};
+  assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'contactCreated');assert.equal(f.db['sales_jobs/'+r.id].steps.contact,undefined);
+});
 test('contact step is blocked before confirmation and repeated company clicks never post contacts',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);
   assert.throws(()=>f.ctx.runSalesJob(r.id,'contact'),/Zuerst Schritt 1/);assert.equal(f.calls.length,0);
@@ -84,7 +148,7 @@ test('HTTP 400 identifies contact step and field names, without persisting error
 test('contact payload omits empty optional fields and only uses the confirmed parent ID',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id,'company');finishCreate(f,r.id);
   const payload=f.calls.find(x=>x.method==='post'&&x.path==='/v2/ContactPersons').body;
-  assert.deepEqual(payload,{companyId:101,firstName:f.input.firstName,lastName:f.input.lastName});
+  assert.deepEqual(payload,{companyId:101,firstName:f.input.firstName,lastName:f.input.lastName,salutationForm:'Formal'});
 });
 test('contact step resumes in a fresh backend execution using only persisted Firebase state',()=>{
   const first=fixture(),r=first.ctx.saveSalesTestCompany(first.input);first.ctx.runSalesJob(r.id,'company');
@@ -225,6 +289,8 @@ test('UI uses catalog dropdowns for industry and salutation and hides deferred c
   vm.runInNewContext(preboot+"state={release:APP_RELEASE,catalog:{industries:['Technik'],salutations:['Frau'],users:[],types:[],subsystems:[],fields:[]},user:{email:'test@example.invalid',admin:true},drafts:[],jobs:[],edition:null};globalThis.form=newCompany();})();",sandbox);
   assert.ok(sandbox.form.includes('<select name="industrialSector">'));
   assert.ok(sandbox.form.includes('<select name="salutation">'));
+  assert.ok(sandbox.form.includes('<select name="salutationForm">'));
+  assert.match(sandbox.form,/<option value="Formal" selected>Formell<\/option>/);
   assert.ok(sandbox.form.includes('Technik'));
   assert.ok(!sandbox.form.includes('Kundenklassifizierung'));
   assert.ok(!sandbox.form.includes('type="url"'));
@@ -234,7 +300,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-26-r7',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-26-r8',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
@@ -259,7 +325,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-26-r7'));
+  assert.ok(root.innerHTML.includes('2026-09-26-r8'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

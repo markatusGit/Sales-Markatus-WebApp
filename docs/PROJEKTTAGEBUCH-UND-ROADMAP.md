@@ -495,3 +495,26 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Bei erneutem Fehler den technischen Text unter **Daten-Testseite → Synchronisationsaufträge** melden, ohne Kundendaten oder IDs; keine weitere Anlage starten.
 
 **Sicherungsstand:** Die acht zu r7 gehörenden Dateien einschließlich Dokumentation wurden im Commit `b496e59` gezielt versioniert und erfolgreich nach `origin/main` auf GitHub übertragen. Unabhängige vorhandene Änderungen blieben außerhalb des Commits. Dieser Sicherungsnachtrag wird separat versioniert. Google-Bereitstellung und r7-Live-Test stehen aus. Automatische zeitversetzte/nächtliche Verarbeitung, Google-Login für weitere Nutzer und die übrige Roadmap bleiben nach erfolgreicher Kontaktabnahme offen.
+
+### 26.09.2026 – Kontaktfehler auf Anrede/Ansprache eingegrenzt; Korrektur r8
+
+**Neue Live-Rückmeldung:** Auch mit den getrennten r7-Aufrufen fehlt der Ansprechpartner. Die konkrete Meldung lautet nun `POST /v2/ContactPersons: HTTP 400` mit den erkannten Feldnamen `salutation` und `salutationForm`. Damit ist r7 vom Nutzer live ausgeführt, der Kontaktweg aber weiterhin fehlgeschlagen. Die Annahme, eine zeitliche Trennung könnte allein helfen, hat sich nicht bestätigt. Der Nutzer fragt nach einem zielführenden Test; keine weitere neue Firma als Diagnose verlangen.
+
+**Befund:** Die öffentliche HQ-v2-Spezifikation unterscheidet die freie Anrede `salutation` von der Ansprache `salutationForm` mit den Werten `Formal`, `Informal`, `Neutral`. Die bisherigen Payloads enthielten nur die Anrede. Die fehlende Ansprache ist nachweisbar und passt zum aktuellen Fehler; ohne die vollständige ursprüngliche Validierungsmeldung ist noch nicht bewiesen, dass dies die einzige Ablehnungsursache ist. Die bisherige Feldnamen-Diagnose hat nun einen konkreten Ansatz geliefert. Keine echten Kontaktwerte oder HQ-IDs aus der Nutzermeldung dokumentiert.
+
+**Lokal implementiert (r8):** Neue Kontakte erhalten ein eigenes Auswahlfeld **Ansprache**, standardmäßig **Formell**. Der Server validiert die dokumentierten Enum-Werte, speichert den Wert in Firebase, sendet ihn im Kontakt-POST und prüft ihn beim Rücklesen. Ältere noch nicht übertragene Entwürfe erhalten vor dem ersten Kontaktversuch ebenfalls die formelle Vorgabe. Anrede und Ansprache bleiben getrennte Felder. Kontakt-Snapshots bewahren die zurückgelesene Ansprache.
+
+**Gezielte Fortsetzung des bestehenden Auftrags:** Über die vorhandene Aktion **HQ-Ausgang nur prüfen** kann ausschließlich ein bekannter alter Kontakt-POST mit HTTP 400, Feldhinweis salutationForm und noch fehlender Ansprache vorbereitet werden. Die Firmenbestätigung, Zuordnung zur eigenen TEST-Firma, unveränderte Testkennung und vollständig gelesene leere Kontaktliste werden in HQ geprüft. Erst dann wird die fehlende Ansprache in Firebase auf Formal ergänzt und derselbe Auftrag für Schritt 2 freigegeben. Die Vorbereitung schreibt nichts nach HQ; vor dem bewusst gestarteten Kontakt-POST wird erneut geprüft, ob inzwischen Kontakte vorhanden sind. Vorhandene Kontakte, andere Fehler/Endpunkte, Timeouts, bekannte Kontakt-IDs, unvollständige Abfragen und bereits korrigierte Payloads bleiben von dieser Freigabe ausgeschlossen. Die Firma wird nicht erneut angelegt. Keine Kontaktlöschung, keine Änderung fremder Firmen und keine automatische Wiederholung.
+
+**Prüfung:** 61 lokale Prüfungen bestanden. Das HQ-Testmodell lehnt jetzt eine fehlende/ungültige Ansprache ab, statt jeden Kontakt-Payload ungeprüft zu akzeptieren; dies bildet den gemeldeten Fehler und die dokumentierten Enum-Werte synthetisch ab und ersetzt keinen Live-Nachweis. Neue Prüfungen umfassen alle drei Ansprachewerte, ältere Entwürfe, reine HQ-Leseprüfung bei Wiederaufnahme, keine zweite Firmenanlage, Sperre bei bestehenden oder zwischenzeitlich angelegten Kontakten, andere Fehler/Endpoints, fehlgeschlagene Abfragen sowie abweichende Rücklesewerte. Die HTML-Skripte sind syntaktisch geprüft. Die fertigen Apps-Script-Dateien wurden aus den Quellen erzeugt. Keine HQ-/Firebase-Schreibzugriffe und kein Google-Upload durch Codex.
+
+**Nächste Nutzeraktionen:**
+
+- `hq-benchmark/SalesBackend.gs` und `hq-benchmark/Sales.html` vollständig in die bestehenden gleichnamigen Google-Dateien übernehmen.
+- Bei der vorhandenen Bereitstellung **Neue Version** veröffentlichen und die Kennung **2026-09-26-r8** prüfen.
+- Unter **Kunden** dieselbe bereits angelegte eigene Testfirma öffnen.
+- **HQ-Ausgang nur prüfen** anklicken und die Meldung zur ergänzten formellen Ansprache abwarten.
+- Nur nach erfolgreicher Prüfung **2. Ansprechpartner nach HQ übertragen** anklicken.
+- Den Ansprechpartner unter **Kontakte** bei derselben Firma in HQ kontrollieren; bei Abweichung den technischen Auftragstext mitteilen.
+
+**Stand und Grenze:** Lokal vorbereitet und geprüft; GitHub-Sicherung folgt im Anschluss. Keine neuen/geänderten Skripteigenschaften, Manifest- oder Zugriffseinstellungen. Die r8-Bereitstellung und erfolgreiche Kontaktanlage bleiben bis zur Nutzerrückmeldung offen. Die übrige Roadmap einschließlich automatischer zeitversetzter Verarbeitung bleibt bestehen.

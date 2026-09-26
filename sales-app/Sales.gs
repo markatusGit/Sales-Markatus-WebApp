@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-26-r7';
+const SALES_RELEASE = '2026-09-26-r8';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -243,7 +243,7 @@ function syncSalesCompany(id) {
       return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,
         plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
     });
-    const value={company,contacts:contacts.map(x=>salesPick_(x,['id','companyId','firstName','lastName','position','salutation','eMail','phoneMobile','phoneLandline','updatedOn'])),histories:historyRows,projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
+    const value={company,contacts:contacts.map(x=>salesPick_(x,['id','companyId','firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline','updatedOn'])),histories:historyRows,projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
     salesWrite_('sales_companies/'+id,value);return {message:'Firmendetails nach Firebase übertragen. Jetzt erneut aus Firebase laden.'};});
 }
 function saveSalesEditionSettings(input) {
@@ -282,7 +282,13 @@ function salesDraftInput_(input,catalog) {
   const contact={};['firstName','lastName','position','salutation','eMail','phoneMobile','phoneLandline'].forEach(k=>contact[k]=salesText_(input[k],200,false));
   if(!contact.firstName||!contact.lastName) throw new Error('Bitte Vor- und Nachname des ersten Ansprechpartners eingeben.');
   if(contact.salutation&&!(catalog.salutations||[]).includes(contact.salutation)) throw new Error('Bitte eine Anrede aus der aktuellen HQ-Auswahlliste wählen.');
+  contact.salutationForm=salesSalutationForm_(input.salutationForm);
   return {company,contact,kind:typeName,addressOrigin:origin,addressOriginOther:origin==='Sonstige'?originOther:''};
+}
+function salesSalutationForm_(value) {
+  const form=value===undefined||value===null||value===''?'Formal':value;
+  if(!['Formal','Informal','Neutral'].includes(form)) throw new Error('Bitte eine gültige Ansprache wählen: Formell, Informell oder Neutral.');
+  return form;
 }
 function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
@@ -416,6 +422,15 @@ function salesRunCreate_(job,draft,step) {
     return;
   }
   if(draft.contact&&!job.steps.contact&&!job.contactId) {
+    if(job.salutationRetryPreparedAt) {
+      // Recheck immediately before the corrected POST, even if the user waited
+      // after preparing it. Any returned contact blocks this narrow retry path.
+      if(salesCollect_('ContactPersons','companyId eq '+job.hqId,Date.now()).length) throw new Error('Seit der Prüfung sind Kontakte in HQ vorhanden. Keine erneute Anlage; bitte HQ prüfen.');
+    }
+    // Separate HQ fields: salutation is e.g. Herr/Frau, salutationForm is an enum.
+    // Complete drafts saved by older app versions before their first contact attempt.
+    draft.contact.salutationForm=salesSalutationForm_(draft.contact.salutationForm);
+    salesWrite_('sales_drafts/'+draft.id,draft);
     // Persist intent before the POST. A timeout cannot cause an automatic duplicate.
     job.contactAttempted=true;salesWrite_('sales_jobs/'+job.id,job);
     const payload={companyId:salesId_(job.hqId)};
@@ -437,12 +452,32 @@ function salesRunCreate_(job,draft,step) {
   job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);
   const cleanCompany=salesOne_('Companies',job.hqId);
   if(!salesHomepageConfirmed_(cleanCompany,draft.company.homepage)||!salesEqualFields_(cleanCompany.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Homepage oder Adresse nach Bereinigung in HQ nicht mehr bestätigt.');
-  salesWrite_('sales_companies/'+job.hqId,{company:salesCompany_(cleanCompany),contacts:job.contactId?[salesPick_(salesOne_('ContactPersons',job.contactId),['id','companyId','firstName','lastName','position','salutation','eMail','phoneMobile','phoneLandline'])]:[],histories:[],projects:[],detailVersion:3,loadedAt:salesNow_()});
+  salesWrite_('sales_companies/'+job.hqId,{company:salesCompany_(cleanCompany),contacts:job.contactId?[salesPick_(salesOne_('ContactPersons',job.contactId),['id','companyId','firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline'])]:[],histories:[],projects:[],detailVersion:3,loadedAt:salesNow_()});
+}
+function salesPrepareSalutationRetry_(job,draft) {
+  const rejection=job.lastWrite;
+  // Only the identified old payload defect is repairable here. Never unlock a
+  // timeout, another endpoint/status, an already fixed payload or a known contact.
+  if(job.state!=='uncertain'||job.kind!=='createCompany'||!job.contactAttempted||job.contactId||job.steps?.contact||job.markerCleanupAttempted||draft.contact?.salutationForm||job.salutationRetryPreparedAt||
+     rejection?.method!=='POST'||rejection.resource!=='/v2/ContactPersons'||rejection.status!==400||!rejection.fields?.includes('salutationForm')) return false;
+  if(!draft.contact||!draft.testOnly||!/^TEST[ -]/i.test(draft.company.name)||!job.companyConfirmedAt||!job.steps?.company||!job.hqId||Number(draft.hqId)!==Number(job.hqId)) throw new Error('Firmenzuordnung für die Kontaktkorrektur nicht bestätigt. Auftrag bleibt gesperrt.');
+  const actual=salesOne_('Companies',job.hqId),marked=[draft.company.description,'[Sales-Test '+job.id+']'].filter(Boolean).join('\n');
+  if(actual.name!==draft.company.name||String(actual.description||'').replace(/\r\n/g,'\n')!==marked) throw new Error('HQ-Firma oder Testkennung inzwischen verändert. Auftrag bleibt gesperrt.');
+  const contacts=salesCollect_('ContactPersons','companyId eq '+job.hqId,Date.now());
+  if(contacts.some(c=>Number(c.companyId)!==Number(job.hqId))) throw new Error('HQ-Kontaktfilter liefert fremde Firmen. Auftrag bleibt gesperrt.');
+  if(contacts.length) throw new Error('In HQ sind bereits Kontakte dieser Firma vorhanden. Keine erneute Kontaktanlage freigegeben; bitte den vorhandenen Kontakt prüfen.');
+  draft.contact.salutationForm='Formal';
+  job.previousContactRejection=rejection;job.salutationRetryPreparedAt=salesNow_();
+  job.contactAttempted=false;job.state='companyConfirmed';job.updatedAt=salesNow_();
+  job.message='HQ geprüft: Firma bestätigt, keine Kontakte vorhanden. Fehlende Ansprache in Firebase auf Formell ergänzt. Jetzt Schritt 2 separat starten; HQ wurde bei dieser Prüfung nicht verändert.';
+  salesWrite_('sales_drafts/'+draft.id,draft);salesWrite_('sales_jobs/'+job.id,job);
+  return true;
 }
 function reconcileSalesJob(id) {
   salesUser_(true);return salesLock_(()=>{const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job||!['uncertain','running'].includes(job.state)) throw new Error('Kein unklarer Auftrag.');
     const draft=salesRead_('sales_drafts/'+job.draftId);if(!draft?.testOnly) throw new Error('Testfirma fehlt.');
     if(job.kind==='createCompany') {
+      if(salesPrepareSalutationRetry_(job,draft)) return salesJobSummary_(job);
       if(job.hqId&&job.markerCleanupAttempted) {
         const checked=salesOne_('Companies',job.hqId),marker=[draft.company.description,'[Sales-Test '+draft.id+']'].filter(Boolean).join('\n');
         if(checked.name!==draft.company.name||!salesEqualFields_(checked,salesPick_(draft.company,['industrialSector']))||!salesHomepageConfirmed_(checked,draft.company.homepage)||!salesEqualFields_(checked.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Firmenwerte in HQ nicht eindeutig bestätigt. Auftrag bleibt gesperrt.');
