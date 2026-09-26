@@ -1,15 +1,16 @@
 # Apps-Script-Datenpilot
 
-Stand: 26.09.2026, lokal vorbereitete Version `2026-09-26-r6`. Der Nutzer hat App-Start, 21 importierte Firmen mit Rechnungen der Ausgabe #70, einen Kundendetailimport sowie Homepage und kompakte Kontakt-Historie im Live-Test bestätigt. Der frühere Versuch, eine bereits in HQ angelegte Testfirma nachträglich zu vervollständigen, hat nicht wie erwartet funktioniert. Der nächste Test konzentriert sich deshalb auf **eine neue Firma mit direkt erfasstem Ansprechpartner**. Die neue Version muss der Nutzer noch selbst nach Apps Script übertragen und live prüfen.
+Stand: 26.09.2026, lokal vorbereitete Version `2026-09-26-r7`. Der Nutzer hat App-Start, 21 importierte Firmen mit Rechnungen der Ausgabe #70, einen Kundendetailimport sowie Homepage und kompakte Kontakt-Historie im Live-Test bestätigt. Der frühere Versuch, eine bereits in HQ angelegte Testfirma nachträglich zu vervollständigen, hat nicht wie erwartet funktioniert. Der nächste Test konzentriert sich deshalb auf **eine neue Firma mit direkt erfasstem Ansprechpartner**. Die Firmenanlage aus r6 wurde live bestätigt, der Ansprechpartner fehlt jedoch weiterhin; der gespeicherte Auftrag meldet HTTP 400. Die konkrete Ursache ist noch offen. r7 trennt die beiden Aufrufe ausdrücklich und ergänzt datensparsame Fehlerdiagnosen. Diese neue Version muss der Nutzer noch selbst nach Apps Script übertragen und live prüfen.
 
 **Neuer Nutzerwunsch:** Ab jetzt nur lokale Dateien vorbereiten. Der Nutzer übernimmt Übertragung und Veröffentlichung selbst. Keine weiteren automatischen Uploads oder Bereitstellungsänderungen ohne erneuten ausdrücklichen Auftrag. Anleitung: [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md).
 
 ## Nächster Schritt für den Nutzer
 
 1. `SalesBackend.gs` und `Sales.html` anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen und bei der vorhandenen Bereitstellung **Neue Version** wählen. Keine neuen Skripteigenschaften oder Bereitstellungsrechte nötig.
-2. Die sichtbare Kennung `2026-09-26-r6` prüfen.
+2. Die sichtbare Kennung `2026-09-26-r7` prüfen.
 3. Eine neue Firma mit `TEST ` am Namensanfang und erfundenem Ansprechpartner in Firebase speichern. Sofortige Anzeige in **Kunden** und **Ansprechpartner** prüfen, bevor ein HQ-Schreibauftrag gestartet wird.
-4. Auf der Firebase-Kundenkarte bewusst **Firma und Ansprechpartner nach HQ synchronisieren** starten. In HQ genau eine Firma und einen mit ihr verknüpften Ansprechpartner prüfen. Bei unklarem Ausgang keine neue Testfirma mit denselben Daten anlegen.
+4. Auf der Firebase-Kundenkarte **1. Firma in HQ anlegen und bestätigen** starten. Die bestätigte Firma in HQ prüfen.
+5. Nach einer bewussten Testpause **2. Ansprechpartner nach HQ übertragen** starten. In HQ genau einen Ansprechpartner bei dieser Firma prüfen. Bei unklarem Ausgang den technischen Status melden; keine neue Testfirma mit denselben Daten anlegen.
 
 ## Update nach der ersten eigenen Testfirma
 
@@ -40,7 +41,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 - Manuell importierte Auswahllisten für HQ-Verantwortliche, Firmentypen, Unternehmensbereiche sowie beobachtete Branchen und Anreden; relevante eigene Felder bleiben für spätere Schritte verfügbar.
 - Eigene Testfirma mit Standardadresse, Firmentyp (Interessent als Vorgabe), verantwortlichem HQ-Benutzer, ausdrücklich gewähltem HQ-Unternehmensbereich und erstem Ansprechpartner in Firebase erfassen. Für diesen Neuanlage-Test sind Vor- und Nachname des Kontakts Pflichtfelder. Beide sind sofort in Kunden- und Ansprechpartneransicht sichtbar, auch ohne HQ-ID.
 - Adressherkunft mit den drei vereinbarten Auswahlen und Pflicht-Freitext bei Sonstige. Bis zur HQ-Feldentscheidung ausschließlich in Firebase speichern.
-- Auftragsvorschau und bewusste Ausführung. Ein Start sendet zuerst die Firma, liest sie anhand der zurückgegebenen ID und eindeutigen Testkennung zurück, sendet danach den Ansprechpartner mit dieser Firmen-ID und prüft ihn zurück. Bei verzögerter HQ-Rücklesung bleibt der Zwischenstand in Firebase gespeichert; die geöffnete App versucht die Prüfung bis zu sechs Mal nach je 30 Sekunden erneut. Ein späterer manueller Start setzt denselben Auftrag fort. Zielprüfung ausschließlich über serverseitige Testfirmen-/Auftragszuordnung; ein frei übergebener Firmenname oder eine HQ-ID schaltet kein Bestandsunternehmen frei.
+- Auftragsvorschau und zwei ausdrücklich getrennte Ausführungen: Schritt 1 sendet nur die Firma und bestätigt ihre Identität per Rücklesung. Schritt 2 ist erst mit gespeicherter Firmenbestätigung möglich, liest dieselbe Firmen-ID erneut und überträgt dann den Kontakt. Kein automatischer Übergang und keine automatische Wiederholung von Schreibversuchen. Der Zwischenstand liegt in Firebase und überlebt das Schließen der App. Zielprüfung ausschließlich über serverseitige Testfirmen-/Auftragszuordnung; frei übergebene Firmen-IDs schalten kein Bestandsunternehmen frei.
 - Unklare Antworten sperren Wiederholungen. Ein eindeutiger Marker ermöglicht das reine Zurücklesen einer eventuell bereits erfolgten Firmen-/Kontaktanlage. Ein nicht eindeutig bestätigter Vorgang bleibt gesperrt und verlangt Prüfung.
 - Neue Kontakthistorie für eine eigene Testfirma in Firebase erfassen und kontrolliert nach HQ übertragen.
 - Erster Änderungs-/Konflikttest für Branche und Homepage der eigenen Testfirma. Vorherige Firebase-Werte und aktueller HQ-Stand werden verglichen. Entscheidung HQ/App; vor einer erneut freigegebenen App-Änderung nochmals vergleichen.
@@ -48,7 +49,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 
 ## Bewusste Grenzen dieses ersten Testschritts
 
-- Eine frühere eigene Testfirma wurde vom Nutzer in HQ angelegt und dort geprüft. Die neue gemeinsame Firebase-Anlage und die anschließende HQ-Firma-/Kontaktsequenz aus r6 sind noch nicht live abgenommen. Die automatische Fortsetzung nach 30 Sekunden läuft nur, solange die Web-App geöffnet ist; ein serverseitiger Nachtlauf existiert noch nicht.
+- Firma in HQ live bestätigt; Kontaktanlage weiterhin ohne Live-Erfolgsnachweis. Der HTTP-400-Grund ist nicht eindeutig bekannt. Leere optionale Kontaktwerte werden jetzt ausgelassen; künftige Fehler zeigen Endpunkt und erkannte Feldnamen ohne rohe Kundenwerte. r7 hat noch keinen automatischen Nachtlauf.
 - Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
 - Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
 - Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.
@@ -64,7 +65,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 3. Einen Kunden öffnen → Firebase abfragen → Detailimport → erneut Firebase lesen. Angaben mit HQ vergleichen; diese Firma nicht ändern.
 4. Auf der Testseite **Auswahllisten HQ → Firebase** starten und Firebase erneut laden.
 5. **Testfirma anlegen**: einen eindeutig als Test gekennzeichneten Namen, Interessent, verantwortlichen HQ-Benutzer und korrekten Unternehmensbereich wählen. Standardadresse und Testkontakt erfassen. Keine echten Kundeninhalte in die Testfirma kopieren.
-6. **In Firebase speichern**. Auftrag und Zielwerte prüfen. Erst **Jetzt nach HQ übertragen und prüfen** sendet die vorgesehene Anlage.
+6. **In Firebase speichern**. Danach die getrennten Firmen- und Kontakt-Schritte gemäß der aktuellen manuellen Anleitung ausführen.
 7. Bei „Ausgang unklar“ keinen neuen Auftrag anlegen. **Ergebnis nur in HQ prüfen** verwenden und danach den gefundenen Stand gemeinsam auswerten.
 8. An der bestätigten Testfirma Kontakt-Historie und den begrenzten Änderungstest ausprobieren. Ein zweiter Klick auf einen bereits bestätigten Auftrag erzeugt keine zweite Anlage.
 
@@ -85,7 +86,7 @@ Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein
 
 ## Prüfung
 
-38 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
+53 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
 
 Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
 

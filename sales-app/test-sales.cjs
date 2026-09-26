@@ -32,9 +32,9 @@ function fixture(){
 }
 function finishCreate(f,id){
   for(let step=0;step<4;step++){
-    const result=f.ctx.runSalesJob(id);
+    const job=f.db['sales_jobs/'+id];const result=f.ctx.runSalesJob(id,job.companyConfirmedAt?'contact':'company');
     if(result.state==='synced')return result;
-    assert.ok(['companyCreated','contactCreated'].includes(result.state),'Unexpected creation state: '+result.state+' '+result.message);
+    assert.ok(['companyCreated','companyConfirmed','contactCreated'].includes(result.state),'Unexpected creation state: '+result.state+' '+result.message);
   }
   throw new Error('Create workflow did not finish.');
 }
@@ -51,14 +51,56 @@ test('Sonstige requires free text, valid responsible and subsystem IDs required'
 test('company and contact are visible from Firebase immediately, before any HQ write',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),state=f.ctx.getSalesState(),detail=f.ctx.getSalesCompany('draft_'+r.id);assert.equal(f.db['sales_jobs/'+r.id].state,'pending');assert.equal(f.db['sales_drafts/'+r.id].kind,'Interessent');assert.equal(state.localCompanies[0].id,'draft_'+r.id);assert.equal(state.localCompanies[0].syncState,'pending');assert.equal(detail.company.name,f.input.name);assert.equal(detail.contacts[0].firstName,f.input.firstName);assert.equal(detail.contacts[0].lastName,f.input.lastName);assert.equal(f.calls.length,0);});
 test('contact names are required so entered contact data is never silently dropped',()=>{const f=fixture();assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,firstName:'',lastName:'',eMail:'test@example.invalid'}),/Vor- und Nachname/);assert.throws(()=>f.ctx.saveSalesTestCompany({...f.input,lastName:''}),/Vor- und Nachname/);assert.equal(f.calls.length,0);});
 test('creation sequences company then contact with returned ID and verifies them',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);
-  assert.equal(f.ctx.runSalesJob(r.id).state,'synced');const writes=f.calls.filter(x=>x.method==='post');assert.deepEqual(writes.map(x=>x.path),['/v2/Companies','/v2/ContactPersons']);assert.equal(writes[1].body.companyId,101);assert.equal(f.db['sales_drafts/'+r.id].hqId,101);assert.equal(f.remote.ContactPersons[202].firstName,f.input.firstName);assert.ok(!f.remote.Companies[101].description.includes('[Sales-Test'));assert.equal(f.db['sales_companies/101'].contacts[0].id,202);assert.equal(f.ctx.getSalesCompany('draft_'+r.id).contacts[0].id,202);assert.equal(f.ctx.getSalesState().localCompanies[0].syncState,'synced');assert.ok(!('addressOrigin' in writes[0].body));assert.ok(!('note' in writes[1].body));});
-test('HQ company read delay keeps a confirmed company phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{if(entity==='Companies')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id);assert.equal(first.state,'companyCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,1);f.ctx.salesOne_=original;assert.equal(f.ctx.runSalesJob(r.id).state,'synced');});
-test('HQ contact read delay keeps a confirmed contact phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{if(entity==='ContactPersons')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id);assert.equal(first.state,'contactCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,2);f.ctx.salesOne_=original;assert.equal(f.ctx.runSalesJob(r.id).state,'synced');});
+  assert.equal(f.ctx.runSalesJob(r.id,'company').state,'companyConfirmed');assert.equal(f.calls.filter(x=>x.method==='post').length,1);assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'synced');const writes=f.calls.filter(x=>x.method==='post');assert.deepEqual(writes.map(x=>x.path),['/v2/Companies','/v2/ContactPersons']);assert.equal(writes[1].body.companyId,101);assert.equal(f.db['sales_drafts/'+r.id].hqId,101);assert.equal(f.remote.ContactPersons[202].firstName,f.input.firstName);assert.ok(!f.remote.Companies[101].description.includes('[Sales-Test'));assert.equal(f.db['sales_companies/101'].contacts[0].id,202);assert.equal(f.ctx.getSalesCompany('draft_'+r.id).contacts[0].id,202);assert.equal(f.ctx.getSalesState().localCompanies[0].syncState,'synced');assert.ok(!('addressOrigin' in writes[0].body));assert.ok(!('note' in writes[1].body));});
+test('HQ company read delay keeps a confirmed company phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{if(entity==='Companies')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id);assert.equal(first.state,'companyCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,1);f.ctx.salesOne_=original;assert.equal(finishCreate(f,r.id).state,'synced');});
+test('HQ contact read delay keeps a confirmed contact phase without a second POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),original=f.ctx.salesOne_;f.ctx.runSalesJob(r.id,'company');f.ctx.salesOne_=(entity,id)=>{if(entity==='ContactPersons')throw Error('HQ noch nicht lesbar');return original(entity,id);};const first=f.ctx.runSalesJob(r.id,'contact');assert.equal(first.state,'contactCreated');assert.match(first.message,/HQ noch nicht lesbar/);assert.equal(f.calls.filter(x=>x.method==='post').length,2);f.ctx.salesOne_=original;assert.equal(finishCreate(f,r.id).state,'synced');});
 test('repeating completed creation is idempotent',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const n=f.calls.length;f.ctx.runSalesJob(r.id);assert.equal(f.calls.length,n);});
-test('lost company response is blocked and reconciled before the contact is posted',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.loseResponse();assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.throws(()=>f.ctx.runSalesJob(r.id),/gesperrt/);assert.equal(f.ctx.reconcileSalesJob(r.id).state,'ready');assert.equal(f.ctx.runSalesJob(r.id).state,'synced');assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
-test('lost contact response is reconciled by unique matching contact without another POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),fetch=f.ctx.UrlFetchApp.fetch;let lost=true;f.ctx.UrlFetchApp.fetch=(url,opt)=>{const out=fetch(url,opt);if(lost&&url.endsWith('/v2/ContactPersons')&&opt.method==='post'){lost=false;throw Error('Lost response');}return out;};assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.equal(f.ctx.reconcileSalesJob(r.id).state,'ready');assert.equal(f.ctx.runSalesJob(r.id).state,'synced');assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,1);});
+test('contact step is blocked before confirmation and repeated company clicks never post contacts',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);
+  assert.throws(()=>f.ctx.runSalesJob(r.id,'contact'),/Zuerst Schritt 1/);assert.equal(f.calls.length,0);
+  assert.equal(f.ctx.runSalesJob(r.id,'company').state,'companyConfirmed');
+  assert.equal(f.ctx.runSalesJob(r.id,'company').state,'companyConfirmed');
+  assert.equal(f.ctx.runSalesJob(r.id).state,'companyConfirmed');
+  assert.equal(f.calls.filter(x=>x.method==='post').length,1);
+  assert.equal(f.ctx.getSalesJobPreview(r.id).job.nextStep,'contact');
+  assert.equal(f.ctx.getSalesCompany('draft_'+r.id).contacts[0].firstName,f.input.firstName);
+  assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'synced');
+});
+test('second call rereads the confirmed company and refuses a changed target before contact POST',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id,'company');
+  f.remote.Companies[101].name='TEST Different';const begin=f.calls.length,result=f.ctx.runSalesJob(r.id,'contact');
+  assert.equal(result.state,'companyConfirmed');assert.match(result.message,/Firmenname/);
+  assert.equal(f.calls[begin].path,'/v2/Companies/101');assert.equal(f.calls.filter(x=>x.method==='post').length,1);
+});
+test('HTTP 400 identifies contact step and field names, without persisting error values or retrying',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'synthetic@example.invalid'});f.ctx.runSalesJob(r.id,'company');
+  const fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>url.endsWith('/v2/ContactPersons')?{getResponseCode:()=>400,getContentText:()=>JSON.stringify({errors:{eMail:['Private customer value: secret-response-value']}})}:fetch(url,opt);
+  const result=f.ctx.runSalesJob(r.id,'contact');
+  assert.equal(result.state,'uncertain');assert.match(result.message,/POST \/v2\/ContactPersons: HTTP 400/);assert.match(result.message,/eMail/);
+  assert.equal(result.lastWrite.status,400);assert.equal(JSON.stringify(f.db).includes('secret-response-value'),false);
+  assert.throws(()=>f.ctx.runSalesJob(r.id,'contact'),/gesperrt/);
+});
+test('contact payload omits empty optional fields and only uses the confirmed parent ID',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(r.id,'company');finishCreate(f,r.id);
+  const payload=f.calls.find(x=>x.method==='post'&&x.path==='/v2/ContactPersons').body;
+  assert.deepEqual(payload,{companyId:101,firstName:f.input.firstName,lastName:f.input.lastName});
+});
+test('contact step resumes in a fresh backend execution using only persisted Firebase state',()=>{
+  const first=fixture(),r=first.ctx.saveSalesTestCompany(first.input);first.ctx.runSalesJob(r.id,'company');
+  const second=fixture();Object.assign(second.db,JSON.parse(JSON.stringify(first.db)));Object.assign(second.remote,JSON.parse(JSON.stringify(first.remote)));
+  assert.equal(second.ctx.runSalesJob(r.id,'contact').state,'synced');
+  assert.deepEqual(second.calls.filter(x=>x.method==='post').map(x=>x.path),['/v2/ContactPersons']);
+});
+test('contact list uses documented OData filtering and paging names',()=>{
+  const f=fixture();f.ctx.salesCollect_('ContactPersons','companyId eq 101',Date.now());
+  const q=new URL('https://example.invalid'+f.calls[0].path).searchParams;
+  assert.equal(q.get('$filter'),'companyId eq 101');assert.equal(q.get('$skip'),'0');assert.equal(q.get('$top'),'200');
+});
+test('lost company response is blocked and reconciled before the contact is posted',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.loseResponse();assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.throws(()=>f.ctx.runSalesJob(r.id),/gesperrt/);assert.equal(f.ctx.reconcileSalesJob(r.id).state,'ready');assert.equal(finishCreate(f,r.id).state,'synced');assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
+test('lost contact response is reconciled by unique matching contact without another POST',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),fetch=f.ctx.UrlFetchApp.fetch;f.ctx.runSalesJob(r.id,'company');let lost=true;f.ctx.UrlFetchApp.fetch=(url,opt)=>{const out=fetch(url,opt);if(lost&&url.endsWith('/v2/ContactPersons')&&opt.method==='post'){lost=false;throw Error('Lost response');}return out;};assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'uncertain');assert.equal(f.ctx.reconcileSalesJob(r.id).state,'ready');assert.equal(finishCreate(f,r.id).state,'synced');assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,1);});
 test('reconciliation never adopts a same-name unrelated company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);f.db['sales_jobs/'+r.id].state='uncertain';f.remote.Companies[99]={id:99,name:f.input.name,description:'unrelated'};assert.throws(()=>f.ctx.reconcileSalesJob(r.id),/Keine eindeutige/);assert.equal(f.db['sales_drafts/'+r.id].hqId,null);});
-test('different HQ address is reported after safe contact linkage without duplicate writes',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),orig=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{const v=orig(entity,id);if(entity==='Companies')v.defaultAddress.city='Wrong';return v;};const check=f.ctx.runSalesJob(r.id);assert.equal(check.state,'contactCreated');assert.match(check.message,/Standardadresse/);assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,1);assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
+test('different HQ address is reported after safe contact linkage without duplicate writes',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),orig=f.ctx.salesOne_;f.ctx.runSalesJob(r.id,'company');f.ctx.salesOne_=(entity,id)=>{const v=orig(entity,id);if(entity==='Companies')v.defaultAddress.city='Wrong';return v;};const check=f.ctx.runSalesJob(r.id,'contact');assert.equal(check.state,'contactCreated');assert.match(check.message,/Standardadresse/);assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,1);assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
 test('central writer rejects project/invoice/foreign-company paths',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);const j=f.db['sales_jobs/'+r.id];j.state='running';for(const path of ['/v2/Documents','/v2/Projects','/v2/Companies/999'])assert.throws(()=>f.ctx.salesWriteHq_(j,path,'post',{}),/gesperrt/);assert.equal(f.calls.length,0);});
 test('contact history is queued then written only to the own test company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const n=f.calls.length,h=f.ctx.saveSalesHistory({draftId:r.id,reason:'Call',content:'Test only',channel:'Call'});assert.equal(f.calls.length,n);assert.equal(f.ctx.runSalesJob(h.id).state,'synced');assert.equal(f.remote.ContactHistories[303].companyId,101);assert.equal(f.db['sales_companies/101'].histories.length,1);});
 test('concurrent HQ change surfaces conflict and prevents another PUT',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const baseline=f.calls.filter(x=>x.method==='put').length,j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'App',homepage:''});f.remote.Companies[101].industrialSector='HQ';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');assert.equal(f.calls.filter(x=>x.method==='put').length,baseline);f.ctx.resolveSalesConflict(j.id,'app');f.remote.Companies[101].industrialSector='HQ again';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');});
@@ -192,12 +234,20 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-26-r6',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-26-r7',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
   assert.ok(sandbox.contacts.includes('Ada Test'));assert.ok(sandbox.contacts.includes('TEST Lokal öffnen'));
-  assert.ok(sandbox.companyView.includes('Ada Test'));assert.ok(sandbox.companyView.includes('Firma und Ansprechpartner nach HQ synchronisieren'));
+  assert.ok(sandbox.companyView.includes('Ada Test'));assert.ok(sandbox.companyView.includes('1. Firma in HQ anlegen und bestätigen'));
+});
+test('UI shows the explicit second step only after confirmation, and no write button after HTTP errors',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
+  vm.runInNewContext(preboot+`state={user:{admin:true}};globalThis.first=createButton({id:'test',state:'pending',nextStep:'company'});globalThis.second=createButton({id:'test',state:'companyConfirmed',nextStep:'contact'});globalThis.blocked=createButton({id:'test',state:'uncertain',nextStep:'contact'});})();`,sandbox);
+  assert.ok(sandbox.first.includes('data-action="create-company"'));assert.ok(!sandbox.first.includes('create-contact'));
+  assert.ok(sandbox.second.includes('2. Ansprechpartner nach HQ übertragen'));assert.ok(sandbox.second.includes('data-action="create-contact"'));assert.equal(sandbox.blocked,'');
 });
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
@@ -209,7 +259,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-26-r6'));
+  assert.ok(root.innerHTML.includes('2026-09-26-r7'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

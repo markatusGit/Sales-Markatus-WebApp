@@ -1,215 +1,86 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 25.09.2026. Ab jetzt erstellt Codex die Dateien lokal; der Nutzer überträgt und veröffentlicht sie selbst. Keine weiteren automatischen Uploads oder Bereitstellungsänderungen ohne erneuten ausdrücklichen Auftrag.
+Stand: 26.09.2026 · **2026-09-26-r7**. Dateien lokal vorbereitet; Übertragung und Bereitstellung übernimmt der Nutzer. Der HQ-Live-Test dieser Version steht noch aus. Frühere Updateanleitungen sind durch diese Anleitung ersetzt; der Verlauf bleibt im Projekttagebuch erhalten.
 
-## Aktueller Stand
+## Was sich ändert
 
-**Aktuelles Update r6 (26.09.2026): neue Testfirma mit Ansprechpartner.** Der Nutzer möchte den früheren Auftrag nicht weiter als Testfall verwenden. Neue Firmen und ihr erster Ansprechpartner werden gemeinsam in Firebase gespeichert und sind dort sofort in **Kunden** und **Ansprechpartner** sichtbar, auch ohne HQ-ID. Erst ein bewusster Klick startet den HQ-Abgleich. Die App sendet zunächst die Firma, speichert deren HQ-ID und sendet danach den Ansprechpartner mit genau dieser ID. Bei verzögerter Rücklesung versucht die geöffnete App die ausstehende Prüfung bis zu sechs Mal im Abstand von 30 Sekunden erneut. Der gespeicherte Zwischenstand bleibt bei einem Seitenwechsel oder Schließen erhalten; dann kann der Auftrag später erneut gestartet werden. Bei **„Ausgang unklar“** wird kein Schreibaufruf automatisch wiederholt.
+Firma und Ansprechpartner werden weiterhin gemeinsam in Firebase gespeichert und sind sofort in der App sichtbar. Der HQ-Abgleich hat jetzt zwei ausdrücklich getrennte Aufrufe:
 
-Für **r6** diese beiden Dateien vollständig ersetzen:
+- **Schritt 1:** Firma anlegen, HQ-ID speichern, Firma zurücklesen und ihre Identität bestätigen. Danach hält die App an. Auch ein zweiter Klick auf Schritt 1 sendet keinen Ansprechpartner.
+- **Schritt 2:** Die bestätigte Firma erneut über ihre gespeicherte ID lesen, den Ansprechpartner mit dieser ID anlegen und zurückprüfen. Danach die technische Firmenkennzeichnung entfernen und den bestätigten Stand in Firebase ablegen.
 
-- [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) → Datei `SalesBackend.gs` im vorhandenen Apps-Script-Projekt.
-- [Sales.html](../hq-benchmark/Sales.html) → Datei `Sales.html` im vorhandenen Apps-Script-Projekt.
+Beide Schritte können zeitlich getrennt und auch nach Schließen der App ausgeführt werden. Es gibt in r7 keine automatische Fortsetzung und noch keinen nächtlichen Hintergrundlauf. Ein unklarer Schreibausgang sperrt die Wiederholung.
 
-Danach den Live-Test mit **einer neuen, selbst angelegten TEST-Firma und erfundenen Kontaktdaten** durchführen:
+Die bisherige HTTP-400-Meldung enthielt weder den betroffenen Endpunkt noch die HQ-Feldhinweise. Deshalb ist die konkrete Ursache noch offen. r7 lässt leere optionale Kontaktfelder weg und speichert bei weiteren Fehlern Methode, Endpunkt, HTTP-Code und erkannte Feldnamen. Rohe Fehlerantworten oder darin enthaltene Kundenwerte werden nicht gespeichert oder angezeigt. Grundlage des Feldabgleichs: [offizielle HQ-v2-Spezifikation](https://developer.hellohq.io/swagger20.json).
 
-1. Im Apps-Script-Editor beide genannten Dateien nacheinander öffnen und jeweils den gesamten bisherigen Inhalt durch die entsprechende lokale Datei ersetzen.
-2. Beide Dateien speichern.
-3. **Bereitstellen → Bereitstellungen verwalten → bestehende Web-App → Stift → Neue Version → Bereitstellen** öffnen. Die bisherige `/exec`-Adresse bleibt der Einstieg.
-4. Die Web-App neu laden. Oben muss **Stand 2026-09-26-r6** stehen. Bei „Dateien haben unterschiedliche Stände“ beide Dateien und die neue Bereitstellung prüfen; keine HQ-Schreibtests ausführen.
-5. **Daten-Testseite → Testfirma anlegen** öffnen. Falls keine HQ-Auswahllisten vorhanden sind, zuerst **Auswahllisten HQ → Firebase** starten.
-6. Für die Firma einen neuen Namen mit `TEST ` am Anfang und ausschließlich erfundene Testdaten eingeben. **Vorname und Nachname** des ersten Ansprechpartners sind für diesen Test Pflichtfelder; weitere Kontaktdaten nach Wunsch ausfüllen.
-7. **In Firebase speichern** klicken. Erwartung: Die Kundenkarte öffnet sich sofort und zeigt Firma und Ansprechpartner mit dem Hinweis **„Nur in Firebase“**. Zu diesem Zeitpunkt darf in HQ noch keiner der beiden Datensätze neu angelegt sein.
-8. Links **Kunden** öffnen und dieselbe Testfirma suchen. Sie muss dort auch nach **Frisch aus Firebase laden** sichtbar bleiben. Unter **Ansprechpartner** muss der neue Kontakt ebenfalls erscheinen.
-9. Die Testfirma öffnen und **Firma und Ansprechpartner nach HQ synchronisieren** klicken. Die Web-App während der Prüfung geöffnet lassen. Erwartung: Am Ende steht **„In HQ bestätigt“**; in HQ sind genau eine neue Firma und genau ein Ansprechpartner dieser Firma vorhanden. Die Firmenbeschreibung darf keine technische `[Sales-Test …]`-Kennzeichnung mehr enthalten.
-10. Wenn stattdessen **„Firma in HQ · Kontakt offen“** oder **„Kontakt in HQ · Prüfung offen“** erscheint, die automatischen Prüfungen abwarten. Nach etwa drei Minuten den sichtbaren Status notieren. Falls die Seite zwischenzeitlich geschlossen wurde, den gespeicherten Auftrag über die Firmenkarte fortsetzen.
-11. Wenn **„HQ-Ausgang prüfen“** erscheint, **HQ-Ausgang nur prüfen** verwenden und den angezeigten Status beziehungsweise den HTTP-Fehler mitteilen. Keine zweite Testfirma mit denselben Daten anlegen und den Auftrag nicht blind wiederholen.
+## Die zwei Dateien ersetzen
 
-Für r6 sind **keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Bereitstellungseinstellungen** nötig. Die Freigabe für weitere Google-Konten ist davon getrennt und bleibt offen. Der HQ-Live-Schreibweg wurde von Codex nicht ausgeführt; die lokale Prüfung nutzt nur synthetische Daten. Der Abgleich läuft in diesem Pilot nach dem bewussten Start und bei Verzögerungen nur automatisch weiter, solange die Web-App geöffnet bleibt. Ein serverseitiger nächtlicher Hintergrundabgleich gehört zum späteren Ausbau.
+1. Die lokale Datei [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) in einem Texteditor öffnen.
+2. Den gesamten Inhalt mit **Strg+A**, danach **Strg+C** kopieren.
+3. Das bestehende Projekt **Magazinvertrieb – HQ-Test** im [Apps-Script-Editor](https://script.google.com/home/projects/1QWMae8m5upOmPusbq2bS_IkIqRm8fVZHnjo-7U7ea6K0RglzOR4y7ZkJ/edit) öffnen.
+4. Links die bestehende Datei **SalesBackend.gs** auswählen.
+5. Ihren bisherigen Inhalt mit **Strg+A**, danach **Strg+V** vollständig ersetzen.
+6. Mit **Strg+S** speichern.
+7. Die lokale Datei [Sales.html](../hq-benchmark/Sales.html) per **Rechtsklick → Öffnen mit → Editor** als Quelltext öffnen.
+8. Den gesamten Inhalt mit **Strg+A**, danach **Strg+C** kopieren.
+9. Im Apps-Script-Editor links die bestehende HTML-Datei **Sales.html** auswählen.
+10. Ihren bisherigen Inhalt mit **Strg+A**, danach **Strg+V** vollständig ersetzen.
+11. Mit **Strg+S** speichern.
 
-Die folgenden r5/r4-Abschnitte sind Projektverlauf. Für die aktuelle Übertragung und den neuen Test gilt die r6-Anleitung oben.
+Nur diese zwei Dateien ersetzen. Keine zusätzliche Datei Sales.gs anlegen. Code.gs, Revenue.gs, FirebaseSync.gs, Index.html und appsscript.json gehören zur bestehenden Installation und werden für dieses Update nicht ersetzt.
 
-**Früheres Update r5 (25.09.2026):** Die App startet laut Nutzer mit r4.1; Homepage und Anzeige der Kontakt-Historie funktionieren im Live-Test. Der damalige Testfirmenauftrag stand auf „Fortsetzung vorbereitet“. Die HQ-Firma wurde gefunden, der Auftrag war aber noch nicht vollständig abgeschlossen. Der Nutzer hat danach entschieden, den Ablauf stattdessen mit einer neuen Firma samt Ansprechpartner zu prüfen. Die damalige r5-Anleitung bleibt nachfolgend als Verlauf erhalten; für den aktuellen Austausch gilt r6 oben.
-
-1. [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) vollständig in die gleichnamige Apps-Script-Datei kopieren.
-2. [Sales.html](../hq-benchmark/Sales.html) vollständig in die gleichnamige HTML-Datei kopieren.
-3. Speichern und die **bestehende** Web-App über **Bereitstellungen verwalten → Stift → Neue Version** aktualisieren. Die Oberflächenkennung muss `2026-09-25-r5` sein. „Dateien haben unterschiedliche Stände“ bedeutet: beide Dateien nochmals vollständig ersetzen und wieder eine neue Version bereitstellen.
-4. In **Daten-Testseite → Synchronisationsaufträge** den bisherigen Auftrag mit „Fortsetzung vorbereitet“ öffnen. In der Vorschau kontrollieren, ob unter `contact` ein Ansprechpartner steht. Dann **Jetzt nach HQ übertragen und prüfen** klicken. Die App liest die vorhandene Firma zurück und legt nur den offenen Ansprechpartner an. Der Auftrag sollte danach „Ansprechpartner angelegt · Abschluss offen“ anzeigen. Nach kurzer Wartezeit **Ansprechpartner prüfen und abschließen** klicken. Erst bei „Bestätigt“ sind Kontakt und bereinigte Firmenbeschreibung zurückgeprüft. Unter **Homepage in HQ prüfen** sind der Auftragsstatus und der Kontaktstatus sichtbar.
-
-Falls `contact` in der Vorschau `null` ist, war im gespeicherten Entwurf kein Ansprechpartner vorhanden. Dann diesen Auftrag **nicht** durch eine neue Testfirma ersetzen; die separate nachträgliche Kontaktanlage ist noch offen. Falls „Ausgang unklar“ erscheint, **Ergebnis nur in HQ prüfen** verwenden und keinen erneuten Anlageversuch auslösen. Bei nicht bestätigter HQ-Rücklesung dieselbe Phase später erneut prüfen. Erst nach Abschluss der vorhandenen Testfirma eine weitere eigene Testfirma anlegen und den Ablauf einmal vollständig durchspielen.
-
-Für r5 gibt es **keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Bereitstellungseinstellungen**. Den bisherigen Ausführen-als-/Zugriffsmodus beibehalten. `pp@markatus.de` benötigt weiterhin einen gesondert funktionierenden Google-Zugang zur Web-App; die App-interne E-Mail-Freigabe allein genügt dafür nicht. Codex hat keine Dateien in Google übertragen und keinen HQ-Live-Schreibtest ausgeführt.
-
-Die Abschnitte darunter dokumentieren frühere Stände. Für den aktuellen Austausch und Test gilt die r5-Anleitung unmittelbar oben.
-
-Der Nutzer hat App-Start, 21 Firmen mit Rechnungen, einen Kundendetailimport und die Anlage einer eigenen Testfirma in HQ bestätigt. Der frühere Syntaxfehler in `r4` wurde mit `r4.1` behoben und der App-Start vom Nutzer bestätigt. Die aktuellen lokalen Dateien stehen im Projektordner `hq-benchmark`; frühere ZIP-Dateien enthalten ältere Stände.
-
-Die App ist ein erster Datenpilot, noch keine vollständige produktive Vertriebs-App. HQ-Schreibtests bleiben auf selbst angelegte Testfirmen begrenzt; die echten Firmen der Pilotausgabe werden ausschließlich gelesen. Der Nutzer hat eine eigene Testfirma bereits nach HQ übertragen und dort geprüft.
-
-## Früheres Update: Startfehler in r4 beheben
-
-Für den damaligen Startfix genügte `Sales.html` mit Oberflächenkennung `2026-09-25-r4.1` und Backend `r4`. **Für den aktuellen Stand gilt die r5-Anleitung oben mit zwei Dateien.**
-
-Der Homepage-Ausdruck verwendet jetzt getrennte Schrägstriche und einen vereinfachten regulären Ausdruck. Eine bloße Domain wird weiterhin um das HTTPS-Schema ergänzt. Bei einem weiteren Startfehler zeigt die Seite die eigentliche technische Fehlermeldung einschließlich Zeile/Spalte als Text; der spätere Zeitwächter überschreibt sie nicht mehr. Die iframe-Sandbox-Warnung in der Konsole war nicht die gemeldete JavaScript-Syntaxfehlerstelle. Die neue Datei ist lokal geprüft; der erfolgreiche Google-Lauf muss nach diesem manuellen Update bestätigt werden. Zunächst nur den App-Start prüfen, danach die unten dokumentierten Kundendetailtests fortsetzen.
-
-Die folgenden Abschnitte bewahren ältere Updates als Projektverlauf; für die aktuelle Übertragung gelten ausschließlich die r5-Schritte oben.
-
-## 1. Lokale Dateien öffnen
-
-Für r5 `SalesBackend.gs` und `Sales.html` aus `hq-benchmark` verwenden. Ein ZIP ist nicht erforderlich. Die Tabelle in Abschnitt 3 beschreibt zusätzlich alle sieben Dateien für eine vollständige Übertragung.
-
-## 2. Bestehendes Projekt öffnen
-
-Öffne das vorhandene Projekt **Magazinvertrieb – HQ-Test** im [Apps-Script-Editor](https://script.google.com/home/projects/1QWMae8m5upOmPusbq2bS_IkIqRm8fVZHnjo-7U7ea6K0RglzOR4y7ZkJ/edit).
-
-Benutze dieses bestehende Projekt, damit die hinterlegten HQ-/Firebase-Einstellungen und die Web-App-Adresse erhalten bleiben. Die Script Properties mit Token und Dienstkontoschlüssel bleiben unverändert. Sie sind nicht Bestandteil des Pakets.
-
-## Vorheriges Update r3/r4: Live-Rückmeldung zu Ansicht und Testfirma
-
-**Startproblem vom 25.09.2026:** Die bisherige feste Ladezeile konnte ohne Hinweis stehen bleiben, wenn das Hauptskript nicht startete. Mit Stand `2026-09-25-r4` zeigt die HTML-Datei schon vor dem Start ihre Versionskennung. Ein unabhängiger Startwächter meldet nach acht Sekunden einen fehlenden Skriptstart; eine unbeantwortete Firebase-Startabfrage zeigt nach 45 Sekunden eine Fehlermeldung und **Erneut versuchen**. Das sind Diagnose und Bedienkorrekturen; ob in Google eine unvollständige Datei, eine alte Bereitstellung oder ein hängender Serveraufruf vorliegt, wird erst durch die Anzeige nach dem manuellen Update geklärt. Dieser Startabruf liest nur Firebase und schreibt weder in HQ noch in Firebase.
-
-Ersetze jetzt `hq-benchmark/SalesBackend.gs` und `hq-benchmark/Sales.html` vollständig in den gleichnamigen Apps-Script-Dateien, speichere und wähle bei der **bestehenden** Bereitstellung **Neue Version**. Danach die `/exec`-Adresse neu laden. Bleibt weiterhin exakt „Verbinde mit Firebase …“ stehen, läuft noch der alte HTML-Stand: die bearbeitete Bereitstellung und die kopierte `Sales.html` kontrollieren. Erscheint `2026-09-25-r4` mit einer Fehlermeldung, deren genauen Wortlaut mitteilen; bei „Startabfrage hat nach 45 Sekunden keine Antwort erhalten“ in Apps Script unter **Ausführungen** prüfen, ob `getSalesState` läuft oder fehlschlägt. Keine Tokens, Schlüssel oder Kundeninhalte teilen. Neue Skripteigenschaften, Manifest- oder Zugriffsänderungen sind für dieses Update nicht erforderlich. Vor erfolgreichem Start keine weiteren HQ-Schreibtests durchführen.
-
-**Nur diese zwei aktuellen Dateien ersetzen:** `hq-benchmark/SalesBackend.gs` → `SalesBackend.gs` und `hq-benchmark/Sales.html` → `Sales.html`. Gesamten Inhalt der beiden Dateien übernehmen, speichern und die **bestehende** Web-App-Bereitstellung auf **Neue Version** setzen (Abschnitt 4). Die anderen fünf Programmdateien, das Manifest, die Skripteigenschaften und der Zugriffsmodus bleiben gleich.
-
-Danach die vorhandene `/exec`-Adresse neu öffnen. Oben muss **Stand 2026-09-25-r4** stehen. Fehlt das, läuft noch eine alte Oberfläche: die vorhandene Bereitstellung und Browser-Neuladung prüfen. Bei **„Dateien haben unterschiedliche Stände“** stimmen HTML- und Serverdatei nicht überein; beide erneut vollständig ersetzen und eine neue Version bereitstellen. Solange diese Meldung erscheint, keine Schreibtests starten.
-
-1. Einen bereits importierten Kunden öffnen. Wenn ein Hinweis auf ältere Firmendaten erscheint, **2 · Details HQ → Firebase** anklicken. Die App liest anschließend selbst erneut aus Firebase. Homepage, Kontakt-Historie und Projekte mit HQ vergleichen. Bei fehlgeschlagenem Import den sichtbaren Fehlertext melden; ein alter Firebase-Stand bleibt erhalten.
-2. Auf der **Daten-Testseite** **Auswahllisten HQ → Firebase** anklicken. Die App lädt danach automatisch neu und zeigt nun auch die Zahl der **Branchen** und **Anreden**. Die Werte stammen aus tatsächlich bei HQ-Firmen beziehungsweise Ansprechpartnern verwendeten Bezeichnungen; HQ v2 bietet hierfür im vorliegenden API-Schema keinen eigenen Auswahllisten-Endpunkt. Dadurch können noch nie verwendete HQ-UI-Optionen fehlen. Die Formularfelder sind Dropdowns, keine freie Eingabe. Kundenklassifizierung und Kundenherkunft sind bei der Neuanlage vorerst ausgeblendet.
-3. Für eine neue Testfirma genügt bei **Homepage** etwa `www.test.de` oder `test.de`. Die App ergänzt `https://` selbst, speichert die Adresse zuerst in Firebase und schreibt sie beim bestätigten Auftrag in das Firmenfeld **und** die HQ-Standardadresse. Die Rückprüfung kontrolliert beide Werte. Eine neue Testfirma wird erst nach vollständiger Prüfung als bestätigt angezeigt. Die technische Kennzeichnung wird dabei nach dem Abgleich aus der Firmenbeschreibung entfernt.
-4. Bei der **bereits angelegten Testfirma** auf der Testseite **Homepage in HQ prüfen** anklicken. Dort siehst du getrennt die ursprünglich in Firebase gespeicherte Homepage, das HQ-Firmenfeld, die HQ-Standardadresse und den gespeicherten App-Wert. Fehlt sie in HQ, **Änderung testen** öffnen, die Homepage eingeben und in Firebase speichern. Dann unter **Synchronisationsaufträge → Auftrag ansehen** Ziel und Werte prüfen und bewusst **Jetzt nach HQ übertragen und prüfen** ausführen. Bei einem Konflikt die HQ-/App-Werte zuerst vergleichen und dann entscheiden. Diese Änderung schreibt ausschließlich in die eigene Testfirma und gleicht beide HQ-Felder ab.
-5. Zeigt die Prüfung **„Technische Kennzeichnung: Noch vorhanden“**, erscheint bei dieser Firma **Testmarkierung entfernen**. Dies erzeugt zunächst nur einen überprüfbaren Auftrag. Nach **Auftrag ansehen** und bewusstem Start entfernt er den Zusatz aus der HQ-Beschreibung und liest sie zurück. Der Marker war bisher für die eindeutige Wiederaufnahme nach einer unterbrochenen Firmenanlage nötig. Bei neuen bestätigten Anlagen wird er nach der Rückprüfung automatisch entfernt.
-
-Wenn HQ bei einer bestehenden Testfirma keine eindeutige Standardadress-ID liefert, wird vor der Homepage-Änderung abgebrochen. Den angezeigten Hinweis mitteilen; keine weitere Testfirma als Ersatz anlegen. Die Versionsanzeige und diese Änderungen sind lokal mit synthetischen Daten geprüft, noch nicht live mit dem Markatus-HQ bestätigt.
-
-## Vorheriges Update vom 25.09.2026: Kundendetails nach dem ersten Live-Test
-
-Für dieses frühere Update galten ebenfalls zwei Dateien. Die **aktuellen** Dateien und Schritte stehen unmittelbar oben. Der Zugang mit weiteren Konten ist weiterhin nicht gelöst.
-
-Danach mit dem funktionierenden Bereitstellerkonto:
-
-1. Den bereits geprüften Kunden öffnen.
-2. **2 · Details HQ → Firebase** starten und Erfolgsmeldung abwarten; danach **3 · Erneut aus Firebase lesen**. Nur Neuladen ohne erneuten HQ-Import ergänzt die neuen Felder nicht.
-3. Homepage vergleichen. Der Import verwendet zuerst die Homepage der Firma, dann die Website der Standardadresse und ersatzweise eine eindeutige Website der Rechnungsadresse. Die verwendete Adressquelle wird angezeigt. Falls weiterhin nichts erscheint, ist die tatsächliche HQ-Antwort noch zu untersuchen; der Adress-Fallback allein ist kein bestätigter Fix für den betroffenen Kunden.
-4. In der Kontakt-Historie einen Rechnungsversand prüfen: Projektname, Versanddatum und Nettobetrag sollen kompakt erscheinen. **Versanddetails und E-Mail anzeigen** klappt Betreff, Belegdatum und vollständigen Text auf. Normale Gesprächsnotizen bleiben lesbar. Die Zuordnung nutzt eindeutige Rechnungsnummern desselben Kunden; bei fehlender oder mehrdeutiger Nummer erscheint ein Hinweis statt eines geratenen Betrags. Gemeinsame Magazinprojekte werden über die Beleg-/Historienbezüge berücksichtigt.
-5. Unter Projekte einen abgeschlossenen und einen offenen Eintrag vergleichen. Abgeschlossene Projekte zeigen das tatsächliche Abschlussdatum, offene Projekte die **Planumsätze aus HQ**, keine Angebote. Plantermine stammen aus den HQ-Schätzungen (`Estimations`); bereits mit Belegen verknüpfte oder anders eingestufte Einträge sind separat aufklappbar. Planungsbeginn und Wiederholungsintervall ersetzen keine fehlenden Plantermine. Fakturierte Umsätze bleiben getrennt. Fehlt eine Quelle, steht das ausdrücklich dabei.
-6. Wenn der neue Planumsatzabruf scheitert, bleibt der vorherige komplette Firebase-Stand erhalten. Den genauen Fehlertext mitteilen. Erst nach erfolgreichem Vergleich die eigene Testfirma anlegen.
-
-Der Ausgabeimport mit 21 Unternehmen wurde vom Nutzer bereits bestätigt. Er muss für diese Detailprüfung nicht wiederholt werden. Die neuen Änderungen sind lokal mit synthetischen Daten geprüft; die Prüfung in eurem HQ erfolgt mit diesem Ablauf.
-
-## 3. Dateien übernehmen
-
-| Lokale Datei | Datei im Apps-Script-Editor | Typ |
-| --- | --- | --- |
-| `Code.gs` | `Code.gs` | Skript |
-| `Revenue.gs` | `Revenue.gs` | Skript |
-| `FirebaseSync.gs` | `FirebaseSync.gs` | Skript |
-| `SalesBackend.gs` | `SalesBackend.gs` | Skript |
-| `Index.html` | `Index.html` | HTML |
-| `Sales.html` | `Sales.html` | HTML |
-| `appsscript.json` | `appsscript.json` | Manifest |
-
-Für jede Datei:
-
-1. Die lokale Datei mit einem Texteditor öffnen, zum Beispiel Windows Editor. Bei HTML-Dateien **Rechtsklick → Öffnen mit → Editor** benutzen, damit du den Quelltext und nicht die Webseite siehst.
-2. Den gesamten Inhalt mit **Strg+A**, **Strg+C** kopieren.
-3. Die gleichnamige Datei im Apps-Script-Editor öffnen und ihren gesamten bisherigen Inhalt durch den kopierten Text ersetzen.
-4. Fehlt eine Datei, neben **Dateien** auf **+** klicken und **Skript** oder **HTML** gemäß Tabelle wählen. Beim Namen nur `SalesBackend` beziehungsweise `Sales` eingeben; die Erweiterung ergänzt Google.
-
-`SalesBackend.gs` und `Sales.html` müssen unterschiedliche Basisnamen behalten. Eine zusätzliche Skriptdatei namens `Sales.gs` gehört nicht zu diesem Paket. Bereits vorhandene Dateien ersetzen, keine zweiten Kopien mit Namen wie „Code2“ anlegen.
-
-Falls `appsscript.json` nicht sichtbar ist: links **Projekteinstellungen** öffnen und **Manifestdatei „appsscript.json“ im Editor anzeigen** aktivieren. Danach zum Editor zurückkehren und den Inhalt übernehmen.
-
-**Speichern** bzw. **Strg+S**. Keine einzelne Funktion über den Ausführen-Knopf starten; die Tests werden über die Web-App bedient.
-
-## 4. Bestehende Web-App aktualisieren
+## Die bestehende Bereitstellung aktualisieren
 
 1. Oben rechts **Bereitstellen → Bereitstellungen verwalten** öffnen.
-2. Die vorhandene Web-App auswählen und auf das **Stiftsymbol** zum Bearbeiten klicken.
-3. Unter **Version** ausdrücklich **Neue Version** auswählen.
-4. Eine kurze Beschreibung eintragen, zum Beispiel „Sales-Datenpilot aktualisiert“.
-5. **Ausführen als: Ich** und den derzeitigen Zugriff **Nur ich** beibehalten.
-6. Auf **Bereitstellen** klicken und anschließend die bisherige Web-App-Adresse neu öffnen oder neu laden.
+2. Die bisher verwendete Web-App auswählen.
+3. Auf das **Stiftsymbol** klicken.
+4. Unter **Version** den Eintrag **Neue Version** auswählen.
+5. Optional als Beschreibung **Sales r7 – Firma und Kontakt getrennt** eingeben.
+6. Auf **Bereitstellen** klicken.
+7. Die bisherige Web-App-Adresse mit dem Ende **/exec** öffnen und neu laden.
+8. Oben in der App **Stand 2026-09-26-r7** prüfen. Bei einer anderen Kennung oder „Dateien haben unterschiedliche Stände“ zunächst beide Dateien und die ausgewählte Bereitstellung prüfen; noch keinen Schreibtest starten.
 
-Nur das Speichern der Programmdateien aktualisiert eine bestehende `/exec`-Web-App nicht. Die vorhandene Bereitstellung bearbeiten, damit dieselbe Adresse erhalten bleibt.
+**Für r7 keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte.** Die vorhandenen Einstellungen bleiben bestehen. Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht.
 
-## 5. Skripteigenschaften vollständig prüfen
+## Genau einen neuen Test durchführen
 
-**Diese Übersicht fehlte in der ursprünglichen Übergabe.** Die beiden `SALES_`-Eigenschaften werden vom Code gelesen, aber beim Datei-Upload nicht automatisch angelegt. Der zunächst eingebaute Standardwert passte nicht zum tatsächlichen Bereitstellerkonto. Ihr Fehlen ist damit eine ausgelassene Einrichtung und kein Beleg für gelöschte Einstellungen.
+1. Mit dem bereits funktionierenden Konto **info@markatus.de** die Web-App öffnen.
+2. Links **Daten-Testseite** auswählen.
+3. **Testfirma anlegen** anklicken. Fehlen Auswahllisten, vorher auf der Testseite **Auswahllisten HQ → Firebase** ausführen.
+4. Einen neuen, eindeutigen Firmennamen mit **TEST ** am Anfang eintragen. Die alten unklaren Aufträge für diesen Test unverändert lassen.
+5. Die erforderlichen Firmenfelder mit erfundenen Angaben ausfüllen.
+6. Beim Ansprechpartner mindestens **Vorname** und **Nachname** mit erfundenen Werten ausfüllen. Weitere Kontaktfelder sind optional.
+7. **In Firebase speichern** anklicken. Erwartung: Firma und Ansprechpartner stehen sofort auf der Kundenkarte; in HQ wurde noch nichts angelegt.
+8. **1. Firma in HQ anlegen und bestätigen** anklicken.
+9. Auf **„Schritt 1 abgeschlossen“** warten. Erwartung: **„Firma in HQ bestätigt · Kontakt offen“** und ein neuer Knopf für Schritt 2. Bei „Rückprüfung offen“ eine Minute warten und Schritt 1 erneut ausführen; eine Firma mit gespeicherter HQ-ID wird dabei nicht nochmals angelegt.
+10. In HQ die neue Firma öffnen. Erwartung: Die Firma existiert, der Ansprechpartner ist noch nicht angelegt. Die technische Kennzeichnung in der Beschreibung bleibt bis zum vollständigen Abschluss vorübergehend bestehen.
+11. Für diesen Test etwa eine Minute warten. Dies ist eine bewusste Testpause, keine vom Programm erzwungene Wartezeit.
+12. In der App dieselbe Kundenkarte öffnen und **2. Ansprechpartner nach HQ übertragen** anklicken.
+13. Auf das Ergebnis warten. Erwartung: **„In HQ bestätigt“** beziehungsweise **„Bestätigt“**.
+14. In HQ dieselbe Firma neu laden und den Bereich **Kontakte** öffnen. Erwartung: Genau ein Ansprechpartner mit den eingegebenen Werten bei genau dieser Firma.
+15. Die Firmenbeschreibung in HQ prüfen. Nach vollständig bestätigtem Abschluss darf die technische Kennzeichnung nicht mehr enthalten sein.
 
-Unter **Projekteinstellungen → Skripteigenschaften** sind für die neue App diese fünf Einträge vorgesehen:
+Bei Abweichung:
 
-| Eigenschaft | Was jetzt zu tun ist | Zweck |
-| --- | --- | --- |
-| `SALES_ADMIN_EMAIL` | Neu anlegen: `info@markatus.de` | App-Administrator passend zum Bereitstellerkonto |
-| `SALES_ALLOWED_EMAILS` | Neu anlegen: `info@markatus.de,pp@markatus.de` | Ausdrücklich erlaubte App-Konten; Googles zusätzliche Bereitstellungsfreigabe bleibt erforderlich |
-| `FIREBASE_PROJECT_ID` | Bestehenden Wert `sales-markatus` beibehalten | Datenbankprojekt |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Vorhandenen geheimen Wert beibehalten, nicht teilen oder hier ersetzen | Serverseitiger Datenbankzugriff |
-| `HQ_API_TOKEN` | Vorhandenen geheimen Wert beibehalten, nicht teilen oder hier ersetzen | HQ-Abrufe und begrenzte Testaufträge |
+- Bei **„Kontakt in HQ · Prüfung offen“** eine Minute warten und **2. Ansprechpartner prüfen und abschließen** anklicken. Der bekannte Kontakt wird zurückgelesen, nicht nochmals angelegt.
+- Bei **„HQ-Ausgang prüfen“ / „Ausgang unklar“** keine weitere Anlage starten.
+- Auf **Daten-Testseite → Synchronisationsaufträge** den Status und den vollständigen technischen Text unter dem Auftrag ablesen.
+- Nur diesen Status und technischen Text mitteilen; keine Firmennamen, IDs, Zugangsdaten oder Kontaktwerte mitsenden. Die neue Meldung nennt beispielsweise **POST /v2/ContactPersons: HTTP 400** und gegebenenfalls die von HQ genannten Feldnamen.
 
-Falls die beiden neuen Eigenschaften inzwischen angelegt wurden, keine doppelten Einträge erstellen; nur ihre Werte prüfen. Der jetzige Inhalt der entfernten Skripteigenschaften wurde nicht ausgelesen. Der erfolgreiche ältere Firebase-Pilot ist ein Hinweis auf eine frühere funktionierende Einrichtung, keine neue Prüfung ihrer heutigen Werte.
+## Bestehende Einrichtung und weitere Google-Konten
 
-Für die **alte Benchmark-Seite** kommen `HQ_BENCH_ALLOWED_EMAILS` (bisherige freigegebene Benchmark-Nutzer) und `HQ_BENCH_CASES` (bestehende Testszenarien) hinzu. Diese alten Einstellungen vorerst beibehalten; sie steuern nicht den Zugang zur neuen Sales-Startseite. `HQ_BENCH_ACTIVE_RUN` ist ein interner vorübergehender Laufstatus und wird nicht von Hand angelegt.
+Diese Übersicht dient zur Orientierung; für r7 müssen diese Werte nicht erneut eingetragen werden:
 
-Die Google-Bereitstellung bleibt vorerst **Ausführen als: Ich** und **Zugriff: Nur ich**. Zunächst mit dem tatsächlichen Bereitstellerkonto testen. Die Aufnahme des zweiten Kontos in `SALES_ALLOWED_EMAILS` allein öffnet die Google-Bereitstellung nicht für dieses Konto.
+| Skripteigenschaft | Vorhandene Konfiguration / Zweck |
+| --- | --- |
+| SALES_ADMIN_EMAIL | info@markatus.de – App-Administrator |
+| SALES_ALLOWED_EMAILS | info@markatus.de,pp@markatus.de beziehungsweise die inzwischen ausdrücklich freigegebenen Adressen |
+| FIREBASE_PROJECT_ID | Bestehendes Projekt sales-markatus beibehalten |
+| FIREBASE_SERVICE_ACCOUNT_JSON | Bestehenden geheimen Dienstkontowert beibehalten, nicht teilen |
+| HQ_API_TOKEN | Bestehenden geheimen HQ-Token beibehalten, nicht teilen |
 
-## 6. Erster Test
+Weitere vorhandene Benchmark-Einstellungen bleiben ebenfalls bestehen. Der Bereitsteller, der App-Administrator und erlaubte weitere Nutzer sind unterschiedliche Rollen. Die letzte bestätigte Google-Bereitstellung verwendet **Ausführen als: Ich** und **Nur ich**. Mit info@markatus.de funktioniert der Zugriff laut Nutzer. Der Zugang mit pp@markatus.de und ein regulärer Google-Login für weitere Nutzer bleiben ein eigenes offenes Arbeitspaket; die interne E-Mail-Freigabe allein öffnet die Google-Bereitstellung nicht.
 
-Öffne die [bestehende Sales-App](https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec) mit deinem freigegebenen Google-Konto.
+## Arbeitsablauf für kommende Änderungen
 
-1. Links **Daten-Testseite** öffnen.
-2. **1 · Firebase abfragen** anklicken. Noch fehlende Ausgabedaten sind beim ersten Start erwartbar.
-3. **2 · Ausgabe HQ → Firebase** starten und das Ende abwarten. Dieser Schritt liest HQ und speichert die Kopie in Firebase.
-4. **3 · Erneut aus Firebase lesen** anklicken.
-5. Bei einer Fehlermeldung den genauen Meldungstext mitteilen. Keine Tokens, Schlüssel oder vollständigen Kundeninhalte senden.
-
-**Erwartetes Ergebnis:** Nach Schritt 4 zeigt die Testseite einen Importzeitpunkt und die Zahl der Unternehmen. Unter Kunden und Buchungshistorie sollen Daten der Ausgabe #70 erscheinen. Ein leerer Firebase-Stand vor dem ersten Import ist erwartbar; eine technische Fehlermeldung ist es nicht. Der erfolgreiche App-Start allein bestätigt noch keinen erfolgreichen Datenimport.
-
-### Danach: Eine Firma genauer prüfen
-
-1. Unter **Kunden** eine Firma der Ausgabe #70 öffnen.
-2. **1 · Firebase abfragen** anklicken. Ansprechpartner, Kontakt-Historie und Projekte können noch fehlen, da diese separat importiert werden.
-3. **2 · Details HQ → Firebase** anklicken und die Rückmeldung abwarten.
-4. **3 · Erneut aus Firebase lesen** anklicken.
-5. Direkt mit HQ vergleichen: Firmenname/Kundennummer, Standardadresse (ersatzweise Rechnungsadresse), eigene Felder, Ansprechpartner, Kontakt-Historie und direkt zugeordnete Projekte. Fehlende Daten oder falsche Zuordnungen festhalten. Projektumsätze und Ausgabeumsatz anhand bekannter Belege einschließlich Gutschriften prüfen; angezeigte Hinweise auf vorläufige Summen beachten.
-
-### Danach: Auswahllisten und Ausgabe-Einstellungen
-
-Auf der **Daten-Testseite** zuerst **Auswahllisten HQ → Firebase**, danach **Firebase erneut abfragen** anklicken. Benutzer, Firmenarten und Unternehmensbereiche sollen geladen sein. Auch dieser Schritt liest HQ nur.
-
-Unter **Verwaltung** können Zielumsatz und Termine der Pilotausgabe gespeichert werden. Diese Änderung betrifft ausschließlich Firebase. Anschließend unter **Mein Tag** frisch aus Firebase laden und die Werte prüfen. Für die historische Ausgabe nachvollziehbare Werte verwenden; versehentliche Testwerte wieder korrigieren. Der Test mit mehreren angemeldeten Nutzern wartet auf die Mehrnutzer-Anmeldung.
-
-### Erst nach erfolgreichen Lesetests: Eigene Testfirma
-
-**Testfirma anlegen** öffnen, einen Namen beginnend mit `TEST` und ausschließlich erfundene Testdaten verwenden, den Verantwortlichen und Unternehmensbereich bewusst auswählen. Standard ist **Interessent**. Optional einen erfundenen Ansprechpartner mit erfassen. Mit **In Firebase speichern** entsteht zunächst ein Entwurf mit Übertragungsauftrag; in HQ wird dabei noch keine Firma angelegt.
-
-Über **Auftrag ansehen** die Werte prüfen. Erst **Jetzt nach HQ übertragen und prüfen** erzeugt echte Einträge in HQ: zunächst die Testfirma, anschließend gegebenenfalls den zugehörigen Ansprechpartner. Danach die bestätigte HQ-ID und die Zuordnung in HQ prüfen. Bei **Ausgang unklar** keine zweite Testanlage starten, sondern **Ergebnis nur in HQ prüfen** verwenden und die Meldung auswerten. Firmen aus Ausgabe #70 bleiben reine Leseziele.
-
-Kontakt-Historie und Änderungen von Branche/Homepage an dieser eigenen Testfirma sind nach erfolgreicher Anlage weitere Tests. Vollständige Bearbeitung aller Stammdaten, weitere Ausgaben und ausgabenübergreifende Filter sind noch nicht fertig.
-
-## Hinweise zum Zugang
-
-**Bestätigter Stand vom 25.09.2026:** Der Nutzer kann die App mit `info@markatus.de` öffnen. Mit `pp@markatus.de` erscheint auch in einem nur mit diesem Konto angemeldeten Inkognito-Fenster weiterhin die Google-Fehlerseite. Der letzte bestätigte Bereitstellungszugriff „Nur ich“ schließt dieses zweite Konto weiterhin aus. Der genaue Fehlertext allein erlaubt keine zusätzliche Diagnose.
-
-**Noch offen:** Reguläre Google-Anmeldung für ausdrücklich freigegebene App-Nutzer, ohne Zugriff auf den Skripteditor und unabhängig von einem HQ-Konto. Die bestehende App verwendet die Apps-Script-Sitzung und eine E-Mail-Freigabeliste; ein eigener Google-Login ist noch nicht eingebaut. Firebase Authentication mit Google ist ein möglicher Baustein, dessen Einbindung einschließlich serverseitiger Identitätsprüfung noch geplant und getestet werden muss. Ein Login-Knopf allein löst die vorgeschaltete Google-Bereitstellungssperre nicht. Keine Hosting-Umstellung oder Erweiterung des Bereitstellungszugriffs vorgenommen.
-
-**Korrektur vom 25.09.2026:** Laut Nutzer läuft das Apps-Script-Projekt unter `info@markatus.de`; `pp@markatus.de` ist ein anderes Testkonto. Der ursprüngliche Code setzte ohne Konfiguration fälschlich das Testkonto als einzigen App-Administrator voraus. Zusammen mit der Google-Bereitstellung „Nur ich“ führte dies zu widersprüchlichen Zugangshürden.
-
-Für den ersten Zugang mit dem Bereitstellerkonto ist kein Dateiaustausch erforderlich:
-
-1. Das bestehende Apps-Script-Projekt mit `info@markatus.de` öffnen.
-2. **Projekteinstellungen → Skripteigenschaften → Skripteigenschaften bearbeiten** öffnen.
-3. `SALES_ADMIN_EMAIL` auf `info@markatus.de` setzen.
-4. `SALES_ALLOWED_EMAILS` auf `info@markatus.de,pp@markatus.de` setzen. Existieren diese beiden Eigenschaften bereits, ihre Werte gezielt bearbeiten. Andere Eigenschaften, insbesondere HQ-/Firebase-Zugangsdaten, unverändert lassen.
-5. Eigenschaften speichern. Diese Werte liest die bereits bereitgestellte App bei jedem Serveraufruf; dafür ist keine neue Codeversion nötig.
-6. Die Web-App in einem separaten Browserprofil oder privaten Fenster öffnen, in dem ausschließlich `info@markatus.de` angemeldet ist.
-
-Das Bereitstellerkonto ist damit als App-Administrator konfiguriert; das Testkonto steht als normaler Nutzer auf der internen Liste. **Die zusätzliche Google-Zugangshürde für das Testkonto wird dadurch nicht aufgehoben.** Die Bereitstellung bleibt „Nur ich“, bis die Erweiterung gesondert freigegeben und eingerichtet ist. Der Screenshot des Nutzers zeigt eine Google-Drive-Fehlerseite; er beweist allein keine eindeutige Ursache. Gleichzeitige Google-Anmeldungen können ebenfalls zu Apps-Script-Zugriffsproblemen führen ([Google-Hinweise](https://developers.google.com/apps-script/guides/support/troubleshooting#issues_with_multiple_google_accounts)).
-
-Die App enthält eine Verwaltung ausdrücklich freigegebener E-Mail-Adressen. Bei der aktuellen Google-Bereitstellung **Nur ich** kann trotzdem zunächst nur der Bereitsteller zugreifen. Die Google-Freigabe für weitere Nutzer wird gesondert eingerichtet; allein das Eintragen einer Adresse in der App reicht dafür noch nicht.
-
-Für manuelles Kopieren im Editor ist keine Bereitstellung über die lokale Kommandozeile nötig. Die bereits aktivierte Apps Script API muss für diesen manuellen Ablauf nicht erneut eingerichtet werden.
-
-## Künftige Updates
-
-Codex nennt die tatsächlich geänderten Dateien im Projektordner und separat neue/geänderte Skripteigenschaften sowie nötige Bereitstellungseinstellungen. ZIP-Pakete gibt es nur auf Wunsch. Du ersetzt die genannten Dateien und veröffentlichst bei Codeänderungen eine neue Version. Bei ausschließlich geänderten Skripteigenschaften genügt deren Speicherung. Erfolgreicher Upload, vollständige Einrichtung, erfolgreicher App-Start und erfolgreicher HQ-Datentest bleiben getrennte Prüfschritte.
+Codex bereitet die Dateien lokal vor, nennt exakt die geänderten Dateien und nötige Einstellungen, pflegt das Projekttagebuch und sichert die geprüften Änderungen auf GitHub. Der Nutzer ersetzt die Dateien in Apps Script und stellt eine neue Version bereit. Lokale Prüfung, GitHub-Sicherung, Google-Bereitstellung und tatsächlicher HQ-Live-Test sind getrennte Schritte.
