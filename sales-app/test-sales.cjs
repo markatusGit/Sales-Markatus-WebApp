@@ -119,6 +119,40 @@ test('readback must confirm the requested salutation form',()=>{
   const one=f.ctx.salesOne_;f.ctx.salesOne_=(entity,id)=>{const value=one(entity,id);if(entity==='ContactPersons')value.salutationForm='Informal';return value;};
   assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'contactCreated');assert.equal(f.db['sales_jobs/'+r.id].steps.contact,undefined);
 });
+test('contact email audit only reads HQ and reports fields without leaking contact values',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
+  const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
+  const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
+  assert.match(result,/Kontaktprüfung 2026-09-26-r8.1/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: eMail/);
+  assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
+});
+test('contact email diagnostic distinguishes missing, empty, alternate and different values',()=>{
+  const f=fixture(),expected={eMail:'synthetic@example.invalid',salutationForm:'Formal'};
+  const result=f.ctx.salesContactDiagnostic_({email:expected.eMail,defaultAddress:{email:'other@example.invalid'},salutationForm:'Informal'},expected);
+  assert.match(result,/HQ eMail: Feld nicht geliefert/);assert.match(result,/HQ email: stimmt mit Firebase überein/);
+  assert.match(result,/defaultAddress.email: vorhanden, weicht von Firebase ab/);assert.match(result,/Abweichende Kontaktfelder: salutationForm, eMail/);
+  assert.equal(result.includes('@'),false);assert.match(f.ctx.salesContactDiagnostic_({eMail:null},{eMail:''}),/E-Mail in Firebase: leer/);
+});
+test('audit blocks a contact assigned to another company',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);f.remote.ContactPersons[202].companyId=999;
+  assert.throws(()=>f.ctx.getSalesTestAudit(r.id),/gehört nicht/);
+});
+test('audit expands a linked contact address and reports failed reads without assuming an empty email',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'synthetic@example.invalid'});finishCreate(f,r.id);
+  f.remote.ContactPersons[202].defaultAddressId=777;const get=f.ctx.salesHqGet_;
+  f.ctx.salesHqGet_=path=>path.includes('expand=DefaultAddress')?{data:{...f.remote.ContactPersons[202],defaultAddress:{email:'synthetic@example.invalid'}},headers:{}}:get(path);
+  assert.match(f.ctx.getSalesTestAudit(r.id).contactStatus,/defaultAddress.email: stimmt mit Firebase überein/);
+  f.ctx.salesHqGet_=path=>{if(path.includes('expand=DefaultAddress'))throw Error('Unavailable');return get(path);};
+  assert.match(f.ctx.getSalesTestAudit(r.id).contactStatus,/zusätzlicher Lesetest nicht erfolgreich/);
+});
+test('a missing HQ email reports the actual field and never creates a duplicate contact',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'synthetic@example.invalid'}),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const response=fetch(url,opt);if(url.endsWith('/v2/ContactPersons'))f.remote.ContactPersons[202].eMail=null;return response;};
+  f.ctx.runSalesJob(r.id,'company');const result=f.ctx.runSalesJob(r.id,'contact');assert.equal(result.state,'contactCreated');
+  assert.match(result.message,/Abweichende Kontaktfelder: eMail/);f.ctx.runSalesJob(r.id,'contact');
+  assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactPersons').length,1);
+});
 test('contact step is blocked before confirmation and repeated company clicks never post contacts',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);
   assert.throws(()=>f.ctx.runSalesJob(r.id,'contact'),/Zuerst Schritt 1/);assert.equal(f.calls.length,0);

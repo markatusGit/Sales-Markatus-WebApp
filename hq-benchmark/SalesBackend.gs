@@ -307,10 +307,41 @@ function getSalesTestAudit(id) {
   const actual=salesOne_('Companies',d.hqId),stored=salesRead_('sales_companies/'+d.hqId),website=salesWebsite_(actual),job=salesRead_('sales_jobs/'+d.id);
   if(actual.name!==d.company.name) throw new Error('HQ-Ziel ist nicht mehr die eigene Testfirma.');
   let contactStatus=d.contact?'Noch nicht in HQ bestätigt':'Kein Ansprechpartner im Entwurf gespeichert.';
-  if(d.contact&&job?.contactId){const contact=salesOne_('ContactPersons',job.contactId);contactStatus=Number(contact.companyId)===Number(d.hqId)&&salesEqualFields_(contact,d.contact)?'In HQ bestätigt':'HQ-Kontakt weicht vom Entwurf ab.';}
+  if(d.contact&&job?.contactId){
+    let contact=salesOne_('ContactPersons',job.contactId),addressNote='';
+    if(Number(contact.companyId)!==Number(d.hqId)) throw new Error('HQ-Kontakt gehört nicht zur gespeicherten Testfirma. Prüfung angehalten.');
+    if(contact.defaultAddressId&&!contact.defaultAddress){
+      try {
+        const expanded=salesHqGet_('/v2/ContactPersons/'+salesId_(job.contactId)+'?expand=DefaultAddress').data;
+        if(Number(expanded?.id)!==Number(job.contactId)||Number(expanded?.companyId)!==Number(d.hqId)) throw new Error('Kontaktzuordnung beim Adressabruf unklar.');
+        contact=expanded;
+      }catch(_){addressNote=' · Kontaktadresse: zusätzlicher Lesetest nicht erfolgreich; keine Aussage über ihren Inhalt';}
+    }
+    contactStatus=salesContactDiagnostic_(contact,d.contact)+addressNote;
+  }
   else if(d.contact&&job?.contactAttempted)contactStatus='Schreibversuch unklar: vor erneutem Anlegen Auftrag prüfen.';
   return {draftHomepage:d.company.homepage||'',hqHomepage:actual.homepage||'',hqAddressWebsite:actual.defaultAddress?.website||'',appHomepage:stored?.company?.homepageDisplay||'',displayHomepage:website.value,displaySource:website.source,
     markerPresent:String(actual.description||'').includes('[Sales-Test '+d.id+']'),detailVersion:stored?.detailVersion||null,creationState:job?.state||'Auftrag fehlt',contactStatus};
+}
+function salesContactDifferences_(actual,expected) {
+  // Return only known field names, never values from the contact.
+  const keys=['firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline'];
+  return keys.filter(k=>expected[k]!==undefined&&!salesEqualFields_(actual,{[k]:expected[k]}));
+}
+function salesContactDiagnostic_(actual,expected) {
+  const expectedEmail=String(expected.eMail||'').trim();
+  function status(object,key){
+    if(!object||!Object.prototype.hasOwnProperty.call(object,key))return 'Feld nicht geliefert';
+    const value=String(object[key]??'').trim();
+    return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
+  }
+  const parts=['Kontaktprüfung 2026-09-26-r8.1','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
+  parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
+  parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
+  const differences=salesContactDifferences_(actual,expected);
+  parts.push('Abweichende Kontaktfelder: '+(differences.join(', ')||'keine'));
+  return parts.join(' · ');
 }
 function queueSalesMarkerCleanup(id) {
   const user=salesUser_(true);return salesLock_(()=>{
@@ -440,7 +471,13 @@ function salesRunCreate_(job,draft,step) {
     const result=salesWriteHq_(job,'/v2/ContactPersons','post',payload);job.contactId=salesId_(result&&result.id);salesWrite_('sales_jobs/'+job.id,job);
     job.safeStage='contactCreated';job.phaseWriteAttempted=false;salesWrite_('sales_jobs/'+job.id,job);
   }
-  if(draft.contact&&!job.steps.contact){const contact=salesOne_('ContactPersons',job.contactId);if(Number(contact.companyId)!==Number(job.hqId)||!salesEqualFields_(contact,draft.contact)) throw new Error('Ansprechpartner wurde in HQ noch nicht vollständig bestätigt.');job.steps.contact=true;salesWrite_('sales_jobs/'+job.id,job);}
+  if(draft.contact&&!job.steps.contact){
+    const contact=salesOne_('ContactPersons',job.contactId);
+    if(Number(contact.companyId)!==Number(job.hqId)) throw new Error('Ansprechpartner gehört in HQ nicht zur gespeicherten Testfirma.');
+    const differences=salesContactDifferences_(contact,draft.contact);
+    if(differences.length) throw new Error('Ansprechpartner noch nicht bestätigt. Abweichende Kontaktfelder: '+differences.join(', ')+'. Bitte auf der Daten-Testseite „Homepage in HQ prüfen“ ausführen und den Text bei „Ansprechpartner“ mitteilen.');
+    job.steps.contact=true;salesWrite_('sales_jobs/'+job.id,job);
+  }
   if(!salesEqualFields_(actual,salesPick_(draft.company,['industrialSector']))) throw new Error('Branche der Firma wurde in HQ noch nicht bestätigt.');
   if(!salesHomepageConfirmed_(actual,draft.company.homepage)) throw new Error('Homepage der Firma wurde in HQ noch nicht bestätigt.');
   if(!salesEqualFields_(actual.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Standardadresse der Firma wurde in HQ noch nicht vollständig bestätigt.');

@@ -1,5 +1,34 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
+## Aktueller Schritt: E-Mail-Lesetest r8.1
+
+Der Ansprechpartner wurde mit r8 laut Nutzer erfolgreich in HQ angelegt. Seine E-Mail fehlt dort; der Auftrag steht auf **Kontakt in HQ · Prüfung offen**. Die Ursache ist noch nicht geklärt: Der Code sendet bereits das dokumentierte Feld eMail. Deshalb folgt zunächst ein gezielter Lesetest am vorhandenen Kontakt. Keine neue Firma und keinen zweiten Kontakt anlegen.
+
+**Nur [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) ersetzen. Sales.html bleibt unverändert.** Die Oberfläche zeigt weiter r8; die Diagnose selbst enthält die Kennung **Kontaktprüfung 2026-09-26-r8.1**. Keine neuen/geänderten Skripteigenschaften, Manifest- oder Zugriffseinstellungen.
+
+1. Die lokale Datei SalesBackend.gs im Texteditor öffnen.
+2. Den gesamten Inhalt mit **Strg+A**, danach **Strg+C** kopieren.
+3. Im bestehenden Apps-Script-Projekt die Datei **SalesBackend.gs** öffnen.
+4. Den gesamten bisherigen Inhalt mit **Strg+A**, danach **Strg+V** ersetzen.
+5. Mit **Strg+S** speichern.
+6. **Bereitstellen → Bereitstellungen verwalten** öffnen.
+7. Die bestehende Web-App auswählen und das **Stiftsymbol** anklicken.
+8. Unter **Version** den Eintrag **Neue Version** auswählen.
+9. **Bereitstellen** anklicken.
+10. Die bestehende /exec-Web-App neu laden.
+11. Links **Daten-Testseite** öffnen.
+12. Im Abschnitt **Schreiben · nur eigene Testfirmen** die bereits angelegte Testfirma suchen.
+13. Bei genau dieser Firma **Homepage in HQ prüfen** anklicken. Die vorhandene Schaltfläche prüft jetzt zusätzlich den Ansprechpartner.
+14. Im eingeblendeten Ergebnis den Eintrag **Ansprechpartner** suchen.
+15. Den vollständigen Text ab **Kontaktprüfung 2026-09-26-r8.1** mitteilen. Dieser Text enthält keine Kontaktwerte oder IDs. Nicht die Homepagewerte oder den Firmennamen mitschicken.
+
+Erwartet werden Aussagen wie **E-Mail in Firebase: vorhanden**, **HQ eMail: leer** und **Abweichende Kontaktfelder: eMail**. Der Test unterscheidet auch abweichende Schreibweisen des Feldnamens und das Feld **defaultAddress.email** der Kontaktadresse. Wenn eine Adresse verknüpft, aber nicht mitgeliefert ist, wird ein zusätzlicher reiner Leseabruf versucht. Ein fehlgeschlagener Abruf wird ausdrücklich gemeldet und nicht als leeres Feld ausgelegt.
+
+Wenn die Kennung r8.1 fehlt, wurde noch die frühere Backend-Version ausgeführt; dann Dateiersetzung und neue Bereitstellung prüfen. Wenn die Prüfung einen anderen Fehler zeigt, diesen technischen Text mitteilen. Noch keine weiteren Schreibtests ausführen. Die E-Mail-Übertragung ist mit diesem Diagnoseschritt ausdrücklich noch nicht behoben.
+
+## Vorherige r8-Übergabe als Referenz
+
+
 Stand: 26.09.2026 · **2026-09-26-r8**. Dateien lokal vorbereitet; Übertragung und Bereitstellung übernimmt der Nutzer. Der HQ-Live-Test dieser Version steht noch aus. Frühere Updateanleitungen sind durch diese Anleitung ersetzt; der Verlauf bleibt im Projekttagebuch erhalten.
 
 ## Was sich ändert
