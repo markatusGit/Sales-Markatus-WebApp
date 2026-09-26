@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-26-r8';
+const SALES_RELEASE = '2026-09-26-r9';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -220,7 +220,7 @@ function syncSalesCompany(id) {
     const edition=salesRead_('sales_editions/'+SALES.edition),drafts=salesList_('sales_drafts');
     if(!edition?.companies.some(c=>c.id===id)&&!drafts.some(d=>String(d.hqId)===id&&d.testOnly)) throw new Error('Firma gehört nicht zum Pilotbestand.');
     salesAssertPrivate_();const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
-    const contacts=salesCollect_('ContactPersons','companyId eq '+id,started),histories=salesCollect_('ContactHistories','companyId eq '+id,started),projects=salesCollect_('Projects','companyId eq '+id,started);
+    const contacts=salesCollect_('ContactPersons','companyId eq '+id,started,'DefaultAddress'),histories=salesCollect_('ContactHistories','companyId eq '+id,started),projects=salesCollect_('Projects','companyId eq '+id,started);
     if([...contacts,...histories,...projects].some(x=>Number(x.companyId)!==Number(id))) throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
     const customerDocuments=salesCollect_('Documents','companyId eq '+id,started);
     if(customerDocuments.some(d=>Number(d.companyId)!==Number(id))) throw new Error('HQ-Belegempfänger stimmt nicht mit der Firma überein.');
@@ -243,7 +243,7 @@ function syncSalesCompany(id) {
       return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,
         plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
     });
-    const value={company,contacts:contacts.map(x=>salesPick_(x,['id','companyId','firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline','updatedOn'])),histories:historyRows,projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
+    const value={company,contacts:contacts.map(salesContactView_),histories:historyRows,projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
     salesWrite_('sales_companies/'+id,value);return {message:'Firmendetails nach Firebase übertragen. Jetzt erneut aus Firebase laden.'};});
 }
 function saveSalesEditionSettings(input) {
@@ -326,7 +326,21 @@ function getSalesTestAudit(id) {
 function salesContactDifferences_(actual,expected) {
   // Return only known field names, never values from the contact.
   const keys=['firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline'];
-  return keys.filter(k=>expected[k]!==undefined&&!salesEqualFields_(actual,{[k]:expected[k]}));
+  const normalized=Object.assign({},actual,{eMail:salesContactEmail_(actual)});
+  return keys.filter(k=>expected[k]!==undefined&&!salesEqualFields_(normalized,{[k]:expected[k]}));
+}
+function salesContactEmail_(contact) {return String(contact?.eMail||contact?.defaultAddress?.email||'');}
+function salesContactView_(contact) {
+  return Object.assign(salesPick_(contact,['id','companyId','firstName','lastName','position','salutation','salutationForm','phoneMobile','phoneLandline','updatedOn']),{eMail:salesContactEmail_(contact)});
+}
+function salesContactWithAddress_(id) {
+  const contact=salesOne_('ContactPersons',id);
+  if(contact.defaultAddressId&&!contact.defaultAddress){
+    const full=salesHqGet_('/v2/ContactPersons/'+salesId_(id)+'?expand=DefaultAddress').data;
+    if(Number(full?.id)!==Number(id)||Number(full?.companyId)!==Number(contact.companyId)) throw new Error('Kontaktzuordnung beim Adressabruf unklar.');
+    return full;
+  }
+  return contact;
 }
 function salesContactDiagnostic_(actual,expected) {
   const expectedEmail=String(expected.eMail||'').trim();
@@ -335,13 +349,89 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-26-r8.1','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-26-r9','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
   const differences=salesContactDifferences_(actual,expected);
   parts.push('Abweichende Kontaktfelder: '+(differences.join(', ')||'keine'));
   return parts.join(' · ');
+}
+function salesContactAddressFields_(address) {
+  return salesPick_(address,['alternativeCompanyName','additionalInformation','street','houseNumber','zipCode','city','country','description','phone','email','fax','website','addressLine2','standardForDocumentType']);
+}
+function salesContactEmailState_(draft,contactId) {
+  const creation=salesRead_('sales_jobs/'+draft.id);
+  if(!draft.testOnly||!/^TEST[ -]/i.test(draft.company.name)||creation?.kind!=='createCompany'||Number(creation.hqId)!==Number(draft.hqId)||Number(creation.contactId)!==Number(contactId)) throw new Error('Kontakt ist nicht der selbst angelegte Ansprechpartner dieser Testfirma.');
+  const company=salesOne_('Companies',draft.hqId);
+  if(company.name!==draft.company.name) throw new Error('HQ-Firmenzuordnung wurde verändert.');
+  const contact=salesHqGet_('/v2/ContactPersons/'+salesId_(contactId)+'?expand=DefaultAddress,CustomFields').data;
+  if(Number(contact?.id)!==Number(contactId)||Number(contact?.companyId)!==Number(draft.hqId)) throw new Error('HQ-Kontaktzuordnung stimmt nicht mit dem Auftrag überein.');
+  const scalar=['firstName','lastName','position','phoneLandline','phoneMobile','eMail','salutation','salutationForm','language','birthdate','note'];
+  if(scalar.some(k=>!Object.prototype.hasOwnProperty.call(contact,k))||!Object.prototype.hasOwnProperty.call(contact,'customFields')) throw new Error('HQ hat die Kontaktfelder nicht vollständig geliefert. Keine Änderung, damit vorhandene Daten erhalten bleiben.');
+  const addressId=salesId_(contact.defaultAddressId);
+  if(!contact.defaultAddress||typeof contact.defaultAddress!=='object') throw new Error('Verknüpfte Kontaktadresse nicht vollständig lesbar. Keine Änderung.');
+  const payload=salesPick_(contact,scalar);
+  if(contact.customFields!==null&&!Array.isArray(contact.customFields)) throw new Error('Eigene Kontaktfelder nicht eindeutig lesbar.');
+  payload.customFields=contact.customFields===null?null:contact.customFields.map(f=>{
+    if(!f.name||!f.type||!Object.prototype.hasOwnProperty.call(f,'value')) throw new Error('Eigenes Kontaktfeld nicht vollständig lesbar.');
+    return salesPick_(f,['name','type','value']);
+  });
+  payload.defaultAddress=salesContactAddressFields_(contact.defaultAddress);
+  // Canonical comparison tolerates HQ exposing the address e-mail only via the address.
+  payload.eMail=salesContactEmail_(contact);
+  return {addressId,payload};
+}
+function salesAssertOwnContactAddress_(draft,contactId,addressId) {
+  const data=salesHqGet_('/v2/Companies/'+salesId_(draft.hqId)+'/Addresses').data;
+  const addresses=Array.isArray(data)?data:data?.data||data?.value;
+  if(!Array.isArray(addresses)) throw new Error('Firmenadressen nicht vollständig lesbar.');
+  if(addresses.some(a=>Number(a.id)===addressId)) throw new Error('Die Kontaktadresse wird auch als Firmenadresse verwendet. Keine automatische E-Mail-Änderung.');
+  const contacts=salesCollect_('ContactPersons','defaultAddressId eq '+addressId,Date.now());
+  if(contacts.length!==1||Number(contacts[0].id)!==Number(contactId)||Number(contacts[0].defaultAddressId)!==addressId||Number(contacts[0].companyId)!==Number(draft.hqId)) throw new Error('Kontaktadresse ist nicht eindeutig diesem Ansprechpartner zugeordnet. Keine Änderung.');
+}
+function queueSalesContactEmail(id) {
+  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(id)),creation=salesRead_('sales_jobs/'+id);
+    if(!draft?.testOnly||creation?.state!=='contactCreated'||!creation.contactId) throw new Error('Zuerst den eigenen Ansprechpartner anlegen. Diese Korrektur gilt nur für eine offene Kontakt-Rückprüfung.');
+    const existing=salesList_('sales_jobs').find(j=>j.kind==='contactEmail'&&j.draftId===id&&j.state!=='canceled');
+    if(existing)return {id:existing.id,message:'Der E-Mail-Auftrag ist bereits vorhanden. Bitte dessen Ergebnis prüfen.'};
+    const email=salesText_(draft.contact?.eMail,200,true),base=salesContactEmailState_(draft,creation.contactId);
+    const differing=salesContactDifferences_(base.payload,draft.contact).filter(k=>k!=='eMail');
+    if(differing.length) throw new Error('Andere Kontaktfelder wurden verändert: '+differing.join(', ')+'. Keine automatische E-Mail-Korrektur.');
+    if(base.payload.eMail||base.payload.defaultAddress.email) throw new Error('In HQ ist bereits eine E-Mail vorhanden. Bitte zuerst zurückprüfen; vorhandene E-Mail wird nicht überschrieben.');
+    salesAssertOwnContactAddress_(draft,creation.contactId,base.addressId);
+    const target=JSON.parse(JSON.stringify(base)),address=target.payload.defaultAddress;
+    const location=['street','zipCode','city','country'];let copiedAddress=false;
+    if(location.every(k=>!address[k])){
+      // An empty auto-created contact address needs the documented mandatory address fields.
+      location.concat(['houseNumber']).forEach(k=>{address[k]=draft.company.defaultAddress[k]||'';});copiedAddress=true;
+    }
+    if(location.some(k=>!address[k])) throw new Error('Kontaktanschrift ist nur teilweise gefüllt. Bitte die fehlenden Adressangaben klären; keine Vermischung von Anschriften.');
+    if(!address.description)address.description='Kontaktadresse';
+    target.payload.eMail=email;address.email=email;
+    const job={id:Utilities.getUuid(),kind:'contactEmail',draftId:id,hqId:draft.hqId,contactId:creation.contactId,name:draft.company.name,state:'pending',baseContact:base,targetContact:target,createdAt:salesNow_(),updatedAt:salesNow_(),
+      change:{operation:'E-Mail am vorhandenen Ansprechpartner und seiner eigenen Kontaktadresse ergänzen',eMail:email,contactAddress:address,addressNote:copiedAddress?'Leere Kontaktanschrift: Pflichtangaben werden aus dem Firmenentwurf übernommen.':'Vorhandene Kontaktanschrift bleibt erhalten.'},message:'E-Mail-Korrektur vorbereitet. Vorschau prüfen; HQ wurde nur gelesen.'};
+    salesWrite_('sales_jobs/'+job.id,job);return {id:job.id,message:job.message};
+  });
+}
+function salesContactEmailEqual_(a,b){
+  function ordered(value){
+    if(Array.isArray(value))return value.map(ordered);
+    if(value&&typeof value==='object'){const out={};Object.keys(value).sort().forEach(k=>out[k]=ordered(value[k]));return out;}
+    return value;
+  }
+  return JSON.stringify(ordered(a))===JSON.stringify(ordered(b));
+}
+function salesRunContactEmail_(job,draft) {
+  const current=salesContactEmailState_(draft,job.contactId);
+  if(salesContactEmailEqual_(current,job.targetContact)){job.message='E-Mail in HQ bestätigt. Jetzt den ursprünglichen Anlageauftrag abschließen.';return;}
+  if(!salesContactEmailEqual_(current,job.baseContact)) throw new Error('Kontakt oder Adresse seit der Vorschau verändert. Keine E-Mail-Änderung.');
+  if(job.writeAttempted) throw new Error('Ein Schreibversuch liegt bereits vor. Nur Rückprüfung erlaubt.');
+  salesAssertOwnContactAddress_(draft,job.contactId,current.addressId);
+  salesWriteHq_(job,'/v2/ContactPersons/'+salesId_(job.contactId),'put',job.targetContact.payload);
+  const after=salesContactEmailState_(draft,job.contactId);
+  if(!salesContactEmailEqual_(after,job.targetContact)) throw new Error('Kontakt-E-Mail oder erhaltene Kontakt-/Adresswerte noch nicht vollständig bestätigt.');
+  job.message='E-Mail und erhaltene Kontaktdaten in HQ bestätigt. Jetzt den ursprünglichen Anlageauftrag abschließen.';
 }
 function queueSalesMarkerCleanup(id) {
   const user=salesUser_(true);return salesLock_(()=>{
@@ -377,6 +467,7 @@ function salesWriteHq_(job,path,method,body) {
   // Never accept an arbitrary destination or payload from the browser.
   if(job.state!=='running') throw new Error('Kein laufender Auftrag.');
   const allowed=job.kind==='createCompany'&&((!job.hqId&&path==='/v2/Companies'&&method==='post')||(job.hqId&&path==='/v2/ContactPersons'&&method==='post'&&Number(body.companyId)===Number(job.hqId))) ||
+    job.kind==='contactEmail'&&method==='put'&&path==='/v2/ContactPersons/'+job.contactId&&Number(salesRead_('sales_jobs/'+job.draftId)?.contactId)===Number(job.contactId)&&JSON.stringify(body)===JSON.stringify(job.targetContact?.payload) ||
     ['createCompany','cleanupMarker'].includes(job.kind)&&job.hqId&&path==='/v2/Companies/'+job.hqId&&method==='put'&&body.name===salesRead_('sales_drafts/'+job.draftId)?.company?.name&&body.description===salesRead_('sales_drafts/'+job.draftId)?.company?.description ||
     job.kind==='history'&&method==='post'&&path==='/v2/ContactHistories'&&Number(body.companyId)===Number(job.hqId) ||
     job.kind==='companyChange'&&method==='put'&&(path==='/v2/Companies/'+job.hqId||job.addressId&&path==='/v2/Companies/'+job.hqId+'/Addresses/'+job.addressId&&body.website===job.change.homepage);
@@ -422,10 +513,11 @@ function runSalesJob(id,step) {
       else if(job.kind==='history') salesRunHistory_(job,draft);
       else if(job.kind==='companyChange') salesRunChange_(job,draft);
       else if(job.kind==='cleanupMarker') salesRunMarkerCleanup_(job,draft);
+      else if(job.kind==='contactEmail') salesRunContactEmail_(job,draft);
       else throw new Error('Unbekannter Auftrag.');
-      if(job.state==='running') {job.state='synced';job.message='HQ zurückgelesen; Übertragung bestätigt.';}
+      if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(job.kind==='companyChange'&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+      if(['companyChange','contactEmail'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
@@ -468,11 +560,12 @@ function salesRunCreate_(job,draft,step) {
     // Optional strings are nullable in ContactPersonPost. Omit empty values instead of
     // asking HQ to validate an empty e-mail address or salutation.
     Object.keys(draft.contact).forEach(k=>{if(draft.contact[k]!=='')payload[k]=draft.contact[k];});
+    if(draft.contact.eMail)payload.defaultAddress=Object.assign({},salesContactAddressFields_(draft.company.defaultAddress),{email:draft.contact.eMail});
     const result=salesWriteHq_(job,'/v2/ContactPersons','post',payload);job.contactId=salesId_(result&&result.id);salesWrite_('sales_jobs/'+job.id,job);
     job.safeStage='contactCreated';job.phaseWriteAttempted=false;salesWrite_('sales_jobs/'+job.id,job);
   }
   if(draft.contact&&!job.steps.contact){
-    const contact=salesOne_('ContactPersons',job.contactId);
+    const contact=salesContactWithAddress_(job.contactId);
     if(Number(contact.companyId)!==Number(job.hqId)) throw new Error('Ansprechpartner gehört in HQ nicht zur gespeicherten Testfirma.');
     const differences=salesContactDifferences_(contact,draft.contact);
     if(differences.length) throw new Error('Ansprechpartner noch nicht bestätigt. Abweichende Kontaktfelder: '+differences.join(', ')+'. Bitte auf der Daten-Testseite „Homepage in HQ prüfen“ ausführen und den Text bei „Ansprechpartner“ mitteilen.');
@@ -489,7 +582,7 @@ function salesRunCreate_(job,draft,step) {
   job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);
   const cleanCompany=salesOne_('Companies',job.hqId);
   if(!salesHomepageConfirmed_(cleanCompany,draft.company.homepage)||!salesEqualFields_(cleanCompany.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Homepage oder Adresse nach Bereinigung in HQ nicht mehr bestätigt.');
-  salesWrite_('sales_companies/'+job.hqId,{company:salesCompany_(cleanCompany),contacts:job.contactId?[salesPick_(salesOne_('ContactPersons',job.contactId),['id','companyId','firstName','lastName','position','salutation','salutationForm','eMail','phoneMobile','phoneLandline'])]:[],histories:[],projects:[],detailVersion:3,loadedAt:salesNow_()});
+  salesWrite_('sales_companies/'+job.hqId,{company:salesCompany_(cleanCompany),contacts:job.contactId?[salesContactView_(salesContactWithAddress_(job.contactId))]:[],histories:[],projects:[],detailVersion:3,loadedAt:salesNow_()});
 }
 function salesPrepareSalutationRetry_(job,draft) {
   const rejection=job.lastWrite;
@@ -513,7 +606,11 @@ function salesPrepareSalutationRetry_(job,draft) {
 function reconcileSalesJob(id) {
   salesUser_(true);return salesLock_(()=>{const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job||!['uncertain','running'].includes(job.state)) throw new Error('Kein unklarer Auftrag.');
     const draft=salesRead_('sales_drafts/'+job.draftId);if(!draft?.testOnly) throw new Error('Testfirma fehlt.');
-    if(job.kind==='createCompany') {
+    if(job.kind==='contactEmail') {
+      const current=salesContactEmailState_(draft,job.contactId);
+      if(!salesContactEmailEqual_(current,job.targetContact)) throw new Error('E-Mail-Korrektur in HQ noch nicht vollständig bestätigt. Kein weiterer Schreibversuch freigegeben.');
+      job.state='synced';job.message='E-Mail-Korrektur nur lesend bestätigt. Jetzt den ursprünglichen Anlageauftrag abschließen.';
+    } else if(job.kind==='createCompany') {
       if(salesPrepareSalutationRetry_(job,draft)) return salesJobSummary_(job);
       if(job.hqId&&job.markerCleanupAttempted) {
         const checked=salesOne_('Companies',job.hqId),marker=[draft.company.description,'[Sales-Test '+draft.id+']'].filter(Boolean).join('\n');
@@ -528,7 +625,7 @@ function reconcileSalesJob(id) {
       if(list.length!==1) throw new Error('Keine eindeutige Firmenanlage gefunden. Auftrag bleibt gesperrt; HQ manuell prüfen.');
       const found=list[0];if(job.hqId&&Number(job.hqId)!==Number(found.id)) throw new Error('Abweichende HQ-ID.');job.hqId=salesId_(found.id);draft.hqId=job.hqId;salesWrite_('sales_drafts/'+draft.id,draft);
       if(draft.contact&&job.contactAttempted) {
-        const contacts=salesCollect_('ContactPersons','companyId eq '+job.hqId,Date.now()).filter(x=>Number(x.companyId)===job.hqId&&salesEqualFields_(x,draft.contact));
+        const contacts=salesCollect_('ContactPersons','companyId eq '+job.hqId,Date.now(),'DefaultAddress').filter(x=>Number(x.companyId)===job.hqId&&!salesContactDifferences_(x,draft.contact).length);
         if(contacts.length!==1) throw new Error('Kontaktanlage nicht eindeutig bestätigt. Auftrag bleibt gesperrt.');job.contactId=salesId_(contacts[0].id);job.steps.contact=true;
       }
       job.state='ready';job.message='Gefundene HQ-Anlage zugeordnet. Fortsetzen führt die Rückprüfung und nur noch ausstehende Schritte aus.';

@@ -14,6 +14,7 @@ function fixture(){
     if(m[2])return {data:clone(remote[entity][m[2]]),headers:{}};
     let rows=Object.values(remote[entity]||{}).map(clone);const q=new URL('https://hq'+path).searchParams,filter=q.get('filter')||q.get('$filter')||'';
     const company=/companyId eq (\d+)/.exec(filter),name=/name eq '(.*)'/.exec(filter);if(company)rows=rows.filter(x=>Number(x.companyId)===Number(company[1]));if(name)rows=rows.filter(x=>x.name===name[1].replace(/''/g,"'"));
+    const address=/defaultAddressId eq (\d+)/.exec(filter);if(address)rows=rows.filter(x=>Number(x.defaultAddressId)===Number(address[1]));
     const project=/projectId eq (\d+)/.exec(filter);if(project)rows=rows.filter(x=>Number(x.projectId)===Number(project[1]));
     return {data:rows,headers:{'helloHQ-Count':rows.length}};
   };
@@ -23,8 +24,9 @@ function fixture(){
       // Model the observed salutation validation failure; the enum values come
       // from HQ ContactPersonPost/SalutationForm, not from our payload builder.
       if(!['Formal','Informal','Neutral'].includes(body.salutationForm))return {getResponseCode:()=>400,getContentText:()=>JSON.stringify({errors:{salutationForm:['Required for salutation']}})};
-      result={...body,id:202};remote.ContactPersons[202]=result;
+      result={position:null,phoneLandline:null,phoneMobile:null,eMail:null,salutation:null,language:null,birthdate:null,note:null,customFields:[],defaultAddressId:707,defaultAddress:{street:null,zipCode:null,city:null,country:null,description:null,email:null},...body,id:202};remote.ContactPersons[202]=result;
     }
+    else if(path==='/v2/ContactPersons/202'&&opt.method==='put') {result={...remote.ContactPersons[202],...clone(body)};remote.ContactPersons[202]=result;}
     else if(path==='/v2/ContactHistories') {result={...body,id:303};remote.ContactHistories[303]=result;}
     else if(path==='/v2/Companies/101'&&opt.method==='put') {result={...remote.Companies[101],...body};remote.Companies[101]=result;}
     else if(path==='/v2/Companies/101/Addresses/501'&&opt.method==='put') {result={...remote.Companies[101].defaultAddress,...body,id:501};remote.Companies[101].defaultAddress=result;}
@@ -45,7 +47,7 @@ function finishCreate(f,id){
 }
 test('all public RPCs enforce the allowlist before accessing data',()=>{
   const f=fixture();f.setEmail('outsider@example.invalid');
-  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','queueSalesContactEmail','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
   assert.equal(f.calls.length,0);
 });
 test('Google identity must be present even for a configured account',()=>{const f=fixture();f.setEmail('');assert.throws(()=>f.ctx.getSalesState(),/Zugriff/);});
@@ -123,8 +125,8 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-09-26-r8.1/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
-  assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: eMail/);
+  assert.match(result,/Kontaktprüfung 2026-09-26-r9/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
 test('contact email diagnostic distinguishes missing, empty, alternate and different values',()=>{
@@ -140,7 +142,7 @@ test('audit blocks a contact assigned to another company',()=>{
 });
 test('audit expands a linked contact address and reports failed reads without assuming an empty email',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'synthetic@example.invalid'});finishCreate(f,r.id);
-  f.remote.ContactPersons[202].defaultAddressId=777;const get=f.ctx.salesHqGet_;
+  f.remote.ContactPersons[202].defaultAddressId=777;f.remote.ContactPersons[202].defaultAddress=null;const get=f.ctx.salesHqGet_;
   f.ctx.salesHqGet_=path=>path.includes('expand=DefaultAddress')?{data:{...f.remote.ContactPersons[202],defaultAddress:{email:'synthetic@example.invalid'}},headers:{}}:get(path);
   assert.match(f.ctx.getSalesTestAudit(r.id).contactStatus,/defaultAddress.email: stimmt mit Firebase überein/);
   f.ctx.salesHqGet_=path=>{if(path.includes('expand=DefaultAddress'))throw Error('Unavailable');return get(path);};
@@ -148,10 +150,82 @@ test('audit expands a linked contact address and reports failed reads without as
 });
 test('a missing HQ email reports the actual field and never creates a duplicate contact',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'synthetic@example.invalid'}),fetch=f.ctx.UrlFetchApp.fetch;
-  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const response=fetch(url,opt);if(url.endsWith('/v2/ContactPersons'))f.remote.ContactPersons[202].eMail=null;return response;};
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const response=fetch(url,opt);if(url.endsWith('/v2/ContactPersons')){f.remote.ContactPersons[202].eMail=null;if(f.remote.ContactPersons[202].defaultAddress)f.remote.ContactPersons[202].defaultAddress.email=null;}return response;};
   f.ctx.runSalesJob(r.id,'company');const result=f.ctx.runSalesJob(r.id,'contact');assert.equal(result.state,'contactCreated');
   assert.match(result.message,/Abweichende Kontaktfelder: eMail/);f.ctx.runSalesJob(r.id,'contact');
   assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactPersons').length,1);
+});
+function missingContactEmail(){
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'contact@example.invalid'}),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.runSalesJob(r.id,'company');
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const response=fetch(url,opt);if(url.endsWith('/v2/ContactPersons')){f.remote.ContactPersons[202].eMail=null;f.remote.ContactPersons[202].defaultAddress.email=null;}return response;};
+  assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'contactCreated');f.ctx.UrlFetchApp.fetch=fetch;
+  return {f,id:r.id};
+}
+test('email correction previews read-only and updates one known contact while preserving its data',()=>{
+  const {f,id}=missingContactEmail(),contact=f.remote.ContactPersons[202];
+  Object.assign(contact,{note:'Keep note',language:'de-DE',birthdate:'01.01.1980',customFields:[{name:'Category',type:'Text',value:'Keep',id:999}]});
+  Object.assign(contact.defaultAddress,{street:'Kontaktweg',houseNumber:'9',fax:'123',additionalInformation:'Keep address'});
+  const n=f.calls.length,j=f.ctx.queueSalesContactEmail(id);assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  assert.equal(f.ctx.queueSalesContactEmail(id).id,j.id);
+  const preview=f.ctx.getSalesJobPreview(j.id);assert.equal(preview.change.eMail,'contact@example.invalid');assert.equal(preview.change.contactAddress.street,'Kontaktweg');
+  assert.equal(f.ctx.runSalesJob(j.id).state,'synced');
+  const writes=f.calls.filter(c=>c.method==='put'&&c.path==='/v2/ContactPersons/202');assert.equal(writes.length,1);
+  assert.equal(writes[0].body.note,'Keep note');assert.equal(writes[0].body.language,'de-DE');assert.equal(writes[0].body.birthdate,'01.01.1980');
+  assert.deepEqual(writes[0].body.customFields,[{name:'Category',type:'Text',value:'Keep'}]);assert.equal(writes[0].body.defaultAddress.fax,'123');
+  assert.equal(writes[0].body.defaultAddress.email,'contact@example.invalid');assert.ok(!('companyId' in writes[0].body));
+  assert.equal(f.ctx.runSalesJob(id,'contact').state,'synced');assert.equal(f.ctx.getSalesCompany('draft_'+id).contacts[0].eMail,'contact@example.invalid');
+  const after=f.calls.length;f.ctx.runSalesJob(j.id);assert.equal(f.calls.length,after);assert.equal(f.calls.filter(c=>c.method==='post').length,2);
+});
+test('new contacts send email on their own address and accept address-derived readback',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'contact@example.invalid'}),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const result=fetch(url,opt);if(url.endsWith('/v2/ContactPersons'))f.remote.ContactPersons[202].eMail=null;return result;};
+  assert.equal(finishCreate(f,r.id).state,'synced');
+  const post=f.calls.find(c=>c.method==='post'&&c.path==='/v2/ContactPersons');assert.equal(post.body.defaultAddress.email,'contact@example.invalid');assert.ok(!('id' in post.body.defaultAddress));
+  assert.equal(f.db['sales_companies/101'].contacts[0].eMail,'contact@example.invalid');
+  assert.notEqual(f.remote.Companies[101].defaultAddress.email,'contact@example.invalid');
+});
+test('lost email PUT response is reconciled only by reading and never repeated',()=>{
+  const {f,id}=missingContactEmail(),j=f.ctx.queueSalesContactEmail(id),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const result=fetch(url,opt);if(url.endsWith('/v2/ContactPersons/202'))throw Error('Lost response');return result;};
+  assert.equal(f.ctx.runSalesJob(j.id).state,'uncertain');assert.throws(()=>f.ctx.runSalesJob(j.id),/gesperrt/);
+  const n=f.calls.length;assert.equal(f.ctx.reconcileSalesJob(j.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  assert.equal(f.calls.filter(c=>c.method==='put'&&c.path==='/v2/ContactPersons/202').length,1);
+});
+test('an unconfirmed email PUT stays blocked with no second write',()=>{
+  const {f,id}=missingContactEmail(),j=f.ctx.queueSalesContactEmail(id),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const result=fetch(url,opt);if(url.endsWith('/v2/ContactPersons/202')){f.remote.ContactPersons[202].eMail=null;f.remote.ContactPersons[202].defaultAddress.email=null;}return result;};
+  assert.equal(f.ctx.runSalesJob(j.id).state,'uncertain');assert.throws(()=>f.ctx.reconcileSalesJob(j.id),/nicht vollständig/);
+  assert.throws(()=>f.ctx.runSalesJob(j.id),/gesperrt/);assert.equal(f.calls.filter(c=>c.method==='put').length,1);
+});
+test('email correction rejects foreign contacts and company or other-contact shared addresses',()=>{
+  for(const mutate of [f=>f.remote.ContactPersons[202].companyId=999,f=>f.remote.ContactPersons[202].defaultAddressId=501,f=>f.remote.ContactPersons[303]={id:303,companyId:999,defaultAddressId:707}]){
+    const {f,id}=missingContactEmail();mutate(f);assert.throws(()=>f.ctx.queueSalesContactEmail(id),/zuordnung|zugeordnet|Firmenadresse/i);assert.equal(f.calls.filter(c=>c.method==='put').length,0);
+  }
+});
+test('email correction refuses changed fields or address association after preview',()=>{
+  for(const mutate of [f=>f.remote.ContactPersons[202].note='Changed',f=>f.remote.ContactPersons[202].eMail='someone@example.invalid',f=>f.remote.ContactPersons[202].defaultAddressId=999]){
+    const {f,id}=missingContactEmail(),j=f.ctx.queueSalesContactEmail(id);mutate(f);const result=f.ctx.runSalesJob(j.id);
+    assert.equal(result.state,'pending');assert.match(result.message,/verändert/);assert.equal(f.calls.filter(c=>c.method==='put').length,0);
+  }
+});
+test('empty contact address has explicit company-address preview; partial address is not invented',()=>{
+  const {f,id}=missingContactEmail();f.remote.ContactPersons[202].defaultAddress={street:null,zipCode:null,city:null,country:null,description:null,email:null,phone:'Keep phone'};
+  const j=f.ctx.queueSalesContactEmail(id),preview=f.ctx.getSalesJobPreview(j.id);
+  assert.match(preview.change.addressNote,/Firmenentwurf/);assert.equal(preview.change.contactAddress.street,f.input.street);assert.equal(preview.change.contactAddress.phone,'Keep phone');
+  assert.equal(f.ctx.runSalesJob(j.id).state,'synced');
+  const other=missingContactEmail();other.f.remote.ContactPersons[202].defaultAddress.city=null;assert.throws(()=>other.f.ctx.queueSalesContactEmail(other.id),/teilweise/);
+});
+test('email correction requires complete writable fields and preserves existing email',()=>{
+  for(const mutate of [f=>delete f.remote.ContactPersons[202].note,f=>delete f.remote.ContactPersons[202].customFields,f=>f.remote.ContactPersons[202].eMail='other@example.invalid']){
+    const {f,id}=missingContactEmail();mutate(f);assert.throws(()=>f.ctx.queueSalesContactEmail(id),/vollständig|bereits eine E-Mail/);assert.equal(f.calls.filter(c=>c.method==='put').length,0);
+  }
+});
+test('central writer limits email correction to the bound contact and exact preview payload',()=>{
+  const {f,id}=missingContactEmail(),queued=f.ctx.queueSalesContactEmail(id),j=f.db['sales_jobs/'+queued.id];j.state='running';
+  assert.throws(()=>f.ctx.salesWriteHq_(j,'/v2/ContactPersons/999','put',j.targetContact.payload),/gesperrt/);
+  assert.throws(()=>f.ctx.salesWriteHq_(j,'/v2/ContactPersons/202','put',{...j.targetContact.payload,note:'Changed'}),/gesperrt/);
+  assert.equal(f.calls.filter(c=>c.method==='put').length,0);
 });
 test('contact step is blocked before confirmation and repeated company clicks never post contacts',()=>{
   const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);
@@ -334,7 +408,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-26-r8',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-26-r9',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
@@ -349,6 +423,16 @@ test('UI shows the explicit second step only after confirmation, and no write bu
   assert.ok(sandbox.first.includes('data-action="create-company"'));assert.ok(!sandbox.first.includes('create-contact'));
   assert.ok(sandbox.second.includes('2. Ansprechpartner nach HQ übertragen'));assert.ok(sandbox.second.includes('data-action="create-contact"'));assert.equal(sandbox.blocked,'');
 });
+test('email preview shows the target person, address and action in readable escaped form',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)],script=scripts.at(-1)[1];
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
+  vm.runInNewContext(preboot+`state={user:{admin:true}};preview={job:{id:'email-1',draftId:'test-1',kind:'contactEmail',state:'pending',name:'TEST Example'},contact:{firstName:'Ada',lastName:'Example'},change:{eMail:'ada@example.invalid',contactAddress:{street:'<Testweg>',city:'Testort',country:'DE'},addressNote:'Vorhandene Kontaktanschrift bleibt erhalten.'}};globalThis.output=previewPage();})();`,sandbox);
+  for(const value of ['Ada Example','ada@example.invalid','&lt;Testweg&gt;','E-Mail jetzt in HQ ergänzen','Zur Testfirma'])assert.ok(sandbox.output.includes(value));
+  assert.ok(!sandbox.output.includes('"contactAddress"'));
+  vm.runInNewContext(preboot+`state={user:{admin:true}};preview={job:{id:'email-1',draftId:'test-1',kind:'contactEmail',state:'synced',message:'E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'},contact:{},change:{contactAddress:{}}};globalThis.output=previewPage();})();`,sandbox);
+  assert.ok(sandbox.output.includes('Status: Bestätigt'));assert.ok(sandbox.output.includes('E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'));assert.ok(!sandbox.output.includes('data-action="run-job"'));
+});
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
   const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
@@ -359,7 +443,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-26-r8'));
+  assert.ok(root.innerHTML.includes('2026-09-26-r9'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

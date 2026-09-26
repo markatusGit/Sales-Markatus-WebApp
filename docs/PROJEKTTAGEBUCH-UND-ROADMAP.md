@@ -540,3 +540,35 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Keine neue Firma oder zweiten Ansprechpartner anlegen. Nach Auswertung wird die gezielte E-Mail-Korrektur fortgesetzt.
 
 **GitHub-Sicherung:** Die sechs zugehörigen Dateien wurden im Commit `eb520d2` gezielt versioniert und erfolgreich nach `origin/main` übertragen. Andere vorhandene Änderungen blieben unberührt. Dieser Sicherungsnachtrag wird separat versioniert. Der Live-Lesetest und die daraus abzuleitende E-Mail-Korrektur stehen weiterhin aus.
+
+### 26.09.2026 – Fehlende Kontakt-E-Mail eingegrenzt; Korrektur r9 vorbereitet
+
+**Neue Live-Rückmeldung:** Die Diagnose r8.1 bestätigt E-Mail in Firebase vorhanden, HQ eMail leer, alternative Schreibweisen nicht geliefert, defaultAddress.email leer und Kontaktadresse verknüpft. Als abweichendes Kontaktfeld wird ausschließlich eMail genannt. Damit ist das Fehlen im zurückgelesenen HQ-Datensatz bestätigt, nicht nur eine Darstellungsabweichung. Keine Kontaktwerte oder echten IDs übernommen.
+
+**API-Befund und lokale Umsetzung:** Die öffentliche HQ-v2-Spezifikation wurde für ContactPersonPost/Put/GetRelated, CompanyAddressBase und CustomFieldContentBase erneut gelesen. Neben eMail ist defaultAddress.email dokumentiert; PUT /v2/ContactPersons/{id} aktualisiert den vorhandenen Kontakt. r9 sendet bei neuen Kontakten mit E-Mail eine eigene Kontaktadresse aus den Firmenanschriftangaben und der Kontakt-E-Mail, ohne eine bestehende Adress-ID zu übernehmen. Firma und Kontakt bleiben zwei getrennte Ausführungen. Anzeige und Rückprüfung berücksichtigen auch die E-Mail der Kontaktadresse; ein vorhandener abweichender eMail-Wert wird nicht durch den Adresswert verdeckt. Das dokumentierte Modell begründet die Korrektur, bestätigt aber noch nicht deren Wirkung im echten Mandanten.
+
+**Gezielte Korrektur des bestehenden Ansprechpartners:** Auf der Kundenkarte eines eigenen Testentwurfs mit offener Kontakt-Rückprüfung erscheint **Kontakt-E-Mail ergänzen**. Die Aktion liest HQ und speichert einen separaten Vorschauauftrag in Firebase. Die Vorschau zeigt Ansprechpartner, E-Mail und Kontaktanschrift. Erst **E-Mail jetzt in HQ ergänzen** führt den PUT an der gespeicherten Kontakt-ID aus. Die Zuordnung zu Firma und ursprünglichem Anlageauftrag wird serverseitig geprüft. Alle dokumentierten skalaren Kontaktfelder, eigene Felder und Adresswerte werden gelesen und im PUT erhalten; nicht vollständig gelieferte Felder blockieren die Änderung. Eine schon vorhandene E-Mail wird nicht überschrieben. Als Firmenadresse oder von weiteren Kontakten genutzte Adressen werden gesperrt. Vor dem Schreiben werden Inhalt und Zuordnung erneut verglichen. Nach einem Schreibversuch erfolgt eine vollständige Rückprüfung; ein unklarer Ausgang erlaubt nur Leseprüfung und keine blinde Wiederholung. Es wird kein zweiter Kontakt und keine neue Firma angelegt.
+
+**Anschrift und Abschluss:** Bei einer vollständig leeren Kontaktanschrift ergänzt der Auftrag die dokumentierten Pflichtangaben aus dem Firmenentwurf und zeigt dies ausdrücklich in der Vorschau. Teilweise ausgefüllte Anschriften werden nicht mit anderen Anschriften gemischt. Eine leere Adressbeschreibung erhält Kontaktadresse. Nach bestätigter E-Mail-Korrektur führt **Zur Testfirma → 2. Ansprechpartner prüfen und abschließen** die Rückprüfung des ursprünglichen Anlageauftrags fort. Erst dessen erfolgreicher Abschluss entfernt den technischen Beschreibungseintrag und speichert den bestätigten HQ-Stand in Firebase. Die Oberfläche zeigt das Ergebnis dauerhaft in der Vorschau.
+
+**Prüfung:** 76 lokale Prüfungen mit rein synthetischen HQ-/Firebase-Diensten bestanden. Die neuen Fälle prüfen gezieltes PUT ohne zweite Anlage, Erhalt von Notiz/Sprache/Geburtstag/eigenen Feldern/Adressangaben, Kontaktadresse bei Neuanlage, Rücklesung aus defaultAddress.email, verlorene PUT-Antwort mit reiner Wiederaufnahmeprüfung, ausbleibende E-Mail ohne zweiten Schreibversuch, Fremd-/gemeinsame Adressen, Änderungen seit Vorschau, leere und teilweise gefüllte Anschriften sowie eine lesbare HTML-escaped Vorschau mit dauerhaftem Ergebnis. Objekt-Schlüsselreihenfolgen werden beim Snapshotvergleich neutralisiert; echte Wertabweichungen bleiben gesperrt. Generierte HTML-Skripte syntaktisch geprüft; SalesBackend.gs und Sales.html aus den Quellen neu erzeugt. Keine echten HQ-/Firebase-Schreibzugriffe und kein Apps-Script-Upload durch Codex.
+
+**Übergabe:** Beide Dateien **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** vollständig ersetzen; vorhandene Bereitstellung auf **Neue Version** setzen. Sichtbare Kennung **2026-09-26-r9**. Keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte. Die aktuelle manuelle Anleitung ersetzt die überholten r8/r8.1-Schritte; Verlauf bleibt hier und in Git erhalten.
+
+**Nächste Nutzeraktionen:**
+
+- Beide Dateien gemäß **sales-app/MANUELL-UEBERTRAGEN.md** vollständig in Apps Script ersetzen.
+- Bei der vorhandenen Bereitstellung **Neue Version** veröffentlichen.
+- Die Kennung **2026-09-26-r9** in der Web-App prüfen.
+- Unter **Kunden** dieselbe eigene Testfirma öffnen.
+- **Kontakt-E-Mail ergänzen** anklicken.
+- Ansprechpartner, E-Mail und Anschrift in der Vorschau prüfen.
+- Bei korrekter Vorschau **E-Mail jetzt in HQ ergänzen** anklicken.
+- Das Ergebnis **Bestätigt** abwarten; bei Abweichung den technischen Auftragstext mitteilen.
+- **Zur Testfirma** anklicken.
+- **2. Ansprechpartner prüfen und abschließen** anklicken.
+- In HQ die E-Mail am vorhandenen Ansprechpartner prüfen.
+- Den erfolgreichen Abschluss beziehungsweise die technische Fehlermeldung mitteilen.
+- Erst nach erfolgreichem Korrekturtest den separaten Neuanlagetest aus der Anleitung durchführen.
+
+**Stand und offene Arbeit:** Lokal vorbereitet und geprüft; gezielte GitHub-Sicherung folgt. Die Google-Bereitstellung übernimmt der Nutzer. E-Mail-Korrektur und geänderter Kontakt-POST sind noch nicht live bestätigt. Neue Testfirma zunächst nicht erforderlich. Automatische zeitversetzte/nächtliche Synchronisation, weitere Google-Nutzer und die übrige Roadmap bleiben offen. Die bestehende Beschränkung auf selbst angelegte Testfirmen bleibt bestehen; der Vorabvergleich ist keine atomare Sperre gleichzeitiger Änderungen in HQ.

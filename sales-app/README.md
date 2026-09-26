@@ -1,13 +1,21 @@
 # Apps-Script-Datenpilot
 
-Stand: 26.09.2026, r8-Oberfläche mit lokal vorbereitetem **Kontakt-Lesetest r8.1**. Der Nutzer bestätigt die tatsächliche Kontaktanlage in HQ nach Ergänzen von salutationForm. Die E-Mail fehlt jedoch in HQ; der Auftrag bleibt korrekt auf Kontakt-Rückprüfung offen. Die E-Mail-Korrektur ist noch nicht implementiert, weil der Code bereits das dokumentierte eMail-Feld sendet und die konkrete HQ-Antwort fehlt.
+Stand: 26.09.2026, **2026-09-26-r9** lokal vorbereitet. Der Live-Lesetest hat bestätigt: E-Mail in Firebase vorhanden, HQ eMail und defaultAddress.email leer; übrige verglichene Kontaktfelder stimmen. r9 ergänzt die E-Mail am bestehenden eigenen Testkontakt einschließlich seiner Kontaktadresse mit Vorschau und Rückprüfung. Neue Kontakte senden die E-Mail ebenfalls an ihrer eigenen Kontaktadresse. Der r9-Schreibweg ist lokal geprüft, aber noch nicht im HQ-Mandanten bestätigt.
 
 ## Nächster Schritt für den Nutzer
 
-1. Nur **hq-benchmark/SalesBackend.gs** anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen und die bestehende Web-App auf eine neue Version setzen. Sales.html bleibt unverändert; keine neuen Einstellungen.
-2. **Daten-Testseite** öffnen und bei derselben eigenen Testfirma **Homepage in HQ prüfen** anklicken.
-3. Den Text unter **Ansprechpartner** ab **Kontaktprüfung 2026-09-26-r8.1** mitteilen. Die Diagnose nennt nur Feldnamen, Präsenz und Übereinstimmung, keine E-Mail-Adressen oder Kontakt-IDs.
-4. Keine neue Firma oder zweiten Ansprechpartner anlegen; die Zielkorrektur folgt nach Auswertung der tatsächlichen Leseergebnisse.
+1. Beide Dateien **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** nach [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen.
+2. Die bestehende Bereitstellung auf **Neue Version** setzen; keine neuen Einstellungen.
+3. In der Web-App die Kennung **2026-09-26-r9** prüfen; bei abweichender Kennung zuerst die Bereitstellung korrigieren.
+4. Unter **Kunden** dieselbe eigene Testfirma öffnen.
+5. **Kontakt-E-Mail ergänzen** anklicken.
+6. Ansprechpartner, E-Mail und Kontaktanschrift in der Vorschau prüfen; bei Abweichung nicht schreiben.
+7. **E-Mail jetzt in HQ ergänzen** anklicken. Erwartung: **Bestätigt**; andernfalls den technischen Auftragstext mitteilen.
+8. **Zur Testfirma** anklicken.
+9. **2. Ansprechpartner prüfen und abschließen** anklicken. Erwartung: **In HQ bestätigt**.
+10. In HQ die E-Mail am vorhandenen Kontakt prüfen. Keine neue Firma oder zweiten Ansprechpartner für diesen Korrekturtest anlegen.
+
+Die Korrektur verwendet nur die gespeicherte Kontakt-ID des Anlageauftrags. Vor dem PUT werden Firmen-/Kontaktzuordnung, eine ausschließlich diesem Kontakt zugeordnete Adresse und alle dokumentierten Kontaktfelder gelesen. Die übrigen Kontakt-/Adresswerte einschließlich eigener Felder bleiben im Payload erhalten. Fremde oder gemeinsame Adressen, zwischenzeitliche Änderungen und bereits befüllte E-Mail-Felder sperren die automatische Ergänzung. Vollständig leere Kontaktanschriften erhalten die Pflichtfelder aus dem Firmenentwurf, sichtbar in der Vorschau; teilweise ausgefüllte Anschriften werden nicht gemischt. Nach unklarem Ausgang ist nur Rückprüfung möglich. Rücklesung und Anzeige berücksichtigen auch defaultAddress.email; ein abweichender nichtleerer eMail-Wert bleibt ein Fehler.
 
 ## Update nach der ersten eigenen Testfirma
 
@@ -46,7 +54,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 
 ## Bewusste Grenzen dieses ersten Testschritts
 
-- Firma und Ansprechpartner sind nach r8 laut Nutzer in HQ angelegt. Die E-Mail fehlt dort noch und die Rückprüfung ist offen. r8.1 ergänzt dafür zunächst eine reine Diagnose; der vollständige Schreibweg ist noch nicht abgenommen. Es gibt keinen automatischen Nachtlauf.
+- Firma und Ansprechpartner sind nach r8 laut Nutzer in HQ angelegt. r8.1 hat die fehlende E-Mail in beiden HQ-Feldern nachgewiesen. r9 ergänzt den kontrollierten Korrekturweg und den geänderten Neuanlage-Payload; beides muss live abgenommen werden. Es gibt keinen automatischen Nachtlauf.
 - Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
 - Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
 - Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.
@@ -75,7 +83,7 @@ node sales-app/build.cjs
 node sales-app/test-sales.cjs
 ```
 
-Bereitstellung aus `hq-benchmark` mit der dortigen `.clasp.json` und `.claspignore`. Nur die sieben explizit freigegebenen Apps-Script-Dateien werden hochgeladen. Das vorhandene Benchmark-Frontend bleibt nach Bereitstellung unter derselben Web-App-Adresse mit `?view=benchmark` erreichbar. Bestehende Script Properties für HQ/Firebase bleiben erhalten.
+Der Nutzer überträgt ausschließlich die in der aktuellen manuellen Anleitung genannten Dateien aus `hq-benchmark` und setzt die bestehende Bereitstellung auf eine neue Version. Kein automatischer Apps-Script-Upload durch Codex. Das vorhandene Benchmark-Frontend bleibt unter derselben Web-App-Adresse mit `?view=benchmark` erreichbar. Bestehende Script Properties für HQ/Firebase bleiben erhalten.
 
 Firestore: neue getrennte Sammlungen `sales_editions`, `sales_companies`, `sales_meta`, `sales_drafts`, `sales_jobs`. Zugriff erfolgt serverseitig über das bereits konfigurierte Dienstkonto. Bestehende Browserregeln sperren diese Sammlungen vollständig; Regeln wurden nicht erweitert. Kundeninhalte werden nicht im Browser-Lokalspeicher abgelegt. Die App speichert dort nur das Farbschema.
 
@@ -83,8 +91,8 @@ Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein
 
 ## Prüfung
 
-66 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
+76 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. r9 prüft außerdem gezielte E-Mail-Korrektur, Datenerhalt, gemeinsam genutzte Adressen, Änderungen seit Vorschau, unklare PUT-Antworten ohne Wiederholung, Neuanlage mit Kontaktadresse und lesbare sichere Vorschau. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
 
 Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
 
-API-Grundlage: öffentliche [HQ-v2-OpenAPI-Beschreibung](https://developer.hellohq.io/swagger20.json), am 24.09.2026 gelesen. Dokumentierte Endpunkte und Modelle sind kein Nachweis für erfolgreiche Ausführung im Mandanten.
+API-Grundlage: öffentliche [HQ-v2-OpenAPI-Beschreibung](https://developer.hellohq.io/swagger20.json), Kontakt-POST/PUT/GET, CompanyAddressBase und CustomFieldContentBase am 26.09.2026 erneut geprüft. Dokumentierte Endpunkte und Modelle sind kein Nachweis für erfolgreiche Ausführung im Mandanten.
