@@ -27,7 +27,7 @@ function fixture(){
       result={position:null,phoneLandline:null,phoneMobile:null,eMail:null,salutation:null,language:null,birthdate:null,note:null,customFields:[],defaultAddressId:707,defaultAddress:{street:null,zipCode:null,city:null,country:null,description:null,email:null},...body,id:202};remote.ContactPersons[202]=result;
     }
     else if(path==='/v2/ContactPersons/202'&&opt.method==='put') {result={...remote.ContactPersons[202],...clone(body)};remote.ContactPersons[202]=result;}
-    else if(path==='/v2/ContactHistories') {result={...body,id:303};remote.ContactHistories[303]=result;}
+    else if(path==='/v2/ContactHistories') {const id=303+Object.keys(remote.ContactHistories).length;result={...body,id};remote.ContactHistories[id]=result;}
     else if(path==='/v2/Companies/101'&&opt.method==='put') {result={...remote.Companies[101],...body};remote.Companies[101]=result;}
     else if(path==='/v2/Companies/101/Addresses/501'&&opt.method==='put') {result={...remote.Companies[101].defaultAddress,...body,id:501};remote.Companies[101].defaultAddress=result;}
     else throw new Error('Unexpected external mutation '+path);
@@ -47,7 +47,7 @@ function finishCreate(f,id){
 }
 test('all public RPCs enforce the allowlist before accessing data',()=>{
   const f=fixture();f.setEmail('outsider@example.invalid');
-  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','queueSalesContactEmail','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','syncSalesHistory','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','queueSalesContactEmail','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
   assert.equal(f.calls.length,0);
 });
 test('Google identity must be present even for a configured account',()=>{const f=fixture();f.setEmail('');assert.throws(()=>f.ctx.getSalesState(),/Zugriff/);});
@@ -125,7 +125,7 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-09-26-r9/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/Kontaktprüfung 2026-09-27-r10/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
   assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
@@ -275,6 +275,78 @@ test('reconciliation never adopts a same-name unrelated company',()=>{const f=fi
 test('different HQ address is reported after safe contact linkage without duplicate writes',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),orig=f.ctx.salesOne_;f.ctx.runSalesJob(r.id,'company');f.ctx.salesOne_=(entity,id)=>{const v=orig(entity,id);if(entity==='Companies')v.defaultAddress.city='Wrong';return v;};const check=f.ctx.runSalesJob(r.id,'contact');assert.equal(check.state,'contactCreated');assert.match(check.message,/Standardadresse/);assert.equal(f.calls.filter(x=>x.path==='/v2/ContactPersons'&&x.method==='post').length,1);assert.equal(f.calls.filter(x=>x.path==='/v2/Companies'&&x.method==='post').length,1);});
 test('central writer rejects project/invoice/foreign-company paths',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);const j=f.db['sales_jobs/'+r.id];j.state='running';for(const path of ['/v2/Documents','/v2/Projects','/v2/Companies/999'])assert.throws(()=>f.ctx.salesWriteHq_(j,path,'post',{}),/gesperrt/);assert.equal(f.calls.length,0);});
 test('contact history is queued then written only to the own test company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const n=f.calls.length,h=f.ctx.saveSalesHistory({draftId:r.id,reason:'Call',content:'Test only',channel:'Call'});assert.equal(f.calls.length,n);assert.equal(f.ctx.runSalesJob(h.id).state,'synced');assert.equal(f.remote.ContactHistories[303].companyId,101);assert.equal(f.db['sales_companies/101'].histories.length,1);});
+function historyFixture(){const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);return {f,id:r.id,input:{draftId:r.id,reason:'TEST Gespräch',content:'Synthetischer Test\nZweite Zeile',channel:'Call',contactOn:'2026-09-26T10:15:00.000Z',status:'NotReached',contactTarget:'contact'}};}
+test('a saved communication appears immediately in both customer views without contacting HQ',()=>{
+  const {f,id,input}=historyFixture(),n=f.calls.length,h=f.ctx.saveSalesHistory(input);
+  for(const key of ['draft_'+id,'101']){const rows=f.ctx.getSalesCompany(key).histories;assert.equal(rows.length,1);assert.equal(rows[0].jobId,h.id);assert.equal(rows[0].syncState,'pending');assert.equal(rows[0].content,input.content);}
+  assert.equal(f.calls.length,n);assert.equal(Object.keys(f.remote.ContactHistories).length,0);
+});
+test('communication writes preserve date, type, content and the server-bound contact without sending mail',()=>{
+  for(const channel of ['Note','Mail','Call','Meeting','Visit']){
+    const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory({...input,channel,companyId:999,contactPersonId:999,projectId:999});const n=f.calls.length;
+    assert.equal(f.ctx.runSalesJob(h.id).state,'synced');
+    const writes=f.calls.slice(n).filter(c=>c.method!=='get');assert.equal(writes.length,1);assert.equal(writes[0].path,'/v2/ContactHistories');
+    const body=writes[0].body;assert.equal(body.companyId,101);assert.equal(body.contactPersonId,202);assert.equal(body.contactOn,input.contactOn);assert.equal(body.contactHistoryStatus,'NotReached');assert.equal(body.content,input.content);assert.equal(body.contactHistoryChannel,channel);assert.ok(!('projectId' in body));
+    const rows=f.ctx.getSalesCompany('101').histories;assert.equal(rows.length,1);assert.equal(rows[0].syncState,'synced');
+  }
+});
+test('invalid history input and incomplete company creation never produce a write job',()=>{
+  for(const extra of [{channel:'SentDocument'},{status:'Unknown'},{contactOn:'invalid'},{contactOn:'2026-02-30T12:00:00Z'},{contactTarget:'999'}]){
+    const {f,input}=historyFixture(),n=Object.keys(f.db).length;assert.throws(()=>f.ctx.saveSalesHistory({...input,...extra}));assert.equal(Object.keys(f.db).length,n);
+  }
+  const {f,id,input}=historyFixture();f.db['sales_jobs/'+id].state='contactCreated';assert.throws(()=>f.ctx.saveSalesHistory(input),/bestätigen/);
+});
+test('history target is reread before writing and a moved contact or renamed firm blocks the POST',()=>{
+  for(const mutate of [f=>f.remote.ContactPersons[202].companyId=999,f=>f.remote.Companies[101].name='TEST Other']){
+    const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory(input),n=f.calls.length;mutate(f);assert.notEqual(f.ctx.runSalesJob(h.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  }
+});
+test('lost history POST response is reconciled read-only and never creates a duplicate',()=>{
+  const {f,id,input}=historyFixture(),h=f.ctx.saveSalesHistory(input),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const r=fetch(url,opt);if(url.endsWith('/ContactHistories'))throw Error('Lost response');return r;};
+  assert.equal(f.ctx.runSalesJob(h.id).state,'uncertain');assert.throws(()=>f.ctx.runSalesJob(h.id),/gesperrt/);
+  const n=f.calls.length;assert.equal(f.ctx.reconcileSalesJob(h.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  assert.equal(f.ctx.getSalesCompany('draft_'+id).histories.length,1);assert.equal(f.db['sales_companies/101'].histories.length,1);
+  f.ctx.runSalesJob(h.id);assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length,1);
+});
+test('returned history ID survives read failure and subsequent readback handles UTC formatting',()=>{
+  const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory(input),get=f.ctx.salesHqGet_;
+  f.ctx.salesHqGet_=path=>{if(path==='/v2/ContactHistories/303')throw Error('Read delayed');return get(path);};
+  assert.equal(f.ctx.runSalesJob(h.id).state,'uncertain');assert.equal(f.db['sales_jobs/'+h.id].historyId,303);
+  f.ctx.salesHqGet_=get;f.remote.ContactHistories[303].contactOn='2026-09-26T12:15:00+02:00';assert.equal(f.ctx.reconcileSalesJob(h.id).state,'synced');
+  assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length,1);
+});
+test('mismatching or ambiguous history remains blocked without losing the Firebase draft',()=>{
+  const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory(input),fetch=f.ctx.UrlFetchApp.fetch;
+  f.ctx.UrlFetchApp.fetch=(url,opt)=>{const r=fetch(url,opt);if(url.endsWith('/ContactHistories'))f.remote.ContactHistories[303].content='Different';return r;};
+  const result=f.ctx.runSalesJob(h.id);assert.equal(result.state,'uncertain');assert.match(result.message,/Abweichende Felder: content/);assert.ok(!result.message.includes('Different'));
+  assert.throws(()=>f.ctx.reconcileSalesJob(h.id),/content/);assert.equal(f.db['sales_jobs/'+h.id].history.content,input.content);
+  delete f.db['sales_jobs/'+h.id].historyId;f.remote.ContactHistories[304]={...f.remote.ContactHistories[303],id:304};assert.throws(()=>f.ctx.reconcileSalesJob(h.id),/eindeutig/);
+  assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length,1);
+});
+test('history refresh preserves pending entries and repeated import does not duplicate confirmed entries',()=>{
+  const {f,id,input}=historyFixture(),one=f.ctx.saveSalesHistory(input);f.ctx.runSalesJob(one.id);const two=f.ctx.saveSalesHistory({...input,reason:'Still pending'});
+  for(let i=0;i<2;i++)f.ctx.syncSalesHistory('draft_'+id);
+  const rows=f.ctx.getSalesCompany('101').histories;assert.equal(rows.length,2);assert.equal(rows.filter(h=>h.syncState==='synced').length,1);assert.equal(rows.filter(h=>h.jobId===two.id&&h.syncState==='pending').length,1);
+  assert.equal(f.db['sales_companies/101'].histories.length,1);assert.ok(f.db['sales_companies/101'].historyLoadedAt);
+  delete f.remote.ContactHistories[303];f.ctx.syncSalesHistory('101');
+  assert.equal(f.ctx.getSalesCompany('101').histories.find(h=>h.jobId===one.id).syncState,'missing');
+  assert.equal(f.ctx.getSalesCompany('101').histories.find(h=>h.jobId===two.id).syncState,'pending');
+});
+test('history refresh uses documented paging, imports all channels and preserves snapshot on incomplete read',()=>{
+  const {f,input}=historyFixture(),get=f.ctx.salesHqGet_;let skips=[];
+  const rows=Array.from({length:205},(_,i)=>({id:1000+i,companyId:101,reason:'Synthetic '+i,content:'Content',contactHistoryChannel:['Note','Mail','Call','Meeting','Visit','Task','Unknown'][i%7]}));
+  f.ctx.salesHqGet_=path=>{if(!path.startsWith('/v2/ContactHistories?'))return get(path);const q=new URL('https://test'+path).searchParams;assert.equal(q.get('$filter'),'companyId eq 101');assert.equal(q.get('$top'),'200');const skip=Number(q.get('$skip'));skips.push(skip);return {data:rows.slice(skip,skip+200),headers:{'helloHQ-Count':205}};};
+  f.ctx.syncSalesHistory('101');assert.deepEqual(skips,[0,200]);assert.equal(f.ctx.getSalesCompany('101').histories.length,205);
+  const before=JSON.stringify(f.db['sales_companies/101']);f.ctx.salesHqGet_=path=>{if(path.startsWith('/v2/ContactHistories?'))return {data:[{id:999,companyId:999}],headers:{}};return get(path);};
+  assert.throws(()=>f.ctx.syncSalesHistory('101'),/Firmenfilter/);assert.equal(JSON.stringify(f.db['sales_companies/101']),before);
+  f.ctx.salesHqGet_=path=>{if(path.startsWith('/v2/ContactHistories?'))throw Error('Page failed');return get(path);};assert.throws(()=>f.ctx.syncSalesHistory('101'),/Page failed/);assert.equal(JSON.stringify(f.db['sales_companies/101']),before);
+});
+test('history-only refresh keeps shared-project invoice summaries and leaves other company sections unchanged',()=>{
+  const f=importFixture();f.ctx.syncSalesCompany('1');const before=JSON.stringify(f.db['sales_companies/1'].projects),n=f.calls.length;f.ctx.syncSalesHistory('1');
+  const row=f.ctx.getSalesCompany('1').histories[0];assert.equal(row.projectName,'Shared test');assert.equal(row.invoice.netCents,10000);assert.equal(JSON.stringify(f.db['sales_companies/1'].projects),before);
+  assert.ok(f.calls.slice(n).every(c=>c.method==='get'&&!c.path.includes('PlannedRevenues')));
+});
 test('concurrent HQ change surfaces conflict and prevents another PUT',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const baseline=f.calls.filter(x=>x.method==='put').length,j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'App',homepage:''});f.remote.Companies[101].industrialSector='HQ';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');assert.equal(f.calls.filter(x=>x.method==='put').length,baseline);f.ctx.resolveSalesConflict(j.id,'app');f.remote.Companies[101].industrialSector='HQ again';assert.equal(f.ctx.runSalesJob(j.id).state,'conflict');});
 test('resolved edit preserves unrelated HQ fields and verifies result',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);f.remote.Companies[101].iban='unchanged';const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'New',homepage:''});assert.equal(f.ctx.runSalesJob(j.id).state,'synced');assert.equal(f.remote.Companies[101].iban,'unchanged');assert.equal(f.db['sales_companies/101'].company.industrialSector,'New');});
 test('own test homepage reaches company and standard address',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'',homepage:'test.invalid'});assert.equal(f.ctx.runSalesJob(j.id).state,'synced');assert.equal(f.remote.Companies[101].homepage,'https://test.invalid');assert.equal(f.remote.Companies[101].defaultAddress.website,'https://test.invalid');assert.equal(f.db['sales_companies/101'].company.homepageDisplay,'https://test.invalid');});
@@ -408,7 +480,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-26-r9',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-27-r10',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
@@ -434,6 +506,24 @@ test('email preview shows the target person, address and action in readable esca
   assert.ok(sandbox.output.includes('Status: Bestätigt'));assert.ok(sandbox.output.includes('E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'));assert.ok(!sandbox.output.includes('data-action="run-job"'));
 });
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
+test('customer history offers separated filters, pending sync actions and collapsed safe long content',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
+  const rows=[{reason:'Call only',content:'A'.repeat(300)+'<img onerror=alert(1)>',contactHistoryChannel:'Call',contactOn:'2026-09-26T10:15:00Z',jobId:'job-1',syncState:'pending'},{projectName:'Project only',content:'Automated full message',documentDispatch:true,contactOn:'2026-09-25',invoice:{netCents:10000,currency:'EUR'}}];
+  vm.runInNewContext(preboot+`state={user:{admin:true},jobs:[{id:'test-1',state:'synced'}]};detail={histories:${JSON.stringify(rows)}};const c={id:'draft_test-1',hqId:'101',localDraftId:'test-1'};globalThis.all=historyPanel(c);historyFilter='documents';globalThis.documents=historyPanel(c);historyFilter='communication';globalThis.communication=historyPanel(c);})();`,sandbox);
+  assert.ok(sandbox.all.includes('Kommunikation erfassen'));assert.ok(sandbox.all.includes('Historie aus HQ aktualisieren'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
+  assert.ok(sandbox.communication.includes('In Firebase · HQ offen'));assert.ok(sandbox.communication.includes('Übertragung ansehen'));assert.ok(!sandbox.communication.includes('Project only'));
+  assert.ok(sandbox.communication.indexOf('&lt;img onerror=alert(1)&gt;')>sandbox.communication.indexOf('<details>'));assert.ok(!sandbox.communication.includes('<img'));
+  assert.ok(!sandbox.documents.includes('Call only'));assert.ok(sandbox.documents.includes('100,00 EUR netto'));assert.ok(sandbox.documents.indexOf('Automated full message')>sandbox.documents.indexOf('<details>'));
+});
+test('ordinary email about an invoice stays communication unless HQ evidence identifies document dispatch',()=>{
+  const {ctx}=fixture(),doc={id:1,companyId:1,number:'RE-1',documentType:'Invoice',netValue:100,currency:'EUR'};
+  const raw={companyId:1,reason:'Rückfrage zur Rechnung',content:'Bitte melden',contactHistoryChannel:'Mail'};
+  assert.equal(ctx.salesHistory_(raw,[doc],{}).documentDispatch,false);
+  assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1'},[doc],{}).documentDispatch,true);
+  assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1',syncId:'sales-local-job'},[doc],{}).documentDispatch,false);
+});
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
   const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
@@ -443,7 +533,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-26-r9'));
+  assert.ok(root.innerHTML.includes('2026-09-27-r10'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

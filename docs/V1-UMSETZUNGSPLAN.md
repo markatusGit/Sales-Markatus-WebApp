@@ -1,6 +1,6 @@
 # Weg zur ersten nutzbaren Sales-App
 
-Stand: 27.09.2026. Vorschlag zur Reihenfolge auf Wunsch des Nutzers; noch keine Umsetzung oder Freigabe produktiver HQ-Schreibzugriffe. Grundlage sind das Projekttagebuch, das Vertriebskonzept und der aktuelle Quellcode. Neueste Nutzerrückmeldung: Die E-Mail wird nun erfolgreich nach HQ übertragen. Ob dabei auch eine weitere vollständige Neuanlage getestet wurde, ist nicht ausdrücklich bestätigt.
+Stand: 27.09.2026. Der Nutzer hat die Reihenfolge inzwischen bestätigt: zuerst Kontakthistorie in beide Richtungen live testen, danach den bestehenden Piloten aufräumen und die Chat-Punkte 1–3 umsetzen (mehrere Ausgaben, manueller Datenabgleich, Magazin-/Kundenansichten und Filter). Diese drei Chat-Punkte sind unten in den Bauabschnitten 1 und 2 zusammengefasst; der hier nummerierte Bauabschnitt 3 ist der spätere Google-Zugang. Keine pauschale Freigabe produktiver HQ-Schreibzugriffe. Grundlage sind das Projekttagebuch, das Vertriebskonzept und der aktuelle Quellcode. Die E-Mail-Übertragung wurde vom Nutzer bestätigt; eine zusätzliche vollständige Neuanlage mit r9 ist nicht ausdrücklich bestätigt.
 
 ## Ziel und bisheriger Stand
 
@@ -75,7 +75,7 @@ Bereits vorhanden sind der Import einer Pilotausgabe, Kundendetails, Kontakt-/Pr
 
 ## Unmittelbarer nächster Schritt
 
-Empfehlung: Bauabschnitt 1 und anschließend 2 als nächste zusammenhängende Lieferung. Zugang für weitere Konten vor dem Teamtest ergänzen. Jetzt noch kein Apps-Script-Update nötig; diese Lieferung ist ausschließlich die Planung.
+Zuerst den vorbereiteten Historientest r10 nach [MANUELL-UEBERTRAGEN.md](../sales-app/MANUELL-UEBERTRAGEN.md) durchführen: bestehende HQ-Historie samt Rechnungsversand lesen, eigene Kommunikation bei einer Testfirma über Firebase nach HQ schreiben, erneut importieren und auf Doppelanzeigen prüfen. r10 ist lokal implementiert und geprüft, der Live-Nachweis steht aus. Danach wie beauftragt aufräumen und Bauabschnitt 1 und anschließend 2 umsetzen. Zugang für weitere Konten vor dem Teamtest ergänzen. Die folgenden Ausgabenangaben werden erst für den anschließenden Ausbau benötigt:
 
 - Die aktuell zu verkaufende Coburger-Ausgabe nennen.
 - Ihre HQ-Projektnummer nennen, falls das Sammelprojekt schon angelegt ist.

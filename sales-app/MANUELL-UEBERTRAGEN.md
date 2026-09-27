@@ -1,12 +1,12 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-## Aktueller Schritt: Kontakt-E-Mail ergänzen – r9
+## Aktueller Schritt: Kontakthistorie in beide Richtungen testen – r10
 
-Stand: 26.09.2026 · **2026-09-26-r9**. Der Lesetest hat bestätigt: Die E-Mail ist in Firebase vorhanden, aber sowohl am HQ-Kontakt als auch an seiner verknüpften Kontaktadresse leer. Die neue Version ergänzt sie am vorhandenen Ansprechpartner mit Vorschau und Rückprüfung. Für diesen Test dieselbe Firma und denselben Kontakt verwenden.
+Stand: 27.09.2026 · **2026-09-27-r10**. Die E-Mail-Übertragung ist vom Nutzer bestätigt. Vor dem vereinbarten Aufräumen und Ausbau der Ausgabenverwaltung, des manuellen Imports und der Magazinfilter folgt jetzt die Live-Prüfung der Kontakthistorie.
 
-Die Änderung ist lokal geprüft. Die tatsächliche Übernahme durch HQ ist erst nach dem unten beschriebenen Live-Test bestätigt. Grundlage der Schreibfelder und des PUT-Endpunkts ist die [offizielle HQ-v2-Spezifikation](https://developer.hellohq.io/swagger20.json).
+**Beide Dateien ersetzen: [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html).** Keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Zugriffseinstellungen. Alle übrigen Apps-Script-Dateien bleiben für dieses Update unverändert.
 
-**Diesmal beide Dateien ersetzen: [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html).** Keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte. Die übrigen Apps-Script-Dateien gehören nicht zu diesem Update.
+Lokal sind 88 synthetische Prüfungen bestanden. Die Annahme der Historienfelder und ihre Darstellung im echten HQ-Mandanten sind erst durch den folgenden Nutzertest bestätigt. Es wurden von Codex keine echten HQ-/Firebase-Schreibtests durchgeführt.
 
 ## Backend-Datei ersetzen
 
@@ -38,63 +38,97 @@ Die Änderung ist lokal geprüft. Die tatsächliche Übernahme durch HQ ist erst
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit dem Ende **/exec** öffnen.
 7. Die Seite neu laden.
-8. Oben die Kennung **2026-09-26-r9** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben die Kennung **2026-09-27-r10** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht. Konto und bestehende Zugriffs-/Skripteinstellungen beibehalten.
 
-## Den bereits vorhandenen Ansprechpartner korrigieren
+## Test A: Bestehende HQ-Historie in der App ansehen
 
-1. Links **Kunden** öffnen.
-2. Dieselbe eigene Testfirma öffnen, deren Ansprechpartner bereits in HQ existiert und dessen E-Mail fehlt.
-3. Auf **Kontakt-E-Mail ergänzen** klicken. Erwartung: Eine Vorschau erscheint; HQ wurde bisher nur gelesen. Fehlt die Schaltfläche, den aktuellen Auftragstext gemäß dem Fehlerabschnitt unten mitteilen.
-4. Den Namen des Ansprechpartners in der Vorschau prüfen. Er muss der bereits angelegten Person entsprechen.
-5. Die angezeigte E-Mail prüfen. Sie muss der in Firebase eingegebenen Adresse entsprechen.
-6. Die angezeigte Kontaktanschrift prüfen. Bei vollständig leerer HQ-Kontaktanschrift übernimmt die Vorschau die Pflichtangaben aus dem Firmenentwurf und weist darauf hin. Eine schon teilweise gefüllte Anschrift wird nicht automatisch mit Firmendaten gemischt.
-7. Wenn die Vorschau stimmt, **E-Mail jetzt in HQ ergänzen** anklicken.
-8. Das Ergebnis abwarten. Erwartung: **Status: Bestätigt** und **E-Mail und erhaltene Kontaktdaten in HQ bestätigt.** Bei einer anderen Meldung dem Fehlerabschnitt folgen.
-9. Auf **Zur Testfirma** klicken.
-10. Auf **2. Ansprechpartner prüfen und abschließen** klicken. Dieser Schritt liest den bekannten Kontakt zurück und schließt den ursprünglichen Anlageauftrag ab.
-11. Das Ergebnis abwarten. Erwartung: **In HQ bestätigt**. Der technische Zusatz in der Firmenbeschreibung wird erst beim vollständigen Abschluss entfernt.
-12. In HQ dieselbe Testfirma neu laden.
-13. In HQ den Bereich **Kontakte** öffnen.
-14. Den vorhandenen Ansprechpartner öffnen.
-15. Die E-Mail kontrollieren. Erwartung: Die eingegebene Adresse steht an diesem Kontakt; es gibt keinen zusätzlichen Ansprechpartner.
-16. Die Firmenbeschreibung prüfen. Erwartung: Der technische Zusatz **[Sales-Test …]** ist entfernt.
-17. Das Testergebnis mitteilen: E-Mail vorhanden oder weiterhin leer; Abschluss bestätigt oder konkrete technische Fehlermeldung.
+1. In der Web-App links **Kunden** öffnen.
+2. Eine bereits importierte Bestandsfirma aus Ausgabe #70 öffnen, bei der HQ sowohl Kommunikation als auch Rechnungsversand enthält. Diese Firma wird nur gelesen.
+3. Falls noch keine Firmendetails vorliegen, **2 · Details HQ → Firebase** anklicken. Erwartung: Die Firmendetails erscheinen; bei Fehlermeldung deren technischen Text mitteilen und stoppen.
+4. Zum Abschnitt **Kontakt-Historie** scrollen.
+5. **Historie aus HQ aktualisieren** anklicken.
+6. Die Abschlussmeldung abwarten. Erwartung: Eine Anzahl vollständig übertragener HQ-Historieneinträge und ein aktualisierter Zeitpunkt beim letzten vollständigen Historienimport.
+7. Unter **Anzeige** den Wert **Alle Einträge** auswählen.
+8. Die Einträge mit der Kontakthistorie derselben Firma in HQ vergleichen. Erwartung: Kein ausgelassener Eintrag; Inhalt und Datum stimmen. Die Reihenfolge ist neueste zuerst.
+9. Unter **Anzeige** den Wert **Rechnungen / Dokumentversand** auswählen.
+10. Einen eindeutig zuordenbaren Rechnungsversand prüfen. Erwartung: In der Übersicht stehen Projektname, Versanddatum und Netto-Rechnungsbetrag.
+11. Bei diesem Eintrag **Versanddetails und E-Mail anzeigen** aufklappen. Erwartung: Betreff und vollständiger gespeicherter Text werden sichtbar.
+12. Unter **Anzeige** den Wert **Kommunikation** auswählen.
+13. Eine Notiz oder ein Telefonat prüfen. Erwartung: Betreff, Datum/Uhrzeit, Kontaktart und Inhalt sind sichtbar; lange Inhalte lassen sich aufklappen.
+14. Bei einem längeren Eintrag **Vollständigen Inhalt anzeigen** aufklappen. Erwartung: Der gesamte gespeicherte Text ist vorhanden.
+
+Bei fehlender oder mehrdeutiger Rechnungsnummer zeigt die App ausdrücklich die ungeklärte Zuordnung und keinen geratenen Betrag. Ein unbekannter Projektname bleibt ebenfalls erkennbar. Solche Fälle bitte melden; es ist kein Anlass, in HQ neue Rechnungen oder Projekte anzulegen. „Datum“ in der kompakten Versandübersicht ist der Kontakt-/Versandzeitpunkt; das Belegdatum steht in den Details.
+
+## Test B: App → Firebase → HQ → App
+
+Voraussetzung ist dieselbe eigene Testfirma mit vollständig bestätigter Firmen-/Kontaktanlage. Falls dort noch **Kontakt in HQ · Prüfung offen** steht, zuerst **2. Ansprechpartner prüfen und abschließen** ausführen und auf **In HQ bestätigt** warten. Bei Abweichung den technischen Auftragstext mitteilen; keine neue Firma anlegen.
+
+1. In der App links **Kunden** öffnen.
+2. Die eigene bestätigte **TEST**-Firma öffnen.
+3. Im Abschnitt **Kontakt-Historie** auf **Kommunikation erfassen** klicken.
+4. Als Betreff beispielsweise **TEST Historie 01** eintragen.
+5. Datum und Uhrzeit prüfen; die Voreinstellung ist die aktuelle lokale Zeit.
+6. Als Kontaktart **Telefonat** auswählen.
+7. Als Ergebnis **Erreicht / dokumentiert** auswählen.
+8. Als Zuordnung **Zum angelegten Ansprechpartner** auswählen.
+9. Unter **Notiz** einen eindeutig erkennbaren erfundenen Testtext mit zwei Zeilen eingeben.
+10. Auf **In Firebase speichern** klicken.
+11. Den neuen Eintrag auf der Kundenkarte prüfen. Erwartung: Sofort sichtbar mit **In Firebase · HQ offen**; die App hat noch nicht nach HQ geschrieben.
+12. Beim Eintrag **Übertragung ansehen** anklicken.
+13. In der Vorschau Firma, Betreff, Datum, Kontaktart, Zuordnung und Text prüfen. Bei einer Abweichung nicht übertragen und den Fehler melden.
+14. Auf **Kommunikation nach HQ übertragen** klicken.
+15. Die Rückmeldung abwarten. Erwartung: **Status: Bestätigt**. Bei einer anderen Meldung nach dem Fehlerabschnitt unten vorgehen.
+16. In HQ dieselbe Testfirma öffnen.
+17. Ihre Kontakthistorie öffnen.
+18. Den neuen Testeintrag prüfen. Erwartung: Genau ein Eintrag mit dem eingegebenen Text, passendem Zeitpunkt, Telefonat und richtig zugeordnetem Ansprechpartner.
+19. In der App auf **Zur Testfirma** klicken.
+20. Auf **Historie aus HQ aktualisieren** klicken.
+21. Den Testeintrag erneut prüfen. Erwartung: Weiterhin genau ein Eintrag, jetzt mit bestätigtem HQ-Stand.
+
+## Test C: E-Mail-Notiz und Gegenrichtung
+
+1. Bei derselben Testfirma erneut **Kommunikation erfassen** öffnen.
+2. Einen anderen Testbetreff eintragen, beispielsweise **TEST E-Mail-Notiz 02**.
+3. Als Kontaktart **E-Mail dokumentieren** auswählen.
+4. Einen längeren erfundenen Text eingeben.
+5. **In Firebase speichern** anklicken.
+6. **Übertragung ansehen** öffnen.
+7. Die Vorschau prüfen.
+8. **Kommunikation nach HQ übertragen** anklicken. Erwartung: **Bestätigt**; in HQ erscheint ein Historieneintrag der Art E-Mail. Es wird keine E-Mail versendet.
+9. In HQ bei derselben Testfirma manuell eine neue Notiz mit einem anderen Testbetreff anlegen. Hierfür die gewohnte HQ-Oberfläche verwenden; deren aktuelle Menübezeichnung wurde nicht live geprüft.
+10. In der App dieselbe Kundenkarte öffnen.
+11. **Historie aus HQ aktualisieren** anklicken.
+12. Die zusätzliche HQ-Notiz prüfen. Erwartung: Sie erscheint mit ihrem Inhalt und Datum in der App; die vorherigen Einträge bleiben jeweils einmal vorhanden.
 
 ## Bei einer Abweichung
 
-- Bei falschem Namen, falscher E-Mail oder unerwarteter Anschrift in der Vorschau keine Übertragung starten.
-- In der App **Daten-Testseite** öffnen.
-- Zum Abschnitt **Synchronisationsaufträge** gehen.
-- Den neuesten Auftrag zur E-Mail-Ergänzung suchen. Der ältere Anlageauftrag derselben Firma bleibt bis Schritt 10 separat offen.
-- Bei **Ausgang unklar** einmal **Ergebnis nur in HQ prüfen** anklicken. Das liest nur zurück und wiederholt den Schreibversuch nicht.
-- Bei bestätigter E-Mail-Korrektur mit **Kunden → eigene Testfirma → 2. Ansprechpartner prüfen und abschließen** fortfahren.
-- Falls der Auftrag weiter offen oder gesperrt bleibt, seinen Status und den vollständigen technischen Text mitteilen; Firmennamen, IDs, E-Mail-Adressen und Zugangsdaten weglassen.
-- Bei einem Fehler vor Erstellung des Korrekturauftrags den oben eingeblendeten Fehlertext mitteilen.
-- Keine neue Firma und keinen zweiten Ansprechpartner als Umgehung anlegen.
+- Bei einer falschen Firma oder Zuordnung in der Vorschau nicht übertragen.
+- Bei **Ausgang unklar** in der App **Daten-Testseite** öffnen.
+- Unter **Synchronisationsaufträge** den betreffenden Kommunikationsauftrag suchen.
+- Einmal **Ergebnis nur in HQ prüfen** anklicken. Diese Aktion liest nur zurück und wiederholt den Schreibversuch nicht.
+- Falls der Auftrag weiterhin offen bleibt, den Status und technischen Text unter dem Auftrag mitteilen; keine Firmen-/Personennamen, IDs, Kommunikationsinhalte oder Zugangsdaten mitsenden.
+- Keinen neuen Auftrag mit demselben Text als Umgehung anlegen.
+- Bei fehlender Schaltfläche prüfen, ob die eigene Testfirma vollständig bestätigt ist und die App die Kennung **2026-09-27-r10** trägt.
+- Bei fehlerhaftem Leseimport den eingeblendeten technischen Text mitteilen. Der vorige vollständig gespeicherte Stand bleibt erhalten.
 
-Die Korrektur stoppt unter anderem bei einer gemeinsam genutzten Kontakt-/Firmenadresse, nicht vollständig lesbaren Kontaktfeldern oder einer Änderung seit der Vorschau. Vorhandene andere E-Mail-Adressen werden nicht überschrieben. Nach einem unklaren Schreibausgang bleibt ein weiterer Schreibversuch gesperrt.
+Nach dem Test bitte kurz zurückmelden:
 
-## Neuanlage nach erfolgreichem Korrekturtest
+- Waren alle erwarteten HQ-Historieneinträge in der App sichtbar?
+- Waren die Rechnungen übersichtlich und die Texte aufklappbar?
+- Ist das Telefonat genau einmal bei der richtigen Firma und Person in HQ angekommen?
+- Ist die E-Mail-Notiz als Historieneintrag angekommen?
+- Hat der erneute Import keine Doppelanzeigen erzeugt?
+- Ist die direkt in HQ angelegte Notiz in der App erschienen?
 
-Neue Ansprechpartner mit E-Mail erhalten in r9 bereits im Kontakt-POST eine eigene Kontaktadresse mit der E-Mail und den Anschriftangaben der Firma. Die beiden getrennten Schritte bleiben bestehen; es gibt noch keinen automatischen Nachtlauf.
+## Danach: vereinbarter Ausbau
 
-1. Nach erfolgreicher Prüfung des vorhandenen Kontakts **Daten-Testseite** öffnen.
-2. **Testfirma anlegen** anklicken.
-3. Die Firmenfelder mit erfundenen Testangaben ausfüllen; der Name muss mit **TEST ** beginnen.
-4. Die Kontaktfelder einschließlich einer Test-E-Mail ausfüllen.
-5. **In Firebase speichern** anklicken. Erwartung: Firma und Ansprechpartner sind sofort in der App sichtbar.
-6. **1. Firma in HQ anlegen und bestätigen** anklicken.
-7. Die Meldung **Firma in HQ bestätigt · Kontakt offen** abwarten. Bei Abweichung den technischen Auftragstext mitteilen.
-8. **2. Ansprechpartner nach HQ übertragen** anklicken.
-9. Die Meldung **In HQ bestätigt** abwarten. Bei Abweichung den technischen Auftragstext mitteilen.
-10. In HQ den Ansprechpartner bei dieser neuen Testfirma öffnen.
-11. Die E-Mail prüfen. Erwartung: Sie wurde bereits bei der Neuanlage übernommen; eine separate Ergänzung ist nicht erforderlich.
+Nach erfolgreichem Live-Historientest folgt das Aufräumen des bestehenden Piloten und dann die im Chat bestätigten Punkte 1–3: mehrere Ausgaben mit echten Daten, ein übersichtlicher manueller Datenabgleich sowie Magazin-/Kundenansichten mit Historienfiltern. Der automatische Nachtlauf bleibt zurückgestellt. Die Schreibtests dieser Lieferung gelten weiterhin nur für selbst angelegte Testfirmen; Bestandsfirmen sind reine Leseziele.
 
 ## Bestehende Einrichtung und weitere Google-Konten
 
-Diese Übersicht dient zur Orientierung; für r9 müssen diese Werte nicht erneut eingetragen werden:
+Diese Übersicht dient zur Orientierung; für r10 müssen diese Werte nicht erneut eingetragen werden:
 
 | Skripteigenschaft | Vorhandene Konfiguration / Zweck |
 | --- | --- |

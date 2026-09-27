@@ -1,17 +1,23 @@
 # Apps-Script-Datenpilot
 
-Stand: 27.09.2026. Der Nutzer bestätigt nach **2026-09-26-r9**, dass die E-Mail nun ebenfalls nach HQ übertragen wird. Der bisherige E-Mail-Blocker ist damit im Nutzertest behoben. Ob zusätzlich eine vollständige neue Firmen-/Kontaktanlage mit r9 getestet wurde, ist nicht ausdrücklich bestätigt. Die aktuelle Installation bleibt ein begrenzter Datenpilot, keine vollständig abgenommene V1.
+Stand: 27.09.2026 · **2026-09-27-r10** lokal vorbereitet. Die E-Mail-Übertragung nach r9 ist vom Nutzer bestätigt. Jetzt ist ausdrücklich die Kontakthistorie vorgezogen: HQ-Einträge vollständig und übersichtlich anzeigen sowie eigene Kommunikation über Firebase nach HQ übertragen und wieder einlesen. Erst nach dem Live-Test folgen Aufräumen und die bestätigten Chat-Punkte 1–3 (mehrere Ausgaben, manueller Abgleich, Kunden-/Magazinansichten und Filter).
 
-## Nächster Schritt
+## Aktuelle Lieferung und nächster Test
 
-Der Nutzer wünscht jetzt einen Plan für die V1 mit echten Daten und zunächst gegebenenfalls manuellem Abgleich. Der [V1-Umsetzungsplan](../docs/V1-UMSETZUNGSPLAN.md) beschreibt den vorgeschlagenen Ausbau. Zuerst mehrere Coburger-Ausgaben samt Kundendetails gesammelt importieren und die Magazin-/Kundenansichten anbinden; Login und Vertriebsabläufe folgen vor dem Teamstart. Diese Planung ist noch nicht implementiert.
+- **SalesBackend.gs** und **Sales.html** anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen.
+- Die vorhandene Bereitstellung auf **Neue Version** setzen; keine geänderten Skripteigenschaften oder Zugriffsrechte.
+- In der Web-App **2026-09-27-r10** prüfen.
+- Bei einer Bestandsfirma **Historie aus HQ aktualisieren** ausführen und Kommunikation/Rechnungsversand mit HQ vergleichen; dieses Ziel bleibt nur lesbar.
+- Bei der eigenen vollständig bestätigten Testfirma **Kommunikation erfassen** verwenden; den Ablauf bis zur Rückübertragung nach der kleinschrittigen Anleitung testen.
+- Bei einer Abweichung den technischen Text mitteilen; keine doppelte Anlage versuchen.
 
-- Die aktuelle Verkaufsausgabe nennen.
-- Die zugehörige HQ-Projektnummer nennen, sofern vorhanden.
-- Mindestens fünf gewünschte vorherige Ausgaben nennen.
-- Deren Projektnummern nennen, soweit bekannt; fehlende Zuordnungen können später über die App gesucht werden.
+Neue Kommunikation erscheint sofort aus Firebase auf der Kundenkarte mit Übertragungsstatus. Die Historie bietet **Alle Einträge**, **Kommunikation** und **Rechnungen / Dokumentversand**. Rechnungen bleiben kompakt mit Projekt, Versanddatum und Netto-Betrag; der Text ist aufklappbar. Lange Kommunikationsinhalte sind ebenfalls aufklappbar. Nicht zuordenbare Belege erhalten keinen geratenen Betrag. Neue App-E-Mail-Notizen werden nicht wegen des Worts Rechnung als Systemversand behandelt.
 
-Für diese Planungsrunde keine Apps-Script-Dateien ersetzen und keine Einstellungen ändern. Die [manuelle r9-Anleitung](MANUELL-UEBERTRAGEN.md) bleibt als Referenz für den bisherigen Stand erhalten; den erfolgreichen Reparaturtest nicht ohne neuen Fehler wiederholen.
+Das Formular ergänzt Zeitpunkt, Ergebnis und optionale Zuordnung zum bereits bestätigten Ansprechpartner. Mail dokumentiert einen Historieneintrag, ohne eine Nachricht zu versenden. Die API-Felder und Kontaktarten wurden gegen die öffentliche HQ-v2-Spezifikation geprüft. Die Rückprüfung verwendet die gespeicherte HQ-Eintrags-ID, ersatzweise die eindeutige syncId. Nach verlorenem Ergebnis wird nur gelesen, nicht erneut geschrieben. Ein erneuter Import führt HQ- und App-Einträge anhand dieser Kennungen zusammen; offene App-Einträge bleiben erhalten. Ein zuvor bestätigter, nun im Import fehlender Eintrag wird als ungeklärt markiert.
+
+App-Autoren werden im lokalen Auftrag gespeichert; eine Zuordnung sämtlicher App-Nutzer zu HQ-Autoren ist noch nicht umgesetzt. Diese Lieferung ergänzt neue Historieneinträge; Bearbeitung oder Löschung vorhandener HQ-Historie wird nicht freigeschaltet. Nachtlauf und produktive Bestandskundenschreibrechte bleiben außerhalb dieses Tests.
+
+Der [V1-Umsetzungsplan](../docs/V1-UMSETZUNGSPLAN.md) hält die bestätigte Reihenfolge fest. Der Historientest ist lokal geprüft, aber noch nicht live vom Nutzer bestätigt.
 
 ## Update nach der ersten eigenen Testfirma
 
@@ -87,7 +93,7 @@ Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein
 
 ## Prüfung
 
-76 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. r9 prüft außerdem gezielte E-Mail-Korrektur, Datenerhalt, gemeinsam genutzte Adressen, Änderungen seit Vorschau, unklare PUT-Antworten ohne Wiederholung, Neuanlage mit Kontaktadresse und lesbare sichere Vorschau. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
+88 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. r9 prüft außerdem gezielte E-Mail-Korrektur, Datenerhalt, gemeinsam genutzte Adressen, Änderungen seit Vorschau, unklare PUT-Antworten ohne Wiederholung, Neuanlage mit Kontaktadresse und lesbare sichere Vorschau. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
 
 Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
 
