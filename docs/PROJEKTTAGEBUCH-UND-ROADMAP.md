@@ -622,3 +622,30 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Ergebnis beziehungsweise technische Fehlermeldung mitteilen; keine Kundendaten oder IDs senden.
 
 **Stand:** Die neun zugehörigen Dateien wurden gezielt im Commit 8285b7c versioniert und erfolgreich nach origin/main auf GitHub übertragen. Unabhängige Änderungen blieben außerhalb des Commits. Dieser Sicherungsnachtrag wird separat versioniert. Bereitstellung und Live-Abnahme sind offen. Nach erfolgreichem Live-Test folgt der ausdrücklich beauftragte V1-Ausbau; dieser wurde in r10 noch nicht vorgezogen. Die übrige Roadmap bleibt erhalten.
+
+### 27.09.2026 – HQ-Historie lesbar; fehlender Kommunikationsbutton und Aufgabe in r11 ergänzt
+
+**Live-Rückmeldung:** Der Nutzer berichtet, dass das Lesen der HQ-Historie funktioniert. Der Schreibweg konnte noch nicht getestet werden, weil auf seiner Kundenkarte Kommunikation erfassen fehlt. Welche konkrete Karte und welcher Auftragsstatus geöffnet waren, ist nicht mitgeteilt. Zusätzlich verlangt der Nutzer ausdrücklich alle sechs Kontaktarten: Notiz, E-Mail, Anruf, Meeting, Besuch und Aufgabe. Leseweg positiv gemeldet, Schreibweg weiterhin nicht live abgenommen.
+
+**Befund:** Die r10-Schaltfläche war ausschließlich von localDraftId und einem vollständig bestätigten Anlageauftrag abhängig. Beim Öffnen einer selbst angelegten Testfirma über die numerische HQ-ID ging der lokale Bezug in der zurückgegebenen Kundenkarte verloren; dadurch wurde der Button ausgeblendet. Bei noch offenen Anlageaufträgen und echten Bestandskunden wurde ebenfalls kommentarlos ausgeblendet. Aufgaben wurden bereits gelesen, fehlten aber im Eingabeformular und in der Schreibfreigabe.
+
+**Lokal korrigiert:** getSalesCompany führt die HQ-ID einer eindeutig zugeordneten eigenen Testfirma zur gleichen Karte wie der lokale Entwurf. Mehrfache Zuordnungen werden gesperrt. Kommunikation erfassen steht oben auf der Karte und im Historienbereich. Bei einer noch offenen Firmen-/Kontaktprüfung bleibt der Button mit Erklärung deaktiviert und bietet Anlageauftrag öffnen an. Bei echten Bestandskunden bleibt die bisherige Lesebeschränkung bestehen; der Hinweis bietet Zu den Testfirmen an. Allein ein Firmenname mit TEST schaltet keinen importierten Kunden frei. Auch der Einstieg von der Testseite verwendet die gemeinsame Prüfung. Keine Lockerung der serverseitigen Schreibzielsperre.
+
+**Alle Kontaktarten:** Das Formular enthält Note, Mail, Call, Meeting, Visit und neu Task. Die öffentliche HQ-v2-Spezifikation wurde nochmals für die Kanalwerte sowie responsibleUserIds, nextContactDate und ContactHistoryStatus geprüft. Aufgaben bekommen einen bewusst ausgewählten HQ-Verantwortlichen aus dem Katalog und optional einen Termin/nächsten Kontakt. Vor dem POST wird der Verantwortliche in HQ als aktiv geprüft. Aufgabe erhält keinen erfundenen Erledigungsstatus aus Reached/NotReached; diese Auswahl wird ausgeblendet. Verantwortliche und Termin erscheinen in Vorschau und Historie, werden beim Rücklesen verglichen und beim erneuten Import erhalten. isReminder aus vorhandenen HQ-Einträgen bleibt gespeichert. Aufgabe ist hier eine Art der Kontakthistorie, keine neu angebundene separate Aufgabenverwaltung; Erledigen und Erinnerungsversand bleiben offen. E-Mail dokumentiert weiterhin nur einen Eintrag und versendet keine Nachricht.
+
+**Prüfung:** 94 lokale synthetische Prüfungen bestanden. Neu geprüft sind identische Kundenkarte über lokale/HQ-ID, keine Freigabe eines bloß TEST benannten Importkunden, Buttonzustände für bestätigt/offen/Bestand, sechs POST-Kontaktarten, Aufgabe mit Verantwortlichem/Termin über Speicherung/Schreiben/Rücklesen/Import, fehlende/ungültige/deaktivierte Verantwortliche, abweichende Rücklesewerte ohne Wiederholungs-POST sowie Formularumschaltung ohne Verlust eingegebener Texte. HTML-Skripte syntaktisch geprüft und fertige Dateien neu erzeugt. Keine echten HQ-/Firebase-Kundendaten gelesen oder geschrieben, kein Apps-Script-Upload durch Codex.
+
+**Übergabe:** Beide Dateien **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** vollständig ersetzen und die bestehende Bereitstellung auf **Neue Version** setzen. Kennung **2026-09-27-r11**. Keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffsrechte. Aktuelle manuelle Anleitung enthält Button-Hilfe, den Aufgabenversuch und die Prüfung aller sechs Arten.
+
+**Nächste Nutzeraktionen:**
+
+- Beide Dateien vollständig nach der manuellen Anleitung ersetzen und r11 bereitstellen.
+- Unter Kunden dieselbe selbst angelegte Testfirma öffnen.
+- Oben Kommunikation erfassen anklicken.
+- Bei deaktiviertem Button den Erklärungstext beachten; bei offener Anlage Anlageauftrag öffnen und den angebotenen Prüfschritt abschließen.
+- Zunächst einen Telefonateintrag in Firebase speichern und über die Vorschau nach HQ übertragen.
+- Anschließend eine Aufgabe mit gewähltem HQ-Verantwortlichem und optionalem Termin testen.
+- In HQ die Kontaktart und Werte prüfen, danach die Historie in der App aktualisieren und auf genau einen Eintrag kontrollieren.
+- Die weiteren Kontaktarten gemäß Anleitung mit jeweils eigenem Testbetreff prüfen; bei Fehlern technischen Text statt Kundeninhalten melden.
+
+**Stand:** Lokal vorbereitet und geprüft; gezielte GitHub-Sicherung folgt. r11-Bereitstellung und Schreib-Live-Test stehen aus. Lesen aus HQ ist durch den Nutzer positiv gemeldet. Danach bleibt die beauftragte Reihenfolge Aufräumen → Chat-Punkte 1–3 unverändert.

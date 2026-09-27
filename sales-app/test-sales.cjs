@@ -3,7 +3,7 @@ const source=fs.readFileSync(__dirname+'/Sales.gs','utf8');
 let count=0;
 function test(name,fn){fn();console.log('PASS',name);count++;}
 function fixture(){
-  const db={},props={},remote={Companies:{},ContactPersons:{},ContactHistories:{}},calls=[];let seq=0,email='pp@markatus.de',failAfterCreate=false;
+  const db={},props={},remote={Companies:{},ContactPersons:{},ContactHistories:{},Users:{1:{id:1,firstName:'Test',lastName:'User',isDeactivated:false}}},calls=[];let seq=0,email='pp@markatus.de',failAfterCreate=false;
   const clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
   const ctx={console,Set,Date,JSON,Number,String,Object,Array,Math,Error,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},Session:{getActiveUser:()=>({getEmail:()=>email})},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{getUuid:()=>`test-${++seq}`,newBlob:x=>({getBytes:()=>Buffer.from(x)})},revenueToken_:()=> 'secret',revenueAmountCents_:x=>typeof x==='number'&&Number.isFinite(x)?Math.round(x*100):null};
   vm.createContext(ctx);vm.runInContext(source,ctx);
@@ -125,7 +125,7 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-09-27-r10/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/Kontaktprüfung 2026-09-27-r11/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
   assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
@@ -276,17 +276,49 @@ test('different HQ address is reported after safe contact linkage without duplic
 test('central writer rejects project/invoice/foreign-company paths',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);const j=f.db['sales_jobs/'+r.id];j.state='running';for(const path of ['/v2/Documents','/v2/Projects','/v2/Companies/999'])assert.throws(()=>f.ctx.salesWriteHq_(j,path,'post',{}),/gesperrt/);assert.equal(f.calls.length,0);});
 test('contact history is queued then written only to the own test company',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const n=f.calls.length,h=f.ctx.saveSalesHistory({draftId:r.id,reason:'Call',content:'Test only',channel:'Call'});assert.equal(f.calls.length,n);assert.equal(f.ctx.runSalesJob(h.id).state,'synced');assert.equal(f.remote.ContactHistories[303].companyId,101);assert.equal(f.db['sales_companies/101'].histories.length,1);});
 function historyFixture(){const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);return {f,id:r.id,input:{draftId:r.id,reason:'TEST Gespräch',content:'Synthetischer Test\nZweite Zeile',channel:'Call',contactOn:'2026-09-26T10:15:00.000Z',status:'NotReached',contactTarget:'contact'}};}
+test('opening an own company by HQ ID resolves to the same local customer and never grants real-company write scope',()=>{
+  const {f,id}=historyFixture(),n=f.calls.length;
+  const direct=f.ctx.getSalesCompany('101'),local=f.ctx.getSalesCompany('draft_'+id);
+  assert.deepEqual(JSON.parse(JSON.stringify(direct)),JSON.parse(JSON.stringify(local)));assert.equal(direct.company.localDraftId,id);assert.equal(f.calls.length,n);
+  f.db['sales_editions/coburger-70']={companies:[{id:'999'}]};f.db['sales_companies/999']={company:{id:'999',name:'TEST Imported only'},histories:[]};
+  assert.equal(f.ctx.getSalesCompany('999').company.localDraftId,undefined);
+  assert.throws(()=>f.ctx.saveSalesHistory({draftId:'999',channel:'Note',reason:'No',content:'No'}),/bestätigen/);
+});
+test('task responsibility and optional date survive POST, readback and full history refresh',()=>{
+  const {f,id,input}=historyFixture(),date='2026-10-01T09:00:00.000Z';
+  const h=f.ctx.saveSalesHistory({...input,channel:'Task',taskResponsibleId:'1',nextContactDate:date});
+  assert.equal(f.ctx.getSalesCompany('draft_'+id).histories[0].nextContactDate,date);
+  assert.equal(f.ctx.runSalesJob(h.id).state,'synced');
+  assert.deepEqual(f.remote.ContactHistories[303].responsibleUserIds,[1]);assert.equal(f.remote.ContactHistories[303].nextContactDate,date);
+  assert.ok(!('contactHistoryStatus' in f.remote.ContactHistories[303]));
+  f.ctx.syncSalesHistory('101');const row=f.ctx.getSalesCompany('101').histories[0];assert.equal(row.contactHistoryChannel,'Task');assert.deepEqual(JSON.parse(JSON.stringify(row.responsibleUserIds)),[1]);assert.equal(row.nextContactDate,date);
+});
+test('task rejects missing or unknown responsible user, invalid date and deactivated HQ user',()=>{
+  for(const extra of [{taskResponsibleId:''},{taskResponsibleId:'999'},{taskResponsibleId:'1',nextContactDate:'invalid'}]){
+    const {f,input}=historyFixture(),n=Object.keys(f.db).length;assert.throws(()=>f.ctx.saveSalesHistory({...input,channel:'Task',...extra}));assert.equal(Object.keys(f.db).length,n);
+  }
+  const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory({...input,channel:'Task',taskResponsibleId:'1'}),n=f.calls.length;
+  f.remote.Users[1].isDeactivated=true;assert.notEqual(f.ctx.runSalesJob(h.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+});
+test('changed task date or responsibility blocks confirmation and does not retry the POST',()=>{
+  for(const mutate of [h=>h.responsibleUserIds=[999],h=>h.nextContactDate='2026-10-02T09:00:00Z']){
+    const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory({...input,channel:'Task',taskResponsibleId:'1',nextContactDate:'2026-10-01T09:00:00Z'}),fetch=f.ctx.UrlFetchApp.fetch;
+    f.ctx.UrlFetchApp.fetch=(url,opt)=>{const result=fetch(url,opt);if(url.endsWith('/ContactHistories'))mutate(f.remote.ContactHistories[303]);return result;};
+    assert.equal(f.ctx.runSalesJob(h.id).state,'uncertain');assert.throws(()=>f.ctx.reconcileSalesJob(h.id),/responsibleUserIds|nextContactDate/);
+    assert.throws(()=>f.ctx.runSalesJob(h.id),/gesperrt/);assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length,1);
+  }
+});
 test('a saved communication appears immediately in both customer views without contacting HQ',()=>{
   const {f,id,input}=historyFixture(),n=f.calls.length,h=f.ctx.saveSalesHistory(input);
   for(const key of ['draft_'+id,'101']){const rows=f.ctx.getSalesCompany(key).histories;assert.equal(rows.length,1);assert.equal(rows[0].jobId,h.id);assert.equal(rows[0].syncState,'pending');assert.equal(rows[0].content,input.content);}
   assert.equal(f.calls.length,n);assert.equal(Object.keys(f.remote.ContactHistories).length,0);
 });
 test('communication writes preserve date, type, content and the server-bound contact without sending mail',()=>{
-  for(const channel of ['Note','Mail','Call','Meeting','Visit']){
-    const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory({...input,channel,companyId:999,contactPersonId:999,projectId:999});const n=f.calls.length;
+  for(const channel of ['Note','Mail','Call','Meeting','Visit','Task']){
+    const {f,input}=historyFixture(),h=f.ctx.saveSalesHistory({...input,channel,taskResponsibleId:'1',companyId:999,contactPersonId:999,projectId:999});const n=f.calls.length;
     assert.equal(f.ctx.runSalesJob(h.id).state,'synced');
     const writes=f.calls.slice(n).filter(c=>c.method!=='get');assert.equal(writes.length,1);assert.equal(writes[0].path,'/v2/ContactHistories');
-    const body=writes[0].body;assert.equal(body.companyId,101);assert.equal(body.contactPersonId,202);assert.equal(body.contactOn,input.contactOn);assert.equal(body.contactHistoryStatus,'NotReached');assert.equal(body.content,input.content);assert.equal(body.contactHistoryChannel,channel);assert.ok(!('projectId' in body));
+    const body=writes[0].body;assert.equal(body.companyId,101);assert.equal(body.contactPersonId,202);assert.equal(body.contactOn,input.contactOn);assert.equal(body.contactHistoryStatus,channel==='Task'?undefined:'NotReached');assert.equal(body.content,input.content);assert.equal(body.contactHistoryChannel,channel);assert.ok(!('projectId' in body));
     const rows=f.ctx.getSalesCompany('101').histories;assert.equal(rows.length,1);assert.equal(rows[0].syncState,'synced');
   }
 });
@@ -480,7 +512,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-27-r10',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-27-r11',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
@@ -524,6 +556,29 @@ test('ordinary email about an invoice stays communication unless HQ evidence ide
   assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1'},[doc],{}).documentDispatch,true);
   assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1',syncId:'sales-local-job'},[doc],{}).documentDispatch,false);
 });
+test('communication button works for own HQ and local identities and explains read-only or unfinished cases',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
+  vm.runInNewContext(preboot+`state={user:{admin:true},drafts:[{id:'own',hqId:101,testOnly:true}],jobs:[{id:'own',state:'synced'}]};globalThis.local=communicationAction({localDraftId:'own'});globalThis.hq=communicationAction({id:'101'});globalThis.real=communicationAction({id:'999'});state.jobs[0].state='contactCreated';globalThis.unfinished=communicationAction({localDraftId:'own'});})();`,sandbox);
+  for(const out of [sandbox.local,sandbox.hq]){assert.ok(out.includes('data-action="history-form"'));assert.ok(out.includes('data-id="own"'));assert.ok(!out.includes('disabled'));}
+  assert.ok(sandbox.real.includes('disabled>Kommunikation erfassen'));assert.ok(sandbox.real.includes('Bestandskunde'));assert.ok(sandbox.real.includes('Zu den Testfirmen'));assert.ok(!sandbox.real.includes('data-action="history-form"'));
+  assert.ok(sandbox.unfinished.includes('disabled>Kommunikation erfassen'));assert.ok(sandbox.unfinished.includes('Anlageauftrag öffnen'));assert.ok(!sandbox.unfinished.includes('data-action="history-form"'));
+  assert.ok(html.includes("button('Zur Kundenliste','nav','customers')+communicationAction(c)"));
+});
+test('task form exposes all six channels, preserves entered text on type switch and renders responsibility and date',()=>{
+  const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const listeners={},responsible={required:false},fields={hidden:true,querySelector:()=>responsible},outcome={hidden:false};
+  const root={dataset:{},addEventListener:(name,fn)=>listeners[name]=fn,querySelector:q=>q==='#history-task-fields'?fields:outcome};
+  const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
+  vm.runInNewContext(preboot+`state={user:{admin:true},catalog:{users:[{id:1,name:'Test User'}]}};formDraft={company:{name:'TEST Example'}};formContactOn='2026-09-27T12:00';globalThis.form=historyForm();const task={reason:'Test task',contactHistoryChannel:'Task',responsibleUserIds:[1],nextContactDate:'2026-10-01T09:00:00Z',contactOn:'2026-09-27T10:00:00Z',content:'<Test>'};globalThis.preview=historyPreview(task);globalThis.row=historyRow(task);})();`,sandbox);
+  for(const type of ['Note','Mail','Call','Meeting','Visit','Task'])assert.ok(sandbox.form.includes('value="'+type+'"'));
+  assert.ok(sandbox.form.includes('name="taskResponsibleId"'));assert.ok(sandbox.form.includes('name="nextContactDate"'));
+  listeners.change({target:{name:'channel',value:'Task'}});assert.equal(fields.hidden,false);assert.equal(responsible.required,true);assert.equal(outcome.hidden,true);
+  listeners.change({target:{name:'channel',value:'Call'}});assert.equal(fields.hidden,true);assert.equal(responsible.required,false);assert.equal(outcome.hidden,false);
+  for(const out of [sandbox.preview,sandbox.row]){assert.ok(out.includes('Aufgabe'));assert.ok(out.includes('Test User'));assert.ok(out.includes('1.10.2026'));assert.ok(out.includes('&lt;Test&gt;'));assert.ok(!out.includes('Erreicht / dokumentiert'));}
+});
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
   const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
@@ -533,7 +588,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-27-r10'));
+  assert.ok(root.innerHTML.includes('2026-09-27-r11'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

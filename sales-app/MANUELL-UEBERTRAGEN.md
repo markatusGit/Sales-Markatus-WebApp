@@ -1,12 +1,12 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-## Aktueller Schritt: Kontakthistorie in beide Richtungen testen – r10
+## Aktueller Schritt: Kontakthistorie in beide Richtungen testen – r11
 
-Stand: 27.09.2026 · **2026-09-27-r10**. Die E-Mail-Übertragung ist vom Nutzer bestätigt. Vor dem vereinbarten Aufräumen und Ausbau der Ausgabenverwaltung, des manuellen Imports und der Magazinfilter folgt jetzt die Live-Prüfung der Kontakthistorie.
+Stand: 27.09.2026 · **2026-09-27-r11**. Die E-Mail-Übertragung ist vom Nutzer bestätigt. Vor dem vereinbarten Aufräumen und Ausbau der Ausgabenverwaltung, des manuellen Imports und der Magazinfilter folgt jetzt die Live-Prüfung der Kontakthistorie.
 
 **Beide Dateien ersetzen: [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html).** Keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Zugriffseinstellungen. Alle übrigen Apps-Script-Dateien bleiben für dieses Update unverändert.
 
-Lokal sind 88 synthetische Prüfungen bestanden. Die Annahme der Historienfelder und ihre Darstellung im echten HQ-Mandanten sind erst durch den folgenden Nutzertest bestätigt. Es wurden von Codex keine echten HQ-/Firebase-Schreibtests durchgeführt.
+Lokal sind 94 synthetische Prüfungen bestanden. Die Annahme der Historienfelder und ihre Darstellung im echten HQ-Mandanten sind erst durch den folgenden Nutzertest bestätigt. Es wurden von Codex keine echten HQ-/Firebase-Schreibtests durchgeführt.
 
 ## Backend-Datei ersetzen
 
@@ -38,11 +38,38 @@ Lokal sind 88 synthetische Prüfungen bestanden. Die Annahme der Historienfelder
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit dem Ende **/exec** öffnen.
 7. Die Seite neu laden.
-8. Oben die Kennung **2026-09-27-r10** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben die Kennung **2026-09-27-r11** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht. Konto und bestehende Zugriffs-/Skripteinstellungen beibehalten.
 
-## Test A: Bestehende HQ-Historie in der App ansehen
+## Den Button finden
+
+Der Nutzer hat den Leseweg aus HQ erfolgreich getestet. r11 korrigiert den fehlenden Einstieg zum Schreibtest: Eigene Testfirmen führen jetzt sowohl über ihre lokale Kennung als auch über die HQ-ID zur gleichen Kundenkarte. **Kommunikation erfassen** steht oben auf der Kundenkarte und im Historienbereich.
+
+1. In der App **Kunden** öffnen.
+2. Die bereits angelegte eigene **TEST**-Firma auswählen.
+3. Oben auf **Kommunikation erfassen** klicken. Erwartung: Das Formular öffnet sich.
+4. Falls der Button deaktiviert ist, den Text daneben lesen.
+5. Bei einer noch offenen Firmen-/Ansprechpartneranlage auf **Anlageauftrag öffnen** klicken.
+6. Den dort angebotenen Prüfschritt ausführen. Erwartung: **Bestätigt**; bei **Ausgang unklar** zuerst nur das HQ-Ergebnis prüfen und bei anhaltendem Fehler den technischen Text mitteilen.
+7. Nach erfolgreichem Abschluss dieselbe Kundenkarte erneut öffnen.
+
+Bei echten Bestandskunden bleibt der Button mit einem erklärenden Hinweis deaktiviert. Für den vereinbarten Schreibtest **Zu den Testfirmen** anklicken und dort bei der eigenen Firma **Firmendetails** öffnen. Der Name TEST allein schaltet keine aus HQ importierte Firma frei; es muss die über die App angelegte Testfirma sein. Keine neue Firma nötig.
+
+## Alle Kontaktarten
+
+| Auswahl in der App | HQ-Kontaktart | Besonderheit |
+| --- | --- | --- |
+| Notiz | Note | Text und Kontaktzeitpunkt |
+| E-Mail dokumentieren | Mail | Historieneintrag; kein Nachrichtenversand |
+| Telefonat | Call | Anruf, mit erreicht/nicht erreicht |
+| Meeting / Besprechung | Meeting | Besprechung |
+| Besuch | Visit | Besuch |
+| Aufgabe | Task | HQ-Verantwortlicher und optionaler Termin / nächster Kontakt |
+
+Rechnungsversand bleibt eine gelesene HQ-Systemhistorie; die App erstellt keine Rechnung. Für Aufgaben werden die dokumentierten Felder responsibleUserIds und nextContactDate verwendet. Reached/NotReached bedeutet erreicht/nicht erreicht und wird nicht als Erledigungsstatus einer Aufgabe ausgegeben. Erledigen und automatischer Erinnerungsversand sind hier noch nicht angebunden.
+
+## Test A: Bestehende HQ-Historie in der App ansehen (bereits positiv gemeldet)
 
 1. In der Web-App links **Kunden** öffnen.
 2. Eine bereits importierte Bestandsfirma aus Ausgabe #70 öffnen, bei der HQ sowohl Kommunikation als auch Rechnungsversand enthält. Diese Firma wird nur gelesen.
@@ -102,6 +129,33 @@ Voraussetzung ist dieselbe eigene Testfirma mit vollständig bestätigter Firmen
 11. **Historie aus HQ aktualisieren** anklicken.
 12. Die zusätzliche HQ-Notiz prüfen. Erwartung: Sie erscheint mit ihrem Inhalt und Datum in der App; die vorherigen Einträge bleiben jeweils einmal vorhanden.
 
+## Test D: Aufgabe und übrige Kontaktarten
+
+1. Bei derselben eigenen bestätigten Testfirma **Kommunikation erfassen** öffnen.
+2. Einen eindeutigen Testbetreff eingeben, beispielsweise **TEST Aufgabe 03**.
+3. Als **Kontaktart** den Eintrag **Aufgabe** auswählen. Erwartung: Die Aufgabenfelder erscheinen; erreicht/nicht erreicht wird ausgeblendet.
+4. Unter **Verantwortlicher in HQ** den für den Test vorgesehenen Benutzer auswählen.
+5. Optional unter **Termin / nächster Kontakt** Datum und Uhrzeit eintragen.
+6. Einen erfundenen Aufgabentext eingeben.
+7. **In Firebase speichern** anklicken. Erwartung: Die Aufgabe ist sofort auf der Kundenkarte sichtbar.
+8. **Übertragung ansehen** anklicken.
+9. Verantwortlichen und Termin in der Vorschau prüfen.
+10. **Kommunikation nach HQ übertragen** anklicken.
+11. Auf **Bestätigt** warten. Bei einem Fehler den technischen Auftragstext mitteilen und nicht neu anlegen.
+12. In HQ bei derselben Firma den neuen Historieneintrag öffnen.
+13. Kontaktart Aufgabe, Text, Verantwortlichen und gegebenenfalls Termin vergleichen.
+14. In der App **Zur Testfirma** anklicken.
+15. **Historie aus HQ aktualisieren** anklicken. Erwartung: Genau ein Aufgabeneintrag; Verantwortlicher und Termin bleiben erhalten.
+
+Wenn die Verantwortlichenauswahl leer oder veraltet ist:
+
+1. **Daten-Testseite** öffnen.
+2. **Auswahllisten HQ → Firebase** anklicken.
+3. Nach erfolgreichem Import zur eigenen Testfirma zurückkehren.
+4. Die Aufgabe erneut vorbereiten, sofern noch kein Auftrag gespeichert wurde. Besteht schon ein Auftrag, seinen technischen Status prüfen und nicht doppelt erfassen.
+
+Nach dem ersten erfolgreichen Telefonat und der Aufgabe die übrigen Arten mit je einem eigenen Testbetreff nach demselben Speicher-/Vorschau-/Übertragungsablauf testen: Notiz, E-Mail dokumentieren, Meeting / Besprechung, Besuch. Jeweils die Kontaktart und den Inhalt in HQ vergleichen und anschließend erneut in die App importieren. Jede Art soll genau einen passenden Eintrag erzeugen.
+
 ## Bei einer Abweichung
 
 - Bei einer falschen Firma oder Zuordnung in der Vorschau nicht übertragen.
@@ -110,7 +164,7 @@ Voraussetzung ist dieselbe eigene Testfirma mit vollständig bestätigter Firmen
 - Einmal **Ergebnis nur in HQ prüfen** anklicken. Diese Aktion liest nur zurück und wiederholt den Schreibversuch nicht.
 - Falls der Auftrag weiterhin offen bleibt, den Status und technischen Text unter dem Auftrag mitteilen; keine Firmen-/Personennamen, IDs, Kommunikationsinhalte oder Zugangsdaten mitsenden.
 - Keinen neuen Auftrag mit demselben Text als Umgehung anlegen.
-- Bei fehlender Schaltfläche prüfen, ob die eigene Testfirma vollständig bestätigt ist und die App die Kennung **2026-09-27-r10** trägt.
+- Bei fehlender Schaltfläche prüfen, ob die eigene Testfirma vollständig bestätigt ist und die App die Kennung **2026-09-27-r11** trägt.
 - Bei fehlerhaftem Leseimport den eingeblendeten technischen Text mitteilen. Der vorige vollständig gespeicherte Stand bleibt erhalten.
 
 Nach dem Test bitte kurz zurückmelden:
@@ -128,7 +182,7 @@ Nach erfolgreichem Live-Historientest folgt das Aufräumen des bestehenden Pilot
 
 ## Bestehende Einrichtung und weitere Google-Konten
 
-Diese Übersicht dient zur Orientierung; für r10 müssen diese Werte nicht erneut eingetragen werden:
+Diese Übersicht dient zur Orientierung; für r11 müssen diese Werte nicht erneut eingetragen werden:
 
 | Skripteigenschaft | Vorhandene Konfiguration / Zweck |
 | --- | --- |

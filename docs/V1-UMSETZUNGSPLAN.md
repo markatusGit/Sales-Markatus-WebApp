@@ -75,7 +75,7 @@ Bereits vorhanden sind der Import einer Pilotausgabe, Kundendetails, Kontakt-/Pr
 
 ## Unmittelbarer nächster Schritt
 
-Zuerst den vorbereiteten Historientest r10 nach [MANUELL-UEBERTRAGEN.md](../sales-app/MANUELL-UEBERTRAGEN.md) durchführen: bestehende HQ-Historie samt Rechnungsversand lesen, eigene Kommunikation bei einer Testfirma über Firebase nach HQ schreiben, erneut importieren und auf Doppelanzeigen prüfen. r10 ist lokal implementiert und geprüft, der Live-Nachweis steht aus. Danach wie beauftragt aufräumen und Bauabschnitt 1 und anschließend 2 umsetzen. Zugang für weitere Konten vor dem Teamtest ergänzen. Die folgenden Ausgabenangaben werden erst für den anschließenden Ausbau benötigt:
+Zuerst den vorbereiteten Historientest r11 nach [MANUELL-UEBERTRAGEN.md](../sales-app/MANUELL-UEBERTRAGEN.md) durchführen: bestehende HQ-Historie samt Rechnungsversand lesen, eigene Kommunikation bei einer Testfirma über Firebase nach HQ schreiben, erneut importieren und auf Doppelanzeigen prüfen. r11 ist lokal implementiert und geprüft. Den HQ-Leseweg hat der Nutzer positiv gemeldet; für den Schreibtest sind der Kommunikationsbutton korrigiert und Aufgaben ergänzt. Der Live-Schreibnachweis steht aus. Danach wie beauftragt aufräumen und Bauabschnitt 1 und anschließend 2 umsetzen. Zugang für weitere Konten vor dem Teamtest ergänzen. Die folgenden Ausgabenangaben werden erst für den anschließenden Ausbau benötigt:
 
 - Die aktuell zu verkaufende Coburger-Ausgabe nennen.
 - Ihre HQ-Projektnummer nennen, falls das Sammelprojekt schon angelegt ist.
