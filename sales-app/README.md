@@ -1,21 +1,17 @@
 # Apps-Script-Datenpilot
 
-Stand: 26.09.2026, **2026-09-26-r9** lokal vorbereitet. Der Live-Lesetest hat bestätigt: E-Mail in Firebase vorhanden, HQ eMail und defaultAddress.email leer; übrige verglichene Kontaktfelder stimmen. r9 ergänzt die E-Mail am bestehenden eigenen Testkontakt einschließlich seiner Kontaktadresse mit Vorschau und Rückprüfung. Neue Kontakte senden die E-Mail ebenfalls an ihrer eigenen Kontaktadresse. Der r9-Schreibweg ist lokal geprüft, aber noch nicht im HQ-Mandanten bestätigt.
+Stand: 27.09.2026. Der Nutzer bestätigt nach **2026-09-26-r9**, dass die E-Mail nun ebenfalls nach HQ übertragen wird. Der bisherige E-Mail-Blocker ist damit im Nutzertest behoben. Ob zusätzlich eine vollständige neue Firmen-/Kontaktanlage mit r9 getestet wurde, ist nicht ausdrücklich bestätigt. Die aktuelle Installation bleibt ein begrenzter Datenpilot, keine vollständig abgenommene V1.
 
-## Nächster Schritt für den Nutzer
+## Nächster Schritt
 
-1. Beide Dateien **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** nach [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen.
-2. Die bestehende Bereitstellung auf **Neue Version** setzen; keine neuen Einstellungen.
-3. In der Web-App die Kennung **2026-09-26-r9** prüfen; bei abweichender Kennung zuerst die Bereitstellung korrigieren.
-4. Unter **Kunden** dieselbe eigene Testfirma öffnen.
-5. **Kontakt-E-Mail ergänzen** anklicken.
-6. Ansprechpartner, E-Mail und Kontaktanschrift in der Vorschau prüfen; bei Abweichung nicht schreiben.
-7. **E-Mail jetzt in HQ ergänzen** anklicken. Erwartung: **Bestätigt**; andernfalls den technischen Auftragstext mitteilen.
-8. **Zur Testfirma** anklicken.
-9. **2. Ansprechpartner prüfen und abschließen** anklicken. Erwartung: **In HQ bestätigt**.
-10. In HQ die E-Mail am vorhandenen Kontakt prüfen. Keine neue Firma oder zweiten Ansprechpartner für diesen Korrekturtest anlegen.
+Der Nutzer wünscht jetzt einen Plan für die V1 mit echten Daten und zunächst gegebenenfalls manuellem Abgleich. Der [V1-Umsetzungsplan](../docs/V1-UMSETZUNGSPLAN.md) beschreibt den vorgeschlagenen Ausbau. Zuerst mehrere Coburger-Ausgaben samt Kundendetails gesammelt importieren und die Magazin-/Kundenansichten anbinden; Login und Vertriebsabläufe folgen vor dem Teamstart. Diese Planung ist noch nicht implementiert.
 
-Die Korrektur verwendet nur die gespeicherte Kontakt-ID des Anlageauftrags. Vor dem PUT werden Firmen-/Kontaktzuordnung, eine ausschließlich diesem Kontakt zugeordnete Adresse und alle dokumentierten Kontaktfelder gelesen. Die übrigen Kontakt-/Adresswerte einschließlich eigener Felder bleiben im Payload erhalten. Fremde oder gemeinsame Adressen, zwischenzeitliche Änderungen und bereits befüllte E-Mail-Felder sperren die automatische Ergänzung. Vollständig leere Kontaktanschriften erhalten die Pflichtfelder aus dem Firmenentwurf, sichtbar in der Vorschau; teilweise ausgefüllte Anschriften werden nicht gemischt. Nach unklarem Ausgang ist nur Rückprüfung möglich. Rücklesung und Anzeige berücksichtigen auch defaultAddress.email; ein abweichender nichtleerer eMail-Wert bleibt ein Fehler.
+- Die aktuelle Verkaufsausgabe nennen.
+- Die zugehörige HQ-Projektnummer nennen, sofern vorhanden.
+- Mindestens fünf gewünschte vorherige Ausgaben nennen.
+- Deren Projektnummern nennen, soweit bekannt; fehlende Zuordnungen können später über die App gesucht werden.
+
+Für diese Planungsrunde keine Apps-Script-Dateien ersetzen und keine Einstellungen ändern. Die [manuelle r9-Anleitung](MANUELL-UEBERTRAGEN.md) bleibt als Referenz für den bisherigen Stand erhalten; den erfolgreichen Reparaturtest nicht ohne neuen Fehler wiederholen.
 
 ## Update nach der ersten eigenen Testfirma
 
@@ -54,7 +50,7 @@ Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von d
 
 ## Bewusste Grenzen dieses ersten Testschritts
 
-- Firma und Ansprechpartner sind nach r8 laut Nutzer in HQ angelegt. r8.1 hat die fehlende E-Mail in beiden HQ-Feldern nachgewiesen. r9 ergänzt den kontrollierten Korrekturweg und den geänderten Neuanlage-Payload; beides muss live abgenommen werden. Es gibt keinen automatischen Nachtlauf.
+- Firma und Ansprechpartner sind nach r8 laut Nutzer in HQ angelegt. r8.1 hat die fehlende E-Mail in beiden HQ-Feldern nachgewiesen. Die E-Mail-Übertragung nach r9 wurde am 27.09. vom Nutzer bestätigt; eine zusätzliche vollständige Neuanlage und weitere Fehlerfälle sind nicht ausdrücklich abgenommen. Es gibt keinen automatischen Nachtlauf.
 - Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
 - Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
 - Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.

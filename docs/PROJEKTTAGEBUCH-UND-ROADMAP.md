@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 26. September 2026.
+Zuletzt aktualisiert: 27. September 2026.
 
 ## Zweck und Pflege
 
@@ -572,3 +572,22 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Erst nach erfolgreichem Korrekturtest den separaten Neuanlagetest aus der Anleitung durchführen.
 
 **Stand und offene Arbeit:** Die acht zugehörigen Dateien wurden gezielt im Commit 06face8 versioniert und erfolgreich nach origin/main auf GitHub übertragen. Unabhängige Änderungen blieben außerhalb des Commits. Dieser Sicherungsnachtrag wird separat versioniert. Die Google-Bereitstellung übernimmt der Nutzer. E-Mail-Korrektur und geänderter Kontakt-POST sind noch nicht live bestätigt. Neue Testfirma zunächst nicht erforderlich. Automatische zeitversetzte/nächtliche Synchronisation, weitere Google-Nutzer und die übrige Roadmap bleiben offen. Die bestehende Beschränkung auf selbst angelegte Testfirmen bleibt bestehen; der Vorabvergleich ist keine atomare Sperre gleichzeitiger Änderungen in HQ.
+
+### 27.09.2026 – E-Mail-Übertragung live bestätigt; Vorschlag für den Weg zur V1
+
+**Nutzerrückmeldung:** „Das hat geklappt“, die E-Mail wird nun ebenfalls übertragen. Damit ist der bisherige E-Mail-Blocker nach r9 im Nutzertest behoben. Die Rückmeldung sagt nicht ausdrücklich, ob zusätzlich eine neue Firma mit neuem Ansprechpartner angelegt oder nur der vorhandene Kontakt korrigiert wurde. Keine pauschale Abnahme aller Neuanlage-, Änderungs- und Konfliktfälle daraus ableiten. Kein erneuter Reparaturtest ohne neuen Fehler erforderlich.
+
+**Neuer Auftrag:** Eine geordnete Auflistung für den möglichst direkten Weg zur V1 mit echten Daten; zunächst gegebenenfalls manueller Button statt Nachtlauf. In dieser Runde ist Planung beauftragt, nicht die sofortige Implementierung aller V1-Funktionen und keine Freigabe bisher gesperrter produktiver HQ-Schreibziele.
+
+**Erarbeitet:** [V1-UMSETZUNGSPLAN.md](V1-UMSETZUNGSPLAN.md) beschreibt sechs vorgeschlagene Bauabschnitte: (1) mehrere Ausgaben und gesammelt importierte echte Daten, (2) nutzbare Kunden-/Magazinansichten und Historienfilter, (3) Google-Zugang für freigegebene Pilotnutzer, (4) Kontaktprotokolle/Wiedervorlagen und geprüfte Stammdaten-Schreibwege, (5) Buchungen/Ausgabensteuerung/Redaktion, (6) Alltagspilot einschließlich Sicherung und Wiederherstellung. Zuerst Coburger mit aktueller Verkaufsausgabe und mindestens fünf früheren Ausgaben, dann weitere vereinbarte Magazine und Dreijahresbestand. Fehlende Datenabdeckung darf keine negative Buchungsaussage erzeugen.
+
+**Empfehlung, noch kein implementierter Bedienweg:** Zwei getrennte manuelle Aktionen für HQ-Leseimport und Übertragung offener App-Änderungen; beide mit Fortschritt, fortsetzbaren Abschnitten, Rückprüfung und erkennbarem Datenstand. Der spätere Nachtlauf soll dieselbe geprüfte Verarbeitung starten. Die nächsten Bauabschnitte 1 und 2 liefern zuerst echte vertriebliche Recherche; produktive Änderungen folgen erst mit geprüften Zielfeldern und Zuordnungen. Projekt-/Rechnungsdaten bleiben nur lesbar. App-Buchungen und spätere HQ-Rechnungen getrennt speichern und verknüpfen, statt sie doppelt zu zählen. Alle früheren Roadmap-Wünsche bleiben bestehen. Die letzte Nutzerpräzisierung zur redaktionellen Termin-/Zielpflege geht dem älteren Konzept mit reiner Adminpflege vor.
+
+**Nächste Nutzeraktionen:**
+
+- Die aktuell zu verkaufende Coburger-Ausgabe nennen.
+- Deren HQ-Projektnummer nennen, sofern bereits vorhanden.
+- Die gewünschten vorherigen Coburger-Ausgaben nennen; mindestens fünf für den entsprechenden Historienfilter.
+- Die zugehörigen HQ-Projektnummern nennen, soweit bekannt; fehlende Zuordnungen können über eine künftige reine Projektsuche ermittelt und bestätigt werden.
+
+**Prüfung und Bereitstellung:** Plan gegen Projekttagebuch, Fachkonzept und vorhandenen Quellcode abgeglichen. Ausschließlich Dokumentation geändert; keine neuen Laufzeittests nötig. Keine HQ-/Firebase-Zugriffe, keine Apps-Script-Dateien oder Einstellungen geändert. Kein Upload durch den Nutzer für diese Planungsrunde erforderlich. GitHub-Sicherung der zugehörigen Dokumentation folgt; die Umsetzung der vorgeschlagenen V1-Ausbauschritte steht noch aus.
