@@ -648,4 +648,4 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - In HQ die Kontaktart und Werte prüfen, danach die Historie in der App aktualisieren und auf genau einen Eintrag kontrollieren.
 - Die weiteren Kontaktarten gemäß Anleitung mit jeweils eigenem Testbetreff prüfen; bei Fehlern technischen Text statt Kundeninhalten melden.
 
-**Stand:** Lokal vorbereitet und geprüft; gezielte GitHub-Sicherung folgt. r11-Bereitstellung und Schreib-Live-Test stehen aus. Lesen aus HQ ist durch den Nutzer positiv gemeldet. Danach bleibt die beauftragte Reihenfolge Aufräumen → Chat-Punkte 1–3 unverändert.
+**Stand:** Die neun zugehörigen Dateien wurden gezielt im Commit f35b19f nach origin/main auf GitHub übertragen. Unabhängige Änderungen blieben unberührt. Dieser Sicherungsnachtrag wird separat versioniert. r11-Bereitstellung und Schreib-Live-Test stehen aus. Lesen aus HQ ist durch den Nutzer positiv gemeldet. Danach bleibt die beauftragte Reihenfolge Aufräumen → Chat-Punkte 1–3 unverändert.
