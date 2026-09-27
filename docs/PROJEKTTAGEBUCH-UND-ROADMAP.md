@@ -621,4 +621,4 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Eine E-Mail-Notiz und eine direkt in HQ angelegte Gegennotiz nach der Anleitung prüfen.
 - Ergebnis beziehungsweise technische Fehlermeldung mitteilen; keine Kundendaten oder IDs senden.
 
-**Stand:** Lokal vorbereitet und geprüft; gezielte GitHub-Sicherung folgt. Bereitstellung und Live-Abnahme sind offen. Nach erfolgreichem Live-Test folgt der ausdrücklich beauftragte V1-Ausbau; dieser wurde in r10 noch nicht vorgezogen. Die übrige Roadmap bleibt erhalten.
+**Stand:** Die neun zugehörigen Dateien wurden gezielt im Commit 8285b7c versioniert und erfolgreich nach origin/main auf GitHub übertragen. Unabhängige Änderungen blieben außerhalb des Commits. Dieser Sicherungsnachtrag wird separat versioniert. Bereitstellung und Live-Abnahme sind offen. Nach erfolgreichem Live-Test folgt der ausdrücklich beauftragte V1-Ausbau; dieser wurde in r10 noch nicht vorgezogen. Die übrige Roadmap bleibt erhalten.
