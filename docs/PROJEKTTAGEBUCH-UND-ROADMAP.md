@@ -649,3 +649,31 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Die weiteren Kontaktarten gemäß Anleitung mit jeweils eigenem Testbetreff prüfen; bei Fehlern technischen Text statt Kundeninhalten melden.
 
 **Stand:** Die neun zugehörigen Dateien wurden gezielt im Commit f35b19f nach origin/main auf GitHub übertragen. Unabhängige Änderungen blieben unberührt. Dieser Sicherungsnachtrag wird separat versioniert. r11-Bereitstellung und Schreib-Live-Test stehen aus. Lesen aus HQ ist durch den Nutzer positiv gemeldet. Danach bleibt die beauftragte Reihenfolge Aufräumen → Chat-Punkte 1–3 unverändert.
+
+### 27.09.2026 – r12: offene Testanlage blockierte Kommunikation und verdeckte Historie
+
+**Nutzerrückmeldung:** Kommunikation erfassen ist mit dem Hinweis auf die unvollständige Firmen-/Kontaktanlage ausgegraut. Direkt in HQ angelegte Einträge erscheinen bei der Testfirma nach Historie aus HQ aktualisieren nicht. Die frühere positive Lesemeldung ist damit keine Abnahme des Testfirmenfalls. Keine neuen echten Kundeninhalte oder IDs übernommen.
+
+**Befund im Code:** getSalesCompany verwendete den gespeicherten HQ-Firmenstand nur bei vollständig synchronisiertem ursprünglichem Anlageauftrag; andernfalls gab es stets eine leere Historie zurück. Ein gezielter Historienimport verlangte zudem bereits einen Firmen-Datensatz, der vor Abschluss der Anlage fehlen konnte. Der spätere Abschluss hätte vorhandene Historie und Projekte mit leeren Listen überschrieben. Der gesperrte Button hing an derselben zu umfassenden Abschlussbedingung. Der genaue Live-Auftragsstatus wurde nicht erneut abgerufen.
+
+**Lokal umgesetzt:** Historie und offene App-Einträge sind unabhängig vom Anlageauftragsstatus aus Firebase sichtbar, über lokale Kennung und HQ-ID identisch. Der gezielte Import kann nach Prüfung der gespeicherten eigenen Firmenzuordnung einen noch fehlenden Datensatz initialisieren; erst nach vollständigem Abruf wird gespeichert. Ein späterer Anlageabschluss erhält Historie, Projekte, Historienimportzeitpunkt und weitere importierte Kontakte.
+
+**Getrennte Kommunikationsfreigabe:** Der Admin-Button **HQ-Zuordnung prüfen** liest ausschließlich die bereits im Anlageauftrag gespeicherten Firmen- und Kontakt-IDs. Testentwurf, bestätigter Firmenschritt, IDs, Firmenname, Personenname und Firmenzugehörigkeit müssen passen. Eine fehlgeschlagene erneute Prüfung entzieht eine vorherige gesonderte Freigabe. Die erfolgreiche Prüfung speichert eine separate Zuordnungsbestätigung und schaltet Kommunikation erfassen frei; Status und offene Feldprüfungen des ursprünglichen Anlageauftrags bleiben erhalten. Kein POST/PUT und keine Neuanlage durch diese Prüfung. Speichern einer Kommunikation erfolgt weiterhin ausschließlich in Firebase. Vor dem bewussten HQ-Schreibschritt werden Firma und Ansprechpartner erneut zurückgelesen, auch bei einer nur der Firma zugeordneten Notiz. Bestandskunden bleiben schreibgesperrt. Keine automatische Wiederholung unklarer Schreibversuche.
+
+**Prüfung:** 101 synthetische Prüfungen bestanden. Neue Fälle: Import ohne Firmendatensatz bei offenem Kontaktschritt, Anzeige über beide Kennungen, unveränderte Firebase-Daten bei Abruffehler, getrennte lesende Freigabe und anschließender Historienabgleich, fehlende/fremde/umbenannte Ziele, entzogene Freigabe, geänderte Kontakt-ID, verschobener Ansprechpartner vor dem POST, Erhalt importierter Daten beim späteren Abschluss sowie Admin-/Allowlist-Sperren und UI-Buttonzustände. Keine echten HQ-/Firebase-Zugriffe durch Codex. Live-Abnahme steht aus.
+
+**Übergabe:** Nur **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** vollständig ersetzen; bestehende Bereitstellung auf **Neue Version** setzen. Kennung **2026-09-27-r12**. Keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffseinstellungen. Vollständige kleinschrittige Anleitung in sales-app/MANUELL-UEBERTRAGEN.md. Nutzer übernimmt Bereitstellung.
+
+**Nächste Nutzeraktionen:**
+
+- Beide Austauschdateien nach der manuellen Anleitung ersetzen.
+- Die vorhandene Web-App als neue Version bereitstellen.
+- In der App die Kennung r12 prüfen.
+- Dieselbe bereits angelegte eigene Testfirma öffnen.
+- Historie aus HQ aktualisieren anklicken; Anzahl und sichtbare HQ-Einträge prüfen.
+- Unter Anzeige Alle Einträge auswählen.
+- Bei ausgegrautem Kommunikationsbutton HQ-Zuordnung prüfen anklicken; auf die Bestätigung warten.
+- Kommunikation erfassen anklicken und den Schreibtest gemäß Anleitung durchführen.
+- Bei Fehler den technischen Text beziehungsweise bei fehlender Historie Anzahl und Importzeitpunkt mitteilen; nichts doppelt anlegen.
+
+**Stand:** Lokal vorbereitet und geprüft; generiertes Backend stimmt mit der Quelle überein, generierte HTML-Skripte und Backend syntaktisch geprüft, git diff --check ohne Inhaltsfehler. GitHub-Sicherung folgt nach abschließender Prüfung. Nicht von Codex in Apps Script übertragen oder live getestet. Die beauftragte Reihenfolge Historien-Live-Test → Aufräumen → Chat-Punkte 1–3 bleibt bestehen.

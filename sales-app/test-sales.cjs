@@ -47,7 +47,7 @@ function finishCreate(f,id){
 }
 test('all public RPCs enforce the allowlist before accessing data',()=>{
   const f=fixture();f.setEmail('outsider@example.invalid');
-  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','syncSalesHistory','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','queueSalesContactEmail','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+  for(const name of ['getSalesState','saveSalesAccess','syncSalesCatalog','syncSalesEdition','getSalesCompany','syncSalesCompany','syncSalesHistory','checkSalesHistoryBinding','saveSalesEditionSettings','saveSalesTestCompany','getSalesJobPreview','getSalesTestAudit','queueSalesMarkerCleanup','queueSalesContactEmail','runSalesJob','reconcileSalesJob','saveSalesHistory','saveSalesCompanyChange','resolveSalesConflict'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
   assert.equal(f.calls.length,0);
 });
 test('Google identity must be present even for a configured account',()=>{const f=fixture();f.setEmail('');assert.throws(()=>f.ctx.getSalesState(),/Zugriff/);});
@@ -125,7 +125,7 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-09-27-r11/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/Kontaktprüfung 2026-09-27-r12/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
   assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
@@ -512,7 +512,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){}},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-27-r11',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-27-r12',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
@@ -560,10 +560,11 @@ test('communication button works for own HQ and local identities and explains re
   const html=fs.readFileSync(__dirname+'/Sales.template.html','utf8'),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
-  vm.runInNewContext(preboot+`state={user:{admin:true},drafts:[{id:'own',hqId:101,testOnly:true}],jobs:[{id:'own',state:'synced'}]};globalThis.local=communicationAction({localDraftId:'own'});globalThis.hq=communicationAction({id:'101'});globalThis.real=communicationAction({id:'999'});state.jobs[0].state='contactCreated';globalThis.unfinished=communicationAction({localDraftId:'own'});})();`,sandbox);
+  vm.runInNewContext(preboot+`state={user:{admin:true},drafts:[{id:'own',hqId:101,testOnly:true}],jobs:[{id:'own',hqId:101,state:'contactCreated',historyReady:true}]};globalThis.local=communicationAction({localDraftId:'own'});globalThis.hq=communicationAction({id:'101'});globalThis.real=communicationAction({id:'999'});state.jobs[0].historyReady=false;globalThis.unfinished=communicationAction({localDraftId:'own'});})();`,sandbox);
   for(const out of [sandbox.local,sandbox.hq]){assert.ok(out.includes('data-action="history-form"'));assert.ok(out.includes('data-id="own"'));assert.ok(!out.includes('disabled'));}
   assert.ok(sandbox.real.includes('disabled>Kommunikation erfassen'));assert.ok(sandbox.real.includes('Bestandskunde'));assert.ok(sandbox.real.includes('Zu den Testfirmen'));assert.ok(!sandbox.real.includes('data-action="history-form"'));
   assert.ok(sandbox.unfinished.includes('disabled>Kommunikation erfassen'));assert.ok(sandbox.unfinished.includes('Anlageauftrag öffnen'));assert.ok(!sandbox.unfinished.includes('data-action="history-form"'));
+  assert.ok(sandbox.unfinished.includes('data-action="check-history-binding"'));assert.ok(sandbox.unfinished.includes('HQ-Zuordnung prüfen'));
   assert.ok(html.includes("button('Zur Kundenliste','nav','customers')+communicationAction(c)"));
 });
 test('task form exposes all six channels, preserves entered text on type switch and renders responsibility and date',()=>{
@@ -588,7 +589,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-27-r11'));
+  assert.ok(root.innerHTML.includes('2026-09-27-r12'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });
@@ -608,5 +609,48 @@ test('browser homepage normalization handles bare domains, whitespace and existi
   const helpers=script.slice(0,script.indexOf('  let state='))+'globalThis.normalize=normalizeHomepageInput;})();';
   const sandbox={document:{getElementById:()=>({})}};vm.runInNewContext(helpers,sandbox);
   for(const [input,expected] of [['  test.de  ','https://test.de'],['www.test.de','https://www.test.de'],['https://test.de/path','https://test.de/path'],['http://test.de','http://test.de'],['   ','']])assert.equal(sandbox.normalize(input),expected);
+});
+test('open creation displays HQ history without a snapshot, before contact creation or confirmation',()=>{
+  const f=fixture(),{id}=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(id,'company');
+  f.remote.ContactHistories[900]={id:900,companyId:101,reason:'TEST HQ note',content:'Read fixture',contactHistoryChannel:'Note',contactOn:'2026-09-27T10:00:00Z'};
+  const n=f.calls.length;f.ctx.syncSalesHistory('draft_'+id);
+  assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  for(const key of ['101','draft_'+id]){const detail=f.ctx.getSalesCompany(key);assert.equal(detail.histories.length,1);assert.equal(detail.histories[0].reason,'TEST HQ note');assert.equal(detail.company.syncState,'companyConfirmed');assert.ok(detail.historyLoadedAt);assert.equal(detail.contacts.length,1);}
+  assert.equal(f.ctx.getSalesState().jobs[0].historyReady,false);
+});
+test('history import failure before initial snapshot leaves Firebase untouched',()=>{
+  const f=fixture(),{id}=f.ctx.saveSalesTestCompany(f.input);f.ctx.runSalesJob(id,'company');const before=JSON.stringify(f.db),get=f.ctx.salesHqGet_;
+  f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Documents?'))throw Error('Read failed');return get(p);};
+  assert.throws(()=>f.ctx.syncSalesHistory('draft_'+id),/Read failed/);assert.equal(JSON.stringify(f.db),before);
+});
+test('read-only binding unlocks history independently of an open original creation job',()=>{
+  const {f,id,input}=historyFixture(),job=f.db['sales_jobs/'+id];job.state='contactCreated';job.message='Original check open';delete job.steps.contact;delete f.db['sales_companies/101'];
+  const n=f.calls.length;f.ctx.checkSalesHistoryBinding(id);assert.ok(f.calls.slice(n).every(c=>c.method==='get'));assert.equal(f.db['sales_jobs/'+id].state,'contactCreated');assert.equal(f.db['sales_jobs/'+id].message,'Original check open');
+  assert.equal(f.ctx.getSalesState().jobs[0].historyReady,true);const beforeSave=f.calls.length,h=f.ctx.saveSalesHistory(input);assert.equal(f.calls.length,beforeSave);
+  assert.equal(f.ctx.getSalesCompany('101').histories[0].syncState,'pending');assert.equal(f.ctx.runSalesJob(h.id).state,'synced');
+  f.ctx.syncSalesHistory('101');assert.equal(f.ctx.getSalesCompany('101').histories.length,1);
+  assert.equal(f.calls.slice(n).filter(c=>c.method==='post').length,1);assert.ok(!f.calls.slice(n).some(c=>c.method==='put'));
+});
+test('binding rejects missing, foreign and renamed targets and never creates a replacement',()=>{
+  for(const mutate of [f=>delete f.remote.Companies[101],f=>f.remote.Companies[101].name='TEST Other',f=>delete f.remote.ContactPersons[202],f=>f.remote.ContactPersons[202].companyId=999,f=>f.remote.ContactPersons[202].lastName='Other',f=>{const j=Object.values(f.db).find(v=>v.kind==='createCompany');delete j.contactId;},f=>{const d=Object.values(f.db).find(v=>v.testOnly);d.hqId=999;}]){
+    const {f,id,input}=historyFixture();f.db['sales_jobs/'+id].state='contactCreated';f.ctx.checkSalesHistoryBinding(id);mutate(f);const n=f.calls.length;
+    assert.throws(()=>f.ctx.checkSalesHistoryBinding(id));assert.throws(()=>f.ctx.saveSalesHistory(input));assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+  }
+});
+test('verified binding is invalidated by changed IDs and live contact reassignment blocks POST',()=>{
+  const {f,id,input}=historyFixture();f.db['sales_jobs/'+id].state='contactCreated';f.ctx.checkSalesHistoryBinding(id);
+  f.db['sales_jobs/'+id].contactId=999;assert.throws(()=>f.ctx.saveSalesHistory(input));f.db['sales_jobs/'+id].contactId=202;
+  const h=f.ctx.saveSalesHistory({...input,contactTarget:'company'}),n=f.calls.length;f.remote.ContactPersons[202].companyId=999;
+  assert.notEqual(f.ctx.runSalesJob(h.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+});
+test('later creation completion preserves history, projects and other imported contacts',()=>{
+  const {f,id}=historyFixture();f.db['sales_jobs/'+id].state='contactCreated';
+  const stored=f.db['sales_companies/101'];stored.histories=[{id:900,reason:'TEST preserved'}];stored.projects=[{id:800,name:'TEST project'}];stored.historyLoadedAt='2026-09-27T10:00:00Z';stored.contacts.push({id:203,firstName:'Other'});
+  const before=JSON.parse(JSON.stringify(stored));assert.equal(f.ctx.runSalesJob(id,'contact').state,'synced');const after=f.db['sales_companies/101'];
+  assert.deepEqual(after.histories,before.histories);assert.deepEqual(after.projects,before.projects);assert.equal(after.historyLoadedAt,before.historyLoadedAt);assert.equal(after.contacts.length,2);
+});
+test('normal users cannot run HQ binding checks',()=>{
+  const {f,id}=historyFixture();f.ctx.saveSalesAccess('pp@markatus.de\nTEST@example.invalid');f.setEmail('test@example.invalid');const n=f.calls.length;
+  assert.throws(()=>f.ctx.checkSalesHistoryBinding(id),/Zugriff/);assert.equal(f.calls.length,n);
 });
 console.log(`${count} meaningful checks passed.`);

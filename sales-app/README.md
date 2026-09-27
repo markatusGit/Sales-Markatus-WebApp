@@ -1,8 +1,8 @@
 # Apps-Script-Datenpilot
 
-Stand: 27.09.2026 · **2026-09-27-r11** lokal vorbereitet. Die E-Mail-Übertragung nach r9 ist vom Nutzer bestätigt. Jetzt ist ausdrücklich die Kontakthistorie vorgezogen: HQ-Einträge vollständig und übersichtlich anzeigen sowie eigene Kommunikation über Firebase nach HQ übertragen und wieder einlesen. Erst nach dem Live-Test folgen Aufräumen und die bestätigten Chat-Punkte 1–3 (mehrere Ausgaben, manueller Abgleich, Kunden-/Magazinansichten und Filter).
+Stand: 27.09.2026 · **2026-09-27-r12** lokal vorbereitet. Die E-Mail-Übertragung nach r9 ist vom Nutzer bestätigt. Jetzt ist ausdrücklich die Kontakthistorie vorgezogen: HQ-Einträge vollständig und übersichtlich anzeigen sowie eigene Kommunikation über Firebase nach HQ übertragen und wieder einlesen. Erst nach dem Live-Test folgen Aufräumen und die bestätigten Chat-Punkte 1–3 (mehrere Ausgaben, manueller Abgleich, Kunden-/Magazinansichten und Filter).
 
-Der Nutzer bestätigt den HQ-Leseweg. r11 korrigiert die fehlende Kommunikation-Schaltfläche: Eine eigene Testfirma wird beim Öffnen über ihre HQ-ID wieder dem lokalen Entwurf zugeordnet. Der Button steht oben und im Historienbereich. Bei Bestandskunden oder unvollständig bestätigter Anlage bleibt er mit Erklärung deaktiviert; die TEST-Schreibbeschränkung besteht weiter.
+Der Nutzer bestätigt den HQ-Leseweg bei Bestandskunden, meldet aber eine leere Historie und einen gesperrten Kommunikationsbutton bei seiner eigenen Testfirma. r12 zeigt gespeicherte Historie unabhängig vom ursprünglichen Anlageauftragsstatus und ermöglicht den Teilimport auch ohne vorherigen vollständigen Firmendatensatz. Ein späterer Anlageabschluss erhält importierte Historie, Projekte und weitere Kontakte. **HQ-Zuordnung prüfen** bestätigt ausschließlich lesend die gespeicherten Firmen-/Kontakt-IDs und ihre Zusammengehörigkeit. Diese gesonderte Freigabe ermöglicht Kommunikation bei noch offenen anderen Anlageprüfungen; sie markiert den ursprünglichen Auftrag nicht als erledigt. Vor jeder Historienübertragung wird die Zuordnung erneut aus HQ gelesen. Die TEST-Schreibbeschränkung besteht weiter.
 
 Alle sechs Kontaktarten sind erfassbar: Note, Mail, Call, Meeting, Visit und Task. Aufgaben erhalten einen ausgewählten HQ-Verantwortlichen und optional nextContactDate. Verantwortlicher und Termin werden übertragen, rückgeprüft und beim Import erhalten. Aufgabe ist hier ein ContactHistories-Eintrag; Aufgabenabschluss/automatische Erinnerung sind nicht angebunden. Die Live-Abnahme des Schreibwegs einschließlich Task steht noch aus.
 
@@ -10,9 +10,10 @@ Alle sechs Kontaktarten sind erfassbar: Note, Mail, Call, Meeting, Visit und Tas
 
 - **SalesBackend.gs** und **Sales.html** anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen.
 - Die vorhandene Bereitstellung auf **Neue Version** setzen; keine geänderten Skripteigenschaften oder Zugriffsrechte.
-- In der Web-App **2026-09-27-r11** prüfen.
+- In der Web-App **2026-09-27-r12** prüfen.
 - Bei einer Bestandsfirma **Historie aus HQ aktualisieren** ausführen und Kommunikation/Rechnungsversand mit HQ vergleichen; dieses Ziel bleibt nur lesbar.
-- Bei der eigenen vollständig bestätigten Testfirma **Kommunikation erfassen** verwenden; den Ablauf bis zur Rückübertragung nach der kleinschrittigen Anleitung testen.
+- Bei der eigenen Testfirma **Historie aus HQ aktualisieren** ausführen; die direkt in HQ angelegten Einträge müssen erscheinen.
+- Bei gesperrtem Kommunikationsbutton **HQ-Zuordnung prüfen** anklicken; danach **Kommunikation erfassen** nach der kleinschrittigen Anleitung testen.
 - Bei einer Abweichung den technischen Text mitteilen; keine doppelte Anlage versuchen.
 
 Neue Kommunikation erscheint sofort aus Firebase auf der Kundenkarte mit Übertragungsstatus. Die Historie bietet **Alle Einträge**, **Kommunikation** und **Rechnungen / Dokumentversand**. Rechnungen bleiben kompakt mit Projekt, Versanddatum und Netto-Betrag; der Text ist aufklappbar. Lange Kommunikationsinhalte sind ebenfalls aufklappbar. Nicht zuordenbare Belege erhalten keinen geratenen Betrag. Neue App-E-Mail-Notizen werden nicht wegen des Worts Rechnung als Systemversand behandelt.
