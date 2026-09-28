@@ -16,7 +16,7 @@ const {chromium}=require('playwright');
     // Reuse the real backend fixture, without running the separate backend test suite.
     const tests=fs.readFileSync(__dirname+'/test-sales.cjs','utf8'),scope={require,__dirname,console,Buffer,URL};
     vm.runInNewContext(tests.slice(0,tests.indexOf("test('all public RPCs"))+'globalThis.f=fixture();',scope);
-    const f=scope.f,{id}=f.ctx.saveSalesTestCompany(f.input);
+    const f=scope.f;vm.runInContext(fs.readFileSync(__dirname+'/SalesV1.gs','utf8'),f.ctx);const {id}=f.ctx.saveSalesTestCompany(f.input);
     f.ctx.runSalesJob(id,'company');f.ctx.runSalesJob(id,'contact');
     f.db['sales_jobs/'+id].state='contactCreated';delete f.db['sales_jobs/'+id].historyBinding;
     const state=f.ctx.getSalesState(),detail=f.ctx.getSalesCompany('draft_'+id);
@@ -31,12 +31,20 @@ const {chromium}=require('playwright');
     const button=page.getByRole('button',{name:'Kommunikation erfassen',exact:true}).first();
     assert.equal(await button.isEnabled(),true);assert.equal(await button.evaluate(b=>getComputedStyle(b).cursor),'pointer');
     await button.click();await page.getByLabel('Betreff',{exact:true}).fill('TEST Browser');
-    await page.getByLabel('Notiz',{exact:true}).fill('Nur Firebase zuerst');
+    for(const channel of ['Note','Mail','Call','Meeting','Visit']){
+      const typeControl=page.locator('select[name="channel"]');assert.equal(await typeControl.count(),1,'Missing channel before '+channel+'; browser errors: '+errors.join('; '));await typeControl.selectOption(channel);
+      const visible=await page.locator('form[data-form="history"]').evaluate(form=>Array.from(new FormData(form).keys()).sort());
+      const expected=['channel','reason','content',...(channel==='Mail'?['recipientEmailAddress']:['contactOn']),...(['Call','Meeting','Visit'].includes(channel)?['contactPersonId']:[]),...(channel==='Call'?['status']:[])].sort();
+      assert.deepEqual(visible,expected);assert.equal(await page.getByLabel('Betreff',{exact:true}).inputValue(),'TEST Browser');
+    }
+    assert.equal(await page.getByLabel('Kontaktart',{exact:true}).locator('option[value="Task"]').count(),0);
+    await page.getByLabel('Kontaktart',{exact:true}).selectOption('Note');
+    await page.getByLabel('Notiz / Text',{exact:true}).fill('Nur Firebase zuerst');
     const n=f.calls.length;await page.getByRole('button',{name:'In Firebase speichern',exact:true}).click();
     await page.getByRole('heading',{name:'TEST Browser',exact:true}).waitFor();
     assert.equal(f.calls.length,n);assert.ok(rpcCalls.includes('saveSalesHistory'));assert.ok(!rpcCalls.includes('checkSalesHistoryBinding'));assert.ok(!rpcCalls.includes('runSalesJob'));
     assert.equal(await page.locator('#magazin-vertrieb').getAttribute('aria-busy'),'false');
-    console.log('PASS actual button click and Firebase save with open creation and no historyReady proof');
+    console.log('PASS actual button click, five type-specific field sets and Firebase save with open creation and no historyReady proof');
     const checks=await page.evaluate(()=>{
       const {historyContent,historyRow,historyPreview}=historyTools;
       const rich='<p>Hallo <strong>Welt</strong> &amp; Team</p><p>Zweite Zeile<br>Weiter</p><ul><li>Eintrag</li></ul><span style="font-weight:700;font-style:italic;text-decoration:underline">Format</span><table><tr><td>Summe</td><td>10 EUR</td></tr></table>';

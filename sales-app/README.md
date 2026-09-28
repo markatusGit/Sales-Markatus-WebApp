@@ -1,107 +1,58 @@
-# Apps-Script-Datenpilot
+# Sales Markatus – Apps-Script-App
 
-Stand: 28.09.2026 · **2026-09-28-r13** lokal vorbereitet. E-Mail-Übertragung und inzwischen auch Historienimport der Testfirma sind vom Nutzer bestätigt. r13 korrigiert den gesperrten Einstieg zum Erfassen und die Darstellung von HQ-HTML. Erst nach dem Live-Schreibtest folgen Aufräumen und die bestätigten Chat-Punkte 1–3 (mehrere Ausgaben, manueller Abgleich, Kunden-/Magazinansichten und Filter).
+Stand: 28.09.2026 · **2026-09-28-r14** lokal vorbereitet. Der Nutzer hat den bisherigen Lese- und Schreibweg der Kontakthistorie bestätigt. Der beauftragte V1-Ausbau der Chat-Punkte 1–3 ist jetzt implementiert; seine Bereitstellung und Live-Abnahme sind offen. Die gesamte V1 einschließlich Teamzugang, Buchungen und Wiedervorlagen ist damit noch nicht fertig.
 
-Erfassen und HQ-Übertragen sind getrennt: **Kommunikation erfassen** öffnet bei der eigenen Testfirma mit HQ-ID direkt das Formular, unabhängig von historyReady und offenen Kontaktprüfungen. Speichern prüft den eigenen Firebase-Anlagebezug und legt nur den Historienauftrag in Firebase an. Der spätere bewusste HQ-Abgleich prüft Firma und Ansprechpartner live anhand der gespeicherten IDs, Namen und Firmenzugehörigkeit, ohne eine vorab gespeicherte Freigabe zu verlangen. Eine fehlgeschlagene Vorprüfung ohne POST lässt den Auftrag offen; tatsächlich unklare Schreibversuche bleiben gegen Wiederholung gesperrt. Bestandskunden bleiben nur lesbar. Der alte Anlageauftrag wird nicht künstlich abgeschlossen.
+## Aktuelle Funktionen
 
-HQ-Historientexte werden über ein inertes HTML-Template geparst und aus erlaubten Elementen neu aufgebaut. Absätze, Umbrüche, Hervorhebungen, Listen, Tabellen und sichere Links bleiben sichtbar. Skripte, Ereignisattribute, eingebettete Inhalte und externe Bilder werden entfernt. Die gespeicherten Originaltexte und HQ-Schreibvergleiche bleiben unverändert. Vorschau, vollständige Kommunikation und Rechnungs-E-Mails verwenden dieselbe Darstellung. Dauerhaft deaktivierte Buttons zeigen keinen Ladezeiger; dieser gehört nur zu einer tatsächlichen laufenden Aktion.
+- Kommunikation: Notiz, E-Mail, Anruf, Meeting, Besuch mit passenden Eingabefeldern. Nur Anrufe haben Erreicht/Nicht erreicht; Anruf/Meeting/Besuch wählen einen Ansprechpartner dieser Firma. E-Mail dokumentiert Empfänger und Inhalt ohne Versand; Datum beim Speichern. Neue Aufgaben sind entfernt, historische HQ-Aufgaben bleiben sichtbar; awork ist zurückgestellt.
+- Mehrere Magazine/Ausgaben über bewusste HQ-Projektsuche und bestätigte Zuordnung in der Verwaltung. Je Ausgabe Zielumsatz und Termine mit Versionsprüfung. Keine fest eingebaute neue aktuelle Verkaufsausgabe.
+- Manueller HQ-Leseimport mit gespeichertem Fortschritt, Fortsetzung und Wiederholung fehlgeschlagener Abschnitte. Je Schritt eine Belegseite oder eine Firma einschließlich aller Kontakte, Historie und Projekte/Planumsätze. Keine HQ-Schreibaufrufe im V1-Import.
+- Zentraler Kunden-/Interessentenbestand nach HQ-ID; auch gezielt ausgewählte Interessenten ohne Magazinrechnung. Gemeinsame Ansprechpartnerübersicht.
+- Magazin-/Ausgabenwahl und kombinierbare Historien-, Branchen-, Orts- und Betreuerfilter. Fehlende Ausgaben werden als unbekannte Abdeckung angezeigt. Frühere Historie wird ausdrücklich auf die importierten Ausgaben begrenzt.
+- Rechnungen/Gutschriften mit Netto-Beträgen. Belege über mehrere Ausgaben lassen sich in Firebase als ungeklärt ausschließen. Keine automatische Erkennung/Verteilung und keine Projekt-/Rechnungsschreibwege.
+- Technische Einzeltests über Verwaltung; regulärer Datenabgleich in der Hauptnavigation. HQ-Schreibaufträge weiterhin einzeln mit Vorschau.
 
-Alle sechs Kontaktarten sind erfassbar: Note, Mail, Call, Meeting, Visit und Task. Aufgaben erhalten einen ausgewählten HQ-Verantwortlichen und optional nextContactDate. Verantwortlicher und Termin werden übertragen, rückgeprüft und beim Import erhalten. Aufgabe ist hier ein ContactHistories-Eintrag; Aufgabenabschluss/automatische Erinnerung sind nicht angebunden. Die Live-Abnahme des Schreibwegs einschließlich Task steht noch aus.
+## Bestehende bestätigte Wege erhalten
 
-## Aktuelle Lieferung und nächster Test
+Firma und erster Ansprechpartner werden zuerst in Firebase erfasst und sind dort sofort sichtbar. Der HQ-Abgleich erfolgt in zwei getrennten Schritten: Firma erstellen und bestätigen, dann Kontakt zur gespeicherten Firmen-ID erstellen und prüfen. Kontakt-E-Mail wird bei Bedarf in der zugehörigen HQ-Kontaktadresse ergänzt. Kein blindes Wiederholen unklarer Schreibversuche. Die Homepage berücksichtigt das Firmenfeld und passende Adressfelder; Eingaben wie test.de werden normalisiert. Der technische Wiederaufnahmemarker wird nach bestätigter Neuanlage bereinigt.
 
-- **SalesBackend.gs** und **Sales.html** anhand von [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md) vollständig ersetzen.
-- Die vorhandene Bereitstellung auf **Neue Version** setzen; keine geänderten Skripteigenschaften oder Zugriffsrechte.
-- In der Web-App **2026-09-28-r13** prüfen.
-- Bei einer Bestandsfirma **Historie aus HQ aktualisieren** ausführen und Kommunikation/Rechnungsversand mit HQ vergleichen; dieses Ziel bleibt nur lesbar.
-- Bei der eigenen Testfirma **Historie aus HQ aktualisieren** ausführen; die direkt in HQ angelegten Einträge müssen erscheinen.
-- **Kommunikation erfassen** direkt anklicken; Eingabe und anschließenden HQ-Schreibtest nach der kleinschrittigen Anleitung prüfen.
-- Bei einer Abweichung den technischen Text mitteilen; keine doppelte Anlage versuchen.
+Kommunikation lässt sich bei einer eigenen Testfirma mit HQ-Firmen-ID direkt in Firebase erfassen. Erst beim separaten Schreibschritt werden Firma, ursprüngliche Personenbindung und gegebenenfalls der ausgewählte zusätzliche Ansprechpartner aus HQ zurückgeprüft. Echte Bestandskunden bleiben als Schreibziele gesperrt. Ein importierter Firmenname mit TEST genügt nicht zur Freigabe.
 
-Neue Kommunikation erscheint sofort aus Firebase auf der Kundenkarte mit Übertragungsstatus. Die Historie bietet **Alle Einträge**, **Kommunikation** und **Rechnungen / Dokumentversand**. Rechnungen bleiben kompakt mit Projekt, Versanddatum und Netto-Betrag; der Text ist aufklappbar. Lange Kommunikationsinhalte sind ebenfalls aufklappbar. Nicht zuordenbare Belege erhalten keinen geratenen Betrag. Neue App-E-Mail-Notizen werden nicht wegen des Worts Rechnung als Systemversand behandelt.
+Kontakt-Historie einschließlich Rechnungsversand bleibt übersichtlich und aufklappbar. Texte werden aus erlaubten HTML-Elementen neu aufgebaut; Skripte, Ereignisattribute, eingebettete Inhalte und externe Bilder werden entfernt. Rechnungszuordnung erfolgt nur anhand eindeutiger vollständiger Rechnungsnummern desselben Kunden. Unsichere Zuordnungen werden angezeigt. Projekte zeigen Abschlussdatum oder Planumsätze mit Terminen, getrennt von fakturierten Summen.
 
-Das Formular ergänzt Zeitpunkt, Ergebnis und optionale Zuordnung zum bereits bestätigten Ansprechpartner. Mail dokumentiert einen Historieneintrag, ohne eine Nachricht zu versenden. Die API-Felder und Kontaktarten wurden gegen die öffentliche HQ-v2-Spezifikation geprüft. Die Rückprüfung verwendet die gespeicherte HQ-Eintrags-ID, ersatzweise die eindeutige syncId. Nach verlorenem Ergebnis wird nur gelesen, nicht erneut geschrieben. Ein erneuter Import führt HQ- und App-Einträge anhand dieser Kennungen zusammen; offene App-Einträge bleiben erhalten. Ein zuvor bestätigter, nun im Import fehlender Eintrag wird als ungeklärt markiert.
+## Grenzen und nächste Abnahme
 
-App-Autoren werden im lokalen Auftrag gespeichert; eine Zuordnung sämtlicher App-Nutzer zu HQ-Autoren ist noch nicht umgesetzt. Diese Lieferung ergänzt neue Historieneinträge; Bearbeitung oder Löschung vorhandener HQ-Historie wird nicht freigeschaltet. Nachtlauf und produktive Bestandskundenschreibrechte bleiben außerhalb dieses Tests.
+- Live-Abnahme r14 nach [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md). Nur die beiden erzeugten Dateien SalesBackend.gs und Sales.html ersetzen; keine neuen Eigenschaften oder Bereitstellungsrechte.
+- Regelmäßige Aktualisierung des Dashboards liest Firebase, nicht HQ. HQ-Import nur nach bewusster Aktion. Kein Nachtlauf; kein Sammelschreiben offener HQ-Aufträge.
+- „Vertreten“ heißt in den Historienfiltern positiver Netto-Rechnungsbetrag nach Gutschriften. Buchungen ohne Rechnung werden später angebunden.
+- Bereitstellung zuletzt „Nur ich“. Der Google-Zugang für weitere Konten und Rollen bleiben offen; die App-Allowlist allein ersetzt diese Einrichtung nicht.
+- Echte Kunden bearbeiten, neue Buchungen, Wiedervorlagen, Redaktionsübergabe, Gmail und awork bleiben eigene Roadmap-Schritte. Adressherkunft vorerst nur Firebase.
+- Pro JSON-Datensatz gilt das bestehende Limit von 750 KB. Directory und Ausgabensnapshot sind noch jeweils ein Dokument. Sehr große Datenmengen benötigen eine weitere Aufteilung; ein Fehler wird angezeigt. Ein Firmendetailabschnitt hat das bisherige Zeitbudget von 210 Sekunden und ist nicht innerhalb einer Firma fortsetzbar. Ausgabeimporte sind seitenweise fortsetzbar (bis 50 Seiten à 200 Belege).
+- Importseiten bleiben vorerst als Staging-Daten gespeichert; eine Aufbewahrungs-/Bereinigungsstrategie ist noch offen. Kein unbegrenzter Vollbestandsbetrieb zugesagt.
+- GitHub sichert den Code, nicht Firebase-Daten. Datensicherung/Wiederherstellung für den Teambetrieb bleibt offen.
 
-Der [V1-Umsetzungsplan](../docs/V1-UMSETZUNGSPLAN.md) hält die bestätigte Reihenfolge fest. Der Historientest ist lokal geprüft, aber noch nicht live vom Nutzer bestätigt.
+## Quellen und Build
 
-## Update nach der ersten eigenen Testfirma
-
-- Oberfläche und Server melden dieselbe Release-Kennung; bei unterschiedlichen Ständen wird die normale Bedienung angehalten. Die Kennung steht sichtbar oben. Alte Firebase-Firmendetails werden als solche gekennzeichnet; ein erfolgreicher Detailimport liest automatisch aus Firebase zurück.
-- Branchen und Anreden sind Auswahlfelder. Ihre Werte werden beim bewusst gestarteten Auswahllistenimport aus tatsächlich in HQ verwendeten Firmen- und Ansprechpartnerangaben gesammelt. Die HQ-v2-Modelle liefern diese Felder als freie Zeichenfolge ohne eigenen Katalog-Endpunkt, daher sind noch nie verwendete UI-Werte nicht automatisch verfügbar. Nur die unterschiedlichen Bezeichnungen werden in Firebase gespeichert. Kundenklassifizierung und Kundenherkunft sind bei der Neuanlage ausgeblendet.
-- Homepage-Eingaben wie `test.de` und `www.test.de` werden serverseitig zu `https://...` ergänzt; das Browserformular nimmt sie ebenfalls an. Neue Testfirmen speichern denselben Wert im HQ-Firmenfeld und an der Standardadresse, danach wird beides zurückgelesen. Für die schon angelegte eigene Testfirma gibt es einen gezielten Prüfknopf und den bisherigen Änderungsauftrag, der jetzt auch die eindeutig identifizierte HQ-Standardadresse prüft und aktualisiert. Abweichende HQ-Werte erzeugen einen Konflikt; fehlende Adresszuordnung stoppt vor dem Schreiben. Verlorene Antworten werden anhand der HQ-ID zurückgeprüft, ohne eine zweite Firma anzulegen.
-- Die technische Kennzeichnung in der Beschreibung war der Wiederaufnahmemarker für einen möglichen Abbruch beim Anlegen. Nach vollständig bestätigter Neuanlage wird sie aus der Beschreibung entfernt und der bereinigte Wert rückgelesen. Für die schon angelegte Testfirma kann nach einer reinen HQ-Prüfung ein separater Vorschauauftrag die Kennzeichnung entfernen. Ein bestehender anderer Beschreibungstext wird nicht überschrieben.
-- Programmdateien und synthetische Tests lokal aktualisiert. Noch nicht bestätigt ist die Ausführung der zusätzlichen HQ-Adressschreibroute im echten Mandanten. Nur eigene Testfirmen sind Schreibziele. Der aktuelle bereitgestellte Code-Stand muss anhand der neuen sichtbaren Kennung geprüft werden.
-
-## Detailupdate nach erstem Live-Test
-
-- Homepageanzeige berücksichtigt zusätzlich die Website der Standardadresse, ersatzweise eine eindeutige Rechnungsadress-Website. Das originale Firmenfeld bleibt für Schreibvergleiche separat erhalten. Ein tatsächlicher fehlender HQ-Wert wird nicht erfunden.
-- Dokumentversand in der Kontakt-Historie zeigt Projekt, Versanddatum und Netto-Rechnungsbetrag, den E-Mail-Text aufklappbar und als escaped Text. Normale Notizen bleiben sichtbar. Die API liefert hier keine direkte Rechnungs-ID: Zuordnung nur anhand einer eindeutigen vollständigen Rechnungsnummer bei demselben Kunden und gegebenenfalls Projekt; Mehrdeutigkeit bleibt sichtbar. Projekt-/Betragsvergleiche allein werden nicht als Zuordnung verwendet.
-- Projekte zeigen `actualFinishDate` bzw. offene Planumsätze aus `PlannedRevenues` mit `Estimations`. Offene Projektionen (`documentId=0`, Status Planned/Deferred) sind von belegverknüpften und unbekannt eingestuften Einträgen getrennt. Kein Zusammenzählen von wiederkehrendem Planbetrag und einzelnen Terminen, keine Vermischung mit fakturiertem Umsatz, keine erfundenen Termine. Ohne Terminaufteilung werden Planbetrag und Planungsbeginn ausdrücklich als solche angezeigt. Nicht als offen bestätigte Planstatus stehen aufklappbar separat.
-- Auch der erweiterte Import schreibt nur nach komplett erfolgreichem Abruf in Firebase. Das Projektziel wird bei Planumsätzen kontrolliert. Keine HQ-Schreibrechte erweitert. Noch offen ist der Live-Nachweis der Feldbefüllung und der Nummernzuordnung im Mandanten.
-
-Die Erweiterung der Bereitstellungszugriffsart auf die Firmendomäne wurde von der automatischen Freigabeprüfung abgelehnt. Der lokale Manifeststand behält deshalb die vorherige Einstellung `MYSELF`/„Nur ich“ bei. Die zusätzliche serverseitige E-Mail-Freigabe ist implementiert. **Weitere eingetragene E-Mail-Adressen erhalten unter „Nur ich“ noch keinen praktischen Zugang.** Eine passende Google-Bereitstellungsfreigabe muss beim Mehrnutzerstart ausdrücklich geklärt werden. Externe Google-Konten brauchen außerdem einen geprüften Identitätsweg; sie sind durch den internen Einzelkontotest nicht abgedeckt.
-
-## Was im Code vorhanden ist
-
-- Apps-Script-Startseite mit Gestaltung aus der bestehenden Demo, ohne deren Beispieldaten, künstliche Kennzahlen oder Demo-Lokalspeicher. Die bisherige Offline-Demo bleibt als separate historische Datei erhalten.
-- Startansicht, Kundenübersicht, Kundendetails, Magazinansicht, HQ-Beleghistorie, integrierte Daten-Testseite und Verwaltung.
-- Explizite Google-E-Mail-Freigabe bei jedem öffentlichen neuen Serveraufruf; separate Administratorprüfung für HQ-Abgleich und Freigabeliste. Erster Administrator ist gemäß Nutzervorgabe in der Konfiguration voreingestellt.
-- Testweg Firebase lesen → bewusster HQ-Import → Firebase erneut lesen. Keine heimlichen direkten HQ-Lesezugriffe beim Öffnen der Kundendaten.
-- Import einer genau identifizierten Pilotausgabe mit Unternehmen und einzelnen Rechnungen/Gutschriften. Name und Projektnummer müssen zusammen passen, falsche Filterergebnisse werden verworfen. Firmen sind dauerhaft nur lesbare Ziele dieses Imports.
-- Je Firma eigener Detailimport mit Standard-/Rechnungsadresse, eigenen Feldern, Ansprechpartnern, Kontakt-Historie sowie direkt zugeordneten Projekten und deren Netto-Umsatz. Details werden erst nach abgeschlossenem Abruf in Firebase ersetzt.
-- Umsatzprüfung mit Warnungen bei unbekannten Statuswerten, fehlenden Angaben, anderer Währung und potenzieller doppelter Stornokürzung. Eine technische Vollständigkeitsanzeige ersetzt keinen Vergleich mit bekannten HQ-Belegen.
-- Manuell importierte Auswahllisten für HQ-Verantwortliche, Firmentypen, Unternehmensbereiche sowie beobachtete Branchen und Anreden; relevante eigene Felder bleiben für spätere Schritte verfügbar.
-- Eigene Testfirma mit Standardadresse, Firmentyp (Interessent als Vorgabe), verantwortlichem HQ-Benutzer, ausdrücklich gewähltem HQ-Unternehmensbereich und erstem Ansprechpartner in Firebase erfassen. Für diesen Neuanlage-Test sind Vor- und Nachname des Kontakts Pflichtfelder. Beide sind sofort in Kunden- und Ansprechpartneransicht sichtbar, auch ohne HQ-ID.
-- Adressherkunft mit den drei vereinbarten Auswahlen und Pflicht-Freitext bei Sonstige. Bis zur HQ-Feldentscheidung ausschließlich in Firebase speichern.
-- Auftragsvorschau und zwei ausdrücklich getrennte Ausführungen: Schritt 1 sendet nur die Firma und bestätigt ihre Identität per Rücklesung. Schritt 2 ist erst mit gespeicherter Firmenbestätigung möglich, liest dieselbe Firmen-ID erneut und überträgt dann den Kontakt. Kein automatischer Übergang und keine automatische Wiederholung von Schreibversuchen. Der Zwischenstand liegt in Firebase und überlebt das Schließen der App. Zielprüfung ausschließlich über serverseitige Testfirmen-/Auftragszuordnung; frei übergebene Firmen-IDs schalten kein Bestandsunternehmen frei.
-- Unklare Antworten sperren Wiederholungen. Ein eindeutiger Marker ermöglicht das reine Zurücklesen einer eventuell bereits erfolgten Firmen-/Kontaktanlage. Ein nicht eindeutig bestätigter Vorgang bleibt gesperrt und verlangt Prüfung.
-- Neue Kontakthistorie für eine eigene Testfirma in Firebase erfassen und kontrolliert nach HQ übertragen.
-- Erster Änderungs-/Konflikttest für Branche und Homepage der eigenen Testfirma. Vorherige Firebase-Werte und aktueller HQ-Stand werden verglichen. Entscheidung HQ/App; vor einer erneut freigegebenen App-Änderung nochmals vergleichen.
-- Zielumsatz und drei Termine für die Pilotausgabe in Firebase ändern. Versionsvergleich verhindert das unbemerkte Überschreiben paralleler App-Änderungen. Dashboard lädt im Minutenabstand Firebase neu und zeigt letzten Änderungsvermerk.
-
-## Bewusste Grenzen dieses ersten Testschritts
-
-- Firma und Ansprechpartner sind nach r8 laut Nutzer in HQ angelegt. r8.1 hat die fehlende E-Mail in beiden HQ-Feldern nachgewiesen. Die E-Mail-Übertragung nach r9 wurde am 27.09. vom Nutzer bestätigt; eine zusätzliche vollständige Neuanlage und weitere Fehlerfälle sind nicht ausdrücklich abgenommen. Es gibt keinen automatischen Nachtlauf.
-- Keine Projekt-/Rechnungsschreibwege. Rechnungen über mehrere Ausgaben werden noch nicht aufgeteilt; Beträge bleiben bis zum fachlichen Belegvergleich vorläufig.
-- Bestehende Kunden aus dem Ausgabeimport sind als HQ-Schreibziele gesperrt. Freischaltung produktiver Stammdatenänderungen ist nicht Bestandteil dieses Schritts.
-- Änderungen an weiteren Firmenfeldern, bestehenden Adressen und bestehenden Ansprechpartnern sind noch nicht als Bearbeitungsoberflächen angebunden; die vollständige Neuanlage und der begrenzte Änderungsweg dienen zunächst der Verifikation.
-- Weitere Ausgaben, ausgabenübergreifende Filter, App-Buchungen, Wiedervorlagen, Redaktionsemails und differenzierte Rollen bleiben Arbeitspakete des vorgesehenen Piloten. Die neue Oberfläche kennzeichnet fehlende Daten/Funktionen, statt Demoaktionen als echte Speicherung auszugeben.
-- Stammdaten-/Detailimporte sind manuelle begrenzte Läufe. Für den Vollbestand sind fortsetzbare Importportionen und der Nachtlauf noch auszubauen. Es wurde kein neuer nächtlicher Trigger eingerichtet.
-- Der dokumentierte HQ-PUT-Endpunkt bietet hier keine geprüfte atomare Versionsbedingung: Der Vergleich erkennt vorher sichtbare Änderungen, aber kein garantiertes Sperren anderer HQ-Nutzer zwischen Lesen und Schreiben. Daher vorerst ausschließlich eigene Testfirmen.
-- Die Google-Bereitstellung bleibt „Nur ich“. Weitere Konten und externe Identitäten sind noch nicht live geprüft.
-
-## Erster Live-Test nach Bereitstellung
-
-1. App öffnen → **Daten-Testseite** → **1 · Firebase abfragen**. Der alte Firebase-Umsatzpilot ersetzt den neuen Ausgabeimport nicht; ein leerer neuer Bestand ist erwartbar.
-2. **2 · Ausgabe HQ → Firebase** starten. Danach **3 · Erneut aus Firebase lesen**. Unternehmen und Belege prüfen.
-3. Einen Kunden öffnen → Firebase abfragen → Detailimport → erneut Firebase lesen. Angaben mit HQ vergleichen; diese Firma nicht ändern.
-4. Auf der Testseite **Auswahllisten HQ → Firebase** starten und Firebase erneut laden.
-5. **Testfirma anlegen**: einen eindeutig als Test gekennzeichneten Namen, Interessent, verantwortlichen HQ-Benutzer und korrekten Unternehmensbereich wählen. Standardadresse und Testkontakt erfassen. Keine echten Kundeninhalte in die Testfirma kopieren.
-6. **In Firebase speichern**. Danach die getrennten Firmen- und Kontakt-Schritte gemäß der aktuellen manuellen Anleitung ausführen.
-7. Bei „Ausgang unklar“ keinen neuen Auftrag anlegen. **Ergebnis nur in HQ prüfen** verwenden und danach den gefundenen Stand gemeinsam auswerten.
-8. An der bestätigten Testfirma Kontakt-Historie und den begrenzten Änderungstest ausprobieren. Ein zweiter Klick auf einen bereits bestätigten Auftrag erzeugt keine zweite Anlage.
-
-## Wartung
-
-Quellen: `Sales.gs` für den neuen Serverteil und `Sales.template.html` für die Oberfläche. `build.cjs` übernimmt ausschließlich CSS aus der ursprünglichen Demo und erzeugt `hq-benchmark/SalesBackend.gs` und `hq-benchmark/Sales.html`. Beide Dateien haben absichtlich unterschiedliche Basisnamen; Apps Script erlaubt keine gleichnamige HTML- und Skriptdatei.
+- Sales.gs: bestehende Pilot-, Identitäts-, Firebase- und TEST-Schreibfunktionen.
+- SalesV1.gs: ausdrücklich freigegebener V1-Leseumfang, Konfiguration, Importfortschritt und zentrale Übersichten.
+- Sales.template.html, SalesV1.js und Sales.styles.css: Oberfläche und Gestaltung ohne Demodatensätze.
+- build.cjs: erzeugt hq-benchmark/SalesBackend.gs aus beiden Serverquellen und hq-benchmark/Sales.html aus Template, V1-Oberfläche und CSS. Keine Abhängigkeit von der unversionierten Offline-Demo.
 
 ```powershell
 node sales-app/build.cjs
 node sales-app/test-sales.cjs
+node sales-app/test-sales-v1.cjs
 ```
 
-Der Nutzer überträgt ausschließlich die in der aktuellen manuellen Anleitung genannten Dateien aus `hq-benchmark` und setzt die bestehende Bereitstellung auf eine neue Version. Kein automatischer Apps-Script-Upload durch Codex. Das vorhandene Benchmark-Frontend bleibt unter derselben Web-App-Adresse mit `?view=benchmark` erreichbar. Bestehende Script Properties für HQ/Firebase bleiben erhalten.
+Browserprüfungen verwenden vorhandenes Playwright und eine Chromium/Edge-Installation. NODE_PATH kann auf dessen vorhandene Module zeigen; PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH wählt die ausführbare Datei. Keine Installation und kein Live-Zugang sind erforderlich.
 
-Firestore: neue getrennte Sammlungen `sales_editions`, `sales_companies`, `sales_meta`, `sales_drafts`, `sales_jobs`. Zugriff erfolgt serverseitig über das bereits konfigurierte Dienstkonto. Bestehende Browserregeln sperren diese Sammlungen vollständig; Regeln wurden nicht erweitert. Kundeninhalte werden nicht im Browser-Lokalspeicher abgelegt. Die App speichert dort nur das Farbschema.
+```powershell
+node sales-app/test-history-browser.cjs
+node sales-app/test-v1-browser.cjs
+```
 
-Vorheriger Apps-Script-Code als lokale Sicherung: `tmp/apps-script-backup`. Kein Auslesen oder Speichern der geheimen Script Properties.
+101 Logikprüfungen, 13 V1-Prüfungen und drei Browser-Integrationsprüfungen mit ausschließlich synthetischen Daten bestanden. Geprüft: Zielschutz und Identität, Firmen-/Kontaktanlage, verlorene Antworten, Feldauswahl, Mail-Empfänger, Kontaktzugehörigkeit, Rich-Text-Sicherheit, eindeutige Projektzuordnung, Importseiten/Fortsetzung, unveränderter alter Snapshot bei Abruffehler, Fehlerwiederholung, Kundendeduplizierung, reine HQ-GET-Aufrufe, unbekannte Historienabdeckung und tatsächliche UI-Bedienung. Kein Nachweis der neuen Funktionen im echten Mandanten.
 
-## Prüfung
+Firestore serverseitig über bestehendes Dienstkonto: sales_editions, sales_companies, sales_meta (Katalog, Directory, aktuelle Ausgabe und Importlauf), sales_imports (Importseiten), sales_drafts, sales_jobs. Bestehende Regeln sperren diese Sammlungen für Browserzugriff; keine Regeländerung. Browser-Lokalspeicher enthält nur das Farbschema.
 
-94 automatisierte Prüfungen mit vollständig nachgebildeten HQ-/Firebase-Diensten: Identität/Freigabe, Trennung reiner Datenbankabrufe, Schreibzielsperren, Pflichtangaben, Neuanlagereihenfolge, Wiederholung, verlorene Antworten und Markerzuordnung, Rückprüfung, Kontakt-Historie, Konflikte, Erhalt anderer HQ-Felder, Umsatzsonderfälle und parallele Terminänderungen. Zusätzlich Homepagequellen, eindeutige bzw. mehrdeutige Belegzuordnung, Plantermine/Fremdwährungen, abgeschlossene Projekte, gemeinsame Magazinprojekte, vollständiger Detailimport, Erhalt des bisherigen Firebase-Stands bei Planabrufproblemen, Branchen-/Anredeoptionen, Formularnormalisierung, Kennzeichnungsbereinigung, Homepageänderung in Firmen- und Adressfeld, Konflikte, verlorene Antworten, Versionsabgleich und sichere aufklappbare Darstellung geprüft. r9 prüft außerdem gezielte E-Mail-Korrektur, Datenerhalt, gemeinsam genutzte Adressen, Änderungen seit Vorschau, unklare PUT-Antworten ohne Wiederholung, Neuanlage mit Kontaktadresse und lesbare sichere Vorschau. Bestehende Benchmark-, Umsatz-, Browserlogik- und Firebase-Pilottests wurden beim ursprünglichen Pilotstand ebenfalls erfolgreich ausgeführt.
-
-Browserprüfung der lokalen Oberfläche ohne echte Kunden/Server: Startansicht, Testseite, Testfirmenformular, Auswahl Sonstige mit Freitext, Wechsel hell/dunkel und schmale Ansicht bei 390 Pixeln ohne seitlichen Überlauf. `preview.cjs` ist ausschließlich ein lokales Prüfwerkzeug und wird nicht hochgeladen. Es enthält keinerlei echte Kunden oder Zugangsdaten.
-
-API-Grundlage: öffentliche [HQ-v2-OpenAPI-Beschreibung](https://developer.hellohq.io/swagger20.json), Kontakt-POST/PUT/GET, CompanyAddressBase und CustomFieldContentBase am 26.09.2026 erneut geprüft. Dokumentierte Endpunkte und Modelle sind kein Nachweis für erfolgreiche Ausführung im Mandanten.
+HQ-Schema: [öffentliche v2-OpenAPI-Beschreibung](https://developer.hellohq.io/swagger20.json). Für diese Änderung wurde insbesondere das dokumentierte Empfängerfeld recipientEmailAddress in der lokal vorhandenen Schemafassung geprüft. Das ersetzt keinen Live-Test. Das alte Benchmark-Frontend bleibt über ?view=benchmark erreichbar.

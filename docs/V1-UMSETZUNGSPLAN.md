@@ -1,16 +1,20 @@
 # Weg zur ersten nutzbaren Sales-App
 
-Stand: 27.09.2026. Der Nutzer hat die Reihenfolge inzwischen bestätigt: zuerst Kontakthistorie in beide Richtungen live testen, danach den bestehenden Piloten aufräumen und die Chat-Punkte 1–3 umsetzen (mehrere Ausgaben, manueller Datenabgleich, Magazin-/Kundenansichten und Filter). Diese drei Chat-Punkte sind unten in den Bauabschnitten 1 und 2 zusammengefasst; der hier nummerierte Bauabschnitt 3 ist der spätere Google-Zugang. Keine pauschale Freigabe produktiver HQ-Schreibzugriffe. Grundlage sind das Projekttagebuch, das Vertriebskonzept und der aktuelle Quellcode. Die E-Mail-Übertragung wurde vom Nutzer bestätigt; eine zusätzliche vollständige Neuanlage mit r9 ist nicht ausdrücklich bestätigt.
+Stand: 28.09.2026. Der Nutzer hat den bisherigen Historien-Lese- und Schreibweg nach HQ bestätigt. Aufräumen und die Chat-Punkte 1–3 (mehrere Ausgaben, manueller Datenabgleich, Magazin-/Kundenansichten und Filter) sind mit **2026-09-28-r14 lokal implementiert und synthetisch geprüft**; Bereitstellung und Live-Abnahme sind offen. Diese drei Chat-Punkte entsprechen unten den Bauabschnitten 1 und 2. Bauabschnitt 3 ist der spätere Google-Zugang und wurde noch nicht umgesetzt. Keine pauschale Freigabe produktiver HQ-Schreibzugriffe.
 
 ## Ziel und bisheriger Stand
 
 Die V1 soll den Alltag vom Finden eines Kunden über Kontakt, Wiedervorlage und Buchung bis zur Redaktionsübergabe abbilden. Sie liest aus Firebase; neue Eingaben sind dort sofort nutzbar. Der Nutzer erwägt zunächst einen manuellen Abgleich statt eines Nachtlaufs. Empfehlung: Dies für die erste V1 übernehmen, mit getrennten Aktionen für Lesen aus HQ und Schreiben nach HQ.
 
-Bereits vorhanden sind der Import einer Pilotausgabe, Kundendetails, Kontakt-/Projekthistorie und die Speicherung eigener Testfirmen mit Ansprechpartner. Der Nutzer bestätigt den Import der Pilotausgabe sowie erfolgreiche Firmen-/Kontaktanlage einschließlich E-Mail im bisherigen Testverlauf. Nicht alle Felder, Summen und Fehlerfälle sind dadurch fachlich abgenommen. Die Anwendung ist weiterhin auf eine feste Ausgabe und eigene Testfirmen als Schreibziele begrenzt. Eine allgemeine V1 ist noch nicht fertig.
+Bereits live positiv gemeldet sind Pilotausgabe, Firmen-/Kontaktanlage einschließlich E-Mail und der Kommunikationsabgleich. r14 erweitert den Leseumfang auf bewusst zugeordnete Ausgaben und gezielt aufgenommene Interessenten. Die aktuelle Verkaufsausgabe wird in der Verwaltung ausgewählt, nicht geraten. Nur eigene Testfirmen bleiben HQ-Schreibziele. Nicht alle Felder, Summen und Fehlerfälle sind fachlich abgenommen; die gesamte V1 ist noch nicht fertig.
+
+**Neue Kommunikationsentscheidung:** Aufgabe entfällt bei neuer Erfassung und Übertragung; spätere awork-Anbindung bleibt vorgemerkt. Historische HQ-Aufgaben bleiben lesbar. Notiz, E-Mail, Anruf, Meeting und Besuch zeigen jeweils nur die gewünschten Felder. E-Mail ist ein Historieneintrag mit Empfänger ohne Versand, Anruf hat erreicht/nicht erreicht.
 
 ## Empfohlene Bauabschnitte
 
 ### 1. Mehrere Ausgaben und einen brauchbaren Datenbestand anbinden
+
+**r14-Status:** Lokal umgesetzt. Der manuelle Import speichert Fortschritt je Belegseite oder Firma und kann angehalten, fortgesetzt und abschnittsweise nach Fehlern wiederholt werden. Zentrale Kunden-/Kontaktübersichten und gezielte Aufnahme vorhandener Interessenten sind vorhanden. Live-Belegvergleich steht aus. Sehr große Firmen/Directory-Daten benötigen ggf. feinere Aufteilung; siehe sales-app/README.md. Mehrfachausgabenbelege werden bewusst manuell markiert, nicht automatisch erkannt.
 
 - Mit dem Coburger beginnen: eine aktuelle Verkaufsausgabe und mindestens fünf vollständig importierte vorherige Ausgaben; danach die anderen vereinbarten Magazine ergänzen.
 - Magazine, Ausgaben und jeweilige HQ-Sammelprojekte ausdrücklich zuordnen. Alte Angaben zu aktuellen Ausgabennummern nicht ungeprüft übernehmen.
@@ -23,6 +27,8 @@ Bereits vorhanden sind der Import einer Pilotausgabe, Kundendetails, Kontakt-/Pr
 **Ergebnis:** Die App hat einen nachvollziehbaren echten Datenbestand für Kunden und Ausgaben.
 
 ### 2. Bestehende Oberfläche mit diesen Daten fertigstellen
+
+**r14-Status:** Lokal umgesetzt und im Browser mit synthetischen Daten geprüft. Die fünf vorherigen Ausgaben beziehen sich auf die gewählte Verkaufsausgabe; fehlende oder ungeklärte Abdeckung wird kenntlich gemacht. Positive Netto-Rechnungssummen nach Gutschriften dienen als bisherige Teilnahme. Aktuelle App-Buchungen ohne Rechnung sind noch nicht enthalten.
 
 - Magazin/Ausgabe auswählbar machen und die feste Beschränkung auf Ausgabe #70 entfernen.
 - Alle importierten Ansprechpartner in der gemeinsamen Ansprechpartneransicht auffindbar machen.
@@ -75,11 +81,17 @@ Bereits vorhanden sind der Import einer Pilotausgabe, Kundendetails, Kontakt-/Pr
 
 ## Unmittelbarer nächster Schritt
 
-Zuerst den vorbereiteten Historientest r11 nach [MANUELL-UEBERTRAGEN.md](../sales-app/MANUELL-UEBERTRAGEN.md) durchführen: bestehende HQ-Historie samt Rechnungsversand lesen, eigene Kommunikation bei einer Testfirma über Firebase nach HQ schreiben, erneut importieren und auf Doppelanzeigen prüfen. r11 ist lokal implementiert und geprüft. Den HQ-Leseweg hat der Nutzer positiv gemeldet; für den Schreibtest sind der Kommunikationsbutton korrigiert und Aufgaben ergänzt. Der Live-Schreibnachweis steht aus. Danach wie beauftragt aufräumen und Bauabschnitt 1 und anschließend 2 umsetzen. Zugang für weitere Konten vor dem Teamtest ergänzen. Die folgenden Ausgabenangaben werden erst für den anschließenden Ausbau benötigt:
+Die kleinschrittige [Anleitung für r14](../sales-app/MANUELL-UEBERTRAGEN.md) enthält alle Menüwege, Erwartungen und Fehlerfälle.
 
-- Die aktuell zu verkaufende Coburger-Ausgabe nennen.
-- Ihre HQ-Projektnummer nennen, falls das Sammelprojekt schon angelegt ist.
-- Die einzubeziehenden vorherigen Coburger-Ausgaben nennen; für den Fünf-Ausgaben-Filter mindestens fünf.
-- Die jeweiligen HQ-Projektnummern nennen, soweit vorhanden. Fehlende Zuordnungen können im nächsten Ausbau über eine reine HQ-Projektsuche angeboten und vom Nutzer bestätigt werden; keine geheimen Schlüssel nötig.
+- SalesBackend.gs vollständig in der gleichnamigen Google-Datei ersetzen.
+- Sales.html vollständig in der gleichnamigen Google-Datei ersetzen.
+- Unter Bereitstellen → Bereitstellungen verwalten die bestehende Web-App auf Neue Version setzen.
+- In der Web-App die Kennung 2026-09-28-r14 prüfen; bei Abweichung erst die Dateistände korrigieren.
+- Bei der vorhandenen eigenen Testfirma die fünf Kontaktarten nach Anleitung prüfen.
+- Unter Verwaltung die aktuelle Verkaufsausgabe ihrem HQ-Projekt zuordnen.
+- Dort die fünf unmittelbar vorherigen Ausgaben ihren HQ-Projekten zuordnen.
+- Unter Datenabgleich den Button Daten aus HQ aktualisieren verwenden; Fehlerabschnitte nach Anleitung prüfen.
+- Nach Abschluss Kunden, Ansprechpartner und Belegbeträge mit HQ vergleichen.
+- Unter Magazinverkauf die beiden Historienfilter nach Anleitung testen.
 
-Danach lässt sich der nächste Ausbau konkret auf diese Ausgaben zuschneiden. Die Konfiguration soll weitere Magazine/Ausgaben ohne neue fest eingebaute Projektkennungen ermöglichen.
+Danach Bauabschnitt 3 (Google-Zugang/Team) und anschließend Vertriebsablauf, Buchungen und Redaktion weiterführen. Der Nachtlauf bleibt zurückgestellt. Ein HQ-Schreibsammellauf gehört nicht zu r14; bestehende Einzelvorschauen und TEST-Zielsperren bleiben erhalten. Zusätzliche Magazine lassen sich bereits über dieselbe Verwaltung konfigurieren.

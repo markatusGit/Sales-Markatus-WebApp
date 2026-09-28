@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-28-r13';
+const SALES_RELEASE = '2026-09-28-r14';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -145,7 +145,7 @@ function salesPlannedRevenue_(raw) {
     estimations:Array.isArray(raw.estimations)?raw.estimations.map(e=>({date:salesDate_(e.estimatedDueDate),cents:amount(e.estimatedNetValue),status:e.documentStatus||'',documentId:Number.isSafeInteger(e.documentId)&&e.documentId>=0?e.documentId:null})):null};
 }
 function salesHistory_(raw,documents,projectById) {
-  const row=salesPick_(raw,['id','companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','updatedOn','syncId','responsibleUserIds','isReminder']);
+  const row=salesPick_(raw,['id','companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','updatedOn','syncId','responsibleUserIds','isReminder','recipientEmailAddress']);
   const reason=String(raw.reason||''),content=String(raw.content||''),channel=raw.contactHistoryChannel;
   row.documentDispatch=channel==='SentDocument';
   const possibleDocumentMail=channel==='Mail'&&!String(raw.syncId||'').startsWith('sales-')&&/\b(rechnung|invoice|gutschrift|credit note)\b/i.test(reason);
@@ -299,7 +299,7 @@ function saveSalesEditionSettings(input) {
 }
 
 function salesJobSummary_(j) {
-  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','conflict','steps','companyConfirmedAt','lastWrite']);
+  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','contactId','conflict','steps','companyConfirmedAt','lastWrite']);
   if(j.kind==='createCompany') {out.nextStep=j.companyConfirmedAt?'contact':'company';out.historyReady=salesHistoryReady_(salesRead_('sales_drafts/'+j.id),j);}
   return out;
 }
@@ -391,7 +391,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-28-r13','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-28-r14','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -732,19 +732,22 @@ function saveSalesHistory(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(input.draftId)),creation=salesRead_('sales_jobs/'+input.draftId);
     // Capturing is Firebase-only. The HQ read-back belongs to the later transfer.
     salesHistoryCompanyBinding_(draft,creation);
-    const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.contactOn||salesNow_()),contactHistoryChannel:input.channel,contactHistoryStatus:input.status||'Reached',companyId:draft.hqId};
-    if(!['Note','Mail','Call','Meeting','Visit','Task'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart.');
-    if(!['Reached','NotReached'].includes(history.contactHistoryStatus))throw new Error('Unzulässiges Kontaktergebnis.');
-    if(history.contactHistoryChannel==='Task'){
-      delete history.contactHistoryStatus; // Reached/NotReached is not a task completion status.
-      const userId=salesId_(input.taskResponsibleId),catalog=salesRead_('sales_meta/catalog');
-      if(!catalog?.users.some(u=>Number(u.id)===userId))throw new Error('Bitte einen Verantwortlichen aus der HQ-Auswahlliste wählen.');
-      history.responsibleUserIds=[userId];
-      if(input.nextContactDate)history.nextContactDate=salesHistoryDate_(input.nextContactDate);
+    const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.channel==='Mail'?salesNow_():input.contactOn||salesNow_()),contactHistoryChannel:input.channel,companyId:draft.hqId};
+    if(!['Note','Mail','Call','Meeting','Visit'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart. Aufgaben werden später über awork angebunden.');
+    if(input.channel==='Call'){
+      if(!['Reached','NotReached'].includes(input.status))throw new Error('Unzulässiger Anrufstatus.');
+      history.contactHistoryStatus=input.status;
     }
-    if(input.contactTarget&&input.contactTarget!=='company'){
-      if(input.contactTarget!=='contact'||!creation.contactId)throw new Error('Bestätigter Ansprechpartner fehlt.');
-      history.contactPersonId=salesId_(creation.contactId);
+    if(input.channel==='Mail'){
+      const emails=salesText_(input.recipientEmailAddress,1000,true).split(/[;,]/).map(x=>x.trim().toLowerCase());
+      if(emails.length>10||emails.some(x=>! /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x)))throw new Error('Bitte gültige Empfänger-E-Mail-Adressen eingeben.');
+      history.recipientEmailAddress=Array.from(new Set(emails)).join(',');
+    }
+    if(['Call','Meeting','Visit'].includes(input.channel)){
+      const contactId=input.contactPersonId||(input.contactTarget==='contact'?creation.contactId:null);
+      const contacts=salesRead_('sales_companies/'+draft.hqId)?.contacts||[];
+      if(!contactId||Number(contactId)!==Number(creation.contactId)&&!contacts.some(c=>Number(c.id)===Number(contactId)&&Number(c.companyId)===Number(draft.hqId)))throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
+      history.contactPersonId=salesId_(contactId);
     }
     const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',draftId:draft.id,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
@@ -752,16 +755,9 @@ function salesHistoryTarget_(job,draft) {
   const creation=salesRead_('sales_jobs/'+draft.id);
   if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Testfirma.');
   salesCheckHistoryBinding_(draft,creation);
-  const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','responsibleUserIds','nextContactDate'];
-  if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit','Task'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder.');
-  if(job.history.contactHistoryChannel==='Task'){
-    const ids=job.history.responsibleUserIds;
-    if(!Array.isArray(ids)||ids.length!==1)throw new Error('Aufgabenverantwortlicher fehlt.');
-    const user=salesOne_('Users',salesId_(ids[0]));
-    if(user.isDeactivated!==false)throw new Error('Aufgabenverantwortlicher in HQ nicht als aktiv bestätigt. Bitte HQ-Auswahllisten prüfen.');
-  }
+  const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','recipientEmailAddress'];
+  if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder. Aufgaben werden nicht mehr nach HQ übertragen.');
   if(job.history.contactPersonId){
-    if(Number(job.history.contactPersonId)!==Number(creation.contactId))throw new Error('Ansprechpartner gehört nicht zum Anlageauftrag.');
     const contact=salesOne_('ContactPersons',job.history.contactPersonId);
     if(Number(contact.companyId)!==Number(job.hqId))throw new Error('Ansprechpartner gehört nicht mehr zur Testfirma.');
   }

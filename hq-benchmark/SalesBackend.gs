@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-28-r13';
+const SALES_RELEASE = '2026-09-28-r14';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -145,7 +145,7 @@ function salesPlannedRevenue_(raw) {
     estimations:Array.isArray(raw.estimations)?raw.estimations.map(e=>({date:salesDate_(e.estimatedDueDate),cents:amount(e.estimatedNetValue),status:e.documentStatus||'',documentId:Number.isSafeInteger(e.documentId)&&e.documentId>=0?e.documentId:null})):null};
 }
 function salesHistory_(raw,documents,projectById) {
-  const row=salesPick_(raw,['id','companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','updatedOn','syncId','responsibleUserIds','isReminder']);
+  const row=salesPick_(raw,['id','companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','updatedOn','syncId','responsibleUserIds','isReminder','recipientEmailAddress']);
   const reason=String(raw.reason||''),content=String(raw.content||''),channel=raw.contactHistoryChannel;
   row.documentDispatch=channel==='SentDocument';
   const possibleDocumentMail=channel==='Mail'&&!String(raw.syncId||'').startsWith('sales-')&&/\b(rechnung|invoice|gutschrift|credit note)\b/i.test(reason);
@@ -299,7 +299,7 @@ function saveSalesEditionSettings(input) {
 }
 
 function salesJobSummary_(j) {
-  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','conflict','steps','companyConfirmedAt','lastWrite']);
+  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','contactId','conflict','steps','companyConfirmedAt','lastWrite']);
   if(j.kind==='createCompany') {out.nextStep=j.companyConfirmedAt?'contact':'company';out.historyReady=salesHistoryReady_(salesRead_('sales_drafts/'+j.id),j);}
   return out;
 }
@@ -391,7 +391,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-28-r13','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-28-r14','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -732,19 +732,22 @@ function saveSalesHistory(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(input.draftId)),creation=salesRead_('sales_jobs/'+input.draftId);
     // Capturing is Firebase-only. The HQ read-back belongs to the later transfer.
     salesHistoryCompanyBinding_(draft,creation);
-    const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.contactOn||salesNow_()),contactHistoryChannel:input.channel,contactHistoryStatus:input.status||'Reached',companyId:draft.hqId};
-    if(!['Note','Mail','Call','Meeting','Visit','Task'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart.');
-    if(!['Reached','NotReached'].includes(history.contactHistoryStatus))throw new Error('Unzulässiges Kontaktergebnis.');
-    if(history.contactHistoryChannel==='Task'){
-      delete history.contactHistoryStatus; // Reached/NotReached is not a task completion status.
-      const userId=salesId_(input.taskResponsibleId),catalog=salesRead_('sales_meta/catalog');
-      if(!catalog?.users.some(u=>Number(u.id)===userId))throw new Error('Bitte einen Verantwortlichen aus der HQ-Auswahlliste wählen.');
-      history.responsibleUserIds=[userId];
-      if(input.nextContactDate)history.nextContactDate=salesHistoryDate_(input.nextContactDate);
+    const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.channel==='Mail'?salesNow_():input.contactOn||salesNow_()),contactHistoryChannel:input.channel,companyId:draft.hqId};
+    if(!['Note','Mail','Call','Meeting','Visit'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart. Aufgaben werden später über awork angebunden.');
+    if(input.channel==='Call'){
+      if(!['Reached','NotReached'].includes(input.status))throw new Error('Unzulässiger Anrufstatus.');
+      history.contactHistoryStatus=input.status;
     }
-    if(input.contactTarget&&input.contactTarget!=='company'){
-      if(input.contactTarget!=='contact'||!creation.contactId)throw new Error('Bestätigter Ansprechpartner fehlt.');
-      history.contactPersonId=salesId_(creation.contactId);
+    if(input.channel==='Mail'){
+      const emails=salesText_(input.recipientEmailAddress,1000,true).split(/[;,]/).map(x=>x.trim().toLowerCase());
+      if(emails.length>10||emails.some(x=>! /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x)))throw new Error('Bitte gültige Empfänger-E-Mail-Adressen eingeben.');
+      history.recipientEmailAddress=Array.from(new Set(emails)).join(',');
+    }
+    if(['Call','Meeting','Visit'].includes(input.channel)){
+      const contactId=input.contactPersonId||(input.contactTarget==='contact'?creation.contactId:null);
+      const contacts=salesRead_('sales_companies/'+draft.hqId)?.contacts||[];
+      if(!contactId||Number(contactId)!==Number(creation.contactId)&&!contacts.some(c=>Number(c.id)===Number(contactId)&&Number(c.companyId)===Number(draft.hqId)))throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
+      history.contactPersonId=salesId_(contactId);
     }
     const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',draftId:draft.id,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
@@ -752,16 +755,9 @@ function salesHistoryTarget_(job,draft) {
   const creation=salesRead_('sales_jobs/'+draft.id);
   if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Testfirma.');
   salesCheckHistoryBinding_(draft,creation);
-  const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','responsibleUserIds','nextContactDate'];
-  if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit','Task'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder.');
-  if(job.history.contactHistoryChannel==='Task'){
-    const ids=job.history.responsibleUserIds;
-    if(!Array.isArray(ids)||ids.length!==1)throw new Error('Aufgabenverantwortlicher fehlt.');
-    const user=salesOne_('Users',salesId_(ids[0]));
-    if(user.isDeactivated!==false)throw new Error('Aufgabenverantwortlicher in HQ nicht als aktiv bestätigt. Bitte HQ-Auswahllisten prüfen.');
-  }
+  const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','recipientEmailAddress'];
+  if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder. Aufgaben werden nicht mehr nach HQ übertragen.');
   if(job.history.contactPersonId){
-    if(Number(job.history.contactPersonId)!==Number(creation.contactId))throw new Error('Ansprechpartner gehört nicht zum Anlageauftrag.');
     const contact=salesOne_('ContactPersons',job.history.contactPersonId);
     if(Number(contact.companyId)!==Number(job.hqId))throw new Error('Ansprechpartner gehört nicht mehr zur Testfirma.');
   }
@@ -832,4 +828,153 @@ function resolveSalesConflict(id,choice) {
     if(choice==='hq') {j.state='canceled';j.message='HQ-Wert behalten. App-Änderung verworfen.';}
     else if(choice==='app') {j.base=salesPick_(j.conflict.hq,['industrialSector','homepage']);j.baseAddressWebsite=j.conflict.hq.addressWebsite||'';j.state='pending';j.message='App-Werte ausgewählt. Beim nächsten Abgleich wird HQ erneut auf weitere Änderungen geprüft.';}
     else throw new Error('Bitte HQ oder App wählen.');j.conflict=null;j.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,j);return salesJobSummary_(j);});
+}
+
+/** Explicitly authorized V1 read workflows. No HQ POST/PUT is called here. */
+function salesV1Index_(){return salesRead_('sales_meta/directory')||{entries:[]};}
+function salesV1Editions_(){return salesList_('sales_editions');}
+function salesV1Known_(id){
+  id=String(salesId_(id));
+  return salesV1Index_().entries.some(e=>e.company.id===id)||salesV1Editions_().some(e=>(e.companyIds||[]).includes(id)||(e.companies||[]).some(c=>c.id===id));
+}
+function getSalesV1State(){
+  salesUser_();const state=getSalesState(),editions=salesV1Editions_(),index=salesV1Index_(),companies={};
+  editions.forEach(e=>{(e.companies||[]).forEach(c=>{companies[c.id]=c;});(e.companyIds||[]).forEach(id=>{if(!companies[id])companies[id]={id,name:'HQ-Unternehmen '+id+' · Details fehlen',companyTypes:[],responsibleUsers:[],customFields:[],addresses:[]};});});index.entries.forEach(e=>{companies[e.company.id]=e.company;});
+  return {...state,editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import')};
+}
+function getSalesV1Company(id){
+  salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);
+  id=String(salesId_(id));if(!salesV1Known_(id))throw new Error('Firma ist noch nicht ausdrücklich in den App-Bestand aufgenommen.');
+  const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesVisibleHistories_(id,stored.histories)}:null;
+}
+function salesV1IndexCompany_(value,explicit){
+  const index=salesV1Index_(),id=value.company.id,old=index.entries.find(e=>e.company.id===id);
+  const entry={company:value.company,contacts:value.contacts||old?.contacts||[],loadedAt:value.loadedAt||old?.loadedAt||null,explicit:explicit||old?.explicit||false};
+  index.entries=index.entries.filter(e=>e.company.id!==id);index.entries.push(entry);salesWrite_('sales_meta/directory',index);
+}
+function salesV1Page_(entity,filter,skip,top){
+  const r=salesHqGet_('/v2/'+entity+'?$top='+top+'&$skip='+skip+'&orderby=id&$filter='+encodeURIComponent(filter));
+  const rows=Array.isArray(r.data)?r.data:r.data?.data||r.data?.value;if(!Array.isArray(rows))throw new Error('HQ-Listenformat unbekannt.');
+  const key=Object.keys(r.headers).find(k=>k.toLowerCase()==='hellohq-count'),total=key?Number(r.headers[key]):null;
+  if(total!==null&&(!Number.isSafeInteger(total)||total<skip+rows.length))throw new Error('HQ-Seitenzähler widersprüchlich.');
+  if(total!==null&&total>skip&&!rows.length)throw new Error('HQ-Seite fehlt.');
+  return {rows,total,done:total!==null?skip+rows.length===total:rows.length<top};
+}
+function salesV1Search_(entity,input){
+  const term=salesText_(input,100,true);if(term.length<3)throw new Error('Bitte mindestens drei Zeichen eingeben.');
+  const literal=term.replace(/'/g,"''"),filter="contains(name,'"+literal+"')"+(entity==='Projects'?" or number eq '"+literal+"'":'');
+  const page=salesV1Page_(entity,filter,0,50),query=term.toLocaleLowerCase('de');
+  const rows=page.rows.filter(x=>String(x.name||'').toLocaleLowerCase('de').includes(query)||entity==='Projects'&&String(x.number)===term);
+  return {rows:rows.map(x=>salesPick_(x,['id','name','number'])),limited:!page.done};
+}
+function searchSalesProjects(term){salesUser_(true);return salesV1Search_('Projects',term);}
+function searchSalesCompanies(term){salesUser_(true);return salesV1Search_('Companies',term);}
+function addSalesCompany(id){
+  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const company=salesCompany_(salesOne_('Companies',salesId_(id)));salesV1IndexCompany_({company},true);return {message:'Unternehmen für den nächsten Datenimport aufgenommen. In HQ wurde nichts verändert.'};});
+}
+function saveSalesEditionConfig(input){
+  salesUser_(true);return salesLock_(()=>{
+    salesAssertPrivate_();const enteredMagazine=salesText_(input.magazine,80,true),issue=Number(input.issue),projectId=String(salesId_(input.projectId));
+    if(!Number.isSafeInteger(issue)||issue<1||issue>100000)throw new Error('Bitte eine gültige Ausgabennummer eingeben.');
+    const project=salesOne_('Projects',projectId),editions=salesV1Editions_(),key=enteredMagazine.toLocaleLowerCase('de');
+    const magazine=editions.find(e=>e.magazine.toLocaleLowerCase('de')===key)?.magazine||enteredMagazine,old=editions.find(e=>String(e.projectId)===projectId);
+    if(editions.some(e=>e.id!==old?.id&&e.magazine.toLocaleLowerCase('de')===key&&Number(e.issue)===issue))throw new Error('Diese Ausgabe ist bereits einem anderen Projekt zugeordnet.');
+    if(old&&(old.magazine.toLocaleLowerCase('de')!==key||Number(old.issue)!==issue))throw new Error('Dieses HQ-Projekt ist bereits einer anderen Ausgabe zugeordnet.');
+    const id=old?.id||'project-'+projectId;
+    const value={...(old||{}),id,magazine,issue,projectId,projectNumber:String(project.number||''),projectName:project.name,companyIds:old?.companyIds||[],companies:old?.companies||[],documents:old?.documents||[],complete:old?.complete||false,settings:old?.settings||{targetCents:null,adDeadline:'',printDate:'',releaseDate:'',revision:0},changes:old?.changes||[],excludedDocumentIds:old?.excludedDocumentIds||[]};
+    salesWrite_('sales_editions/'+id,value);
+    if(input.current===true||input.current==='on')salesWrite_('sales_meta/preferences',{currentEditionId:id});
+    return {id,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
+  });
+}
+function saveSalesV1EditionSettings(input){
+  const user=salesUser_();return salesLock_(()=>{
+    const id=salesKey_(input.editionId),e=salesRead_('sales_editions/'+id);if(!e)throw new Error('Ausgabe fehlt.');
+    if(Number(input.revision)!==e.settings.revision)throw new Error('Ausgabe inzwischen geändert. Bitte neu laden.');
+    const target=Number(input.target);if(!Number.isFinite(target)||target<0||target>100000000)throw new Error('Zielumsatz ungültig.');
+    const settings={targetCents:Math.round(target*100),revision:e.settings.revision+1};
+    for(const k of ['adDeadline','printDate','releaseDate']){settings[k]=salesText_(input[k],10,false);if(settings[k]&&salesDate_(settings[k])!==settings[k])throw new Error('Ungültiges Datum.');}
+    if(settings.adDeadline&&settings.printDate&&settings.adDeadline>settings.printDate||settings.printDate&&settings.releaseDate&&settings.printDate>settings.releaseDate)throw new Error('Termine müssen in zeitlicher Reihenfolge liegen.');
+    e.changes=[{at:salesNow_(),actor:user.email,before:e.settings,after:settings},...(e.changes||[])].slice(0,50);e.settings=settings;salesWrite_('sales_editions/'+id,e);return {message:'Ziel und Termine dieser Ausgabe für alle Nutzer gespeichert.'};
+  });
+}
+function salesV1Scope_(id){
+  id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
+}
+function salesV1LoadCompany_(id){
+  id=salesV1Scope_(id);const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
+  const contacts=salesCollect_('ContactPersons','companyId eq '+id,started,'DefaultAddress'),histories=salesCollect_('ContactHistories','companyId eq '+id,started),projects=salesCollect_('Projects','companyId eq '+id,started),documents=salesCollect_('Documents','companyId eq '+id,started);
+  if([...contacts,...histories,...projects,...documents].some(x=>Number(x.companyId)!==Number(id)))throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
+  const projectRows=projects.map(p=>{
+    const ds=salesCollect_('Documents','projectId eq '+salesId_(p.id),started);if(ds.some(d=>Number(d.projectId)!==Number(p.id)))throw new Error('HQ-Projektfilter wurde nicht eingehalten.');
+    const b=salesBelegs_(ds),actualFinishDate=salesDate_(p.actualFinishDate),status=p.status||p.projectStatus?.name||'',completed=!!actualFinishDate||/^(abgeschlossen|completed|finished)$/i.test(status.trim());
+    const plans=completed?[]:salesCollect_('PlannedRevenues','projectId eq '+salesId_(p.id),started,'Estimations');if(plans.some(r=>Number(r.projectId)!==Number(p.id)))throw new Error('HQ-Planumsatz gehört zu anderem Projekt.');
+    return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
+  });
+  const value={company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
+  salesWrite_('sales_companies/'+id,value);salesV1IndexCompany_(value,false);return {message:'Kundendetails einschließlich aller Kontakte, Historie und Projekte aktualisiert.'};
+}
+function syncSalesV1Company(id){salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();return salesV1LoadCompany_(id);});}
+function syncSalesV1History(id){
+  salesUser_(true);return salesLock_(()=>{
+    const visible=getSalesV1Company(id);if(!visible)throw new Error('Zuerst Kundendetails importieren.');
+    const companyId=salesV1Scope_(visible.company.hqId||visible.company.id);salesAssertPrivate_();const started=Date.now();
+    const histories=salesCollect_('ContactHistories','companyId eq '+companyId,started),documents=salesCollect_('Documents','companyId eq '+companyId,started);
+    if([...histories,...documents].some(h=>Number(h.companyId)!==Number(companyId)))throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
+    const stored=salesRead_('sales_companies/'+companyId)||{company:visible.company,contacts:visible.contacts,projects:[],detailVersion:3};
+    stored.histories=salesHistoryRows_(histories,documents,[],started);stored.historyLoadedAt=salesNow_();salesWrite_('sales_companies/'+companyId,stored);
+    return {message:stored.histories.length+' HQ-Historieneinträge vollständig nach Firebase übertragen.'};
+  });
+}
+function startSalesImport(){
+  salesUser_(true);return salesLock_(()=>{
+    salesAssertPrivate_();const old=salesRead_('sales_meta/import');if(old?.state==='running')return old;
+    const editions=salesV1Editions_(),companyIds=salesV1Index_().entries.map(e=>e.company.id);
+    if(!editions.length&&!companyIds.length)throw new Error('Zuerst eine Ausgabe zuordnen oder ein Unternehmen aufnehmen.');
+    const run={id:Utilities.getUuid(),revision:0,state:'running',startedAt:salesNow_(),updatedAt:salesNow_(),cursor:0,tasks:[...editions.map(e=>({kind:'edition',id:e.id,label:e.magazine+' #'+e.issue,skip:0,pages:0})),...companyIds.map(id=>({kind:'company',id,label:'HQ-Unternehmen '+id}))],errors:[],done:0};
+    salesWrite_('sales_meta/import',run);return run;
+  });
+}
+function salesV1EditionStep_(run,task){
+  const e=salesRead_('sales_editions/'+salesKey_(task.id));if(!e?.projectId)throw new Error('Ausgabe hat keine bestätigte HQ-Projektzuordnung.');
+  const project=salesOne_('Projects',e.projectId);if(project.name!==e.projectName||String(project.number)!==String(e.projectNumber))throw new Error('HQ-Projekt wurde geändert. Zuordnung in der Verwaltung erneut bestätigen.');
+  if(task.pages>=50)throw new Error('Ausgabe überschreitet 10.000 Belege; Importumfang prüfen.');
+  const page=salesV1Page_('Documents','projectId eq '+salesId_(e.projectId),task.skip,200);
+  if(page.rows.some(d=>Number(d.projectId)!==Number(e.projectId)))throw new Error('HQ-Projektfilter wurde nicht eingehalten.');
+  if(task.total!==undefined&&task.total!==page.total)throw new Error('HQ-Beleganzahl während des Imports geändert. Ausgabe erneut importieren.');
+  const key=run.id+'-'+task.id+'-'+task.pages;salesWrite_('sales_imports/'+key,{rows:page.rows});task.total=page.total;task.pages++;task.skip+=page.rows.length;
+  if(!page.done)return false;
+  const docs=[];for(let p=0;p<task.pages;p++)docs.push(...salesRead_('sales_imports/'+run.id+'-'+task.id+'-'+p).rows);
+  if(new Set(docs.map(d=>String(d.id))).size!==docs.length)throw new Error('Doppelte Belege über mehrere HQ-Seiten.');
+  const excluded=new Set(e.excludedDocumentIds||[]),result=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
+  excluded.forEach(id=>{if(docs.some(d=>String(d.id)===id))result.issues.push({id,reason:'Mehrere Ausgaben / Zuordnung ungeklärt: aus Summe ausgeschlossen'});});
+  const companyIds=Array.from(new Set(docs.filter(d=>['Invoice','CreditNote'].includes(d.documentType)&&d.companyId).map(d=>String(salesId_(d.companyId)))));
+  salesWrite_('sales_editions/'+e.id,{...e,documents:result.accepted,excludedDocuments:docs.filter(d=>excluded.has(String(d.id))).map(d=>({id:String(d.id),number:d.number||''})),ignored:result.ignored,issues:result.issues,complete:result.issues.length===0,companyIds,loadedAt:salesNow_()});
+  companyIds.forEach(id=>{if(!run.tasks.some(t=>t.kind==='company'&&t.id===id))run.tasks.push({kind:'company',id,label:'HQ-Unternehmen '+id});});return true;
+}
+function runSalesImportStep(id,revision){
+  salesUser_(true);return salesLock_(()=>{
+    const run=salesRead_('sales_meta/import');if(!run||run.id!==id)throw new Error('Importlauf nicht gefunden.');
+    if(run.state!=='running'||Number(revision)!==run.revision)return run;
+    salesAssertPrivate_();const task=run.tasks[run.cursor];
+    try{const done=task.kind==='edition'?salesV1EditionStep_(run,task):(salesV1LoadCompany_(task.id),true);if(done){run.done++;run.cursor++;}}
+    catch(e){run.errors.push({kind:task.kind,id:task.id,label:task.label,message:e.message||'Import fehlgeschlagen'});run.cursor++;}
+    run.revision++;run.updatedAt=salesNow_();
+    if(run.cursor>=run.tasks.length){run.state=run.errors.length?'completedWithErrors':'completed';run.finishedAt=salesNow_();}
+    salesWrite_('sales_meta/import',run);return run;
+  });
+}
+function retrySalesImport(){
+  salesUser_(true);return salesLock_(()=>{
+    const old=salesRead_('sales_meta/import');if(!old?.errors?.length||old.state==='running')throw new Error('Keine abgeschlossenen Fehlerabschnitte vorhanden.');
+    const run={id:Utilities.getUuid(),revision:0,state:'running',startedAt:salesNow_(),updatedAt:salesNow_(),cursor:0,tasks:old.errors.map(e=>({kind:e.kind,id:e.id,label:e.label,skip:0,pages:0})),errors:[],done:0};salesWrite_('sales_meta/import',run);return run;
+  });
+}
+function setSalesDocumentExcluded(input){
+  salesUser_(true);return salesLock_(()=>{
+    const id=salesKey_(input.editionId),e=salesRead_('sales_editions/'+id),documentId=String(salesId_(input.documentId));
+    if(!e||![...(e.documents||[]),...(e.excludedDocuments||[])].some(d=>String(d.id)===documentId))throw new Error('Beleg gehört nicht zu dieser Ausgabe.');
+    const ids=new Set(e.excludedDocumentIds||[]);if(input.excluded===true){ids.add(documentId);const doc=e.documents.find(d=>d.id===documentId);e.excludedDocuments=[...(e.excludedDocuments||[]).filter(d=>d.id!==documentId),{id:documentId,number:doc?.number||''}];e.documents=e.documents.filter(d=>d.id!==documentId);}else ids.delete(documentId);
+    e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
+  });
 }
