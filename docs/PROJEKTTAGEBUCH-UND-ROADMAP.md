@@ -776,4 +776,4 @@ Treffer, Ladezustand, leeres Ergebnis und Fehler direkt beim Suchfeld; Suchtext 
 - Ausgewählte Ausgaben importieren anklicken; erwartet wird der Wechsel zum Datenabgleich mit laufendem Import.
 - Den Abschluss beziehungsweise konkrete Fehlerabschnitte nach Anleitung prüfen. Die nachfolgenden V1-Schritte sind weiterhin live abzunehmen.
 
-**Stand:** Lokal vorbereitet und geprüft. GitHub-Sicherung folgt nach abschließender Dateiprüfung. Nutzer übernimmt Bereitstellung; r15-Live-Prüfung steht aus. Die ältere Roadmap und der ausstehende Google-Teamzugang bleiben unverändert.
+**Stand:** Lokal vorbereitet und geprüft. Generierte Dateien mit Quellen abgeglichen, Backend/HTML-Skripte syntaktisch geprüft, git diff --check ohne Inhaltsfehler. Die 15 zugehörigen Dateien wurden gezielt im Commit 2eb3c1b nach origin/main auf GitHub übertragen. Dieser Sicherungsnachtrag wird separat versioniert. Unabhängige Änderungen blieben unberührt. Die bekannte packed-refs.lock-Warnung verhinderte Commit/Push nicht; keine Sperrdatei verändert. Nutzer übernimmt Bereitstellung; r15-Live-Prüfung steht aus. Die ältere Roadmap und der ausstehende Google-Teamzugang bleiben unverändert.
