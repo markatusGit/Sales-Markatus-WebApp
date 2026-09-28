@@ -2,7 +2,7 @@
   function projectChoice(p){
     const old=(state.editions||[]).find(e=>String(e.projectId)===String(p.id));
     const match=String(p.name||'').match(/^(.+?)\s+(?:Ausgabe\s*#?\s*|#)(\d+)\b/i);
-    return projectChoices[p.id]||(projectChoices[p.id]={checked:false,magazine:old?.magazine||match?.[1]?.trim()||'',issue:old?.issue||match?.[2]||'',current:false});
+    return projectChoices[p.id]||(projectChoices[p.id]={checked:!!old&&old.syncEnabled!==false,magazine:old?.magazine||match?.[1]?.trim()||'',issue:old?.issue||match?.[2]||'',current:false});
   }
   function projectSearchPanel(){
     const rows=projectResults?.rows||[];
@@ -11,10 +11,10 @@
       (projectSearchError?'<p class="m-error" role="alert">'+esc(projectSearchError)+'</p>':'')+
       (projectResults&&!projectSearching?'<p>'+rows.length+' Treffer für „'+esc(projectSearchTerm)+'“'+(projectResults.limited?' · Noch nicht vollständig. Bitte Suche eingrenzen oder erneut suchen.':'.')+'</p>':'')+
       (projectResults&&!rows.length&&!projectSearching&&!projectSearchError?'<p>Keine passenden Projekte gefunden. Bitte einen anderen Teil des Namens oder die genaue Projektnummer eingeben.</p>':'')+
-      (rows.length&&!projectSearching?'<p>Gewünschte Projekte anhaken. Magazin und Ausgabennummer prüfen; Vorschläge aus dem Projektnamen sind noch keine Zuordnung. Bereits zugeordnete Projekte können erneut importiert werden.</p><form data-form="edition-selection">'+rows.map(p=>{
+      (rows.length&&!projectSearching?'<p>Gewünschte Projekte anhaken. Magazin und Ausgabennummer prüfen; Vorschläge aus dem Projektnamen sind noch keine Zuordnung. Bereits ausgewählte Projekte sind angehakt. Abwählen beendet ihre Aktualisierung; vorhandene Daten bleiben erhalten.</p><form data-form="edition-selection">'+rows.map(p=>{
         const c=projectChoice(p),old=(state.editions||[]).find(e=>String(e.projectId)===String(p.id)),disabled=!c.checked||!!old;
         return '<fieldset data-project-row="'+esc(p.id)+'" class="m-plan"><legend><label><input type="checkbox" name="projectSelect" data-id="'+esc(p.id)+'" '+(c.checked?'checked':'')+'> '+esc(p.number+' · '+p.name)+'</label></legend>'+(c.checked?'<div class="m-form"><label class="m-field">Magazinname<input name="magazine-'+esc(p.id)+'" data-project-field="magazine" value="'+esc(c.magazine)+'" '+(disabled?'disabled':'required')+' maxlength="80"></label><label class="m-field">Ausgabennummer<input name="issue-'+esc(p.id)+'" data-project-field="issue" type="number" min="1" max="100000" step="1" value="'+esc(c.issue)+'" '+(disabled?'disabled':'required')+'></label><label class="m-project-current"><input type="checkbox" name="projectCurrent" data-id="'+esc(p.id)+'" '+(c.current?'checked':'')+' '+(!c.checked?'disabled':'')+'> Als aktuelle Verkaufsausgabe verwenden</label></div>':'')+(old?'<p>Bereits zugeordnet: '+esc(editionLabel(old))+'</p>':'')+'</fieldset>';
-      }).join('')+'<button class="m-button m-primary" '+(busy?'disabled':'')+'>Ausgewählte Ausgaben importieren</button></form>':'')+'</div><p>Bestehende Zuordnungen:</p>'+(state.editions||[]).map(e=>'<p>'+esc(editionLabel(e))+' → '+esc(e.projectNumber+' · '+e.projectName)+'</p>').join('')+'</div></section>';
+      }).join('')+'<button class="m-button m-primary" '+(busy?'disabled':'')+'>Auswahl für HQ-Sync speichern</button></form>':'')+'</div><p>Bestehende Zuordnungen:</p>'+(state.editions||[]).map(e=>'<p>'+esc(editionLabel(e))+' → '+esc(e.projectNumber+' · '+e.projectName)+' · '+(e.syncEnabled===false?'nicht für HQ-Sync ausgewählt':'für HQ-Sync ausgewählt')+'</p>').join('')+'</div></section>';
   }
   async function searchV1Projects(term){
     projectSearchTerm=term.trim();projectSearchError='';projectSearching=true;projectResults={rows:[],limited:true};projectChoices={};
@@ -41,17 +41,18 @@
     choices.forEach(c=>{projectChoices[c.projectId]={...c};});projectSearchError='';let ids=[];
     await act(async()=>{
       try{
-        if(!choices.length||choices.length>200)throw new Error('Bitte 1 bis 200 Projekte anhaken.');
-        if(state.importRun?.state==='running')throw new Error('Zuerst den laufenden Import unter Datenabgleich fortsetzen und abschließen.');
+        if(choices.length>200)throw new Error('Bitte höchstens 200 Projekte gleichzeitig auswählen.');
+        if(state.syncRun?.state==='running')throw new Error('Zuerst den laufenden Import unter Datenabgleich fortsetzen und abschließen.');
         const keys=choices.map(c=>c.magazine.trim().toLocaleLowerCase('de')+'#'+Number(c.issue));
         if(new Set(keys).size!==keys.length)throw new Error('Zwei ausgewählte Projekte haben dieselbe Magazin-/Ausgabenzuordnung. Bitte prüfen.');
         if(choices.some(c=>!c.magazine.trim()||!Number.isSafeInteger(Number(c.issue))||Number(c.issue)<1))throw new Error('Bitte Magazin und Ausgabennummer aller ausgewählten Projekte ausfüllen.');
         for(const choice of choices){const r=await rpc('saveSalesEditionConfig',choice);ids.push(r.id);if(choice.current)selectedEditionId=r.id;}
-        state=await rpc('getSalesState');
+        for(const row of form.querySelectorAll('[data-project-row]')){const old=(state.editions||[]).find(e=>String(e.projectId)===row.dataset.projectRow);if(old&&!row.querySelector('[name="projectSelect"]').checked)await rpc('setSalesEditionEnabled',old.id,false);}
+        state=await rpc('getSalesState');return {message:'Auswahl in Firebase gespeichert. Unter Datenabgleich den HQ-Sync starten.'};
       }catch(e){projectSearchError='Auswahl noch nicht gestartet: '+e.message+' Bereits gespeicherte Zuordnungen bleiben erhalten; erneutes Übernehmen legt keine zweite Ausgabe an.';throw new Error(projectSearchError);}
     });
     if(error){root.querySelector('#project-results')?.scrollIntoView({block:'nearest'});return;}
-    view='import';await continueV1Import(false,ids);
+    message='Auswahl in Firebase gespeichert. Unter Datenabgleich den HQ-Sync starten.';render();
   }
   function changeProjectChoice(e){
     const name=e.target.name;

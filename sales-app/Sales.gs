@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-28-r15';
+const SALES_RELEASE = '2026-09-28-r16';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -27,19 +27,17 @@ function salesContext_() {
 function salesPath_(path) {if (!/^sales_[a-z]+\/[a-zA-Z0-9_-]+$/.test(path)) throw new Error('Ungültiger Datenpfad.'); return path;}
 function salesRead_(path) {
   const c=salesContext_(), raw=pilotReadDocument_(c.project,salesPath_(path),c.token);
-  return raw ? JSON.parse(raw.payload) : null;
+  return raw ? salesDecodeStored_(path,raw.payload,c) : null;
 }
 function salesWrite_(path,value) {
-  const c=salesContext_(), payload=JSON.stringify(value);
-  if (Utilities.newBlob(payload).getBytes().length>750000) throw new Error('Datenpaket zu groß. Import muss weiter aufgeteilt werden; bisheriger Stand bleibt erhalten.');
-  pilotWriteDocument_(c.project,salesPath_(path),{payload},c.token);
+  salesStorePayload_(path,value);
 }
 function salesList_(collection) {
-  if (!/^sales_(jobs|drafts|editions)$/.test(collection)) throw new Error('Ungültige Sammlung.');
+  if (!/^sales_(jobs|drafts|editions|directory)$/.test(collection)) throw new Error('Ungültige Sammlung.');
   const c=salesContext_(), result=[];let next='';
-  for (let i=0;i<20;i++) {
+  for (let i=0;i<1000;i++) {
     const page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=100'+(next?'&pageToken='+encodeURIComponent(next):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
-    (page.documents||[]).forEach(d=>result.push(JSON.parse(d.fields.payload.stringValue)));
+    (page.documents||[]).forEach(d=>result.push(salesDecodeStored_(collection+'/'+d.name.split('/').pop(),d.fields.payload.stringValue,c)));
     next=page.nextPageToken;if (!next) return result;
   }
   throw new Error('Zu viele Datensätze für diesen Pilotabruf.');
@@ -78,7 +76,7 @@ function salesCollect_(entity,filter,started,expand) {
 function salesOne_(entity,id) {const data=salesHqGet_('/v2/'+entity+'/'+salesId_(id)).data;if(!data||Number(data.id)!==Number(id)) throw new Error('HQ-Objekt stimmt nicht mit der angefragten ID überein.');return data;}
 function salesAssertPrivate_() {
   const c=salesContext_();
-  for(const path of ['sales_editions/'+SALES.edition,'sales_jobs/security-probe','sales_companies/security-probe']) {
+  for(const path of ['sales_editions/'+SALES.edition,'sales_jobs/security-probe','sales_companies/security-probe','sales_directory/security-probe','sales_chunks/security-probe','sales_meta/security-probe','sales_imports/security-probe']) {
     const r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',muteHttpExceptions:true,followRedirects:false});
     if(![401,403].includes(r.getResponseCode())) throw new Error('Firestore-Schutz für die App-Daten fehlt. Import angehalten.');
   }
@@ -391,7 +389,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-28-r15','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-28-r16','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -539,7 +537,10 @@ function salesEqualFields_(actual,expected) {
   return Object.keys(expected).every(k=>{const v=expected[k];if(v&&typeof v==='object') return JSON.stringify(actual[k])===JSON.stringify(v);return String(actual[k]??'')===String(v??'');});
 }
 function runSalesJob(id,step) {
-  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
+  salesUser_(true);return salesLock_(()=>salesRunJobLocked_(id,step));
+}
+function salesRunJobLocked_(id,step) {
+  salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
     if(job.state==='synced') return {message:'Bereits synchronisiert. Keine erneute Anlage.'};
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
     const draft=salesRead_('sales_drafts/'+job.draftId);if(!draft?.testOnly) throw new Error('Testfirma fehlt.');
@@ -563,7 +564,7 @@ function runSalesJob(id,step) {
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
-    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);return salesJobSummary_(job);});
+    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);return salesJobSummary_(job);
 }
 function salesRunCreate_(job,draft,step) {
   if(!job.hqId) {
@@ -583,7 +584,7 @@ function salesRunCreate_(job,draft,step) {
     // Hard execution boundary: repeating step 1 can never dispatch the dependent POST.
     job.companyConfirmedAt=job.companyConfirmedAt||salesNow_();
     job.state=job.contactId?'contactCreated':'companyConfirmed';
-    job.message='Schritt 1 abgeschlossen: Firma in HQ angelegt und zurückgelesen. Ansprechpartner bleibt in Firebase. Schritt 2 bitte separat starten.';
+    job.message='Schritt 1 abgeschlossen: Firma in HQ angelegt und zurückgelesen. Ansprechpartner bleibt in Firebase. Der HQ-Sync führt den Ansprechpartner im nächsten getrennten Abschnitt aus.';
     return;
   }
   if(draft.contact&&!job.steps.contact&&!job.contactId) {
@@ -644,7 +645,7 @@ function salesPrepareSalutationRetry_(job,draft) {
   draft.contact.salutationForm='Formal';
   job.previousContactRejection=rejection;job.salutationRetryPreparedAt=salesNow_();
   job.contactAttempted=false;job.state='companyConfirmed';job.updatedAt=salesNow_();
-  job.message='HQ geprüft: Firma bestätigt, keine Kontakte vorhanden. Fehlende Ansprache in Firebase auf Formell ergänzt. Jetzt Schritt 2 separat starten; HQ wurde bei dieser Prüfung nicht verändert.';
+  job.message='HQ geprüft: Firma bestätigt, keine Kontakte vorhanden. Fehlende Ansprache in Firebase auf Formell ergänzt. Beim nächsten HQ-Sync wird der Ansprechpartner übertragen; diese Prüfung hat HQ nicht verändert.';
   salesWrite_('sales_drafts/'+draft.id,draft);salesWrite_('sales_jobs/'+job.id,job);
   return true;
 }

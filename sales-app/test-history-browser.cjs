@@ -16,7 +16,7 @@ const {chromium}=require('playwright');
     // Reuse the real backend fixture, without running the separate backend test suite.
     const tests=fs.readFileSync(__dirname+'/test-sales.cjs','utf8'),scope={require,__dirname,console,Buffer,URL};
     vm.runInNewContext(tests.slice(0,tests.indexOf("test('all public RPCs"))+'globalThis.f=fixture();',scope);
-    const f=scope.f;vm.runInContext(fs.readFileSync(__dirname+'/SalesV1.gs','utf8'),f.ctx);const {id}=f.ctx.saveSalesTestCompany(f.input);
+    const f=scope.f;vm.runInContext(['SalesV1.gs','SalesSync.gs'].map(p=>fs.readFileSync(__dirname+'/'+p,'utf8')).join('\n'),f.ctx);const {id}=f.ctx.saveSalesTestCompany(f.input);
     f.ctx.runSalesJob(id,'company');f.ctx.runSalesJob(id,'contact');
     f.db['sales_jobs/'+id].state='contactCreated';delete f.db['sales_jobs/'+id].historyBinding;
     const state=f.ctx.getSalesState(),detail=f.ctx.getSalesCompany('draft_'+id);

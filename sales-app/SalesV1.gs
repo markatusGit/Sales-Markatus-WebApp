@@ -1,5 +1,5 @@
 /** Explicitly authorized V1 read workflows. No HQ POST/PUT is called here. */
-function salesV1Index_(){return salesRead_('sales_meta/directory')||{entries:[]};}
+function salesV1Index_(){const entries=new Map((salesRead_('sales_meta/directory')?.entries||[]).map(e=>[String(e.company.id),e]));salesList_('sales_directory').forEach(e=>entries.set(String(e.company.id),e));return {entries:Array.from(entries.values())};}
 function salesV1Editions_(){return salesList_('sales_editions');}
 function salesV1Known_(id){
   id=String(salesId_(id));
@@ -8,7 +8,7 @@ function salesV1Known_(id){
 function getSalesV1State(){
   salesUser_();const state=getSalesState(),editions=salesV1Editions_(),index=salesV1Index_(),companies={};
   editions.forEach(e=>{(e.companies||[]).forEach(c=>{companies[c.id]=c;});(e.companyIds||[]).forEach(id=>{if(!companies[id])companies[id]={id,name:'HQ-Unternehmen '+id+' · Details fehlen',companyTypes:[],responsibleUsers:[],customFields:[],addresses:[]};});});index.entries.forEach(e=>{companies[e.company.id]=e.company;});
-  return {...state,editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import')};
+  return {...state,editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
 }
 function getSalesV1Company(id){
   salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);
@@ -16,12 +16,12 @@ function getSalesV1Company(id){
   const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesVisibleHistories_(id,stored.histories)}:null;
 }
 function salesV1IndexCompany_(value,explicit){
-  const index=salesV1Index_(),id=value.company.id,old=index.entries.find(e=>e.company.id===id);
+  const id=value.company.id,old=salesRead_('sales_directory/'+id)||(salesRead_('sales_meta/directory')?.entries||[]).find(e=>e.company.id===id);
   const entry={company:value.company,contacts:value.contacts||old?.contacts||[],loadedAt:value.loadedAt||old?.loadedAt||null,explicit:explicit||old?.explicit||false};
-  index.entries=index.entries.filter(e=>e.company.id!==id);index.entries.push(entry);salesWrite_('sales_meta/directory',index);
+  salesWrite_('sales_directory/'+id,entry);
 }
-function salesV1Page_(entity,filter,skip,top){
-  const r=salesHqGet_('/v2/'+entity+'?$top='+top+'&$skip='+skip+'&orderby=id&$filter='+encodeURIComponent(filter));
+function salesV1Page_(entity,filter,skip,top,expand){
+  const r=salesHqGet_('/v2/'+entity+'?$top='+top+'&$skip='+skip+'&orderby=id'+(filter?'&$filter='+encodeURIComponent(filter):'')+(expand?'&expand='+encodeURIComponent(expand):''));
   const rows=Array.isArray(r.data)?r.data:r.data?.data||r.data?.value;if(!Array.isArray(rows))throw new Error('HQ-Listenformat unbekannt.');
   const key=Object.keys(r.headers).find(k=>k.toLowerCase()==='hellohq-count'),total=key?Number(r.headers[key]):null;
   if(total!==null&&(!Number.isSafeInteger(total)||total<skip+rows.length))throw new Error('HQ-Seitenzähler widersprüchlich.');
@@ -44,6 +44,7 @@ function addSalesCompany(id){
 }
 function saveSalesEditionConfig(input){
   salesUser_(true);return salesLock_(()=>{
+    if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Auswahl erst nach Abschluss des laufenden HQ-Sync ändern.');
     salesAssertPrivate_();const enteredMagazine=salesText_(input.magazine,80,true),issue=Number(input.issue),projectId=String(salesId_(input.projectId));
     if(!Number.isSafeInteger(issue)||issue<1||issue>100000)throw new Error('Bitte eine gültige Ausgabennummer eingeben.');
     const project=salesOne_('Projects',projectId),editions=salesV1Editions_(),key=enteredMagazine.toLocaleLowerCase('de');
@@ -52,7 +53,7 @@ function saveSalesEditionConfig(input){
     if(old&&(old.magazine.toLocaleLowerCase('de')!==key||Number(old.issue)!==issue))throw new Error('Dieses HQ-Projekt ist bereits einer anderen Ausgabe zugeordnet.');
     const id=old?.id||'project-'+projectId;
     const value={...(old||{}),id,magazine,issue,projectId,projectNumber:String(project.number||''),projectName:project.name,companyIds:old?.companyIds||[],companies:old?.companies||[],documents:old?.documents||[],complete:old?.complete||false,settings:old?.settings||{targetCents:null,adDeadline:'',printDate:'',releaseDate:'',revision:0},changes:old?.changes||[],excludedDocumentIds:old?.excludedDocumentIds||[]};
-    salesWrite_('sales_editions/'+id,value);
+    value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
     if(input.current===true||input.current==='on')salesWrite_('sales_meta/preferences',{currentEditionId:id});
     return {id,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
   });
@@ -98,6 +99,7 @@ function syncSalesV1History(id){
 }
 function startSalesImport(editionIds){
   salesUser_(true);return salesLock_(()=>{
+    if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Der gemeinsame HQ-Sync läuft bereits. Bitte unter Datenabgleich fortsetzen.');
     salesAssertPrivate_();const scoped=editionIds!==undefined;
     if(scoped&&(!Array.isArray(editionIds)||!editionIds.length||editionIds.length>200||new Set(editionIds).size!==editionIds.length))throw new Error('Bitte 1 bis 200 unterschiedliche Ausgaben auswählen.');
     const all=salesV1Editions_();if(scoped&&editionIds.some(id=>!all.some(e=>e.id===id)))throw new Error('Auswahl enthält eine nicht zugeordnete Ausgabe.');
@@ -127,6 +129,7 @@ function salesV1EditionStep_(run,task){
 }
 function runSalesImportStep(id,revision){
   salesUser_(true);return salesLock_(()=>{
+    if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Der gemeinsame HQ-Sync läuft bereits. Bitte unter Datenabgleich fortsetzen.');
     const run=salesRead_('sales_meta/import');if(!run||run.id!==id)throw new Error('Importlauf nicht gefunden.');
     if(run.state!=='running'||Number(revision)!==run.revision)return run;
     salesAssertPrivate_();const task=run.tasks[run.cursor];
@@ -139,6 +142,7 @@ function runSalesImportStep(id,revision){
 }
 function retrySalesImport(){
   salesUser_(true);return salesLock_(()=>{
+    if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Der gemeinsame HQ-Sync läuft bereits. Bitte unter Datenabgleich fortsetzen.');
     const old=salesRead_('sales_meta/import');if(!old?.errors?.length||old.state==='running')throw new Error('Keine abgeschlossenen Fehlerabschnitte vorhanden.');
     const run={id:Utilities.getUuid(),revision:0,state:'running',startedAt:salesNow_(),updatedAt:salesNow_(),cursor:0,tasks:old.errors.map(e=>({kind:e.kind,id:e.id,label:e.label,skip:0,pages:0})),errors:[],done:0};salesWrite_('sales_meta/import',run);return run;
   });

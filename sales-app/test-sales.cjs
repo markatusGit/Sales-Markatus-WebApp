@@ -126,7 +126,7 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-09-28-r15/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/Kontaktprüfung 2026-09-28-r16/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
   assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
@@ -507,27 +507,26 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-09-28-r15',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-09-28-r16',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
-  assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nur in Firebase'));
+  assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
   assert.ok(sandbox.contacts.includes('Ada Test'));assert.ok(sandbox.contacts.includes('TEST Lokal'));assert.ok(sandbox.contacts.includes('data-id="draft_test-1"'));
-  assert.ok(sandbox.companyView.includes('Ada Test'));assert.ok(sandbox.companyView.includes('1. Firma in HQ anlegen und bestätigen'));
+  assert.ok(sandbox.companyView.includes('Ada Test'));assert.ok(!sandbox.companyView.includes('data-action="create-company"'));
 });
-test('UI shows the explicit second step only after confirmation, and no write button after HTTP errors',()=>{
+test('UI reserves company/contact transfer for the common HQ sync',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state={user:{admin:true}};globalThis.first=createButton({id:'test',state:'pending',nextStep:'company'});globalThis.second=createButton({id:'test',state:'companyConfirmed',nextStep:'contact'});globalThis.blocked=createButton({id:'test',state:'uncertain',nextStep:'contact'});})();`,sandbox);
-  assert.ok(sandbox.first.includes('data-action="create-company"'));assert.ok(!sandbox.first.includes('create-contact'));
-  assert.ok(sandbox.second.includes('2. Ansprechpartner nach HQ übertragen'));assert.ok(sandbox.second.includes('data-action="create-contact"'));assert.equal(sandbox.blocked,'');
+  assert.equal(sandbox.first,'');assert.equal(sandbox.second,'');assert.equal(sandbox.blocked,'');
 });
 test('email preview shows the target person, address and action in readable escaped form',()=>{
   const html=readUi(),scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)],script=scripts.at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state={user:{admin:true}};preview={job:{id:'email-1',draftId:'test-1',kind:'contactEmail',state:'pending',name:'TEST Example'},contact:{firstName:'Ada',lastName:'Example'},change:{eMail:'ada@example.invalid',contactAddress:{street:'<Testweg>',city:'Testort',country:'DE'},addressNote:'Vorhandene Kontaktanschrift bleibt erhalten.'}};globalThis.output=previewPage();})();`,sandbox);
-  for(const value of ['Ada Example','ada@example.invalid','&lt;Testweg&gt;','E-Mail jetzt in HQ ergänzen','Zur Testfirma'])assert.ok(sandbox.output.includes(value));
+  for(const value of ['Ada Example','ada@example.invalid','&lt;Testweg&gt;','gemeinsamen HQ-Sync','Zur Testfirma'])assert.ok(sandbox.output.includes(value));
   assert.ok(!sandbox.output.includes('"contactAddress"'));
   vm.runInNewContext(preboot+`state={user:{admin:true}};preview={job:{id:'email-1',draftId:'test-1',kind:'contactEmail',state:'synced',message:'E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'},contact:{},change:{contactAddress:{}}};globalThis.output=previewPage();})();`,sandbox);
   assert.ok(sandbox.output.includes('Status: Bestätigt'));assert.ok(sandbox.output.includes('E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'));assert.ok(!sandbox.output.includes('data-action="run-job"'));
@@ -539,7 +538,7 @@ test('customer history offers separated filters, pending sync actions and collap
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   const rows=[{reason:'Call only',content:'A'.repeat(300)+'End & text',contactHistoryChannel:'Call',contactOn:'2026-09-26T10:15:00Z',jobId:'job-1',syncState:'pending'},{projectName:'Project only',content:'Automated full message',documentDispatch:true,contactOn:'2026-09-25',invoice:{netCents:10000,currency:'EUR'}}];
   vm.runInNewContext(preboot+`state={user:{admin:true},jobs:[{id:'test-1',state:'synced'}]};detail={histories:${JSON.stringify(rows)}};const c={id:'draft_test-1',hqId:'101',localDraftId:'test-1'};globalThis.all=historyPanel(c);historyFilter='documents';globalThis.documents=historyPanel(c);historyFilter='communication';globalThis.communication=historyPanel(c);})();`,sandbox);
-  assert.ok(sandbox.all.includes('Kommunikation erfassen'));assert.ok(sandbox.all.includes('Historie aus HQ aktualisieren'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
+  assert.ok(sandbox.all.includes('Kommunikation erfassen'));assert.ok(!sandbox.all.includes('data-action="sync-history"'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
   assert.ok(sandbox.communication.includes('In Firebase · HQ offen'));assert.ok(sandbox.communication.includes('Übertragung ansehen'));assert.ok(!sandbox.communication.includes('Project only'));
   assert.ok(sandbox.communication.indexOf('End &amp; text')>sandbox.communication.indexOf('<details>'));assert.ok(!sandbox.communication.includes('<img'));
   assert.ok(!sandbox.documents.includes('Call only'));assert.ok(sandbox.documents.includes('100,00 EUR netto'));assert.ok(sandbox.documents.indexOf('Automated full message')>sandbox.documents.indexOf('<details>'));
@@ -576,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-09-28-r15'));
+  assert.ok(root.innerHTML.includes('2026-09-28-r16'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

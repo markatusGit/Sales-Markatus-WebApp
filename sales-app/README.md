@@ -1,64 +1,59 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 28.09.2026 · **2026-09-28-r15** lokal vorbereitet. Der Nutzer hat den bisherigen Lese- und Schreibweg der Kontakthistorie bestätigt. Der beauftragte V1-Ausbau der Chat-Punkte 1–3 ist jetzt implementiert; seine Bereitstellung und Live-Abnahme sind offen. Die gesamte V1 einschließlich Teamzugang, Buchungen und Wiedervorlagen ist damit noch nicht fertig.
+Stand: 28.09.2026 · **2026-09-28-r16** lokal implementiert und synthetisch geprüft. Der Nutzer bestätigt den bisherigen Firmen-/Kontakt-/Kommunikationsweg. Beim r15-Ausgabeimport trat das 750-KB-Paketlimit auf; Vollständigkeit des realen Bestands ist noch nicht bestätigt. r16 erweitert auf den ausdrücklich beauftragten Gesamtimport und einen gemeinsamen manuellen HQ-Sync. Live-Abnahme und Bereitstellung übernimmt der Nutzer.
 
-## Korrektur r15
+## Datenabgleich
 
-Der Nutzer meldet: Projektsuche ohne sichtbares Ergebnis; die nachfolgenden Importschritte konnten deshalb noch nicht geprüft werden. Die bisherige Suche verwendete contains, während der [HQ-v2-Guide](https://developer.hellohq.io/) substringof dokumentiert. Umgestellt auf substringof mit literal-escaped Suchbegriffen. Die Testgegenstelle weist contains nun ausdrücklich ab. Kein behaupteter Live-Nachweis der neuen Suche.
+- **HQ synchronisieren** ist die gemeinsame reguläre Aktion. Firebase-Aufträge zuerst: Firmen anlegen und zurücklesen, anschließend Ansprechpartner in getrennten Aufrufen, danach weitere gespeicherte Änderungen. Anschließend HQ → Firebase lesen. Firmen- und Kontakt-ID bleiben serverseitig gebunden; bestätigte Aufträge werden nicht erneut angelegt.
+- Bestehende TEST-Zielprüfung bleibt wirksam. Der Sammellauf nimmt nur gespeicherte Aufträge mit eigenem serverseitigem Testentwurf, TEST-Namen und erlaubter Auftragsart an. Zielbindung und exakte Schreibpfade prüft zusätzlich der bisherige zentrale Writer. Reale Importfirmen sowie Projekte/Rechnungen sind keine Schreibziele. Unklare/running/conflicted Aufträge werden angezeigt, nicht automatisch wiederholt; Rückprüfung und Konfliktentscheidung bleiben verfügbar.
+- Alle über die HQ-API verfügbaren Unternehmen, Kontakte und Kontakthistorien werden unabhängig von Magazinbuchungen gelesen. Firmenimport in Abschnitten: Stammdaten, Kontakte, Belege, Projekte, Historie, einzelne Projektbelege/-Planumsätze und historische Textzuordnung. Listen seitenweise à 50, Ausgabenbelege wie bisher à 200.
+- Nur bewusst zugeordnete, ausgewählte HQ-Projekte werden als Magazinausgaben ausgewertet. **Auswahl für HQ-Sync speichern** ändert Firebase-Konfiguration, startet keinen Import. Abwählen beendet künftige Aktualisierung, löscht keine historischen Daten. Bisherige Zuordnungen bleiben beim Umstieg ausgewählt; andere Suchergebnisse werden beim Speichern nicht abgewählt.
+- Fortschritt und Seiten serverseitig gespeichert. **HQ-Sync fortsetzen** benutzt denselben Lauf; alte Revisionen führen keinen weiteren Abschnitt aus. Innerhalb einer Firma fortsetzbar. Fehler bleiben sichtbar; der nächste neue Lauf liest erneut vollständig.
+- Abschlusszahlen vergleichen geladene Firmen/Kontakte/Historie mit HQ-Gesamtzahlen. Je Ausgabe: Belegstatus, erwartete Firmen und vollständig geladene Firmenkennungen. Unvollständigkeit gilt nicht als erfolgreicher Gesamtimport. Mengenprüfung ersetzt keinen fachlichen Beleg-/Feldvergleich.
+- Globale Kontakt-/Historienlisten werden zusätzlich nach Datensätzen ohne importierbare Firmenzuordnung durchsucht. Diese bleiben separat in Firebase und über **Ohne Firmenzuordnung ansehen** sichtbar. Keine erfundene Zuordnung.
+- Gewöhnliche Ansichten und neue Eingaben arbeiten mit Firebase. HQ-Zugriffe beim manuellen Sync, bei expliziter administrativer Suche oder diagnostischer Rückprüfung. Im Lauf neu angelegte Aufträge kommen beim nächsten neuen Sync dran. Kein Nachtlauf.
 
-Trefferliste mit Mehrfachauswahl, sichtbarem Lade-/Leer-/Fehlerzustand direkt am Suchfeld und automatisch nachgeladenen Seiten à 200 Treffer, bis 50 Seiten. Kein unnötiger Firebase-Gesamtneuladevorgang nach der Suche. 60-Sekunden-Antwortgrenze je Suchaufruf. Magazin und Ausgabennummer werden nur bei erkennbarem Projektnamen vorgeschlagen und vom Nutzer bestätigt. Ausgewählte Ausgaben importieren speichert Zuordnungen einzeln und startet einen auf diese Ausgaben begrenzten Leseimport. Teilweise gespeicherte Zuordnungen bleiben bei Fehler erhalten; der gleiche Projektbezug bleibt idempotent. Ein bestehender laufender Import wird nicht ersetzt.
+## Große Daten und Migration
 
-## Aktuelle Funktionen
+Die alte Fehlermeldung nannte eine Firmenkennung, keine Anzahl. Sowohl eine komplette Kundenakte als auch das zentrale Verzeichnis konnten das Paketlimit erreichen; aus dem Fehler allein lässt sich das betroffene Paket nicht unterscheiden.
 
-- Kommunikation: Notiz, E-Mail, Anruf, Meeting, Besuch mit passenden Eingabefeldern. Nur Anrufe haben Erreicht/Nicht erreicht; Anruf/Meeting/Besuch wählen einen Ansprechpartner dieser Firma. E-Mail dokumentiert Empfänger und Inhalt ohne Versand; Datum beim Speichern. Neue Aufgaben sind entfernt, historische HQ-Aufgaben bleiben sichtbar; awork ist zurückgestellt.
-- Mehrere Magazine/Ausgaben über bewusste HQ-Projektsuche und bestätigte Zuordnung in der Verwaltung. Je Ausgabe Zielumsatz und Termine mit Versionsprüfung. Keine fest eingebaute neue aktuelle Verkaufsausgabe.
-- Manueller HQ-Leseimport mit gespeichertem Fortschritt, Fortsetzung und Wiederholung fehlgeschlagener Abschnitte. Je Schritt eine Belegseite oder eine Firma einschließlich aller Kontakte, Historie und Projekte/Planumsätze. Keine HQ-Schreibaufrufe im V1-Import.
-- Zentraler Kunden-/Interessentenbestand nach HQ-ID; auch gezielt ausgewählte Interessenten ohne Magazinrechnung. Gemeinsame Ansprechpartnerübersicht.
-- Magazin-/Ausgabenwahl und kombinierbare Historien-, Branchen-, Orts- und Betreuerfilter. Fehlende Ausgaben werden als unbekannte Abdeckung angezeigt. Frühere Historie wird ausdrücklich auf die importierten Ausgaben begrenzt.
-- Rechnungen/Gutschriften mit Netto-Beträgen. Belege über mehrere Ausgaben lassen sich in Firebase als ungeklärt ausschließen. Keine automatische Erkennung/Verteilung und keine Projekt-/Rechnungsschreibwege.
-- Technische Einzeltests über Verwaltung; regulärer Datenabgleich in der Hauptnavigation. HQ-Schreibaufträge weiterhin einzeln mit Vorschau.
+SalesStorage.gs liest alte Datensätze unverändert. Größere JSON-Werte bekommen unveränderliche Teilpakete in sales_chunks; der Wurzelverweis wird erst nach allen erfolgreichen Teilwrites ersetzt. Leser prüfen Quelle, Reihenfolge, Teile und Gesamtlänge. Teilwrite-Abbruch ersetzt keinen vorherigen vollständigen Snapshot. Maximal 2.000 Teile à 100.000 UTF-16-Codeeinheiten; keine Zusage unbegrenzter Datenmengen.
 
-## Bestehende bestätigte Wege erhalten
+Die Firmenübersicht liegt jetzt unter sales_directory pro HQ-ID. Das alte sales_meta/directory wird lesend mit neuen Einträgen zusammengeführt; neuer Datensatz gewinnt. Keine manuelle Migration oder Löschung. Große Ausgaben und Importzustände werden ebenfalls aufgeteilt. Importseiten und alte/abgebrochene Teilgenerationen bleiben vorerst gespeichert. Aufbewahrung, Speicherbudget und Firebase-Backup vor Teamfreigabe festlegen.
 
-Firma und erster Ansprechpartner werden zuerst in Firebase erfasst und sind dort sofort sichtbar. Der HQ-Abgleich erfolgt in zwei getrennten Schritten: Firma erstellen und bestätigen, dann Kontakt zur gespeicherten Firmen-ID erstellen und prüfen. Kontakt-E-Mail wird bei Bedarf in der zugehörigen HQ-Kontaktadresse ergänzt. Kein blindes Wiederholen unklarer Schreibversuche. Die Homepage berücksichtigt das Firmenfeld und passende Adressfelder; Eingaben wie test.de werden normalisiert. Der technische Wiederaufnahmemarker wird nach bestätigter Neuanlage bereinigt.
+## Oberfläche und vorhandene Funktionen
 
-Kommunikation lässt sich bei einer eigenen Testfirma mit HQ-Firmen-ID direkt in Firebase erfassen. Erst beim separaten Schreibschritt werden Firma, ursprüngliche Personenbindung und gegebenenfalls der ausgewählte zusätzliche Ansprechpartner aus HQ zurückgeprüft. Echte Bestandskunden bleiben als Schreibziele gesperrt. Ein importierter Firmenname mit TEST genügt nicht zur Freigabe.
+- **Kunden**: alphabetische Namensliste, Namenssuche und Kundenkarte. Keine Magazin-/Umsatz-/Historienfilter in dieser Liste.
+- **Magazinverkauf**: Magazin und Ausgabe auswählen; bestehende Historien-/Branchen-/Orts-/Betreuerfilter vorerst erhalten. Zusätzliche vorgefertigte Ansichten und Filterregeln noch gemeinsam definieren.
+- Gemeinsame Ansprechpartnerübersicht; Firma und erster Kontakt nach Anlage sofort in Firebase sichtbar.
+- Je Ausgabe Zielumsatz, Anzeigenschluss, Drucktermin und Veröffentlichung mit Versionsprüfung und Dashboard-Hinweis.
+- Kommunikation: Notiz, E-Mail, Anruf, Meeting, Besuch mit passenden Feldern. E-Mail erfasst Empfänger ohne Versand; Anruf mit Erreicht/Nicht erreicht. Neue Aufgaben entfernt, alte HQ-Aufgaben lesbar; awork später.
+- Homepage normalisiert; Testmarkierung nach bestätigter Anlage bereinigt. Ansprechpartner-E-Mail über zugehörige HQ-Kontaktadresse übertragen und rückgeprüft.
+- Historie sicher formatiert: Skripte, Ereignisattribute, eingebettete Inhalte und externe Bilder entfernt. Rechnungsversand kurz, Details aufklappbar; nur eindeutiger Belegbezug desselben Kunden wird zugeordnet.
+- Projekte zeigen Abschlussdatum oder echte HQ-Planumsätze mit Terminen, getrennt von Rechnungsumsätzen. Nur Lesen.
+- Historische Teilnahme: positive Netto-Rechnungen nach Gutschriften. Fehlende/unklare Ausgabe bedeutet unbekannte Abdeckung. Mehrfachausgabenbelege manuell als ungeklärt markierbar; automatische Aufteilung und App-Buchungen ohne Rechnung noch offen.
 
-Kontakt-Historie einschließlich Rechnungsversand bleibt übersichtlich und aufklappbar. Texte werden aus erlaubten HTML-Elementen neu aufgebaut; Skripte, Ereignisattribute, eingebettete Inhalte und externe Bilder werden entfernt. Rechnungszuordnung erfolgt nur anhand eindeutiger vollständiger Rechnungsnummern desselben Kunden. Unsichere Zuordnungen werden angezeigt. Projekte zeigen Abschlussdatum oder Planumsätze mit Terminen, getrennt von fakturierten Summen.
+## Übergabe und Grenzen
 
-## Grenzen und nächste Abnahme
+Nur [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html) vollständig ersetzen, dann bestehende Bereitstellung auf Neue Version setzen. [Anleitung](MANUELL-UEBERTRAGEN.md). Keine neuen/geänderten Eigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffsrechte. Bereitsteller, App-Administrator und weitere Konten bleiben getrennt.
 
-- Live-Abnahme r14 nach [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md). Nur die beiden erzeugten Dateien SalesBackend.gs und Sales.html ersetzen; keine neuen Eigenschaften oder Bereitstellungsrechte.
-- Regelmäßige Aktualisierung des Dashboards liest Firebase, nicht HQ. HQ-Import nur nach bewusster Aktion. Kein Nachtlauf; kein Sammelschreiben offener HQ-Aufträge.
-- „Vertreten“ heißt in den Historienfiltern positiver Netto-Rechnungsbetrag nach Gutschriften. Buchungen ohne Rechnung werden später angebunden.
-- Bereitstellung zuletzt „Nur ich“. Der Google-Zugang für weitere Konten und Rollen bleiben offen; die App-Allowlist allein ersetzt diese Einrichtung nicht.
-- Echte Kunden bearbeiten, neue Buchungen, Wiedervorlagen, Redaktionsübergabe, Gmail und awork bleiben eigene Roadmap-Schritte. Adressherkunft vorerst nur Firebase.
-- Pro JSON-Datensatz gilt das bestehende Limit von 750 KB. Directory und Ausgabensnapshot sind noch jeweils ein Dokument. Sehr große Datenmengen benötigen eine weitere Aufteilung; ein Fehler wird angezeigt. Ein Firmendetailabschnitt hat das bisherige Zeitbudget von 210 Sekunden und ist nicht innerhalb einer Firma fortsetzbar. Ausgabeimporte sind seitenweise fortsetzbar (bis 50 Seiten à 200 Belege).
-- Importseiten bleiben vorerst als Staging-Daten gespeichert; eine Aufbewahrungs-/Bereinigungsstrategie ist noch offen. Kein unbegrenzter Vollbestandsbetrieb zugesagt.
-- GitHub sichert den Code, nicht Firebase-Daten. Datensicherung/Wiederherstellung für den Teambetrieb bleibt offen.
+Gesamtimport noch nicht gegen den gesamten realen Mandanten geprüft. HQ-Token muss vollständiges Lesen erlauben. Finale Zusammenführung großer Firmen und Gesamtübersicht erfolgen weiterhin im Arbeitsspeicher; Laufzeit, Kontingente und Browsergröße bleiben praktische Grenzen. Ausgabe maximal 50 Seiten à 200 Belege; Firebase-Auflistung maximal 1.000 Seiten à 100 Dokumente, danach expliziter Fehler. Gelöschte HQ-Firmen werden nicht automatisch aus alten App-Daten gelöscht; Archivierungs-/Löschregeln offen. Abschlusszahlen beziehen sich ausdrücklich auf den aktuellen Lauf.
 
-## Quellen und Build
+Bereitstellung zuletzt **Nur ich**. Nächste Nutzerfolge: 4 Google-Zugang, 5 Gespräche/Wiedervorlagen/Stammdatenbearbeitung, 6 Buchungen/Redaktionsübergabe, 7 Teamtest einer aktuellen Ausgabe. Adressherkunft vorerst Firebase; Gmail, awork, Nachtlauf, HQ-Planumsatzerzeugung und weitere Roadmap-Wünsche bleiben zurückgestellt.
 
-- Sales.gs: bestehende Pilot-, Identitäts-, Firebase- und TEST-Schreibfunktionen.
-- SalesV1.gs: ausdrücklich freigegebener V1-Leseumfang, Konfiguration, Importfortschritt und zentrale Übersichten.
-- Sales.template.html, SalesV1.js, SalesProjects.js und Sales.styles.css: Oberfläche und Gestaltung ohne Demodatensätze.
-- build.cjs: erzeugt hq-benchmark/SalesBackend.gs aus beiden Serverquellen und hq-benchmark/Sales.html aus Template, V1-Oberfläche und CSS. Keine Abhängigkeit von der unversionierten Offline-Demo.
+## Quellen und Prüfung
 
-```powershell
-node sales-app/build.cjs
-node sales-app/test-sales.cjs
-node sales-app/test-sales-v1.cjs
-```
+- Sales.gs: Identität, Firebase und bestehende TEST-Schreibwege.
+- SalesStorage.gs: abwärtskompatible Teilpakete.
+- SalesV1.gs: Konfiguration, Übersichten, Ausgabenauswertung; alte Import-RPCs bleiben kompatibel, keine regulären UI-Aktionen mehr. Ein alter Lauf wird vom Gesamtsync abgelöst und kann parallel nicht neu gestartet werden.
+- SalesSync.gs: gespeicherte Warteschlange, Gesamtimport, Zuordnungs-/Mengenprüfung.
+- Sales.template.html, SalesV1.js, SalesProjects.js, Sales.styles.css: Oberfläche ohne Demodaten.
+- build.cjs: beide Austauschdateien aus diesen Quellen, keine Abhängigkeit von Offline-Demos.
 
-Browserprüfungen verwenden vorhandenes Playwright und eine Chromium/Edge-Installation. NODE_PATH kann auf dessen vorhandene Module zeigen; PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH wählt die ausführbare Datei. Keine Installation und kein Live-Zugang sind erforderlich.
+Prüfbefehle: node sales-app/build.cjs; node sales-app/test-sales.cjs; node sales-app/test-sales-v1.cjs; node sales-app/test-sales-sync.cjs. Browser: node sales-app/test-history-browser.cjs und node sales-app/test-v1-browser.cjs mit vorhandenem Playwright/Edge. NODE_PATH bei Bedarf auf vorhandene Module, PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH auf Edge setzen.
 
-```powershell
-node sales-app/test-history-browser.cjs
-node sales-app/test-v1-browser.cjs
-```
+101 bestehende, 15 V1- und 12 Speicher-/Sync-Prüfungen sowie drei Browser-Integrationsprüfungen mit synthetischen Daten bestanden. Geprüft: große Unicode-Daten, mehrseitige Firmen/Kontakte/Historie, Teilwrite-Abbruch, alte vollständige Daten erhalten, Wiederaufnahme, Firmen-/Kontakt-Reihenfolge, verlorene Schreibantwort ohne doppeltes POST, TEST-Ziele, Rechte, Vollständigkeit, alte Directory-Migration und Sperre paralleler Altimporte. Keine echten HQ-/Firebase-Daten angefasst; kein Apps-Script-Upload durch Codex.
 
-101 Logikprüfungen, 15 V1-Prüfungen und drei Browser-Integrationsprüfungen mit ausschließlich synthetischen Daten bestanden. Geprüft: Zielschutz und Identität, Firmen-/Kontaktanlage, verlorene Antworten, Feldauswahl, Mail-Empfänger, Kontaktzugehörigkeit, Rich-Text-Sicherheit, eindeutige Projektzuordnung, Importseiten/Fortsetzung, unveränderter alter Snapshot bei Abruffehler, Fehlerwiederholung, Kundendeduplizierung, reine HQ-GET-Aufrufe, unbekannte Historienabdeckung und tatsächliche UI-Bedienung. Kein Nachweis der neuen Funktionen im echten Mandanten.
+Dienstkonto verwendet sales_editions, sales_companies, sales_directory, sales_chunks, sales_meta, sales_imports, sales_drafts und sales_jobs. Bestehende Firestore-Regeln sperren direkten Browserzugriff; Privatheitsprüfung umfasst neue Sammlungen. Browser-Lokalspeicher enthält nur das Farbschema. GitHub sichert Code, keine Firebase-Daten.
 
-Firestore serverseitig über bestehendes Dienstkonto: sales_editions, sales_companies, sales_meta (Katalog, Directory, aktuelle Ausgabe und Importlauf), sales_imports (Importseiten), sales_drafts, sales_jobs. Bestehende Regeln sperren diese Sammlungen für Browserzugriff; keine Regeländerung. Browser-Lokalspeicher enthält nur das Farbschema.
-
-HQ-Schema: [öffentliche v2-OpenAPI-Beschreibung](https://developer.hellohq.io/swagger20.json). Für diese Änderung wurde insbesondere das dokumentierte Empfängerfeld recipientEmailAddress in der lokal vorhandenen Schemafassung geprüft. Das ersetzt keinen Live-Test. Das alte Benchmark-Frontend bleibt über ?view=benchmark erreichbar.
+HQ-Referenz: [v2-Schema](https://developer.hellohq.io/swagger20.json), lokal vorhandene Fassung für $filter/$top/$skip/orderby und DefaultAddress-/Estimations-Erweiterungen geprüft; [HQ-Guide](https://developer.hellohq.io/) für substringof. Kein Ersatz für Mandantenabnahme. Benchmark bleibt über ?view=benchmark erreichbar.

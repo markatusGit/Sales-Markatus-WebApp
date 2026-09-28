@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const prior=fs.readFileSync(__dirname+'/test-sales.cjs','utf8'),moduleSource=fs.readFileSync(__dirname+'/SalesV1.gs','utf8'),cases=[];let count=0;
+const prior=fs.readFileSync(__dirname+'/test-sales.cjs','utf8'),moduleSource=['SalesV1.gs','SalesSync.gs'].map(p=>fs.readFileSync(__dirname+'/'+p,'utf8')).join('\n'),cases=[];let count=0;
 function test(name,fn){cases.push({name,fn});}
 function setup(){
   const scope={require,__dirname,console,Buffer,URL};vm.runInNewContext(prior.slice(0,prior.indexOf("test('all public RPCs"))+'globalThis.f=fixture();globalThis.finish=finishCreate;',scope);

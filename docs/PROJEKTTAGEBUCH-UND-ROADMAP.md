@@ -777,3 +777,45 @@ Treffer, Ladezustand, leeres Ergebnis und Fehler direkt beim Suchfeld; Suchtext 
 - Den Abschluss beziehungsweise konkrete Fehlerabschnitte nach Anleitung prüfen. Die nachfolgenden V1-Schritte sind weiterhin live abzunehmen.
 
 **Stand:** Lokal vorbereitet und geprüft. Generierte Dateien mit Quellen abgeglichen, Backend/HTML-Skripte syntaktisch geprüft, git diff --check ohne Inhaltsfehler. Die 15 zugehörigen Dateien wurden gezielt im Commit 2eb3c1b nach origin/main auf GitHub übertragen. Dieser Sicherungsnachtrag wird separat versioniert. Unabhängige Änderungen blieben unberührt. Die bekannte packed-refs.lock-Warnung verhinderte Commit/Push nicht; keine Sperrdatei verändert. Nutzer übernimmt Bereitstellung; r15-Live-Prüfung steht aus. Die ältere Roadmap und der ausstehende Google-Teamzugang bleiben unverändert.
+
+
+### 28.09.2026 – r16: vollständiger Firmenimport, große Datenpakete und gemeinsamer HQ-Sync
+
+**Nutzerrückmeldung / neue Entscheidung:** Ausgewählte Coburger-Ausgaben wurden offenbar geladen, jedoch endete ein Firmenabschnitt mit Datenpaket zu groß. Vollständigkeit der Kunden ist nicht bestätigt. Die Zahl im Fehler ist eine HQ-Firmenkennung, keine Anzahl. Nutzer verlangt alle Unternehmen, Ansprechpartner und die gesamte Kontakthistorie in Firebase; Magazinausgaben aller Magazine zunächst bewusst per Häkchen zuordnen. Ein manueller Button soll App → HQ und danach HQ → Firebase ausführen; Firma vor Ansprechpartner. Normalbetrieb und neue Eingaben bleiben Firebase. Kundenansicht nur Namensliste/-suche, Magazinverkauf getrennt mit Magazinwahl; weitere vorgefertigte Ansichten und Filter später definieren. Danach ausdrücklich: 4 Google-Zugang, 5 Gespräche/Wiedervorlagen/Stammdatenbearbeitung, 6 Buchungen/Redaktionsübergabe, 7 Teamtest einer aktuellen Ausgabe. Nachtlauf zurückgestellt.
+
+**Befund:** Bisheriger salesWrite_ begrenzte jedes JSON-Paket auf 750 KB. Sowohl Firmenakte als auch zentrale Directory-Datei konnten dies überschreiten. Welches Paket den Live-Fehler auslöste, ist ohne Zugriff auf den tatsächlichen Datensatz nicht bewiesen; keine echten Kundeninhalte zur Diagnose abgerufen.
+
+**Lokal umgesetzt:** Neue abwärtskompatible Speicheraufteilung in SalesStorage.gs: kleine Datensätze unverändert, große Werte in unveränderlichen Teilen; Wurzelverweis erst nach allen erfolgreichen Teilwrites freigeben. Quelle/Index/Länge beim Lesen prüfen. Alte vollständige Daten bleiben bei Teilwrite-Fehler lesbar. Firmenübersicht pro HQ-ID in sales_directory; bestehendes sales_meta/directory weiterhin lesend zusammenführen, ohne manuelles Löschen/Migrieren. Ausgabe- und Importzustände ebenfalls teilbar.
+
+SalesSync.gs speichert einen fortsetzbaren Gesamtlauf: vorhandene ausführbare Testaufträge, zuerst alle Firmen bestätigen und anschließend Kontakte in eigenen Backend-Aufrufen; danach alle HQ-Firmen seitenweise entdecken, Auswahllisten, ausgewählte Ausgaben und sämtliche Firmendetails lesen. Kontakte, Firmenbelege, Projekte, Historien seitenweise à 50; einzelne Projektbeleg-/Planumsatzseiten und Historientextanreicherung separat. Erst nach vollständigem Firmenabschnitt neue Kundenakte veröffentlichen. Revisionen blockieren doppelte/stale Schritte. Alter laufender Ausgabeimport wird abgelöst; alte Importstarts während des Gesamtlaufs gesperrt.
+
+Schreibsammellauf verwendet ausschließlich vorhandene getestete Writer und serverseitige eigene TEST-Entwürfe, zusätzlich Ziel-/Art-/Statusprüfung vor jedem Auftrag. Keine pauschale Freigabe echter Bestandskunden, Rechnungen oder Projekte. Unklare/running/conflicted Aufträge bleiben sichtbar und werden nicht erneut geschrieben. Bestätigte Aufträge werden übersprungen. Kein Nachtlauf. Neue während eines Laufs gespeicherte Aufträge kommen beim nächsten neuen Lauf dran. Damit ist die gemeinsame Bedienung vorhanden; produktive Stammdatenbearbeitung bleibt Schritt 5.
+
+Globale Kontakte/Historien zusätzlich nach fehlender bekannter Firmenzuordnung prüfen und separat speichern/anzeigen. Abschlussvergleich der Firmen-/Kontakt-/Historienanzahlen mit HQ; je ausgewählter Ausgabe geladene Belege und fehlende Firmenkennungen anzeigen. Bei fehlender Bestätigung oder unklaren Belegen kein vollständig erfolgreicher Status. Aufgezählte Kontakte/Historien schließen separat gespeicherte unzugeordnete Datensätze ein. Mengenprüfung ersetzt keinen fachlichen Inhaltsvergleich.
+
+**Oberfläche:** Ein regulärer Button HQ synchronisieren bzw. HQ-Sync fortsetzen; alte Einzelübertragungsbuttons aus regulären Ansichten entfernt, diagnostische Rückprüfung/Konfliktentscheidung bleibt. Ausgaben-Häkchen speichern nur die Firebase-Auswahl; abgewählte Ausgaben nicht mehr aktualisieren, vorhandene Daten erhalten. Bisherige Zuordnungen zunächst ausgewählt. Kundenliste nur Name und Namenssuche. Magazinverkauf mit Magazin-/Ausgabenauswahl und bisherigen Filtern als vorläufige Grundlage; zusätzliche Ansichten nicht erfunden. Separate Aufnahme einzelner Interessenten nicht mehr nötig, da Gesamtimport.
+
+**Prüfung:** 101 bestehende Logikprüfungen, 15 V1-Prüfungen, 12 neue Speicher-/Sync-Prüfungen sowie drei Browser-Integrationsprüfungen bestanden. Große Unicode-Kundenakte mit mehr als 750 KB, abgebrochene Teilwrites, fehlende Teile, alte Snapshot-Erhaltung, 56 Firmen über mehrere Seiten, mehrseitige Kontakte/Historie, unzugeordnete Datensätze, vollständige Ausgabenabdeckung, Wiederaufnahme und alte Revisionen geprüft. Gemeinsamer Schreibstart bestätigt Firma vor Kontakt; verlorene Antwort führt auch beim nächsten Lauf zu keinem zweiten POST. Unbekannte/fremde Entwürfe und Konflikte bleiben gesperrt. Directory-Migration sowie Sperre paralleler Altimporte geprüft. Browser: Auswahl ohne automatischen Import, gemeinsamer Start, Pause/Fortsetzen, reine Kunden-Namenssuche, bisherige Magazinfilter, Kontakte, Kommunikationsfelder und sichere Textformatierung. Sync-Abschlussansicht visuell geprüft. Ausschließlich synthetische Daten; kein echter HQ-/Firebase-Zugriff, keine Apps-Script-Bereitstellung durch Codex.
+
+**Grenzen / offen:** Realer Gesamtbestand und Laufzeit noch nicht abgenommen. HQ-API-Rechte und Gesamtzahlen müssen zum Mandanten passen. Finale Zusammenführung und Übersichtslesen erfolgen weiterhin im Arbeitsspeicher; Apps-Script-/API-Kontingente und sehr große Browserantworten bleiben praktische Grenzen. Maximal 2.000 Speicherteile, Ausgaben weiterhin bis 10.000 Belege; keine unbegrenzte Skalierung behauptet. Importseiten und alte Teilgenerationen werden noch nicht bereinigt. Speicher-/Backup-/Aufbewahrungsstrategie vor Teamfreigabe offen. Gelöschte HQ-Firmen nicht automatisch aus alten App-Daten entfernen; Archivierungsregeln später. Historie ohne Firmenzuordnung wird nicht automatisch verknüpft. Filterdefinition, persönliche Anmeldung und Roadmap 4–7 bleiben erhalten.
+
+**Übergabe:** Nur hq-benchmark/SalesBackend.gs und hq-benchmark/Sales.html vollständig ersetzen, dann bestehende Bereitstellung auf Neue Version setzen. Kennung 2026-09-28-r16. Keine neuen/geänderten Skripteigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffseinstellungen. Neue lokale Module sind in den beiden Austauschdateien enthalten. Anleitung und V1-Plan aktualisiert.
+
+**Nächste Nutzeraktionen:**
+
+- SalesBackend.gs gemäß manueller Anleitung vollständig ersetzen.
+- Sales.html gemäß manueller Anleitung vollständig ersetzen.
+- Die bestehende Web-App auf Neue Version setzen.
+- Oben 2026-09-28-r16 prüfen; bei abweichender Kennung zuerst die Übertragung kontrollieren.
+- Unter Datenabgleich → Aufträge und Konflikte ansehen die vorhandenen offenen Testaufträge prüfen.
+- Unter Verwaltung die gewünschten Magazinausgaben suchen und anhaken.
+- Auswahl für HQ-Sync speichern anklicken; noch kein Import.
+- Unter Datenabgleich HQ synchronisieren anklicken.
+- Nach Abschluss die drei Mengenzeilen mit HQ vergleichen; fehlende Bestätigung nicht als vollständig werten.
+- Vollständigkeit je Ausgabe auf fehlende Firmen und Belegwarnungen prüfen.
+- Kundenkarte, Ansprechpartner, Historie und Belege stichprobenartig mit HQ vergleichen.
+- Bei Abweichung Abschnitt und technischen Text ohne echte Inhalte/Zugangsdaten mitteilen; keine doppelten Testaufträge anlegen.
+
+**Freigabeprüfung:** Ein Dokumentationsschreibversuch wurde wegen Workspace-Guthabens vor Ausführung gestoppt; ausdrücklich kein Sicherheitsurteil. Nach erneutem Nutzerauftrag erfolgreich über denselben Freigabeweg ausgeführt. Kein Umgehen der Prüfung.
+
+**Stand:** Lokal implementiert und synthetisch geprüft. Generiertes Backend mit allen vier Serverquellen identisch, Backend/HTML-Skripte syntaktisch geprüft, abschließende Browserprüfung bestanden, git diff --check ohne Inhaltsfehler. GitHub-Sicherung folgt in diesem Arbeitsschritt. Bereitstellung und echter Gesamtlauf stehen aus. Unabhängige lokale Änderungen bleiben unberührt.
