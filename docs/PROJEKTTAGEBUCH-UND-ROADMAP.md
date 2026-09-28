@@ -677,3 +677,32 @@ Eigene Punkte können unterhalb der Liste mit Titel, optionaler Beschreibung und
 - Bei Fehler den technischen Text beziehungsweise bei fehlender Historie Anzahl und Importzeitpunkt mitteilen; nichts doppelt anlegen.
 
 **Stand:** Lokal vorbereitet und geprüft; generiertes Backend stimmt mit der Quelle überein, generierte HTML-Skripte und Backend syntaktisch geprüft, git diff --check ohne Inhaltsfehler. Die acht zugehörigen Dateien wurden gezielt im Commit 929a7fd nach origin/main auf GitHub übertragen; unabhängige Änderungen blieben unberührt. Dieser Sicherungsnachtrag wird separat versioniert. Nicht von Codex in Apps Script übertragen oder live getestet. Die beauftragte Reihenfolge Historien-Live-Test → Aufräumen → Chat-Punkte 1–3 bleibt bestehen.
+
+### 28.09.2026 – r13: Kommunikation direkt erfassen; HQ-Historientexte formatiert anzeigen
+
+**Live-Rückmeldung:** Der Nutzer bestätigt den erfolgreichen Import der HQ-Einträge auch bei der Testfirma. Sichtbare HTML-Tags wie p stören in den Beschreibungstexten; Formatierung soll in der gesamten Historie einschließlich Rechnungs-/E-Mail-Details angewendet werden. Kommunikation erfassen ist weiterhin gesperrt und zeigt beim Darüberfahren einen Ladekreis, unabhängig von Wartezeit oder Neuladen. Ob die separate Zuordnungsprüfung aus r12 durchgeführt wurde, ist unbekannt; keine konkrete HQ-Prüfabweichung behaupten.
+
+**Befund:** CSS setzte cursor:wait pauschal für jeden deaktivierten Button; es war kein Nachweis einer laufenden Übertragung. Oberfläche und Firebase-Speicherfunktion verlangten weiterhin eine vorab gespeicherte historyReady-Freigabe. HQ-Texte wurden durchgehend escaped, weshalb HTML-Markup sichtbar blieb.
+
+**Lokal geändert:** Bei einer eigenen Testfirma mit gespeicherter HQ-Firmen-ID öffnet Kommunikation erfassen direkt, auch ohne historyReady und bei offenem Kontakt-Anlageabschluss. Der serverseitige Speicherweg prüft den eigenen Testentwurf, passenden Anlageauftrag und bestätigten Firmenschritt, speichert aber nur in Firebase. Erst der separate, bewusst gestartete Übertragungsauftrag liest die vorhandene Firma und den Ansprechpartner aus HQ und prüft IDs, Namen und Firmenzugehörigkeit vor dem POST. Kein vorgeschalteter Freigabebutton nötig, kein automatisches Schreiben und keine neue Firma/Person. Ein Fehler der Vorprüfung ohne Schreibversuch bleibt als offener Auftrag wieder prüfbar; nach einem tatsächlichen unklaren POST ist weiterhin ausschließlich Rückprüfung möglich. Echte Bestandsfirmen bleiben schreibgesperrt. Die gesonderte r12-Prüf-API bleibt für bestehende Aufrufe erhalten, ist aber keine Voraussetzung für Erfassung/Übertragung mehr. Dauerhaft gesperrte Buttons zeigen not-allowed; wait nur während einer tatsächlichen Aktion mit aria-busy.
+
+**Historienformatierung:** Gemeinsame Browserdarstellung für kurze/lange Kommunikation, Auftragsvorschau und Rechnungsversand. Ein inertes Template parst HQ-HTML; ausgegeben werden neu aufgebaute erlaubte Elemente. Absätze, Umbrüche, fett/kursiv/unterstrichen, Listen, Tabellen und sichere http(s)/mailto/tel-Links werden angewendet. Einmal als HTML-Entities kodierte Absatz-Tags werden ebenfalls erkannt. Skripte, Ereignisattribute, fremde Styles, eingebettete Inhalte und externe Bilder werden nicht übernommen. Vorschautext stammt aus dem lesbaren Inhalt; lange Texte und Rechnungs-E-Mails bleiben aufklappbar. Originaldaten in Firebase und die exakten HQ-Schreibvergleiche bleiben unverändert.
+
+**Prüfung:** 101 synthetische Prüfungen bestanden; bisherige Zielschutz-, Wiederholungs- und Historienimportprüfungen weiterhin erfolgreich. Zusätzlich zwei echte Headless-Browser-Integrationsprüfungen mit ausschließlich synthetischen Daten: tatsächlicher Klick auf Kommunikation erfassen bei offenem Anlageauftrag ohne historyReady, Formulareingabe und Firebase-Speicherung ohne HQ-Aufruf; außerdem echte DOM-Formatierung für Notiz/E-Mail/Rechnung/Aufgabenvorschau, kodierte Tags, Klartext, sichere Links und Entfernung von Skripten/Trackern ohne externe Requests oder Browserfehler. Testdatei sales-app/test-history-browser.cjs verwendet vorhandenes Playwright und Chromium über Umgebungsvariablen; keine Abhängigkeiten neu installiert. Die zuvor in einfachen VM-Tests als escaped erwarteten HTML-Fragmente werden nun im Browser auf bereinigte Darstellung geprüft. Keine echten HQ-/Firebase-Daten gelesen oder geschrieben.
+
+**Übergabe:** **hq-benchmark/SalesBackend.gs** und **hq-benchmark/Sales.html** vollständig ersetzen und die bestehende Bereitstellung als **Neue Version** bereitstellen. Kennung **2026-09-28-r13**. Keine neuen/geänderten Skripteigenschaften, Manifestwerte oder Zugriffseinstellungen. Keine automatischen Apps-Script-Uploads. Kleinschrittige Anleitung in sales-app/MANUELL-UEBERTRAGEN.md aktualisiert.
+
+**Nächste Nutzeraktionen:**
+
+- Beide Austauschdateien nach Anleitung vollständig ersetzen.
+- Bestehende Bereitstellung als neue Version bereitstellen.
+- In der Web-App die Kennung 2026-09-28-r13 prüfen.
+- Dieselbe eigene Testfirma öffnen.
+- Einen vorhandenen HQ-Historieneintrag prüfen; Absätze sollen ohne sichtbare Tags erscheinen, ein neuer Import ist für die Darstellungsänderung nicht nötig.
+- Einen E-Mail-/Rechnungsdetailtext aufklappen und die Formatierung prüfen.
+- Kommunikation erfassen direkt anklicken; das Formular soll sich ohne vorgeschaltete Freigabe öffnen.
+- Eine Testnotiz in Firebase speichern.
+- Den Schreibtest anschließend gemäß Anleitung über Übertragung ansehen und Kommunikation nach HQ übertragen durchführen.
+- Bei Abweichung die Versionskennung und den konkreten technischen Text melden; keine zweite Firma oder Person anlegen.
+
+**Stand:** Lokal vorbereitet und geprüft. GitHub-Sicherung folgt nach Abschlussprüfung. Apps-Script-Bereitstellung und Live-Schreibtest stehen aus; HQ-Leseimport einschließlich Testfirma ist vom Nutzer bestätigt. Danach unverändert Aufräumen → beauftragte Chat-Punkte 1–3; übrige Roadmap bleibt erhalten.

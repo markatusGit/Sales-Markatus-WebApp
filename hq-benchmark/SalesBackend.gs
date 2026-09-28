@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-27-r12';
+const SALES_RELEASE = '2026-09-28-r13';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -391,7 +391,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-27-r12','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-28-r13','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -559,7 +559,7 @@ function runSalesJob(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+      if(['companyChange','contactEmail','history'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
@@ -730,7 +730,8 @@ function checkSalesHistoryBinding(draftId) {
 }
 function saveSalesHistory(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(input.draftId)),creation=salesRead_('sales_jobs/'+input.draftId);
-    if(!salesHistoryReady_(draft,creation)) throw new Error('Zuerst die HQ-Zuordnung der eigenen Testfirma bestätigen: „HQ-Zuordnung prüfen“ anklicken.');
+    // Capturing is Firebase-only. The HQ read-back belongs to the later transfer.
+    salesHistoryCompanyBinding_(draft,creation);
     const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.contactOn||salesNow_()),contactHistoryChannel:input.channel,contactHistoryStatus:input.status||'Reached',companyId:draft.hqId};
     if(!['Note','Mail','Call','Meeting','Visit','Task'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart.');
     if(!['Reached','NotReached'].includes(history.contactHistoryStatus))throw new Error('Unzulässiges Kontaktergebnis.');
@@ -749,7 +750,7 @@ function saveSalesHistory(input) {
 }
 function salesHistoryTarget_(job,draft) {
   const creation=salesRead_('sales_jobs/'+draft.id);
-  if(!salesHistoryReady_(draft,creation)||Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Testfirma.');
+  if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Testfirma.');
   salesCheckHistoryBinding_(draft,creation);
   const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','responsibleUserIds','nextContactDate'];
   if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit','Task'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder.');

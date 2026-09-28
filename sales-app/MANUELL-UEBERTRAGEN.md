@@ -1,12 +1,12 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-## Aktueller Schritt: Testfirmen-Historie und Kommunikationsfreigabe – r12
+## Aktueller Schritt: Kommunikation direkt erfassen und HQ-Texte formatieren – r13
 
-Stand: 27.09.2026 · **2026-09-27-r12**. Die E-Mail-Übertragung ist vom Nutzer bestätigt. Vor dem vereinbarten Aufräumen und Ausbau der Ausgabenverwaltung, des manuellen Imports und der Magazinfilter folgt jetzt die Live-Prüfung der Kontakthistorie.
+Stand: 28.09.2026 · **2026-09-28-r13**. Die HQ-Historie einschließlich der Testfirma wird laut Nutzerrückmeldung erfolgreich importiert. Dieses Update korrigiert den weiterhin gesperrten Kommunikationsbutton und zeigt HQ-HTML formatiert an. Der Schreibtest steht noch aus.
 
 **Beide Dateien ersetzen: [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html).** Keine neuen oder geänderten Skripteigenschaften, Manifestwerte oder Zugriffseinstellungen. Alle übrigen Apps-Script-Dateien bleiben für dieses Update unverändert.
 
-Lokal sind 101 synthetische Prüfungen bestanden. r12 behebt die unsichtbare Historie bei offenem Anlageauftrag und ergänzt eine getrennte Prüfung der HQ-Zuordnung. Die Live-Prüfung dieser Korrektur steht aus. Es wurden von Codex keine echten HQ-/Firebase-Schreibtests durchgeführt.
+Lokal sind 101 synthetische Prüfungen sowie zwei Browser-Integrationsprüfungen bestanden. Der tatsächliche Klick und die anschließende Firebase-Speicherung wurden mit offenem Anlageauftrag und ohne vorherige Kommunikationsfreigabe getestet. Formatierte Notizen, E-Mails, Rechnungsdetails und Auftragsvorschau wurden im Browser geprüft. Keine echten HQ-/Firebase-Schreibtests durch Codex.
 
 ## Backend-Datei ersetzen
 
@@ -38,23 +38,24 @@ Lokal sind 101 synthetische Prüfungen bestanden. r12 behebt die unsichtbare His
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit dem Ende **/exec** öffnen.
 7. Die Seite neu laden.
-8. Oben die Kennung **2026-09-27-r12** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben die Kennung **2026-09-28-r13** prüfen. Bei einer anderen Kennung zunächst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern ohne neue Bereitstellungsversion aktualisiert die /exec-App nicht. Konto und bestehende Zugriffs-/Skripteinstellungen beibehalten.
 
 ## Zuerst die vorhandene Testfirma prüfen
 
-Bestandskunden wurden bereits erfolgreich gelesen. Bei der eigenen Testfirma konnte dagegen der offene ursprüngliche Anlageauftrag sowohl den Kommunikationsbutton sperren als auch bereits importierte Historie verdecken. r12 trennt diese Vorgänge. Der ursprüngliche Anlageauftrag wird durch die neue Zuordnungsprüfung nicht als vollständig erledigt markiert; seine noch offenen Feldprüfungen bleiben erhalten.
+Der separate Freigabeschritt aus r12 ist für das Erfassen nicht mehr erforderlich. Bei einer eigenen Testfirma mit gespeicherter HQ-Firmen-ID öffnet **Kommunikation erfassen** direkt das Formular. Die Eingabe wird zuerst nur in Firebase gespeichert. Erst beim bewussten Übertragen nach HQ werden Firma und Ansprechpartner erneut gelesen und ihrer gespeicherten Zuordnung gegenübergestellt. Der ursprüngliche Anlageauftrag bleibt unverändert.
 
 1. In der App **Kunden** öffnen.
 2. Die bereits angelegte eigene **TEST**-Firma auswählen.
 3. Im Abschnitt **Kontakt-Historie** auf **Historie aus HQ aktualisieren** klicken. Erwartung: Eine Abschlussmeldung mit der Anzahl importierter Einträge; bei Fehler den technischen Meldungstext mitteilen und stoppen.
 4. Unter **Anzeige** den Wert **Alle Einträge** auswählen. Erwartung: Auch die direkt in HQ eingetragenen Testnotizen erscheinen.
 5. Bei weiterhin fehlenden Einträgen die angezeigte Anzahl und den Importzeitpunkt mitteilen; noch keinen Schreibtest starten.
-6. Bei ausgegrautem Kommunikationsbutton **HQ-Zuordnung prüfen** anklicken. Dieser Schritt liest nur die schon gespeicherten HQ-IDs von Firma und Ansprechpartner zurück; er legt nichts an und verändert keine HQ-Daten.
-7. Die Abschlussmeldung abwarten. Erwartung: **HQ-Zuordnung von Firma und Ansprechpartner bestätigt** und ein aktiver Button **Kommunikation erfassen**.
-8. Bei einer Fehlermeldung deren technischen Text mitteilen; keine neue Firma und keinen weiteren Ansprechpartner anlegen.
-9. **Kommunikation erfassen** anklicken. Erwartung: Das Formular öffnet sich; dann mit Test B fortfahren.
+6. Eine Notiz mit Absätzen oder Hervorhebungen ansehen. Erwartung: Formatierter Text ohne sichtbare p-, div- oder br-Tags.
+7. Bei einer E-Mail **Vollständigen Inhalt anzeigen** aufklappen. Erwartung: Auch der vollständige Text ist formatiert.
+8. Bei einem Rechnungsversand **Versanddetails und E-Mail anzeigen** aufklappen. Erwartung: Formatierte E-Mail; die kompakte Rechnungsübersicht bleibt erhalten.
+9. **Kommunikation erfassen** anklicken. Erwartung: Das Formular öffnet sich direkt, auch wenn der ursprüngliche Anlageauftrag noch offen ist.
+10. Falls der Button bei dieser vorhandenen Testfirma trotzdem gesperrt ist, die oben sichtbare Versionskennung und den Erklärungstext mitteilen; keine neue Firma anlegen.
 
 Bei echten Bestandskunden bleibt der Button mit einem erklärenden Hinweis deaktiviert. Für den vereinbarten Schreibtest **Zu den Testfirmen** anklicken und dort bei der eigenen Firma **Firmendetails** öffnen. Der Name TEST allein schaltet keine aus HQ importierte Firma frei; es muss die über die App angelegte Testfirma sein. Keine neue Firma nötig.
 
@@ -92,7 +93,7 @@ Bei fehlender oder mehrdeutiger Rechnungsnummer zeigt die App ausdrücklich die 
 
 ## Test B: App → Firebase → HQ → App
 
-Voraussetzung ist dieselbe eigene Testfirma mit bestätigter HQ-Zuordnung. Auch bei noch offenem ursprünglichem Anlageauftrag ist der Test nach erfolgreicher **HQ-Zuordnung prüfen** möglich. Alle Eingaben bleiben zuerst in Firebase; erst der ausdrücklich gestartete Übertragungsauftrag schreibt nach HQ.
+Voraussetzung ist dieselbe eigene Testfirma mit gespeicherter HQ-Firmen-ID. **HQ-Zuordnung prüfen** ist kein vorgeschalteter Bedienungsschritt mehr. Alle Eingaben bleiben zuerst in Firebase; erst der ausdrücklich gestartete Übertragungsauftrag prüft die HQ-Ziele und schreibt anschließend nach HQ. Fehlt eine bestätigbare Personenbindung, bleibt der Eintrag in Firebase erhalten und der Schreibschritt zeigt den konkreten Fehler.
 
 1. In der App links **Kunden** öffnen.
 2. Die eigene bestätigte **TEST**-Firma öffnen.
@@ -166,7 +167,7 @@ Nach dem ersten erfolgreichen Telefonat und der Aufgabe die übrigen Arten mit j
 - Einmal **Ergebnis nur in HQ prüfen** anklicken. Diese Aktion liest nur zurück und wiederholt den Schreibversuch nicht.
 - Falls der Auftrag weiterhin offen bleibt, den Status und technischen Text unter dem Auftrag mitteilen; keine Firmen-/Personennamen, IDs, Kommunikationsinhalte oder Zugangsdaten mitsenden.
 - Keinen neuen Auftrag mit demselben Text als Umgehung anlegen.
-- Bei fehlender Schaltfläche prüfen, ob die eigene Testfirma vollständig bestätigt ist und die App die Kennung **2026-09-27-r12** trägt.
+- Bei fehlender Schaltfläche prüfen, ob die eigene Testfirma vollständig bestätigt ist und die App die Kennung **2026-09-28-r13** trägt.
 - Bei fehlerhaftem Leseimport den eingeblendeten technischen Text mitteilen. Der vorige vollständig gespeicherte Stand bleibt erhalten.
 
 Nach dem Test bitte kurz zurückmelden:
@@ -184,7 +185,7 @@ Nach erfolgreichem Live-Historientest folgt das Aufräumen des bestehenden Pilot
 
 ## Bestehende Einrichtung und weitere Google-Konten
 
-Diese Übersicht dient zur Orientierung; für r12 müssen diese Werte nicht erneut eingetragen werden:
+Diese Übersicht dient zur Orientierung; für r13 müssen diese Werte nicht erneut eingetragen werden:
 
 | Skripteigenschaft | Vorhandene Konfiguration / Zweck |
 | --- | --- |

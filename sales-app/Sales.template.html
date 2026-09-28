@@ -2,9 +2,9 @@
 <html lang="de"><head><meta charset="utf-8"><base target="_top"><title>Sales Markatus</title>
 <!--DEMO_STYLES-->
 <style>
-body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
+body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-09-27-r12</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-09-28-r13</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -15,7 +15,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-09-27-r12</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-09-28-r13</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -29,26 +29,57 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-09-27-r12';
-  const UI_BUILD='2026-09-27-r12';
+  const APP_RELEASE='2026-09-28-r13';
+  const UI_BUILD='2026-09-28-r13';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=c=>c===null||c===undefined?'Noch nicht hinterlegt':new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(c/100);
   const dateLabel=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'')?v.slice(0,10).split('-').reverse().join('.'):'Datum nicht geliefert';
   const amountLabel=(c,currency)=>c===null||c===undefined?'Betrag nicht geliefert':currency?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(c/100)+' '+currency+' netto':'Währung nicht geliefert';
+  function historyContent(value){
+    const raw=String(value||'');
+    if(!/<\/?(?:html|head|body|p|div|br|strong|b|em|i|u|s|strike|ul|ol|li|blockquote|pre|code|table|thead|tbody|tfoot|tr|td|th|h[1-6]|hr|a|span|font|script|style|iframe|object|embed|svg|math|img|video|audio|source|link|meta|base|input|button|textarea|select)\b[^>]*>|&(?:#\d+|#x[\da-f]+|[a-z]+);/i.test(raw))return {html:esc(raw),text:raw};
+    // Template contents are inert. Rebuild a small set of formatting tags; never insert HQ HTML directly.
+    const template=document.createElement('template');template.innerHTML=raw;
+    if(!template.content.querySelector('*')&&/<\/?(?:p|div|br|strong|em|ul|ol|li|table|a)\b/i.test(template.content.textContent))template.innerHTML=template.content.textContent;
+    const allowed=new Set(['p','div','br','strong','b','em','i','u','s','strike','ul','ol','li','blockquote','pre','code','table','thead','tbody','tfoot','tr','td','th','h1','h2','h3','h4','h5','h6','hr']);
+    const blocked=new Set(['script','style','iframe','object','embed','svg','math','img','video','audio','source','link','meta','base','input','button','textarea','select']);
+    let text='';
+    function clean(node){
+      if(node.nodeType===3){text+=node.textContent;return esc(node.textContent);}
+      if(node.nodeType!==1)return '';
+      const tag=node.tagName.toLowerCase();if(blocked.has(tag))return '';
+      const block=/^(p|div|br|li|blockquote|pre|tr|h[1-6]|hr)$/.test(tag);if(block)text+='\n';
+      let body=Array.from(node.childNodes).map(clean).join('');if(block)text+='\n';
+      if(tag==='td'||tag==='th')text+='\t';
+      if(tag==='a'){
+        const href=(node.getAttribute('href')||'').trim();
+        return /^(https?:|mailto:|tel:)/i.test(href)&&!/[\u0000-\u0020\u007f]/.test(href)?'<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+body+'</a>':body;
+      }
+      if(tag==='span'||tag==='font'){
+        if(/^(bold|[6-9]00)$/.test(node.style.fontWeight))body='<strong>'+body+'</strong>';
+        if(node.style.fontStyle==='italic')body='<em>'+body+'</em>';
+        if(node.style.textDecorationLine.includes('underline'))body='<u>'+body+'</u>';
+        return body;
+      }
+      return allowed.has(tag)?'<'+tag+'>'+body+(['br','hr'].includes(tag)?'':'</'+tag+'>'):body;
+    }
+    const html=Array.from(template.content.childNodes).map(clean).join('');
+    return {html,text:text.replace(/\n{3,}/g,'\n\n').trim()};
+  }
   function historyRow(h){
     const dispatch=h.documentDispatch||h.contactHistoryChannel==='SentDocument';
     if(!dispatch){
-      const text=String(h.content||''),long=text.length>280||h.contactHistoryChannel==='Mail';
+      const formatted=historyContent(h.content),text=formatted.text,long=text.length>280||h.contactHistoryChannel==='Mail';
       const channels={Note:'Notiz',Mail:'E-Mail',Call:'Telefonat',Meeting:'Besprechung',Visit:'Besuch',Task:'Aufgabe'};
       const states={pending:'In Firebase · HQ offen',running:'HQ-Prüfung offen',uncertain:'HQ-Ausgang unklar',synced:'In HQ bestätigt',missing:'Im HQ-Import nicht gefunden · prüfen'};
       const status=h.jobId?(states[h.syncState]||'HQ-Abgleich offen'):'Aus HQ';
       const when=Number.isFinite(Date.parse(h.contactOn))?new Date(h.contactOn).toLocaleString('de-DE'):'Datum nicht geliefert';
-      return `<div class="m-row"><h3>${esc(h.reason||channels[h.contactHistoryChannel]||'Kontakt')}</h3><small>${esc(when)} · ${esc(channels[h.contactHistoryChannel]||h.contactHistoryChannel||'Kontakt')}${h.contactHistoryStatus==='NotReached'?' · Nicht erreicht':''}</small>${taskHistoryInfo(h)}<p>${tag(status,h.syncState==='synced'?'good':'')}</p><p class="m-detail">${esc(long?text.slice(0,280)+(text.length>280?' …':''):text)}</p>${long?`<details><summary>Vollständigen Inhalt anzeigen</summary><div class="m-detail">${esc(text)}</div></details>`:''}${h.jobId?button('Übertragung ansehen','preview',h.jobId):''}</div>`;
+      return `<div class="m-row"><h3>${esc(historyContent(h.reason||channels[h.contactHistoryChannel]||'Kontakt').text)}</h3><small>${esc(when)} · ${esc(channels[h.contactHistoryChannel]||h.contactHistoryChannel||'Kontakt')}${h.contactHistoryStatus==='NotReached'?' · Nicht erreicht':''}</small>${taskHistoryInfo(h)}<p>${tag(status,h.syncState==='synced'?'good':'')}</p>${long?'<p class="m-detail">'+esc(text.slice(0,280)+(text.length>280?' …':''))+'</p>':'<div class="m-history-content">'+formatted.html+'</div>'}${long?`<details><summary>Vollständigen Inhalt anzeigen</summary><div class="m-history-content">${formatted.html}</div></details>`:''}${h.jobId?button('Übertragung ansehen','preview',h.jobId):''}</div>`;
     }
     const invoice=h.invoice;
-    return `<div class="m-row"><h3>${esc(h.projectName||'Projekt nicht zugeordnet')}</h3><p>${esc(dateLabel(h.contactOn))} · ${esc(invoice?amountLabel(invoice.netCents,invoice.currency):'Rechnung nicht eindeutig zugeordnet')}</p><details><summary>Versanddetails und E-Mail anzeigen</summary><p>${esc(h.reason||'Dokumentversand')}</p>${invoice?`<p>Beleg ${esc(invoice.number)} · Belegdatum ${esc(dateLabel(invoice.date))}</p>`:`<p class="m-muted">${h.documentMatch==='ambiguous'?'Mehrere passende Belege gefunden.':'Eine eindeutige Rechnungsnummer fehlt. Bitte mit HQ vergleichen.'}</p>`}<div class="m-detail">${esc(h.content)}</div></details></div>`;
+    return `<div class="m-row"><h3>${esc(h.projectName||'Projekt nicht zugeordnet')}</h3><p>${esc(dateLabel(h.contactOn))} · ${esc(invoice?amountLabel(invoice.netCents,invoice.currency):'Rechnung nicht eindeutig zugeordnet')}</p><details><summary>Versanddetails und E-Mail anzeigen</summary><p>${esc(historyContent(h.reason||'Dokumentversand').text)}</p>${invoice?`<p>Beleg ${esc(invoice.number)} · Belegdatum ${esc(dateLabel(invoice.date))}</p>`:`<p class="m-muted">${h.documentMatch==='ambiguous'?'Mehrere passende Belege gefunden.':'Eine eindeutige Rechnungsnummer fehlt. Bitte mit HQ vergleichen.'}</p>`}<div class="m-history-content">${historyContent(h.content).html}</div></details></div>`;
   }
   function taskHistoryInfo(h){
     if(h.contactHistoryChannel!=='Task')return '';
@@ -58,11 +89,11 @@ window.__salesStarted=false;
   function communicationAction(c){
     const candidates=c.localDraftId?[{id:c.localDraftId}]:(state.drafts||[]).filter(d=>d.testOnly&&String(d.hqId)===String(c.hqId||c.id));
     const id=candidates.length===1?candidates[0].id:null,job=id?state.jobs.find(j=>j.id===id):null;
-    if(job?.historyReady)return button('Kommunikation erfassen','history-form',id,true);
-    return '<button type="button" class="m-button" disabled>Kommunikation erfassen</button><p class="m-muted">'+(id?'Die HQ-Zuordnung muss für die Kommunikation bestätigt sein. „HQ-Zuordnung prüfen“ liest die vorhandene Firma und ihren Ansprechpartner; es wird nichts neu angelegt. Der Historienimport ist bereits unabhängig davon möglich.':'Dieser Bestandskunde ist im Pilot nur zum Lesen freigegeben. Bitte den Schreibtest bei einer selbst angelegten Testfirma ausführen.')+'</p>'+(id?((state.user.admin&&job?.hqId?button('HQ-Zuordnung prüfen','check-history-binding',id):'')+button('Anlageauftrag öffnen','preview',id)):button('Zu den Testfirmen','nav','test'));
+    if(id&&job?.hqId)return button('Kommunikation erfassen','history-form',id,true);
+    return '<button type="button" class="m-button" disabled>Kommunikation erfassen</button><p class="m-muted">'+(id?'Dieser Testfirma fehlt noch die gespeicherte HQ-Firmen-ID. Bitte zuerst den Firmenschritt im Anlageauftrag abschließen.':'Dieser Bestandskunde ist im Pilot nur zum Lesen freigegeben. Bitte den Schreibtest bei einer selbst angelegten Testfirma ausführen.')+'</p>'+(id?((state.user.admin&&job?.hqId?button('HQ-Zuordnung prüfen','check-history-binding',id):'')+button('Anlageauftrag öffnen','preview',id)):button('Zu den Testfirmen','nav','test'));
   }
   function historyPreview(h){
-    return '<h3>'+esc(h.reason)+'</h3><p>'+esc(new Date(h.contactOn).toLocaleString('de-DE'))+' · '+esc(({Note:'Notiz',Mail:'E-Mail dokumentieren',Call:'Telefonat',Meeting:'Besprechung',Visit:'Besuch',Task:'Aufgabe'})[h.contactHistoryChannel]||h.contactHistoryChannel)+'</p><p>'+esc(h.contactHistoryChannel==='Task'?'Aufgabe':h.contactHistoryStatus==='NotReached'?'Nicht erreicht':'Erreicht / dokumentiert')+' · '+esc(h.contactPersonId?'Firma und angelegter Ansprechpartner':'Nur Firma')+'</p><div class="m-detail">'+esc(h.content)+'</div>'+taskHistoryInfo(h);
+    return '<h3>'+esc(historyContent(h.reason).text)+'</h3><p>'+esc(new Date(h.contactOn).toLocaleString('de-DE'))+' · '+esc(({Note:'Notiz',Mail:'E-Mail dokumentieren',Call:'Telefonat',Meeting:'Besprechung',Visit:'Besuch',Task:'Aufgabe'})[h.contactHistoryChannel]||h.contactHistoryChannel)+'</p><p>'+esc(h.contactHistoryChannel==='Task'?'Aufgabe':h.contactHistoryStatus==='NotReached'?'Nicht erreicht':'Erreicht / dokumentiert')+' · '+esc(h.contactPersonId?'Firma und angelegter Ansprechpartner':'Nur Firma')+'</p><div class="m-history-content">'+historyContent(h.content).html+'</div>'+taskHistoryInfo(h);
   }
   function historyPanel(c){
     const rows=detail?.histories||[],isDocument=h=>h.documentDispatch||h.contactHistoryChannel==='SentDocument';
@@ -139,7 +170,7 @@ window.__salesStarted=false;
     const pages={home,customers:customerList,company,magazine,invoices,test,preview:previewPage,new:newCompany,history:historyForm,change:changeForm,admin,contacts:contactList,reminders:()=>head('Wiedervorlagen')+empty('Die gemeinsame Wiedervorlagenverwaltung wird nach dem ersten Kontakt-Historien-Test angebunden.')};
     root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Pilot · COBURGER #70<br>Lesedaten aus HQ<br>Schreibtests separat</p></div></aside><main class="m-main">${(pages[view]||home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
   }
-  async function act(fn,{reload=false,preserve=false}={}){if(busy)return;busy=true;error='';let result;if(preserve){root.querySelectorAll('button').forEach(b=>b.disabled=true);}else render();try{result=await fn();if(result?.message)message=result.message;if(reload)state=await rpc('getSalesState');}catch(e){error=e.message;if(preserve){busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const status=root.querySelector('.m-status');if(status){status.textContent=error;status.classList.add('m-error');}return;}}finally{busy=false;}render();return result;}
+  async function act(fn,{reload=false,preserve=false}={}){if(busy)return;busy=true;root.setAttribute('aria-busy','true');error='';let result;if(preserve){root.querySelectorAll('button').forEach(b=>b.disabled=true);}else render();try{result=await fn();if(result?.message)message=result.message;if(reload)state=await rpc('getSalesState');}catch(e){error=e.message;if(preserve){busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const status=root.querySelector('.m-status');if(status){status.textContent=error;status.classList.add('m-error');}return;}}finally{busy=false;root.setAttribute('aria-busy','false');}render();return result;}
   async function runCreateJob(id,step){
     return act(async()=>{const r=await rpc('runSalesJob',id,step);preview=await rpc('getSalesJobPreview',id);if(selected==='draft_'+id)detail=await rpc('getSalesCompany',selected);return r;},{reload:true});
   }
@@ -160,7 +191,7 @@ window.__salesStarted=false;
     if(a==='run-job'){const job=state.jobs.find(j=>j.id===id);if(job?.kind==='createCompany')return runCreateJob(id,'company');return act(async()=>{const r=await rpc('runSalesJob',id);preview=await rpc('getSalesJobPreview',id);if(preview.job.kind==='cleanupMarker'&&r.state==='synced'){audit=null;auditId=null;}return r;},{reload:true});}
     if(a==='reconcile')return act(async()=>{const r=await rpc('reconcileSalesJob',id);if(selected==='draft_'+id)detail=await rpc('getSalesCompany',selected);return r;},{reload:true});
     if(a==='conflict-hq'||a==='conflict-app')return act(()=>rpc('resolveSalesConflict',id,a==='conflict-hq'?'hq':'app'),{reload:true});
-    if(a==='history-form'){if(!state.jobs.find(j=>j.id===id)?.historyReady){error='Zuerst „HQ-Zuordnung prüfen“ ausführen.';render();return;}formDraft=state.drafts.find(d=>d.id===id);const now=new Date();formContactOn=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);view='history';render();return;}
+    if(a==='history-form'){if(!state.drafts.find(d=>d.id===id)?.testOnly||!state.jobs.find(j=>j.id===id)?.hqId){error='Zuerst die eigene Testfirma in HQ anlegen.';render();return;}formDraft=state.drafts.find(d=>d.id===id);const now=new Date();formContactOn=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);view='history';render();return;}
     if(a==='change-form')return act(async()=>{formDraft=state.drafts.find(d=>d.id===id);detail=await rpc('getSalesCompany',formDraft.hqId);if(!detail)throw new Error('Zuerst Firmendetails importieren.');view='change';});
   });
   root.addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value;root.querySelector('#customer-rows').innerHTML=customerRows();}});
