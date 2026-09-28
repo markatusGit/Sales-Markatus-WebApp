@@ -63,13 +63,12 @@
   }
   function v1Admin(){
     let body=admin().replace('COBURGER #70 · Ziel und Termine',esc(editionLabel(state.edition))+' · Ziel und Termine');body=editionSelectors()+body;if(!state.user.admin)return body;
-    const projectForm=projectResults?'<p>'+projectResults.rows.length+' Treffer'+(projectResults.limited?' · Suche eingrenzen, weitere Treffer vorhanden':'')+'</p><form data-form="edition-config" class="m-form">'+select('HQ-Sammelprojekt','projectId',[{id:'',name:'Bitte bewusst auswählen'},...projectResults.rows.map(p=>({id:p.id,name:p.number+' · '+p.name}))])+field('Magazinname','magazine','','text',true)+field('Ausgabennummer','issue','','number',true)+'<label class="m-field"><input type="checkbox" name="current"> Als aktuelle Verkaufsausgabe verwenden</label><button class="m-button m-primary">Ausgabe zuordnen</button></form>':'';
-    return body+'<section class="m-panel m-section"><div class="m-panel-head"><h2>Magazine und Ausgaben</h2></div><div class="m-panel-body"><form data-form="project-search">'+field('HQ-Projekt suchen (Name oder Projektnummer)','term','','text',true)+'<button class="m-button">Projekte in HQ suchen</button></form>'+projectForm+'<p>Bestehende Zuordnungen:</p>'+(state.editions||[]).map(e=>'<p>'+esc(editionLabel(e))+' → '+esc(e.projectNumber+' · '+e.projectName)+'</p>').join('')+'</div></section><section class="m-panel m-section"><div class="m-panel-head"><h2>Kunden und Interessenten ohne Magazinrechnung aufnehmen</h2></div><div class="m-panel-body"><form data-form="company-search">'+field('Unternehmen in HQ suchen','term','','text',true)+'<button class="m-button">Unternehmen suchen</button></form>'+(companyResults?'<p>'+companyResults.rows.length+' Treffer'+(companyResults.limited?' · Suche weiter eingrenzen':'')+'</p>'+companyResults.rows.map(c=>'<p>'+esc(c.name)+' '+button('In App-Bestand aufnehmen','add-company',c.id)+'</p>').join(''):'')+'</div></section><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
+    return body+projectSearchPanel()+'<section class="m-panel m-section"><div class="m-panel-head"><h2>Kunden und Interessenten ohne Magazinrechnung aufnehmen</h2></div><div class="m-panel-body"><form data-form="company-search">'+field('Unternehmen in HQ suchen','term','','text',true)+'<button class="m-button">Unternehmen suchen</button></form>'+(companyResults?'<p>'+companyResults.rows.length+' Treffer'+(companyResults.limited?' · Suche weiter eingrenzen':'')+'</p>'+companyResults.rows.map(c=>'<p>'+esc(c.name)+' '+button('In App-Bestand aufnehmen','add-company',c.id)+'</p>').join(''):'')+'</div></section><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
   }
-  async function continueV1Import(retry){
+  async function continueV1Import(retry,editionIds){
     if(importLoop)return;importLoop=true;stopImport=false;
     try{
-      await act(async()=>{state.importRun=await rpc(retry?'retrySalesImport':'startSalesImport');});if(error)return;
+      await act(async()=>{state.importRun=await (retry?rpc('retrySalesImport'):editionIds?rpc('startSalesImport',editionIds):rpc('startSalesImport'));});if(error)return;
       while(!stopImport&&state.importRun?.state==='running'){await act(async()=>{state.importRun=await rpc('runSalesImportStep',state.importRun.id,state.importRun.revision);});if(error)break;}
       const failure=error;await act(async()=>{state=await rpc('getSalesState');return {message:failure?'Import unterbrochen: '+failure:stopImport?'Import angehalten; später fortsetzbar.':state.importRun?.state==='completed'?'Datenimport abgeschlossen.':'Importstand gespeichert. Hinweise im Datenabgleich prüfen.'};});
     }finally{importLoop=false;render();}
@@ -81,6 +80,7 @@
     if(a==='exclude-document'||a==='include-document'){act(()=>rpc('setSalesDocumentExcluded',{editionId:state.edition.id,documentId:id,excluded:a==='exclude-document'}),{reload:true});return true;}return false;
   }
   function v1Change(e){
+    if(changeProjectChoice(e))return true;
     const name=e.target.name,value=e.target.value;
     if(name==='v1Magazine'){state.edition=(state.editions||[]).filter(x=>x.magazine===value).sort((a,b)=>b.issue-a.issue)[0];selectedEditionId=state.edition.id;}
     else if(name==='v1Edition'){selectedEditionId=value;state.edition=state.editions.find(x=>x.id===value);}

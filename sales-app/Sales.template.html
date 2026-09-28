@@ -3,8 +3,8 @@
 <!--DEMO_STYLES-->
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
-input[type="checkbox"]{width:auto!important}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-09-28-r14</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-09-28-r15</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -15,7 +15,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-09-28-r14</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-09-28-r15</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -29,8 +29,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-09-28-r14';
-  const UI_BUILD='2026-09-28-r14';
+  const APP_RELEASE='2026-09-28-r15';
+  const UI_BUILD='2026-09-28-r15';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -120,7 +120,7 @@ window.__salesStarted=false;
     if(!window.google?.script?.run){reject(new Error('Diese Datei läuft als bereitgestellte Apps-Script-Web-App. Bitte die Google-Web-App-Adresse öffnen.'));return;}
     let done=false;
     const finish=(ok,value)=>{if(done)return;done=true;if(timer)clearTimeout(timer);if(ok&&name==='getSalesState')value=adoptSalesState(value);(ok?resolve:reject)(value);};
-    const timer=name==='getSalesState'?setTimeout(()=>finish(false,new Error('Die Firebase-Startabfrage hat nach 45 Sekunden keine Antwort erhalten. Bitte erneut versuchen und ggf. die Apps-Script-Ausführungen prüfen.')),45000):null;
+    const timer=name==='searchSalesProjects'?setTimeout(()=>finish(false,new Error('Die HQ-Projektsuche hat nach 60 Sekunden keine Antwort erhalten. Bitte erneut suchen.')),60000):name==='getSalesState'?setTimeout(()=>finish(false,new Error('Die Firebase-Startabfrage hat nach 45 Sekunden keine Antwort erhalten. Bitte erneut versuchen und ggf. die Apps-Script-Ausführungen prüfen.')),45000):null;
     try{google.script.run.withSuccessHandler(value=>finish(true,value)).withFailureHandler(e=>finish(false,new Error(e?.message||'Anfrage fehlgeschlagen.')))[({getSalesState:'getSalesV1State',getSalesCompany:'getSalesV1Company',syncSalesCompany:'syncSalesV1Company',syncSalesHistory:'syncSalesV1History',saveSalesEditionSettings:'saveSalesV1EditionSettings'})[name]||name](...args);}
     catch(e){finish(false,new Error(e?.message||'Google Apps Script konnte nicht aufgerufen werden.'));}
   });}
@@ -210,12 +210,12 @@ window.__salesStarted=false;
   root.addEventListener('input',e=>{if(e.target.id==='contact-search'){const position=e.target.selectionStart;search=e.target.value;render();const input=root.querySelector('#contact-search');input.focus();input.setSelectionRange(position,position);return;}if(e.target.id==='search'){search=e.target.value;root.querySelector('#customer-rows').innerHTML=v1CustomerRows(view!=='magazine');}});
   root.addEventListener('change',e=>{if(v1Change(e))return;if(e.target.name==='channel'){updateHistoryFields();return;}if(e.target.name==='historyFilter'){historyFilter=e.target.value;render();return;}if(e.target.name==='addressOrigin'){const label=root.querySelector('#origin-other');label.hidden=e.target.value!=='Sonstige';label.querySelector('input').required=e.target.value==='Sonstige';}});
   root.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const form=e.target;if(form.elements.homepage)form.elements.homepage.value=normalizeHomepageInput(form.elements.homepage.value);if(!form.reportValidity())return;const input=Object.fromEntries(new FormData(form)),kind=form.dataset.form;
+    if(kind==='project-search'){searchV1Projects(input.term);return;}
+    if(kind==='edition-selection'){importSelectedV1Projects(form);return;}
     act(async()=>{let r;if(kind==='company'){r=await rpc('saveSalesTestCompany',input);selected='draft_'+r.id;detail=await rpc('getSalesCompany',selected);view='company';}
       if(kind==='history'){r=await rpc('saveSalesHistory',{...input,contactOn:input.channel==='Mail'?'':new Date(input.contactOn).toISOString(),draftId:formDraft.id});selected='draft_'+formDraft.id;detail=await rpc('getSalesCompany',selected);historyFilter='all';view='company';}
       if(kind==='change'){r=await rpc('saveSalesCompanyChange',{...input,draftId:formDraft.id});view='test';}
       if(kind==='edition')r=await rpc('saveSalesEditionSettings',{...input,editionId:state.edition.id,revision:state.edition.settings.revision});
-      if(kind==='project-search'){projectResults=await rpc('searchSalesProjects',input.term);r={message:'Projektliste gelesen. Bitte die gewünschte Zuordnung auswählen.'};}
-      if(kind==='edition-config'){r=await rpc('saveSalesEditionConfig',input);selectedEditionId=r.id;projectResults=null;}
       if(kind==='company-search'){companyResults=await rpc('searchSalesCompanies',input.term);r={message:'Unternehmensliste gelesen. Bitte gezielt auswählen.'};}
       if(kind==='access'){await rpc('saveSalesAccess',input.emails);r={message:'E-Mail-Freigaben gespeichert.'};}return r;},{reload:true,preserve:true});
   });

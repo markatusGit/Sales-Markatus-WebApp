@@ -2,6 +2,8 @@
 
 Stand: 28.09.2026. Der Nutzer hat den bisherigen Historien-Lese- und Schreibweg nach HQ bestätigt. Aufräumen und die Chat-Punkte 1–3 (mehrere Ausgaben, manueller Datenabgleich, Magazin-/Kundenansichten und Filter) sind mit **2026-09-28-r14 lokal implementiert und synthetisch geprüft**; Bereitstellung und Live-Abnahme sind offen. Diese drei Chat-Punkte entsprechen unten den Bauabschnitten 1 und 2. Bauabschnitt 3 ist der spätere Google-Zugang und wurde noch nicht umgesetzt. Keine pauschale Freigabe produktiver HQ-Schreibzugriffe.
 
+**Nachtrag r15:** Der Nutzer konnte r14 wegen der Projektsuche noch nicht weiter prüfen. Suche lokal auf dokumentiertes substringof korrigiert; sichtbare Fehler, Trefferliste mit Häkchen, mehrseitige Treffer und Import der bewusst ausgewählten Ausgaben ergänzt. Die folgenden V1-Lese-/Filterschritte sind weiterhin nicht live abgenommen.
+
 ## Ziel und bisheriger Stand
 
 Die V1 soll den Alltag vom Finden eines Kunden über Kontakt, Wiedervorlage und Buchung bis zur Redaktionsübergabe abbilden. Sie liest aus Firebase; neue Eingaben sind dort sofort nutzbar. Der Nutzer erwägt zunächst einen manuellen Abgleich statt eines Nachtlaufs. Empfehlung: Dies für die erste V1 übernehmen, mit getrennten Aktionen für Lesen aus HQ und Schreiben nach HQ.
@@ -81,12 +83,12 @@ Bereits live positiv gemeldet sind Pilotausgabe, Firmen-/Kontaktanlage einschlie
 
 ## Unmittelbarer nächster Schritt
 
-Die kleinschrittige [Anleitung für r14](../sales-app/MANUELL-UEBERTRAGEN.md) enthält alle Menüwege, Erwartungen und Fehlerfälle.
+Die kleinschrittige [Anleitung für r15](../sales-app/MANUELL-UEBERTRAGEN.md) enthält alle Menüwege, Erwartungen und Fehlerfälle.
 
 - SalesBackend.gs vollständig in der gleichnamigen Google-Datei ersetzen.
 - Sales.html vollständig in der gleichnamigen Google-Datei ersetzen.
 - Unter Bereitstellen → Bereitstellungen verwalten die bestehende Web-App auf Neue Version setzen.
-- In der Web-App die Kennung 2026-09-28-r14 prüfen; bei Abweichung erst die Dateistände korrigieren.
+- In der Web-App die Kennung 2026-09-28-r15 prüfen; bei Abweichung erst die Dateistände korrigieren.
 - Bei der vorhandenen eigenen Testfirma die fünf Kontaktarten nach Anleitung prüfen.
 - Unter Verwaltung die aktuelle Verkaufsausgabe ihrem HQ-Projekt zuordnen.
 - Dort die fünf unmittelbar vorherigen Ausgaben ihren HQ-Projekten zuordnen.

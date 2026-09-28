@@ -1,6 +1,6 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 28.09.2026 · **2026-09-28-r14**. Kommunikation mit passenden Feldern und der beauftragte V1-Ausbau (mehrere Ausgaben, manueller Leseimport, gemeinsame Übersichten und Filter) sind lokal vorbereitet. Der bisherige Kommunikationsweg nach HQ wurde vom Nutzer bestätigt. Der neue Umfang muss nach der Bereitstellung live geprüft werden.
+Stand: 28.09.2026 · **2026-09-28-r15**. Die HQ-Projektsuche ist korrigiert und bietet jetzt eine Trefferliste mit Häkchen für mehrere Ausgaben. Diese Korrektur ist lokal vorbereitet. Der bisherige Kommunikationsweg nach HQ wurde vom Nutzer bestätigt. Der neue Umfang muss nach der Bereitstellung live geprüft werden.
 
 **Austauschdateien:** [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html). Nur diese beiden Dateien übertragen. Keine neuen/geänderten Skripteigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffseinstellungen. Kein automatischer Upload durch Codex.
 
@@ -34,9 +34,9 @@ Stand: 28.09.2026 · **2026-09-28-r14**. Kommunikation mit passenden Feldern und
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit **/exec** als info@markatus.de öffnen.
 7. Die Seite neu laden.
-8. Oben **2026-09-28-r14** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben **2026-09-28-r15** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
-Nur Speichern aktualisiert die /exec-App nicht. Die lokalen Dateien SalesV1.gs und SalesV1.js sind bereits in den beiden Austauschdateien enthalten und werden nicht zusätzlich in Google angelegt.
+Nur Speichern aktualisiert die /exec-App nicht. Die lokalen Dateien SalesV1.gs, SalesV1.js und SalesProjects.js sind bereits in den beiden Austauschdateien enthalten und werden nicht zusätzlich in Google angelegt.
 
 ## 4. Kontaktformular prüfen
 
@@ -75,22 +75,29 @@ E-Mail erfasst eine Kommunikation; es wird keine Nachricht versendet. Der Zeitpu
 - Einen E-Mail-Eintrag mit einer erfundenen Empfängeradresse nach demselben Speicher-/Vorschau-/Übertragungsablauf testen. Erwartung: Empfänger, Betreff und Text kommen als HQ-Historieneintrag an; keine E-Mail wird verschickt.
 - Notiz, Meeting und Besuch jeweils mit eigenem Testbetreff nach diesem Ablauf testen. Erwartung: Passende Kontaktart und Werte, jeweils genau ein Eintrag nach dem erneuten Import.
 
-## 5. Magazine und Ausgaben zuordnen
+## 5. Magazine und Ausgaben suchen und auswählen
 
-Die aktuelle Verkaufsausgabe wird von dir festgelegt. #70 wird nicht automatisch zur aktuellen Ausgabe erklärt. Bestehende Daten und Einstellungen bleiben erhalten.
+Die Suche verwendet jetzt die von HQ dokumentierte Textsuche. Ergebnisse, Ladefortschritt und Fehler erscheinen direkt unter dem Suchfeld. Mehrere Suchseiten werden automatisch nachgeladen; bei einer Unterbrechung oder dem Limit von 10.000 Treffern steht ausdrücklich dabei, dass die Liste unvollständig ist. Eine Suche allein speichert keine Ausgaben und startet keinen Datenimport.
 
 1. **Verwaltung** öffnen.
 2. Zum Abschnitt **Magazine und Ausgaben** scrollen.
-3. Unter **HQ-Projekt suchen (Name oder Projektnummer)** die Projektnummer einer gewünschten Ausgabe eingeben.
-4. **Projekte in HQ suchen** anklicken. Erwartung: Passende Treffer; bei fehlendem Treffer die Schreibweise prüfen oder mindestens drei Zeichen des Projektnamens versuchen.
-5. Unter **HQ-Sammelprojekt** das richtige Projekt anhand von Nummer und Name auswählen.
-6. Unter **Magazinname** den Magazinnamen eintragen. Für alle Ausgaben desselben Magazins dieselbe Schreibweise verwenden, beispielsweise **COBURGER** für die vorhandene Pilotausgabe.
-7. Unter **Ausgabennummer** die zugehörige Ausgabennummer eintragen.
-8. Nur bei der aktuellen Verkaufsausgabe **Als aktuelle Verkaufsausgabe verwenden** anhaken.
-9. **Ausgabe zuordnen** anklicken. Erwartung: Die Zuordnung erscheint unter **Bestehende Zuordnungen**; HQ wird dabei nur gelesen.
-10. Diesen Zuordnungsablauf für jede der fünf direkt vorhergehenden Ausgaben wiederholen. Erwartung: Jede Ausgabe ist genau ihrem eigenen HQ-Projekt zugeordnet; einen Konflikthinweis nicht durch eine zweite Zuordnung umgehen.
+3. Unter **HQ-Projekt suchen (Name oder Projektnummer)** beispielsweise **Coburger** eingeben.
+4. **Projekte in HQ suchen** anklicken. Erwartung: Zunächst ein sichtbarer Ladehinweis, anschließend eine Trefferzahl und eine Liste mit Projektnummer, Projektname und Häkchen.
+5. Bei **Projektsuche fehlgeschlagen** den vollständigen technischen Text direkt unter dem Suchfeld mitteilen. Die Eingabe bleibt erhalten; noch keinen Import starten.
+6. Bei **Keine passenden Projekte gefunden** einen anderen Teil des Namens oder die genaue Projektnummer eingeben; mindestens drei Zeichen verwenden.
+7. In der Trefferliste bei jeder gewünschten Ausgabe das Häkchen links vor dem Projektnamen setzen. Erwartung: Die Felder für diese Ausgabe klappen auf; mehrere Projekte können gleichzeitig ausgewählt werden.
+8. Bei jeder angehakten Ausgabe den **Magazinname** prüfen. Erkennbare Namen werden vorgeschlagen; fehlende oder falsche Vorschläge bitte korrigieren. Für alle Ausgaben eines Magazins dieselbe Schreibweise verwenden.
+9. Bei jeder angehakten Ausgabe die **Ausgabennummer** prüfen. Eine Nummer aus „Ausgabe #70“ oder „#70“ wird vorgeschlagen; bei unklaren Namen bleibt das Feld leer und muss ausgefüllt werden.
+10. Nur bei der aktuellen Verkaufsausgabe **Als aktuelle Verkaufsausgabe verwenden** anhaken. Erwartung: Höchstens eine Ausgabe ist so markiert; die Auswahl ist optional und überschreibt keine Vorgabe, solange sie nicht gesetzt wird.
+11. **Ausgewählte Ausgaben importieren** anklicken. Erwartung: Die bestätigten Zuordnungen werden in Firebase gespeichert; die App wechselt zu **Datenabgleich** und startet den Import nur dieser Ausgaben sowie ihrer Kunden.
+12. Auf **Datenimport abgeschlossen.** warten. Bei Fehlern oder gewünschter Unterbrechung nach Abschnitt 6 vorgehen.
 
-Weitere Magazine und ältere Ausgaben werden auf demselben Weg ergänzt. Ein fehlendes HQ-Projekt wird von der App nicht neu angelegt. Rechnungen und Projekte werden niemals nach HQ geschrieben.
+Bereits zugeordnete Projekte sind gekennzeichnet; ihre gespeicherten Magazin-/Ausgabennummern bleiben erhalten. Sie können erneut angehakt und importiert werden. Nicht angehakte Ausgaben werden durch diesen Auswahlimport nicht neu geladen. Rechnungen, Projekte und echte Bestandskunden bleiben in HQ unverändert.
+
+- Für den Fünf-Ausgaben-Filter die aktuelle Verkaufsausgabe und die fünf unmittelbar vorherigen Ausgaben nach diesem Ablauf auswählen.
+- Bei einem Hinweis auf einen bereits laufenden Import diesen unter **Datenabgleich → Import fortsetzen** zuerst abschließen; anschließend die gewünschte Auswahl erneut starten.
+- Bei einem Zuordnungskonflikt den angezeigten Text prüfen. Bereits erfolgreich gespeicherte Zuordnungen bleiben erhalten; erneutes Übernehmen erzeugt keine zweite Ausgabe.
+- Für ein weiteres Magazin dessen Namen im selben Suchfeld eingeben und den Auswahlablauf wiederholen.
 
 ### Ziele und Termine je Ausgabe
 
@@ -103,7 +110,9 @@ Weitere Magazine und ältere Ausgaben werden auf demselben Weg ergänzt. Ein feh
 7. **Für alle in Firebase speichern** anklicken. Erwartung: Bestätigung; bei einem Änderungskonflikt neu laden und die inzwischen gespeicherten Werte zuerst prüfen.
 8. **Mein Tag** öffnen. Erwartung: Ziel und Termine der gewählten Ausgabe sind sichtbar; Änderungen werden beim erneuten Firebase-Laden auch bei anderen zugelassenen Nutzern angezeigt.
 
-## 6. Den gemeinsamen Datenimport starten
+## 6. Den Datenimport beobachten oder erneut starten
+
+Der Auswahlimport aus Schritt 5 läuft bereits. Die folgenden Schritte zum Starten sind nur nötig, wenn du später alle gespeicherten Ausgaben und gezielt aufgenommenen Interessenten gemeinsam aktualisieren möchtest. Der Button **Daten aus HQ aktualisieren** verwendet weiterhin den gesamten konfigurierten Bestand.
 
 1. **Datenabgleich** öffnen.
 2. **Daten aus HQ aktualisieren** anklicken.
@@ -168,7 +177,7 @@ Eine automatische Erkennung oder Aufteilung solcher Rechnungen ist noch nicht im
 
 ## Bestehende Einrichtung und offener Google-Zugang
 
-Für r14 keine dieser Einstellungen erneut eintragen oder verändern:
+Für r15 keine dieser Einstellungen erneut eintragen oder verändern:
 
 | Skripteigenschaft | Vorhandener Zweck |
 | --- | --- |
@@ -180,4 +189,4 @@ Für r14 keine dieser Einstellungen erneut eintragen oder verändern:
 
 Weitere Benchmark-Einstellungen bleiben erhalten. Die letzte bestätigte Google-Bereitstellung verwendet **Ausführen als: Ich** und **Nur ich**. info@markatus.de kann sie laut Nutzer öffnen. Persönlicher Zugang für pp@markatus.de und weitere Google-Konten bleibt ein eigenes offenes Arbeitspaket. Die interne E-Mail-Freigabe allein öffnet die Google-Bereitstellung nicht.
 
-Lokal geprüft: 101 bestehende/angepasste Logikprüfungen, 13 V1-Prüfungen und drei Browser-Integrationsprüfungen mit synthetischen Daten. Keine echten HQ-/Firebase-Zugriffe durch Codex. Bereitstellung und Live-Abnahme übernimmt der Nutzer.
+Lokal geprüft: 101 bestehende/angepasste Logikprüfungen, 15 V1-Prüfungen und drei Browser-Integrationsprüfungen mit synthetischen Daten. Keine echten HQ-/Firebase-Zugriffe durch Codex. Bereitstellung und Live-Abnahme übernimmt der Nutzer.

@@ -744,3 +744,36 @@ Zentraler Firmenbestand dedupliziert nach HQ-ID und gemeinsame Ansprechpartnerü
 - Technische Fehlertexte ohne Kundeninhalte/Zugangsdaten mitteilen; keine doppelten Schreibaufträge anlegen.
 
 **Stand:** Lokal implementiert und mit synthetischen Daten geprüft. Generiertes Backend stimmt mit beiden Quellen überein, Backend und HTML-Skripte syntaktisch geprüft, git diff --check ohne Inhaltsfehler. Die 16 zugehörigen Dateien wurden gezielt im Commit d4cde6e nach origin/main auf GitHub übertragen. Dieser Sicherungsnachtrag wird separat versioniert. Neue Bereitstellung und Live-Abnahme r14 sind offen. Frühere unabhängige Änderungen blieben außerhalb der Lieferung. Git meldete erneut die vorhandene packed-refs.lock bei automatischer Wartung; Commit und Push waren dennoch erfolgreich, die Sperrdatei wurde nicht verändert.
+
+### 28.09.2026 – r15: Projektsuche korrigiert und Mehrfachauswahl von Ausgaben
+
+**Nutzerrückmeldung:** Unter Verwaltung → Magazine und Ausgaben liefert weder Projektnummer noch Projektname ein sichtbares Ergebnis; kurzer Ladevorgang, dann erneut anklickbar. Weitere V1-Import-/Filterschritte konnten deshalb noch nicht live getestet werden. Wunsch: etwa Coburger eingeben, passende Projekte als Liste sehen und mehrere Ausgaben per Häkchen für den Import auswählen.
+
+**Befund:** Die r14-Suche verwendete contains(name, Suchtext). Der aktuell aufgerufene offizielle HQ-Entwicklerguide dokumentiert für v2 stattdessen substringof(Suchtext, name): https://developer.hellohq.io/. Die bisherige synthetische Gegenstelle hatte contains akzeptiert und diesen Kompatibilitätsfehler nicht erkannt. Außerdem zeigte die Oberfläche Fehler nur in der globalen Statuszeile weit oberhalb des Suchformulars. Der konkrete Live-HTTP-Fehler wurde nicht aus dem Mandanten abgerufen; diese Befunde sind keine rückwirkende Behauptung einer nachgewiesenen Live-Antwort.
+
+**Lokal umgesetzt:** Projekt- und Unternehmenssuche auf dokumentiertes substringof umgestellt; genaue Projektnummer weiterhin alternativ suchbar, Apostrophe bleiben als Literale geschützt. Projektsuche mit Seitenargument, jeweils 200 Treffern und automatisch fortgesetzten Suchseiten; keine stille 50-Treffer-Abschneidung mehr. Höchstens 50 Seiten, dann sichtbarer Unvollständigkeitshinweis. Doppelte Seiten/fehlender Fortschritt werden als Fehler angezeigt. Suchaufrufe ohne Antwort enden nach 60 Sekunden mit sichtbarem Hinweis; verspätete Antworten ändern den abgeschlossenen Browseraufruf nicht.
+
+Treffer, Ladezustand, leeres Ergebnis und Fehler direkt beim Suchfeld; Suchtext bleibt erhalten und Ergebnisbereich wird eingeblendet. Kein nachgelagerter Firebase-Gesamtabruf mehr, der ein erfolgreiches Suchergebnis verdecken könnte. Kompakte Liste mit Projektnummer/-name und Häkchen; erst bei Auswahl öffnen die Zuordnungsfelder. Erkennbare Magazinnamen/Ausgabennummern aus Ausgabe #N oder #N sind überprüfbare Vorschläge, kein automatisches Speichern. Bereits bestätigte Zuordnungen bleiben unverändert sichtbar. Mehrere Projekte auswählbar, höchstens eine aktuelle Verkaufsausgabe.
+
+**Importverhalten:** Ausgewählte Ausgaben importieren speichert die bestätigten Zuordnungen in Firebase und wechselt direkt zum manuellen Leseimport dieser Ausgaben sowie ihrer Kunden. Nicht ausgewählte Ausgaben werden durch diesen Start nicht importiert. Der bisherige allgemeine Datenabgleich bleibt ein Lauf über alle konfigurierten Ausgaben und gezielt aufgenommenen Interessenten. Auswahl leer/doppelt/ungültig wird abgefangen; maximal 200 ausgewählte Ausgaben pro Start. Laufender Import muss zuerst beendet werden, wird nicht ersetzt. Bei einer fehlgeschlagenen Zuordnung bleiben zuvor gespeicherte Zuordnungen erhalten; Wiederholung mit derselben Projekt-ID legt keine zweite Ausgabe an. Keine neuen HQ-Schreibwege und keine Änderungen an Bereitstellung/Identität.
+
+**Prüfung:** 101 bestehende Logikprüfungen und 15 V1-Prüfungen bestanden. Neue Regressionen: Testgegenstelle lehnt contains ab, Textsuche einschließlich Apostroph/Projektnummer/205 Treffern/Seitenvalidierung; Auswahlimport mit zwei von drei Ausgaben, Fortsetzung und Schutz gegen unbekannte/doppelte IDs oder das Ersetzen eines laufenden Imports. Browserprüfung mit künstlichem HTTP-400-Fehler direkt am Suchfeld, keiner Trefferliste, 201 Treffern über zwei Seiten, Import ohne Häkchen, Mehrfachauswahl, vorgeschlagenen Nummern, zwei ausgewählten Ausgaben und ausgelassener dritter Ausgabe, Anhalten/Fortsetzen sowie bisherigen Filtern und Kontakten bestanden. Die beiden Historien-Browsertests weiterhin erfolgreich. Ansicht der Projektauswahl visuell geprüft. Ausschließlich synthetische Daten; keine echten HQ-/Firebase-Zugriffe durch Codex. Neue kleine Frontendquelle SalesProjects.js ist im Build enthalten.
+
+**Übergabe:** Wieder beide Dateien hq-benchmark/SalesBackend.gs und hq-benchmark/Sales.html vollständig ersetzen und die bestehende Bereitstellung als Neue Version veröffentlichen. Kennung 2026-09-28-r15. Keine neuen/geänderten Skripteigenschaften, Firestore-Regeln, Manifestwerte oder Zugriffseinstellungen. Neue lokale Quelldatei nicht separat nach Google übertragen. Schritt 5 der manuellen Anleitung wurde durch Suche → Häkchen → Zuordnung prüfen → Auswahlimport ersetzt.
+
+**Nächste Nutzeraktionen:**
+
+- SalesBackend.gs gemäß Anleitung vollständig ersetzen.
+- Sales.html gemäß Anleitung vollständig ersetzen.
+- Die bestehende Bereitstellung auf Neue Version setzen.
+- In der Web-App 2026-09-28-r15 prüfen; bei falscher Kennung zunächst die Übertragung kontrollieren.
+- Verwaltung öffnen.
+- Unter HQ-Projekt suchen (Name oder Projektnummer) Coburger eingeben.
+- Projekte in HQ suchen anklicken; erwartet werden Trefferzahl und Projekte mit Häkchen. Bei Fehler den neuen technischen Text direkt darunter mitteilen.
+- Die gewünschten Ausgaben anhaken.
+- Bei jeder angehakten Ausgabe Magazinname und Ausgabennummer prüfen beziehungsweise korrigieren.
+- Optional genau eine aktuelle Verkaufsausgabe markieren.
+- Ausgewählte Ausgaben importieren anklicken; erwartet wird der Wechsel zum Datenabgleich mit laufendem Import.
+- Den Abschluss beziehungsweise konkrete Fehlerabschnitte nach Anleitung prüfen. Die nachfolgenden V1-Schritte sind weiterhin live abzunehmen.
+
+**Stand:** Lokal vorbereitet und geprüft. GitHub-Sicherung folgt nach abschließender Dateiprüfung. Nutzer übernimmt Bereitstellung; r15-Live-Prüfung steht aus. Die ältere Roadmap und der ausstehende Google-Teamzugang bleiben unverändert.

@@ -1,6 +1,12 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 28.09.2026 · **2026-09-28-r14** lokal vorbereitet. Der Nutzer hat den bisherigen Lese- und Schreibweg der Kontakthistorie bestätigt. Der beauftragte V1-Ausbau der Chat-Punkte 1–3 ist jetzt implementiert; seine Bereitstellung und Live-Abnahme sind offen. Die gesamte V1 einschließlich Teamzugang, Buchungen und Wiedervorlagen ist damit noch nicht fertig.
+Stand: 28.09.2026 · **2026-09-28-r15** lokal vorbereitet. Der Nutzer hat den bisherigen Lese- und Schreibweg der Kontakthistorie bestätigt. Der beauftragte V1-Ausbau der Chat-Punkte 1–3 ist jetzt implementiert; seine Bereitstellung und Live-Abnahme sind offen. Die gesamte V1 einschließlich Teamzugang, Buchungen und Wiedervorlagen ist damit noch nicht fertig.
+
+## Korrektur r15
+
+Der Nutzer meldet: Projektsuche ohne sichtbares Ergebnis; die nachfolgenden Importschritte konnten deshalb noch nicht geprüft werden. Die bisherige Suche verwendete contains, während der [HQ-v2-Guide](https://developer.hellohq.io/) substringof dokumentiert. Umgestellt auf substringof mit literal-escaped Suchbegriffen. Die Testgegenstelle weist contains nun ausdrücklich ab. Kein behaupteter Live-Nachweis der neuen Suche.
+
+Trefferliste mit Mehrfachauswahl, sichtbarem Lade-/Leer-/Fehlerzustand direkt am Suchfeld und automatisch nachgeladenen Seiten à 200 Treffer, bis 50 Seiten. Kein unnötiger Firebase-Gesamtneuladevorgang nach der Suche. 60-Sekunden-Antwortgrenze je Suchaufruf. Magazin und Ausgabennummer werden nur bei erkennbarem Projektnamen vorgeschlagen und vom Nutzer bestätigt. Ausgewählte Ausgaben importieren speichert Zuordnungen einzeln und startet einen auf diese Ausgaben begrenzten Leseimport. Teilweise gespeicherte Zuordnungen bleiben bei Fehler erhalten; der gleiche Projektbezug bleibt idempotent. Ein bestehender laufender Import wird nicht ersetzt.
 
 ## Aktuelle Funktionen
 
@@ -35,7 +41,7 @@ Kontakt-Historie einschließlich Rechnungsversand bleibt übersichtlich und aufk
 
 - Sales.gs: bestehende Pilot-, Identitäts-, Firebase- und TEST-Schreibfunktionen.
 - SalesV1.gs: ausdrücklich freigegebener V1-Leseumfang, Konfiguration, Importfortschritt und zentrale Übersichten.
-- Sales.template.html, SalesV1.js und Sales.styles.css: Oberfläche und Gestaltung ohne Demodatensätze.
+- Sales.template.html, SalesV1.js, SalesProjects.js und Sales.styles.css: Oberfläche und Gestaltung ohne Demodatensätze.
 - build.cjs: erzeugt hq-benchmark/SalesBackend.gs aus beiden Serverquellen und hq-benchmark/Sales.html aus Template, V1-Oberfläche und CSS. Keine Abhängigkeit von der unversionierten Offline-Demo.
 
 ```powershell
@@ -51,7 +57,7 @@ node sales-app/test-history-browser.cjs
 node sales-app/test-v1-browser.cjs
 ```
 
-101 Logikprüfungen, 13 V1-Prüfungen und drei Browser-Integrationsprüfungen mit ausschließlich synthetischen Daten bestanden. Geprüft: Zielschutz und Identität, Firmen-/Kontaktanlage, verlorene Antworten, Feldauswahl, Mail-Empfänger, Kontaktzugehörigkeit, Rich-Text-Sicherheit, eindeutige Projektzuordnung, Importseiten/Fortsetzung, unveränderter alter Snapshot bei Abruffehler, Fehlerwiederholung, Kundendeduplizierung, reine HQ-GET-Aufrufe, unbekannte Historienabdeckung und tatsächliche UI-Bedienung. Kein Nachweis der neuen Funktionen im echten Mandanten.
+101 Logikprüfungen, 15 V1-Prüfungen und drei Browser-Integrationsprüfungen mit ausschließlich synthetischen Daten bestanden. Geprüft: Zielschutz und Identität, Firmen-/Kontaktanlage, verlorene Antworten, Feldauswahl, Mail-Empfänger, Kontaktzugehörigkeit, Rich-Text-Sicherheit, eindeutige Projektzuordnung, Importseiten/Fortsetzung, unveränderter alter Snapshot bei Abruffehler, Fehlerwiederholung, Kundendeduplizierung, reine HQ-GET-Aufrufe, unbekannte Historienabdeckung und tatsächliche UI-Bedienung. Kein Nachweis der neuen Funktionen im echten Mandanten.
 
 Firestore serverseitig über bestehendes Dienstkonto: sales_editions, sales_companies, sales_meta (Katalog, Directory, aktuelle Ausgabe und Importlauf), sales_imports (Importseiten), sales_drafts, sales_jobs. Bestehende Regeln sperren diese Sammlungen für Browserzugriff; keine Regeländerung. Browser-Lokalspeicher enthält nur das Farbschema.
 

@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-09-28-r14';
+const SALES_RELEASE = '2026-09-28-r15';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -391,7 +391,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-09-28-r14','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-09-28-r15','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -860,14 +860,16 @@ function salesV1Page_(entity,filter,skip,top){
   if(total!==null&&total>skip&&!rows.length)throw new Error('HQ-Seite fehlt.');
   return {rows,total,done:total!==null?skip+rows.length===total:rows.length<top};
 }
-function salesV1Search_(entity,input){
+function salesV1Search_(entity,input,skip){
   const term=salesText_(input,100,true);if(term.length<3)throw new Error('Bitte mindestens drei Zeichen eingeben.');
-  const literal=term.replace(/'/g,"''"),filter="contains(name,'"+literal+"')"+(entity==='Projects'?" or number eq '"+literal+"'":'');
-  const page=salesV1Page_(entity,filter,0,50),query=term.toLocaleLowerCase('de');
+  skip=skip===undefined?0:Number(skip);if(!Number.isSafeInteger(skip)||skip<0||skip>10000)throw new Error('Ungültige Suchseite. Bitte Suche eingrenzen.');
+  // HQ v2 documents substringof(value, field), not OData contains(field, value).
+  const literal=term.replace(/'/g,"''"),filter="substringof('"+literal+"',name)"+(entity==='Projects'?" or number eq '"+literal+"'":'');
+  const page=salesV1Page_(entity,filter,skip,200),query=term.toLocaleLowerCase('de');
   const rows=page.rows.filter(x=>String(x.name||'').toLocaleLowerCase('de').includes(query)||entity==='Projects'&&String(x.number)===term);
-  return {rows:rows.map(x=>salesPick_(x,['id','name','number'])),limited:!page.done};
+  return {rows:rows.map(x=>salesPick_(x,['id','name','number'])),limited:!page.done,nextSkip:page.done?null:skip+page.rows.length,total:page.total};
 }
-function searchSalesProjects(term){salesUser_(true);return salesV1Search_('Projects',term);}
+function searchSalesProjects(term,skip){salesUser_(true);return salesV1Search_('Projects',term,skip);}
 function searchSalesCompanies(term){salesUser_(true);return salesV1Search_('Companies',term);}
 function addSalesCompany(id){
   salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const company=salesCompany_(salesOne_('Companies',salesId_(id)));salesV1IndexCompany_({company},true);return {message:'Unternehmen für den nächsten Datenimport aufgenommen. In HQ wurde nichts verändert.'};});
@@ -926,10 +928,13 @@ function syncSalesV1History(id){
     return {message:stored.histories.length+' HQ-Historieneinträge vollständig nach Firebase übertragen.'};
   });
 }
-function startSalesImport(){
+function startSalesImport(editionIds){
   salesUser_(true);return salesLock_(()=>{
-    salesAssertPrivate_();const old=salesRead_('sales_meta/import');if(old?.state==='running')return old;
-    const editions=salesV1Editions_(),companyIds=salesV1Index_().entries.map(e=>e.company.id);
+    salesAssertPrivate_();const scoped=editionIds!==undefined;
+    if(scoped&&(!Array.isArray(editionIds)||!editionIds.length||editionIds.length>200||new Set(editionIds).size!==editionIds.length))throw new Error('Bitte 1 bis 200 unterschiedliche Ausgaben auswählen.');
+    const all=salesV1Editions_();if(scoped&&editionIds.some(id=>!all.some(e=>e.id===id)))throw new Error('Auswahl enthält eine nicht zugeordnete Ausgabe.');
+    const old=salesRead_('sales_meta/import');if(old?.state==='running'){if(scoped)throw new Error('Zuerst den laufenden Import unter Datenabgleich fortsetzen und abschließen. Die neue Auswahl ist noch nicht gestartet.');return old;}
+    const editions=scoped?all.filter(e=>editionIds.includes(e.id)):all,companyIds=scoped?[]:salesV1Index_().entries.map(e=>e.company.id);
     if(!editions.length&&!companyIds.length)throw new Error('Zuerst eine Ausgabe zuordnen oder ein Unternehmen aufnehmen.');
     const run={id:Utilities.getUuid(),revision:0,state:'running',startedAt:salesNow_(),updatedAt:salesNow_(),cursor:0,tasks:[...editions.map(e=>({kind:'edition',id:e.id,label:e.magazine+' #'+e.issue,skip:0,pages:0})),...companyIds.map(id=>({kind:'company',id,label:'HQ-Unternehmen '+id}))],errors:[],done:0};
     salesWrite_('sales_meta/import',run);return run;

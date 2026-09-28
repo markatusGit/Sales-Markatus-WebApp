@@ -10,7 +10,8 @@ function setup(){
   const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=path=>{
     const r=get(path);if(!path.includes('?'))return r;
     const q=new URL('https://fixture'+path).searchParams,filter=q.get('$filter')||q.get('filter')||'';let rows=r.data;
-    const number=/number eq '((?:''|[^'])*)'/.exec(filter),contains=/contains\(name,'((?:''|[^'])*)'\)/.exec(filter);
+    if(/contains\(/.test(filter))throw Error('Unsupported HQ filter: contains; expected substringof');
+    const number=/number eq '((?:''|[^'])*)'/.exec(filter),contains=/substringof\('((?:''|[^'])*)',name\)/.exec(filter);
     if(contains||number)rows=rows.filter(x=>contains&&String(x.name).toLowerCase().includes(contains[1].replace(/''/g,"'").toLowerCase())||number&&x.number===number[1]);
     return {data:rows.slice(Number(q.get('$skip')||q.get('skip')||0),Number(q.get('$skip')||q.get('skip')||0)+Number(q.get('$top')||q.get('top')||200)),headers:{'helloHQ-Count':rows.length}};
   };
@@ -72,6 +73,24 @@ test('edition targets and dates are independent and protected from lost updates'
 test('HQ search is read-only and escapes literal quote characters',()=>{
  const f=setup();f.config(70);const n=f.calls.length;assert.equal(f.ctx.searchSalesProjects('P70').rows.length,1);f.ctx.searchSalesCompanies("O'Brien");
  assert.ok(f.calls.slice(n).every(c=>c.method==='get'));assert.ok(decodeURIComponent(f.calls.at(-1).path).includes("O''Brien"));
+ assert.ok(decodeURIComponent(f.calls.at(-1).path).includes('substringof('));
+});
+
+test('project search pages all matches beyond fifty and accepts exact numbers and literal quotes',()=>{
+ const f=setup();for(let i=1;i<=205;i++)f.remote.Projects[i]={id:i,name:'COBURGER Ausgabe #'+i,number:'P'+i};
+ f.remote.Projects[999]={id:999,name:"O'Brien Sonderausgabe",number:'Q999'};
+ const first=f.ctx.searchSalesProjects('Coburger'),second=f.ctx.searchSalesProjects('Coburger',first.nextSkip);
+ assert.equal(first.rows.length,200);assert.equal(first.nextSkip,200);assert.equal(second.rows.length,5);assert.equal(second.limited,false);
+ assert.equal(f.ctx.searchSalesProjects('P205').rows[0].id,205);assert.equal(f.ctx.searchSalesProjects("O'Brien").rows[0].id,999);
+ assert.equal(f.ctx.searchSalesProjects('Nicht vorhanden').rows.length,0);assert.throws(()=>f.ctx.searchSalesProjects('Coburger',-1));
+});
+
+test('selected import schedules only selected editions and their companies',()=>{
+ const f=setup(),a=f.config(69),b=f.config(70),c=f.config(71);f.doc(69,1);f.doc(70,2);f.doc(71,3);
+ const run=f.ctx.startSalesImport([a,c]);assert.deepEqual(Array.from(run.tasks,t=>t.id),[a,c]);
+ assert.throws(()=>f.ctx.startSalesImport([b]),/laufenden Import/);assert.equal(f.ctx.startSalesImport().id,run.id);
+ const n=f.calls.length;f.finish();assert.ok(f.db['sales_editions/'+a].loadedAt);assert.ok(f.db['sales_editions/'+c].loadedAt);assert.equal(f.db['sales_editions/'+b].loadedAt,undefined);
+ assert.ok(f.calls.slice(n).every(c=>c.method==='get'));assert.throws(()=>f.ctx.startSalesImport(['unknown']),/nicht zugeordnete/);assert.throws(()=>f.ctx.startSalesImport([a,a]),/unterschiedliche/);assert.throws(()=>f.ctx.startSalesImport([]),/auswählen/);
 });
 test('ordinary allowed users can read but cannot change import scope or run HQ import',()=>{
  const f=setup();f.ctx.saveSalesAccess('pp@markatus.de\ntest@example.invalid');f.setEmail('test@example.invalid');f.ctx.getSalesV1State();
