@@ -46,12 +46,14 @@ const {chromium}=require('playwright'),{setup}=require('./test-sales-v1.cjs');
   await page.getByRole('button',{name:'HQ synchronisieren',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#magazin-vertrieb[aria-busy=true]')&&document.body.innerText.includes('Aktueller Abschnitt'));
   // Wait for the first queued RPC to reach the synthetic server, then interrupt the client loop.
-  for(let i=0;!releaseFirstStep&&i<100;i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(releaseFirstStep);
-  await page.getByRole('button',{name:'Nach diesem Abschnitt anhalten',exact:true}).click();releaseFirstStep();
-  await page.getByText('HQ-Sync angehalten; später fortsetzbar.',{exact:false}).waitFor();assert.equal(f.db['sales_meta/sync'].state,'running');
+  for(let i=0;!releaseFirstStep&&i<100;i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(releaseFirstStep);assert.equal(await page.getByText('Läuft in diesem Fenster',{exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'HQ-Sync fortsetzen',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Nach diesem Abschnitt anhalten',exact:true}).click();await page.getByText('Anhalten angefordert · laufender Abschnitt endet noch',{exact:true}).waitFor();releaseFirstStep();
+  await page.getByText('HQ-Sync angehalten; später fortsetzbar.',{exact:false}).waitFor();assert.equal(f.db['sales_meta/sync'].state,'running');assert.equal(f.db['sales_meta/sync'].paused,true);await page.getByText('Angehalten · Fortschritt gespeichert',{exact:true}).waitFor();assert.ok((await page.locator('#sync-discovery').innerText()).includes('3 von 3 Firmen erfasst'));
+  const pausedId=f.db['sales_meta/sync'].id;await page.screenshot({path:path.join(os.tmpdir(),'sales-r17-paused-qa.png'),fullPage:true});
+  await page.setContent(fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8'));await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();await page.getByRole('button',{name:'Datenabgleich',exact:true}).click();await page.getByText('Angehalten · Fortschritt gespeichert',{exact:true}).waitFor();
   await page.getByRole('button',{name:'HQ-Sync fortsetzen',exact:true}).click();await page.getByText('HQ-Sync abgeschlossen.',{exact:false}).waitFor();
   assert.deepEqual(Array.from(f.db['sales_meta/sync'].tasks.filter(t=>t.kind==='edition'),t=>t.id),[65,66,67,68,69,70,71].map(i=>'project-'+(500+i)));assert.equal(f.db['sales_editions/project-572'],undefined);
-  assert.equal(f.db['sales_meta/sync'].state,'completed');assert.ok(f.calls.slice(startCalls).every(c=>c.method==='get'));
+  assert.equal(f.db['sales_meta/sync'].id,pausedId);assert.equal(f.db['sales_meta/sync'].state,'completed');assert.ok(f.calls.slice(startCalls).every(c=>c.method==='get'));
   await page.screenshot({path:path.join(os.tmpdir(),'sales-sync-qa.png'),fullPage:true});
   await page.getByRole('button',{name:'Kunden',exact:true}).click();
   assert.equal(await page.getByLabel('Magazin',{exact:true}).count(),0);assert.equal(await page.getByLabel('Historie',{exact:true}).count(),0);

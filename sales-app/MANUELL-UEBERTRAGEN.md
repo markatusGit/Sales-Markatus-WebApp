@@ -1,6 +1,6 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 28.09.2026 · **2026-09-28-r16**. Neu: ein gemeinsamer HQ-Sync mit vollständigem Firmen-/Kontakt-/Historienimport, kleineren Datenpaketen und Vollständigkeitsanzeige. Lokal vorbereitet und synthetisch geprüft; die Live-Abnahme steht aus.
+Stand: 02.10.2026 · **2026-10-02-r17**. Neu: beschleunigte erste Firmenerfassung, sichtbare Firmen-/Seitenzähler und dauerhaft bestätigtes Anhalten. Der gemeinsame HQ-Sync aus r16 bleibt erhalten. Lokal vorbereitet und synthetisch geprüft; die Live-Abnahme steht aus.
 
 **Austauschdateien:** [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html). Beide vollständig ersetzen. Keine neuen/geänderten Skripteigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffseinstellungen. Kein automatischer Upload durch Codex. Alte Firebase-Daten bleiben lesbar; nichts löschen oder manuell migrieren.
 
@@ -34,9 +34,26 @@ Stand: 28.09.2026 · **2026-09-28-r16**. Neu: ein gemeinsamer HQ-Sync mit vollst
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit **/exec** als info@markatus.de öffnen.
 7. Die Seite neu laden.
-8. Oben **2026-09-28-r16** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben **2026-10-02-r17** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern aktualisiert die /exec-App nicht. Die zusätzlichen lokalen Quellmodule sind bereits in den beiden Austauschdateien enthalten und werden nicht zusätzlich in Google angelegt.
+
+## Deinen bereits angehaltenen r16-Lauf fortsetzen
+
+Nach dem Dateiaustausch und der neuen Bereitstellung zuerst diesen Abschnitt verwenden. Die weiteren Abschnitte beschreiben allgemeine Abläufe; Ausgaben nicht erneut zuordnen und keinen neuen Lauf anlegen.
+
+1. Alle noch geöffneten alten Web-App-Tabs schließen. Erwartung: Kein alter Browser setzt den Lauf weiter fort; ein bereits gestarteter Serverabschnitt kann noch enden.
+2. Die Web-App neu öffnen.
+3. Oben **2026-10-02-r17** prüfen. Bei anderer Kennung zuerst die Bereitstellung kontrollieren.
+4. **Datenabgleich** öffnen.
+5. Die neue Zeile **… von … Firmen erfasst** ablesen. Erwartung: Der bisher gespeicherte Firmenstand und die Seitenzahl werden angezeigt; die Tabelle vollständiger Kundenakten darf zunächst noch 0 zeigen.
+6. Den Status prüfen. Beim alten r16-Lauf darf **Hier nicht aktiv · gespeicherter Lauf fortsetzbar** stehen: r16 hatte keine dauerhaft gespeicherte Pause. Das ist kein Verlust des Fortschritts und behauptet keinen globalen Serverstillstand.
+7. **HQ-Sync fortsetzen** einmal anklicken. Erwartung: Derselbe Lauf arbeitet ab seiner gespeicherten Seite weiter. Falls stattdessen nur **HQ synchronisieren** erscheint, vor dem Klicken den Status mitteilen.
+8. Die neue Firmenzahl beobachten. Erwartung: Sie steigt nach jeder erfolgreich gespeicherten Seite um bis zu 50; anschließend folgt **Firmenerfassung abgeschlossen** und der Import der Kundenakten.
+9. Wenn die Zahl über mehrere Minuten unverändert bleibt, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Zunächst **Anhalten angefordert · laufender Abschnitt endet noch**, danach **Angehalten · Fortschritt gespeichert**.
+10. Bei ausbleibender Anhaltebestätigung den aktuellen Abschnitt, Firmen-/Seitenzähler, Zeitpunkt und technischen Text mitteilen. Keinen zweiten Lauf oder Ersatzauftrag anlegen.
+
+Die vorhandenen Schreibfehler bleiben erhalten. Bei Fortsetzung ab der Firmenerfassung werden die schon durchlaufenen Schreibabschnitte nicht wiederholt. Daher kann der Lauf am Ende trotz erfolgreichem Leseimport weiterhin **Mit offenen Punkten beendet** melden. Geladene Zahlen und Ausgabenprüfung getrennt von den alten Schreibfehlern beurteilen; diese werden anschließend einzeln geklärt. Der folgende Detailimport umfasst weiterhin viele Abschnitte; keine feste Gesamtdauer zugesagt.
 
 ## 4. Vorhandene App-Aufträge ansehen
 
@@ -73,9 +90,9 @@ Alle Unternehmen, Ansprechpartner und Historieneinträge werden unabhängig von 
 
 1. **Datenabgleich** öffnen.
 2. **HQ synchronisieren** anklicken. Erwartung: Zuerst offene Testaufträge, danach der Leseimport aller Unternehmen, Ansprechpartner und Historien sowie der ausgewählten Ausgaben.
-3. Den **Aktuellen Abschnitt** beobachten. Erwartung: Firmen werden in Stammdaten, Ansprechpartner, Belege, Projekte, Kontakthistorie und weitere Teilschritte aufgeteilt; die Zahl bekannter Abschnitte kann wachsen.
+3. Den **Aktuellen Abschnitt** beobachten. Während der ersten Erfassung wächst zusätzlich **… von … Firmen erfasst** nach jeder gespeicherten Seite. Erwartung: Firmen werden in Stammdaten, Ansprechpartner, Belege, Projekte, Kontakthistorie und weitere Teilschritte aufgeteilt; die Zahl bekannter Abschnitte kann wachsen.
 4. Die App während des Laufs geöffnet lassen. Auch ein größerer Erstimport darf längere Zeit benötigen; Fortschritt wird nach Abschnitten gespeichert.
-5. Falls du unterbrechen möchtest, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Der laufende Abschnitt endet, danach erscheint **HQ-Sync angehalten; später fortsetzbar.**
+5. Falls du unterbrechen möchtest, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Der laufende Abschnitt endet, danach erscheinen **HQ-Sync angehalten; später fortsetzbar.** und **Angehalten · Fortschritt gespeichert**. Die Pause bleibt beim erneuten Öffnen gespeichert.
 6. Zum Fortsetzen **HQ-Sync fortsetzen** anklicken. Erwartung: Derselbe gespeicherte Lauf geht weiter, auch nach Schließen und erneutem Öffnen der App.
 7. Am Ende den Status prüfen. Erwartung: **HQ-Sync abgeschlossen.** und **Abgeschlossen · Zahlen geprüft**. Bei **Mit offenen Punkten beendet** die Hinweise nach dem nächsten Abschnitt prüfen.
 8. In der Tabelle die drei Zeilen **Unternehmen**, **Ansprechpartner** und **Historieneinträge** vergleichen. Erwartung: Die vollständig geladenen Anzahlen entsprechen jeweils der HQ-Gesamtzahl. Kontakte/Historie ohne bekannte Firmenzuordnung sind in diesen Anzahlen enthalten.
@@ -170,7 +187,7 @@ E-Mail dokumentiert eine Kommunikation, verschickt aber keine Nachricht. Alte HQ
 
 ## Bestehende Einrichtung und nächster Ausbau
 
-Für r16 keine dieser Einstellungen erneut eintragen oder verändern:
+Für r17 keine dieser Einstellungen erneut eintragen oder verändern:
 
 | Skripteigenschaft | Vorhandener Zweck |
 | --- | --- |
@@ -184,4 +201,4 @@ Weitere Benchmark-Einstellungen bleiben erhalten. Bereitstellung zuletzt **Ausf�
 
 Danach gemäß Nutzerplanung: **4. Persönlicher Google-Zugang → 5. Gespräche, Wiedervorlagen und Stammdatenbearbeitung → 6. Buchungen und Redaktionsübergabe → 7. Eine aktuelle Ausgabe im kleinen Team testen.**
 
-Lokal geprüft: 101 bestehende Logikprüfungen, 15 V1-Prüfungen, 12 Speicher-/Gesamtabgleichprüfungen und drei Browser-Integrationsprüfungen mit synthetischen Daten. Keine echten HQ-/Firebase-Zugriffe durch Codex. Der komplette reale Bestand ist erst nach deinem Lauf und der anschließenden Prüfung bestätigt.
+Lokal geprüft: 101 bestehende Logikprüfungen, 15 V1-Prüfungen, 17 Speicher-/Gesamtabgleichprüfungen und drei Browser-Integrationsprüfungen mit synthetischen Daten. Keine echten HQ-/Firebase-Zugriffe durch Codex. Der komplette reale Bestand ist erst nach deinem Lauf und der anschließenden Prüfung bestätigt.

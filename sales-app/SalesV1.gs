@@ -1,5 +1,12 @@
 /** Explicitly authorized V1 read workflows. No HQ POST/PUT is called here. */
-function salesV1Index_(){const entries=new Map((salesRead_('sales_meta/directory')?.entries||[]).map(e=>[String(e.company.id),e]));salesList_('sales_directory').forEach(e=>entries.set(String(e.company.id),e));return {entries:Array.from(entries.values())};}
+function salesV1Index_(){
+  const records=salesList_('sales_directory'),entries=new Map();
+  records.forEach(e=>(e.companies||[]).forEach(company=>entries.set(String(company.id),{company,contacts:[],loadedAt:null,explicit:false})));
+  // Fully loaded entries take precedence over preliminary discovery pages.
+  (salesRead_('sales_meta/directory')?.entries||[]).forEach(e=>entries.set(String(e.company.id),e));
+  records.filter(e=>e.company).forEach(e=>entries.set(String(e.company.id),e));
+  return {entries:Array.from(entries.values())};
+}
 function salesV1Editions_(){return salesList_('sales_editions');}
 function salesV1Known_(id){
   id=String(salesId_(id));

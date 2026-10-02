@@ -830,3 +830,36 @@ Globale Kontakte/Historien zusätzlich nach fehlender bekannter Firmenzuordnung 
 **Empfohlene Nutzeraktion:** Falls sichtbar einmal Nach diesem Abschnitt anhalten anklicken; laufenden Abschnitt abschließen lassen und gespeicherten Fortschritt behalten. Vorerst keinen neuen Sync, keine Ersatzaufträge und keine Löschung in Firebase/HQ. Aktuellen Wert von Letzte Aktualisierung sowie Sichtbarkeit des Anhalten-Buttons erfragt. Bei ausbleibender Abschlussmeldung zunächst Status klären. Unklare Schreibausgänge nicht wiederholen; die eigentlichen 400-/404-/Rückprüfungsprobleme getrennt von der Leseleistung untersuchen.
 
 **Offen:** Firmenimport effizienter speichern und seinen tatsächlichen Teilfortschritt anzeigen. Alte offene Testaufträge einzeln zuordnen/klären; keine automatische Verwerfung oder Freigabe. Noch keine Codeänderung, neue Version, HQ-Aktion oder Firebase-Änderung in dieser Diagnose. Diagnose-Nachtrag im Commit 402e535 erfolgreich nach origin/main übertragen; dieser Sicherungsvermerk wird separat versioniert. Bestehende Roadmap unverändert.
+
+
+### 02.10.2026 – r17: Firmenerfassung beschleunigen, Teilfortschritt und dauerhafte Pause
+
+**Auftrag / Live-Stand:** Nutzer hat Nach diesem Abschnitt anhalten angeklickt und meldet HQ-Sync fortsetzen bereit; der vorherige Zeitstempel war weitergerückt. Auftrag zur besprochenen Verbesserung ausdrücklich erteilt. Vollständiger Import weiterhin nicht bestätigt. Keine Wiederholung oder Verwerfung der alten Schreibfehler beauftragt.
+
+**Lokal umgesetzt:** Erste Erfassung speichert Firmengrunddaten seitenweise mit bis zu 50 Firmen in sales_directory/discovery-<offset>. Keine separaten Directory-/Legacy-Reads und Writes pro Firma mehr. Bestehende individuelle/alte Directory-Einträge mit Kontakten und loadedAt werden beim Lesen bevorzugt und nicht überschrieben. Vollständige Kundenakten weiterhin einzeln nach vollständig erfolgreichem Detailimport veröffentlichen. Große Seiten nutzen vorhandene Teilpakete. Doppelte IDs schon beim nächsten Seitenabruf gegen gespeicherte Firmen-IDs prüfen; am Ende keine erneute Zusammenführung aller Rohseiten. Folgeaufträge über ein Set ergänzen.
+
+Gespeicherter r16-Lauf bleibt mit derselben ID, Cursor, Revision, Seitenoffset, Fehlerliste und Aufgabe bestehen. StartSalesSync nimmt ihn wieder auf, statt einen neuen Lauf anzulegen. Schon durchlaufene Schreibabschnitte werden beim Fortsetzen der Firmenerfassung nicht erneut ausgeführt. Keine Änderungen am HQ-Writer, keine Freigabe echter Bestandskunden.
+
+Neue Anzeige für erfasste Firmen / HQ-Gesamtzahl / gespeicherte Seiten, getrennt von vollständigen Kundenakten. Aktiver Startbutton während des Laufs durch deaktiviertes HQ-Sync läuft ersetzt. Laufstatus im Browser: Läuft in diesem Fenster, Anhalten angefordert, Angehalten · Fortschritt gespeichert. Nach letztem Abschnitt bestätigt pauseSalesSync die Pause unter bestehendem Lauf; Adminprüfung, Revisionserhöhung und serverseitige Schrittsperre. Fortsetzen hebt Pause ausdrücklich auf. Interner Zustand running bleibt für bisherige Konfigurationssperren erhalten. Bei erneutem Öffnen ohne bestätigte Pause oder altem r16-Lauf: Hier nicht aktiv · gespeicherter Lauf fortsetzbar; keine falsche Behauptung eines globalen Serverstillstands.
+
+**Prüfung:** 101 bestehende, 15 V1- und nun 17 Speicher-/Sync-Prüfungen bestanden. Zusätzlicher synthetischer Bestand mit 3.202 Firmen: 65 Directory-Seitenwrites statt einzelner Firmenwrites und keine individuellen Directory-/Legacy-Lesezugriffe in der Erfassung; insgesamt 196 kleine physische Writes mit Rohseiten und Laufzustand. Dies ist eine Aufrufzählung, keine echte Laufzeitmessung. Wiederaufnahme eines nach r16 aufgebauten Teilstands am gespeicherten Offset geprüft, Fehler unverändert, kein HQ-POST. Pause über Neulesung erhalten, späte/stale Schritte blockiert, kein Neustart beim Fortsetzen; alte Kontakte/Details behalten und doppelte Firmen-ID auf Folgeseite abgefangen. Drei Browserprüfungen bestanden; echte Bedienung von Läuft → Anhalten angefordert → Angehalten, erneutes Öffnen und Fortsetzen desselben Laufs zusätzlich geprüft. Pausenansicht visuell geprüft. Ausschließlich künstliche Daten; kein Zugriff auf echtes HQ/Firebase und keine Bereitstellung durch Codex.
+
+**Grenzen / offen:** Live-Geschwindigkeit und kompletter realer Datenbestand nach Nutzerbereitstellung prüfen. Detailimport umfasst weiter viele Abschnitte, keine feste Dauer zugesagt. Bestehende Teilpaket-/Laufzeit-/API-/Aufbewahrungsgrenzen unverändert. Die 15 gemeldeten Schreibhinweise bleiben erhalten und werden separat geklärt; Abschluss kann deshalb trotz vollständiger Lesedaten offene Punkte melden. Keine neuen Rollen, keine Nachtläufe; V1-Roadmap unverändert.
+
+**Übergabe / nächste Nutzeraktionen:**
+
+- SalesBackend.gs vollständig in der gleichnamigen Google-Datei ersetzen.
+- Sales.html vollständig in der gleichnamigen Google-Datei ersetzen.
+- Beide Änderungen speichern.
+- Bestehende Bereitstellung als Neue Version veröffentlichen.
+- Alte Web-App-Tabs schließen.
+- Web-App erneut öffnen.
+- Kennung 2026-10-02-r17 prüfen; bei Abweichung Bereitstellung kontrollieren.
+- Datenabgleich öffnen.
+- Neue Zeile Firmen erfasst ablesen; bisher gespeicherte Seiten sollen sichtbar sein.
+- HQ-Sync fortsetzen einmal anklicken; falls nur HQ synchronisieren angeboten wird, erst Status mitteilen.
+- Wachsenden Firmen-/Seitenzähler prüfen; später folgen vollständige Kundenakten.
+- Bei erneutem Stillstand einmal Nach diesem Abschnitt anhalten anklicken und auf Angehalten · Fortschritt gespeichert warten.
+- Bei ausbleibender Bestätigung Abschnitt, Zähler und Zeitstempel mitteilen; keine Ersatzaufträge anlegen.
+
+Keine neuen/geänderten Skripteigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffseinstellungen. Keine zusätzliche lokale Quelldatei separat nach Google übertragen. Manuelle Anleitung enthält einen eigenen Abschnitt zur Wiederaufnahme dieses r16-Laufs. Lokal vorbereitet und geprüft; GitHub-Sicherung folgt. Nutzerbereitstellung und Live-Prüfung offen.

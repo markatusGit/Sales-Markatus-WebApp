@@ -1,11 +1,15 @@
 /** One explicit sync: saved app jobs first, full HQ reads second. Never runs on a timer. */
 function salesSyncSummary_(run){
   if(!run)return null;
-  return {id:run.id,revision:run.revision,state:run.state,done:run.done,total:run.tasks.length,current:run.tasks[run.cursor]?.label||'',stage:run.tasks[run.cursor]?.stage||'',updatedAt:run.updatedAt,stats:run.stats,errors:run.errors,coverage:run.coverage||[]};
+  const discovery=run.tasks.find(t=>t.kind==='discover')?.collections?.companies;
+  return {id:run.id,revision:run.revision,state:run.state,paused:run.paused===true,done:run.done,total:run.tasks.length,current:run.tasks[run.cursor]?.label||'',stage:run.tasks[run.cursor]?.stage||'',updatedAt:run.updatedAt,stats:run.stats,errors:run.errors,coverage:run.coverage||[],discovery:{count:run.companyIds.length,total:discovery?.total??run.stats.hqCompanies??null,pages:discovery?.pages||0,complete:run.discoveryComplete===true}};
 }
 function startSalesSync(){
   salesUser_(true);return salesLock_(()=>{
-    salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running')return salesSyncSummary_(old);
+    salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running'){
+      if(old.paused){old.paused=false;old.revision++;salesWrite_('sales_meta/sync',old);}
+      return salesSyncSummary_(old);
+    }
     const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
     // Separate executions for company and contact, with all companies scheduled first.
     for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:step==='company'?'App → HQ: Firma anlegen/bestätigen':'App → HQ: Ansprechpartner anlegen/bestätigen'}));
@@ -16,6 +20,13 @@ function startSalesSync(){
     const run={id:Utilities.getUuid(),revision:0,state:'running',cursor:0,done:0,tasks,errors:[],companyIds:[],loadedCompanyIds:[],startedAt:salesNow_(),updatedAt:salesNow_(),stats:{companies:0,contacts:0,histories:0,editions:0,writes:0}};
     const legacy=salesRead_('sales_meta/import');if(legacy?.state==='running'){legacy.state='superseded';legacy.message='Vom vollständigen HQ-Sync abgelöst.';salesWrite_('sales_meta/import',legacy);}
     salesWrite_('sales_meta/sync',run);return salesSyncSummary_(run);
+  });
+}
+function pauseSalesSync(id){
+  salesUser_(true);return salesLock_(()=>{
+    const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
+    if(run.state==='running'&&!run.paused){run.paused=true;run.revision++;run.pausedAt=salesNow_();salesWrite_('sales_meta/sync',run);}
+    return salesSyncSummary_(run);
   });
 }
 function salesSyncWrite_(task){
@@ -36,10 +47,13 @@ function salesSyncPage_(run,task,key,entity,filter,expand){
   const page=salesV1Page_(entity,filter,meta.skip,50,expand);
   if(meta.total!==undefined&&meta.total!==page.total)throw new Error('HQ-Anzahl während des Abschnitts geändert. Beim nächsten Sync erneut prüfen.');
   if(new Set(page.rows.map(r=>String(salesId_(r.id)))).size!==page.rows.length)throw new Error('Doppelte IDs in HQ-Seite.');
+  if(task.kind==='discover'){
+    const known=new Set(run.companyIds);if(page.rows.some(r=>known.has(String(r.id))))throw new Error('Doppelte Firmen-ID über mehrere HQ-Seiten.');
+  }
   if(filter){const m=/^(companyId|projectId) eq (\d+)$/.exec(filter);if(m&&page.rows.some(r=>Number(r[m[1]])!==Number(m[2])))throw new Error('HQ-Zuordnung stimmt nicht mit dem abgefragten Ziel überein.');}
   salesWrite_('sales_imports/'+run.id+'-'+task.kind+'-'+task.id+'-'+key+'-'+meta.pages,{rows:page.rows});
   meta.pages++;meta.skip+=page.rows.length;meta.total=page.total;
-  if(page.done){const rows=salesSyncRows_(run,task,key);if(new Set(rows.map(r=>String(r.id))).size!==rows.length)throw new Error('Doppelte IDs über mehrere HQ-Seiten.');meta.complete=true;}
+  if(page.done){if(task.kind!=='discover'){const rows=salesSyncRows_(run,task,key);if(new Set(rows.map(r=>String(r.id))).size!==rows.length)throw new Error('Doppelte IDs über mehrere HQ-Seiten.');}meta.complete=true;}
   return page;
 }
 function salesSyncRows_(run,task,key){
@@ -47,12 +61,15 @@ function salesSyncRows_(run,task,key){
   const rows=[];for(let i=0;i<meta.pages;i++){const p=salesRead_('sales_imports/'+run.id+'-'+task.kind+'-'+task.id+'-'+key+'-'+i);if(!p?.rows)throw new Error('Gespeicherte Importseite fehlt.');rows.push(...p.rows);}return rows;
 }
 function salesSyncDiscover_(run,task){
+  const skip=task.collections?.companies?.skip||0;
   const page=salesSyncPage_(run,task,'companies','Companies','');
-  page.rows.forEach(raw=>salesV1IndexCompany_({company:salesCompany_(raw)},false));
+  // One summary write per page. Existing individual records keep contacts and loadedAt.
+  salesWrite_('sales_directory/discovery-'+skip,{companies:page.rows.map(salesCompany_)});
   run.companyIds=Array.from(new Set([...run.companyIds,...page.rows.map(r=>String(r.id))]));run.stats.hqCompanies=page.total;
   if(!page.done)return false;
   run.discoveryComplete=true;
-  run.companyIds.forEach(id=>{if(!run.tasks.some(t=>t.kind==='company'&&t.id===id))run.tasks.push({kind:'company',id,label:'HQ-Unternehmen · Kennung '+id});});
+  const queued=new Set(run.tasks.filter(t=>t.kind==='company').map(t=>t.id));
+  run.companyIds.forEach(id=>{if(!queued.has(id)){queued.add(id);run.tasks.push({kind:'company',id,label:'HQ-Unternehmen · Kennung '+id});}});
   return true;
 }
 function salesSyncCompany_(run,task){
@@ -117,7 +134,7 @@ function getSalesUnassigned(){salesUser_();return {contacts:salesRead_('sales_me
 function runSalesSyncStep(id,revision){
   salesUser_(true);return salesLock_(()=>{
     const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
-    if(run.state!=='running'||run.revision!==Number(revision))return salesSyncSummary_(run);
+    if(run.state!=='running'||run.paused||run.revision!==Number(revision))return salesSyncSummary_(run);
     salesAssertPrivate_();const task=run.tasks[run.cursor];
     try{
       let done=false;

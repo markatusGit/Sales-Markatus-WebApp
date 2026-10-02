@@ -1,6 +1,8 @@
 # Weg zur ersten nutzbaren Sales-App
 
-Stand: 28.09.2026 · **2026-09-28-r16 lokal implementiert und synthetisch geprüft**. Nutzer bestätigt den bisherigen Schreibweg und teilweise den Ausgabeimport, meldet aber einen zu großen Firmendatensatz. Vollständigkeit des echten Bestands bleibt offen. Neue verbindliche Folge: alle Daten korrekt in Firebase, gemeinsamer manueller HQ-Sync und getrennte Kunden-/Magazinansichten; danach Schritte 4–7 unten. Nachtlauf zurückgestellt.
+Stand: 02.10.2026 · **2026-10-02-r17 lokal implementiert und synthetisch geprüft**. Nutzer bestätigt den bisherigen Schreibweg und teilweise den Ausgabeimport, meldet aber einen zu großen Firmendatensatz. Vollständigkeit des echten Bestands bleibt offen. Neue verbindliche Folge: alle Daten korrekt in Firebase, gemeinsamer manueller HQ-Sync und getrennte Kunden-/Magazinansichten; danach Schritte 4–7 unten. Nachtlauf zurückgestellt.
+
+**Nachtrag r17:** Erste Firmenerfassung auf seitenweises Speichern beschleunigt; Firmen-/Seitenzahl sichtbar und bestätigte Pause dauerhaft gespeichert. Angehaltenen r16-Lauf nach Dateiaustausch mit HQ-Sync fortsetzen weiterführen, keine neue Auswahl und kein Neustart nötig. Alte Schreibfehler bleiben separat offen. Live-Gesamtabnahme weiterhin ausstehend.
 
 ## Ziel und bisheriger Stand
 
@@ -85,16 +87,16 @@ Bereits live positiv gemeldet sind Pilotausgabe, Firmen-/Kontaktanlage einschlie
 
 ## Unmittelbarer nächster Schritt
 
-Die [Anleitung für r16](../sales-app/MANUELL-UEBERTRAGEN.md) enthält Menüwege, Erwartungen und Fehlerfälle.
+Die [Anleitung für r17](../sales-app/MANUELL-UEBERTRAGEN.md) enthält Menüwege, Erwartungen und Fehlerfälle.
 
 - SalesBackend.gs vollständig in der gleichnamigen Google-Datei ersetzen.
 - Sales.html vollständig in der gleichnamigen Google-Datei ersetzen.
 - Unter Bereitstellen → Bereitstellungen verwalten die bestehende Web-App auf Neue Version setzen.
-- In der Web-App 2026-09-28-r16 prüfen; bei Abweichung zuerst Dateistände korrigieren.
+- In der Web-App 2026-10-02-r17 prüfen; bei Abweichung zuerst Dateistände korrigieren.
 - Unter Datenabgleich → Aufträge und Konflikte ansehen offene Testaufträge prüfen.
 - Unter Verwaltung gewünschte Magazinausgaben per Projektsuche anhaken.
 - Auswahl für HQ-Sync speichern anklicken; startet keinen Import.
-- Unter Datenabgleich HQ synchronisieren anklicken.
+- Beim bestehenden angehaltenen Lauf unter Datenabgleich HQ-Sync fortsetzen anklicken; den aktuellen Wiederaufnahmeabschnitt der Anleitung verwenden.
 - Danach Abschlusszahlen gegen HQ und Vollständigkeit je Ausgabe prüfen.
 - Kunden, Kontakte, Historie und Belegbeträge stichprobenartig mit HQ vergleichen.
 - Bei Fehlern nach Anleitung Abschnitt und technischen Text mitteilen.

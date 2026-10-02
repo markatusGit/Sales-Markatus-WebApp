@@ -71,8 +71,8 @@ test('only explicitly enabled magazine editions participate, while firms without
  const active=f.ctx.startSalesSync();assert.throws(()=>f.ctx.setSalesEditionEnabled(a,false),/Abschluss/);assert.throws(()=>f.ctx.saveSalesEditionConfig({}),/Abschluss/);finish(f,active);
 });
 test('all common sync endpoints enforce identity and administrative mutation permissions',()=>{
- const f=setup();f.setEmail('outside@example.invalid');for(const name of ['startSalesSync','runSalesSyncStep','setSalesEditionEnabled','getSalesUnassigned'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
- f.setEmail('pp@markatus.de');f.ctx.saveSalesAccess('pp@markatus.de,reader@example.invalid');f.setEmail('reader@example.invalid');assert.doesNotThrow(()=>f.ctx.getSalesUnassigned());for(const name of ['startSalesSync','runSalesSyncStep','setSalesEditionEnabled'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+ const f=setup();f.setEmail('outside@example.invalid');for(const name of ['startSalesSync','runSalesSyncStep','pauseSalesSync','setSalesEditionEnabled','getSalesUnassigned'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+ f.setEmail('pp@markatus.de');f.ctx.saveSalesAccess('pp@markatus.de,reader@example.invalid');f.setEmail('reader@example.invalid');assert.doesNotThrow(()=>f.ctx.getSalesUnassigned());for(const name of ['startSalesSync','runSalesSyncStep','pauseSalesSync','setSalesEditionEnabled'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
 });
 test('discovery and global contact scans cross page boundaries without omitting companies or contacts',()=>{
  const f=setup();for(let i=200;i<254;i++)f.remote.Companies[i]={...f.remote.Companies[102],id:i,name:'Synthetic '+i};
@@ -85,5 +85,48 @@ test('legacy directory migration preserves other records and blocks overlapping 
  const f=setup(),old=f.ctx.salesCompany_(f.remote.Companies[102]);f.db['sales_meta/directory']={entries:[{company:old,contacts:[{id:'legacy-contact'}]}]};
  f.ctx.salesV1IndexCompany_({company:{...old,name:'Updated'}},false);assert.equal(f.ctx.salesV1Index_().entries[0].company.name,'Updated');assert.equal(f.ctx.salesV1Index_().entries[0].contacts[0].id,'legacy-contact');
  f.ctx.startSalesSync();for(const name of ['startSalesImport','runSalesImportStep','retrySalesImport'])assert.throws(()=>f.ctx[name](),/gemeinsame HQ-Sync/);
+});
+
+test('discovery of thousands of firms uses page writes without individual directory reads',()=>{
+ const f=setup();for(let i=200;i<3400;i++)f.remote.Companies[i]={...f.remote.Companies[102],id:i,name:'Synthetic bulk '+i};
+ const raw=useRealStorage(f),read=f.ctx.pilotReadDocument_,write=f.ctx.pilotWriteDocument_,reads=[],writes=[];
+ f.ctx.pilotReadDocument_=(p,k,t)=>{reads.push(k);return read(p,k,t);};f.ctx.pilotWriteDocument_=(p,k,v,t)=>{writes.push(k);return write(p,k,v,t);};
+ let r=f.ctx.startSalesSync();for(let i=0;i<100&&r.current.includes('alle Unternehmen');i++)r=f.ctx.runSalesSyncStep(r.id,r.revision);
+ assert.equal(r.discovery.count,3202);assert.equal(r.discovery.pages,65);assert.equal(r.discovery.complete,true);assert.equal(r.stats.companies,0);
+ assert.equal(writes.filter(p=>p.startsWith('sales_directory/')).length,65);assert.equal(reads.filter(p=>p.startsWith('sales_directory/')||p==='sales_meta/directory').length,0);
+ assert.equal(writes.length,196);assert.equal(f.ctx.salesV1Index_().entries.length,3202);assert.equal(JSON.parse(raw['sales_meta/sync'].payload).tasks.filter(t=>t.kind==='company').length,3202);
+});
+test('an r16 run resumes at its saved offset without resetting errors or replaying writes',()=>{
+ const f=setup();for(let i=200;i<260;i++)f.remote.Companies[i]={...f.remote.Companies[102],id:i,name:'Synthetic legacy '+i};
+ const initial=f.ctx.startSalesSync(),run=f.db['sales_meta/sync'],rows=f.ctx.salesV1Page_('Companies','',0,50).rows;
+ run.tasks.unshift({kind:'write',id:'old-job',label:'Old write'});run.cursor=1;run.done=0;run.errors=[{kind:'write',id:'old-job',message:'uncertain'}];run.revision=17;
+ run.tasks[1].collections={companies:{pages:1,skip:50,total:62}};run.companyIds=Array.from(rows,r=>String(r.id));run.stats.hqCompanies=62;
+ f.db['sales_imports/'+run.id+'-discover-all-companies-0']={rows};rows.forEach(r=>f.ctx.salesV1IndexCompany_({company:f.ctx.salesCompany_(r)},false));
+ const n=f.calls.length,resume=f.ctx.startSalesSync();assert.equal(resume.id,initial.id);assert.equal(resume.revision,17);assert.equal(resume.discovery.count,50);
+ const next=f.ctx.runSalesSyncStep(resume.id,resume.revision);assert.equal(next.discovery.count,62);assert.equal(next.errors[0].message,'uncertain');assert.equal(next.discovery.complete,true);
+ assert.equal(f.ctx.salesV1Index_().entries.length,62);assert.ok(f.calls.slice(n).every(c=>c.method==='get'));assert.ok(f.calls.slice(n).some(c=>c.path.includes('$skip=50')));assert.ok(!f.calls.slice(n).some(c=>c.path.includes('$skip=0')));
+});
+test('pause is persisted, blocks late calls and resume preserves cursor and invalidates old revisions',()=>{
+ const f=setup(),r=f.ctx.startSalesSync(),paused=f.ctx.pauseSalesSync(r.id),n=f.calls.length;
+ assert.equal(paused.paused,true);assert.equal(f.ctx.getSalesV1State().syncRun.paused,true);
+ f.ctx.runSalesSyncStep(r.id,r.revision);f.ctx.runSalesSyncStep(r.id,paused.revision);assert.equal(f.calls.length,n);
+ assert.equal(f.ctx.pauseSalesSync(r.id).revision,paused.revision);
+ const resumed=f.ctx.startSalesSync();assert.equal(resumed.id,r.id);assert.equal(resumed.paused,false);assert.equal(resumed.current,r.current);
+ f.ctx.runSalesSyncStep(r.id,paused.revision);assert.equal(f.calls.length,n);assert.equal(finish(f,resumed).state,'completed');
+ assert.equal(f.ctx.pauseSalesSync(r.id).state,'completed');assert.equal(f.ctx.pauseSalesSync(r.id).paused,false);
+});
+test('discovery pages preserve existing complete and legacy directory contacts with no duplicate firms',()=>{
+ const f=setup(),c=f.ctx.salesCompany_(f.remote.Companies[102]);
+ f.db['sales_meta/directory']={entries:[{company:c,contacts:[{id:'old'}],loadedAt:'legacy',explicit:true}]};
+ f.db['sales_directory/discovery-0']={companies:[{...c,name:'Preliminary'},f.ctx.salesCompany_(f.remote.Companies[101])]};
+ let entries=f.ctx.salesV1Index_().entries;assert.equal(entries.length,2);assert.equal(entries.find(e=>e.company.id==='102').contacts[0].id,'old');
+ f.ctx.salesV1IndexCompany_({company:c,contacts:[{id:'new'}],loadedAt:'complete'},false);entries=f.ctx.salesV1Index_().entries;
+ assert.equal(entries.length,2);assert.equal(entries.find(e=>e.company.id==='102').contacts[0].id,'new');assert.equal(entries.find(e=>e.company.id==='102').loadedAt,'complete');
+});
+test('duplicate firms on later discovery pages are rejected without claiming completeness',()=>{
+ const f=setup();for(let i=200;i<255;i++)f.remote.Companies[i]={...f.remote.Companies[102],id:i,name:'Synthetic '+i};
+ let r=f.ctx.startSalesSync();r=f.ctx.runSalesSyncStep(r.id,r.revision);const get=f.ctx.salesHqGet_;
+ f.ctx.salesHqGet_=p=>{const value=get(p);if(p.startsWith('/v2/Companies?')&&p.includes('$skip=50'))value.data[0]=f.remote.Companies[101];return value;};
+ r=f.ctx.runSalesSyncStep(r.id,r.revision);assert.equal(r.discovery.count,50);assert.equal(r.discovery.complete,false);assert.ok(r.errors.some(e=>e.message.includes('Doppelte Firmen-ID')));
 });
 console.log(count+' storage and sync checks passed.');

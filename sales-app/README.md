@@ -1,6 +1,14 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 28.09.2026 · **2026-09-28-r16** lokal implementiert und synthetisch geprüft. Der Nutzer bestätigt den bisherigen Firmen-/Kontakt-/Kommunikationsweg. Beim r15-Ausgabeimport trat das 750-KB-Paketlimit auf; Vollständigkeit des realen Bestands ist noch nicht bestätigt. r16 erweitert auf den ausdrücklich beauftragten Gesamtimport und einen gemeinsamen manuellen HQ-Sync. Live-Abnahme und Bereitstellung übernimmt der Nutzer.
+Stand: 02.10.2026 · **2026-10-02-r17** lokal implementiert und synthetisch geprüft. Der Nutzer bestätigt den bisherigen Firmen-/Kontakt-/Kommunikationsweg. Beim r15-Ausgabeimport trat das 750-KB-Paketlimit auf; Vollständigkeit des realen Bestands ist noch nicht bestätigt. r16 erweitert auf den ausdrücklich beauftragten Gesamtimport und einen gemeinsamen manuellen HQ-Sync. Live-Abnahme und Bereitstellung übernimmt der Nutzer.
+
+## Korrektur r17
+
+Live-Rückmeldung: lange Firmenerfassung, 0 vollständige Akten und keine erkennbare Seitenzahl; Anhalten war nur browserlokal. Die erste Erfassung schreibt jetzt eine vorläufige Übersichtsseite für je 50 Firmen unter sales_directory/discovery-<offset>, ohne einzelne Verzeichniseinträge oder die Legacy-Datei pro Firma zu lesen. Neue Seiten werden dedupliziert mit individuellen/alten Einträgen gelesen; vollständige Einträge einschließlich Kontakte und loadedAt haben Vorrang. Kein Löschen alter Daten. Am Ende der Erfassung kein erneutes Laden sämtlicher Rohseiten; doppelte IDs werden gegen die schon gespeicherten Firmenkennungen geprüft. Folgeaufträge werden mit einem Set ohne quadratische Suche ergänzt.
+
+Bestehender r16-Lauf behält ID, Cursor, Revision, Seitenoffset, bisherige Firmen-IDs, Fehler und Aufgaben. Keine Migration nötig. Fortschritt zeigt erfasste Firmen, HQ-Gesamtzahl und Seiten getrennt von vollständigen Kundenakten. Pause wird unter demselben Lauf als paused gespeichert und blockiert weitere Schrittaufrufe; Fortsetzen hebt sie ausdrücklich auf und erhöht die Revision. Interner Zustand running bleibt für bestehende Konfigurationssperren erhalten. Oberfläche: Läuft in diesem Fenster / Anhalten angefordert / Angehalten. Nach bloßem Wiederöffnen eines alten oder nicht explizit pausierten Laufs: Hier nicht aktiv, ohne globalen Stillstand zu behaupten.
+
+Nachweis mit 3.202 synthetischen Firmen: 65 Directory-Seitenwrites, keine individuellen Directory-/Legacy-Lesezugriffe während discovery; 196 kleine physische Writes einschließlich Rohseiten und Laufzustand im Test. Kein gemessener Live-Zeitfaktor. Alte Schreibfehler bleiben zur separaten Klärung erhalten. Späterer Detailimport und bisherige Grenzen bleiben bestehen.
 
 ## Datenabgleich
 
@@ -19,7 +27,7 @@ Die alte Fehlermeldung nannte eine Firmenkennung, keine Anzahl. Sowohl eine komp
 
 SalesStorage.gs liest alte Datensätze unverändert. Größere JSON-Werte bekommen unveränderliche Teilpakete in sales_chunks; der Wurzelverweis wird erst nach allen erfolgreichen Teilwrites ersetzt. Leser prüfen Quelle, Reihenfolge, Teile und Gesamtlänge. Teilwrite-Abbruch ersetzt keinen vorherigen vollständigen Snapshot. Maximal 2.000 Teile à 100.000 UTF-16-Codeeinheiten; keine Zusage unbegrenzter Datenmengen.
 
-Die Firmenübersicht liegt jetzt unter sales_directory pro HQ-ID. Das alte sales_meta/directory wird lesend mit neuen Einträgen zusammengeführt; neuer Datensatz gewinnt. Keine manuelle Migration oder Löschung. Große Ausgaben und Importzustände werden ebenfalls aufgeteilt. Importseiten und alte/abgebrochene Teilgenerationen bleiben vorerst gespeichert. Aufbewahrung, Speicherbudget und Firebase-Backup vor Teamfreigabe festlegen.
+Vollständige Firmenübersichten liegen unter sales_directory pro HQ-ID; vorläufige Erfassungsseiten enthalten dort mehrere Firmen gemeinsam. Das alte sales_meta/directory wird lesend mit neuen Einträgen zusammengeführt; neuer Datensatz gewinnt. Keine manuelle Migration oder Löschung. Große Ausgaben und Importzustände werden ebenfalls aufgeteilt. Importseiten und alte/abgebrochene Teilgenerationen bleiben vorerst gespeichert. Aufbewahrung, Speicherbudget und Firebase-Backup vor Teamfreigabe festlegen.
 
 ## Oberfläche und vorhandene Funktionen
 
@@ -52,7 +60,7 @@ Bereitstellung zuletzt **Nur ich**. Nächste Nutzerfolge: 4 Google-Zugang, 5 Ges
 
 Prüfbefehle: node sales-app/build.cjs; node sales-app/test-sales.cjs; node sales-app/test-sales-v1.cjs; node sales-app/test-sales-sync.cjs. Browser: node sales-app/test-history-browser.cjs und node sales-app/test-v1-browser.cjs mit vorhandenem Playwright/Edge. NODE_PATH bei Bedarf auf vorhandene Module, PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH auf Edge setzen.
 
-101 bestehende, 15 V1- und 12 Speicher-/Sync-Prüfungen sowie drei Browser-Integrationsprüfungen mit synthetischen Daten bestanden. Geprüft: große Unicode-Daten, mehrseitige Firmen/Kontakte/Historie, Teilwrite-Abbruch, alte vollständige Daten erhalten, Wiederaufnahme, Firmen-/Kontakt-Reihenfolge, verlorene Schreibantwort ohne doppeltes POST, TEST-Ziele, Rechte, Vollständigkeit, alte Directory-Migration und Sperre paralleler Altimporte. Keine echten HQ-/Firebase-Daten angefasst; kein Apps-Script-Upload durch Codex.
+101 bestehende, 15 V1- und 17 Speicher-/Sync-Prüfungen sowie drei Browser-Integrationsprüfungen mit synthetischen Daten bestanden. Geprüft: große Unicode-Daten, mehrseitige Firmen/Kontakte/Historie, Teilwrite-Abbruch, alte vollständige Daten erhalten, Wiederaufnahme, Firmen-/Kontakt-Reihenfolge, verlorene Schreibantwort ohne doppeltes POST, TEST-Ziele, Rechte, Vollständigkeit, alte Directory-Migration und Sperre paralleler Altimporte. Keine echten HQ-/Firebase-Daten angefasst; kein Apps-Script-Upload durch Codex.
 
 Dienstkonto verwendet sales_editions, sales_companies, sales_directory, sales_chunks, sales_meta, sales_imports, sales_drafts und sales_jobs. Bestehende Firestore-Regeln sperren direkten Browserzugriff; Privatheitsprüfung umfasst neue Sammlungen. Browser-Lokalspeicher enthält nur das Farbschema. GitHub sichert Code, keine Firebase-Daten.
 
