@@ -4,6 +4,8 @@ Stand: 02.10.2026 · **2026-10-02-r17 lokal implementiert und synthetisch geprü
 
 **Nachtrag r17:** Erste Firmenerfassung auf seitenweises Speichern beschleunigt; Firmen-/Seitenzahl sichtbar und bestätigte Pause dauerhaft gespeichert. Angehaltenen r16-Lauf nach Dateiaustausch mit HQ-Sync fortsetzen weiterführen, keine neue Auswahl und kein Neustart nötig. Alte Schreibfehler bleiben separat offen. Live-Gesamtabnahme weiterhin ausstehend.
 
+**Aktuelle Priorität nach r17-Live-Test:** Firmenerfassung abgeschlossen, Detailimport weiter zu langsam. Vor weiterem Vollimport einen effizienten Erstimport, zuverlässigen Änderungsabgleich pro Datenart und browserunabhängige serverseitige Fortsetzung planen/prüfen. Heute liest jeder neue Lauf noch vollständig; ein Delta-Abgleich und Hintergrundworker sind nicht implementiert. HQ-Änderungs-/Löschinformationen dafür erst verifizieren. Manuell starten bleibt gewünscht, automatische Nachtplanung später. Angehaltenen Fortschritt und offene Schreibaufträge bewahren.
+
 ## Ziel und bisheriger Stand
 
 Die V1 soll den Alltag vom Finden eines Kunden über Kontakt, Wiedervorlage und Buchung bis zur Redaktionsübergabe abbilden. Sie liest aus Firebase; neue Eingaben sind dort sofort nutzbar. Der Nutzer hat einen gemeinsamen manuellen Abgleich beauftragt: App → HQ und danach HQ → Firebase über denselben Button.
