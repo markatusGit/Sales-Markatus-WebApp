@@ -1,6 +1,28 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 02.10.2026 · **2026-10-02-r17** lokal implementiert und synthetisch geprüft. Der Nutzer bestätigt den bisherigen Firmen-/Kontakt-/Kommunikationsweg. Beim r15-Ausgabeimport trat das 750-KB-Paketlimit auf; Vollständigkeit des realen Bestands ist noch nicht bestätigt. r16 erweitert auf den ausdrücklich beauftragten Gesamtimport und einen gemeinsamen manuellen HQ-Sync. Live-Abnahme und Bereitstellung übernimmt der Nutzer.
+Stand: 02.10.2026 · **2026-10-02-r18** lokal implementiert. Bereitstellung und Prüfung am echten HQ-Bestand übernimmt der Nutzer. Vollständiger Erstimport noch offen.
+
+## r18: Sammelimport, Änderungsabgleich und Hintergrundfortsetzung
+
+Sechs HQ-Datenarten werden in gemeinsamen Seiten à 200 gelesen. Benötigte Felder werden in Firebase zwischengespeichert und anhand Firmen-/Projektkennungen zugeordnet; keine HQ-Einzelabfrage je Firma. Firestore batchGet/commit und 64 Zuordnungsgruppen reduzieren Einzelzugriffe. Große Nutzdaten behalten unveränderliche Teile. Kundenakten werden erst nach vollständig gelesenen Datenarten und erfolgreicher Aufbereitung veröffentlicht. Der Gesamtbestand wird gruppenweise aktualisiert, nicht als globale Transaktion.
+
+Historien, Dokumente und Projekte erhalten getrennte updatedOn-Marken, mit zwei Minuten Überlappung und id-Fortsetzung statt verschiebbarer Seitenoffsets. Marken werden erst nach Verarbeitung und Mengenprüfung fortgeschrieben. Firmen und Kontakte werden wegen verschachtelter Adressen, Planumsätze wegen Schätzungen weiterhin gesammelt gelesen. Identische Inhalte lösen keine erneute Kundenveröffentlichung aus. Fehlendes Änderungsdatum oder abgelehnter Datumsfilter führt für die Datenart zur vollständigen Sammelprüfung. Beim nächsten manuellen Start nach sieben Tagen erfolgt ein Kontroll-Vollabgleich, ebenso nach Mengenabweichungen. Löschungen in Delta-Daten können bis dahin unentdeckt bleiben; Mengenprüfung allein erkennt Löschen plus Neuanlage gleicher Anzahl nicht. Gelöschte Firmen bleiben zur fachlichen Klärung in der bisherigen App-Ansicht erhalten.
+
+Ein temporärer Apps-Script-Minuten-Trigger setzt ausschließlich den manuell gestarteten Lauf fort. Worker arbeiten etwa drei Minuten, prüfen Trigger-ID/Ausführungskonto/Adminfreigabe und speichern Abschnitte. Das ist kein Nachtplan. Pause kann auch bei belegtem Script-Lock angefordert werden. Bei Abschluss, Pause oder behandeltem Fehler wird der Trigger entfernt. Firmen- und Ansprechpartneranlage erfolgen in getrennten Trigger-Ausführungen. Unklare Schreibausgänge bleiben gesperrt. Browser-Schritt-RPCs treiben den neuen Lauf nicht an; die Oberfläche pollt nur den Firebase-Status.
+
+Ein r16/r17-Lauf behält ID und Schreibhinweise. Ausstehende Leseaufgaben werden durch eine neue gemeinsame Lesebasis ersetzt; alte vollständige Akten bleiben nutzbar. Bereits durchlaufene Schreibaufgaben werden nicht erneut eingeplant. Vorbereitete Seiten werden vor Cache-Writes dauerhaft protokolliert; bei verlorenen Antworten wird dieselbe Seite mit denselben Zählern wiederholt.
+
+Neue Quellen: SalesBulkStore.gs, SalesBulkSync.gs und SalesWorker.gs; alle werden in SalesBackend.gs eingebaut. Neue private Sammlungen: sales_rawcompanies, sales_rawcontacts, sales_rawhistories, sales_rawprojects, sales_rawdocuments, sales_rawplans, sales_projectviews. Nur benötigte Felder speichern, keine Rechnungspositionen oder Bankdaten ohne Verwendungszweck. Anonyme Zugriffe auf die neuen Sammlungen werden vor Verarbeitung geprüft.
+
+**Einrichtung:** Beide Austauschdateien ersetzen, Scope `https://www.googleapis.com/auth/script.scriptapp` prüfen, einmal `setupSalesSyncWorker` im Editor ausführen, anschließend Neue Version bereitstellen. Interne Eigenschaften SALES_SYNC_EXECUTOR, SALES_SYNC_ADMIN, SALES_SYNC_TRIGGER und SALES_SYNC_PAUSE werden automatisch angelegt. Keine weiteren Zugangsdaten oder geänderten Firestore-Regeln. Details: [manuelle Anleitung](MANUELL-UEBERTRAGEN.md).
+
+**Grenzen:** Eine Firebase-Gruppe ist auf 25.000 Datensätze pro Datenart begrenzt; darüber expliziter Stopp statt abgeschnittener Daten. Große Gruppen werden im Speicher zusammengeführt. Google-Kontingente, Firebase-Kosten und Browsergröße bleiben praktische Grenzen. Kein globaler HQ-Schnappschuss: spätere Änderungen werden im folgenden Lauf aufgeholt. Importjournale/alte Teile bleiben gespeichert; Bereinigung und Backupstrategie vor Teamfreigabe offen. Keine echte Laufzeit zugesagt.
+
+**Zusätzliche Prüfung:** `node sales-app/test-sales-bulk.cjs` sowie `node sales-app/test-worker-browser.cjs`. Synthetischer Bestand mit 3.202 Firmen: 17 gemeinsame Firmenseiten plus Mengenabfrage, keine HQ-Einzelabfrage pro Firma. Abbruch, verlorene Firebase-Antwort, Kontaktwechsel, Adressänderung ohne Eltern-Zeitstempel, Delta, Löschung, Filterfehler, Triggerrechte und Verarbeitung bei geschlossenem Testbrowser geprüft. Kein echter HQ-/Firebase-Zugriff durch Codex.
+
+Referenzen: [HQ-v2-Filter und Seitennavigation](https://developer.hellohq.io/), [Google installierbare Trigger](https://developers.google.com/apps-script/guides/triggers/installable), [Firestore commit](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/commit), [batchGet](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/batchGet), [runQuery](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/runQuery).
+
+Die folgenden r16/r17-Abschnitte dokumentieren die bisherige Umsetzung. Angaben zum alten Einzelabruf, Browserbetrieb und vollständigen Neuladen wurden durch r18 oben ersetzt; Oberflächenfunktionen und TEST-Schreibgrenzen bleiben bestehen.
 
 ## Korrektur r17
 

@@ -1,10 +1,12 @@
 /** One explicit sync: saved app jobs first, full HQ reads second. Never runs on a timer. */
 function salesSyncSummary_(run){
   if(!run)return null;
+  if(run.engine===2)return salesBulkSummary_(run);
   const discovery=run.tasks.find(t=>t.kind==='discover')?.collections?.companies;
   return {id:run.id,revision:run.revision,state:run.state,paused:run.paused===true,done:run.done,total:run.tasks.length,current:run.tasks[run.cursor]?.label||'',stage:run.tasks[run.cursor]?.stage||'',updatedAt:run.updatedAt,stats:run.stats,errors:run.errors,coverage:run.coverage||[],discovery:{count:run.companyIds.length,total:discovery?.total??run.stats.hqCompanies??null,pages:discovery?.pages||0,complete:run.discoveryComplete===true}};
 }
 function startSalesSync(){
+  if(typeof salesBulkStart_==='function')return salesBulkStart_();
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running'){
       if(old.paused){old.paused=false;old.revision++;salesWrite_('sales_meta/sync',old);}
@@ -23,6 +25,8 @@ function startSalesSync(){
   });
 }
 function pauseSalesSync(id){
+  salesUser_(true);
+  if(typeof salesWorkerPause_==='function'&&salesRead_('sales_meta/sync')?.engine===2)return salesWorkerPause_(id);
   salesUser_(true);return salesLock_(()=>{
     const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
     if(run.state==='running'&&!run.paused){run.paused=true;run.revision++;run.pausedAt=salesNow_();salesWrite_('sales_meta/sync',run);}
@@ -132,6 +136,7 @@ function salesSyncUnassigned_(run,task){
 }
 function getSalesUnassigned(){salesUser_();return {contacts:salesRead_('sales_meta/unassignedcontacts')?.rows||[],histories:salesRead_('sales_meta/unassignedhistories')?.rows||[]};}
 function runSalesSyncStep(id,revision){
+  if(typeof salesBulkStart_==='function'){salesUser_(true);return salesSyncSummary_(salesRead_('sales_meta/sync'));}
   salesUser_(true);return salesLock_(()=>{
     const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
     if(run.state!=='running'||run.paused||run.revision!==Number(revision))return salesSyncSummary_(run);

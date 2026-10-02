@@ -1,8 +1,8 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 02.10.2026 · **2026-10-02-r17**. Neu: beschleunigte erste Firmenerfassung, sichtbare Firmen-/Seitenzähler und dauerhaft bestätigtes Anhalten. Der gemeinsame HQ-Sync aus r16 bleibt erhalten. Lokal vorbereitet und synthetisch geprüft; die Live-Abnahme steht aus.
+Stand: 02.10.2026 · **2026-10-02-r18**. Neu: gemeinsamer Sammelimport, Änderungsabgleich und Hintergrundfortsetzung bei Google. Lokal vorbereitet und synthetisch geprüft; Bereitstellung und Live-Abnahme stehen aus.
 
-**Austauschdateien:** [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html). Beide vollständig ersetzen. Keine neuen/geänderten Skripteigenschaften, Manifestwerte, Firestore-Regeln oder Zugriffseinstellungen. Kein automatischer Upload durch Codex. Alte Firebase-Daten bleiben lesbar; nichts löschen oder manuell migrieren.
+**Austauschdateien:** [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html). Beide vollständig ersetzen. Zusätzlich ist die einmalige Google-Freigabe in Abschnitt 2a erforderlich. Kein automatischer Upload durch Codex. Alte vollständige Firebase-Daten bleiben lesbar; nichts löschen.
 
 ## 1. Backend ersetzen
 
@@ -25,6 +25,28 @@ Stand: 02.10.2026 · **2026-10-02-r17**. Neu: beschleunigte erste Firmenerfassun
 6. Mit **Strg+V** vollständig ersetzen.
 7. Mit **Strg+S** speichern.
 
+## 2a. Hintergrundfortsetzung einmalig freigeben
+
+Der Code benötigt die Google-Berechtigung `https://www.googleapis.com/auth/script.scriptapp`. Sie kann in deiner Google-Datei bereits vorhanden sein. Die lokale appsscript.json nicht vollständig übertragen: Sie enthält weitere lokale Einstellungen, die nicht Teil dieser Übergabe sind.
+
+1. Im Apps-Script-Editor das Projekt als **info@markatus.de** öffnen, wie bei deiner bisherigen Bereitstellung.
+2. Links auf **Projekteinstellungen** klicken.
+3. **Manifestdatei „appsscript.json“ im Editor anzeigen** aktivieren, falls noch nicht aktiviert.
+4. Links zum **Editor** zurückkehren.
+5. **appsscript.json** öffnen.
+6. Im vorhandenen Abschnitt **oauthScopes** nach `https://www.googleapis.com/auth/script.scriptapp` suchen.
+7. Falls der Eintrag fehlt, diese eine Zeichenfolge als zusätzlichen Eintrag in die vorhandene Liste aufnehmen; bestehende Einträge behalten. Zwischen zwei Einträgen steht ein Komma, hinter dem letzten keines. Falls es gar keinen Abschnitt oauthScopes gibt, diesen Schritt auslassen: Google ermittelt Berechtigungen dann automatisch.
+8. Mit **Strg+S** speichern. Erwartung: Kein roter Syntaxfehler. Bei einem Fehler nicht bereitstellen; Fehlermeldung ohne Zugangsdaten mitteilen.
+9. Links **SalesBackend.gs** öffnen.
+10. Oben im Funktionsmenü **setupSalesSyncWorker** auswählen.
+11. Auf **Ausführen** klicken.
+12. Falls Google **Berechtigungen überprüfen** anzeigt, darauf klicken.
+13. Das Konto **info@markatus.de** auswählen.
+14. Die angeforderten Berechtigungen für dein eigenes Script bestätigen.
+15. Das **Ausführungsprotokoll** prüfen. Erwartung: **Ausführung abgeschlossen**. Bei **Zugriff nicht freigegeben** oder einer anderen Fehlermeldung hier stoppen und den technischen Text mitteilen; keine E-Mail-Freigaben auf Verdacht verändern.
+
+Damit ist die Fortsetzung freigegeben, aber noch kein Import gestartet. Die internen Skripteigenschaften **SALES_SYNC_EXECUTOR** und **SALES_SYNC_ADMIN** werden dabei automatisch angelegt. **SALES_SYNC_TRIGGER** und **SALES_SYNC_PAUSE** verwaltet anschließend der Code. Diese vier Eigenschaften nicht von Hand ausfüllen. Bestehende HQ-/Firebase-Zugangsdaten, SALES_ADMIN_EMAIL und SALES_ALLOWED_EMAILS bleiben unverändert. Keine geänderten Firestore-Regeln, keine Änderung der Web-App-Zugriffsgruppe und kein Nachtplan erforderlich.
+
 ## 3. Bestehende Bereitstellung aktualisieren
 
 1. **Bereitstellen → Bereitstellungen verwalten** öffnen.
@@ -34,26 +56,28 @@ Stand: 02.10.2026 · **2026-10-02-r17**. Neu: beschleunigte erste Firmenerfassun
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit **/exec** als info@markatus.de öffnen.
 7. Die Seite neu laden.
-8. Oben **2026-10-02-r17** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben **2026-10-02-r18** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern aktualisiert die /exec-App nicht. Die zusätzlichen lokalen Quellmodule sind bereits in den beiden Austauschdateien enthalten und werden nicht zusätzlich in Google angelegt.
 
-## Deinen bereits angehaltenen r16-Lauf fortsetzen
+## Deinen bereits angehaltenen r16/r17-Lauf auf den Sammelimport umstellen
 
 Nach dem Dateiaustausch und der neuen Bereitstellung zuerst diesen Abschnitt verwenden. Die weiteren Abschnitte beschreiben allgemeine Abläufe; Ausgaben nicht erneut zuordnen und keinen neuen Lauf anlegen.
 
 1. Alle noch geöffneten alten Web-App-Tabs schließen. Erwartung: Kein alter Browser setzt den Lauf weiter fort; ein bereits gestarteter Serverabschnitt kann noch enden.
 2. Die Web-App neu öffnen.
-3. Oben **2026-10-02-r17** prüfen. Bei anderer Kennung zuerst die Bereitstellung kontrollieren.
+3. Oben **2026-10-02-r18** prüfen. Bei anderer Kennung zuerst die Bereitstellung kontrollieren.
 4. **Datenabgleich** öffnen.
-5. Die neue Zeile **… von … Firmen erfasst** ablesen. Erwartung: Der bisher gespeicherte Firmenstand und die Seitenzahl werden angezeigt; die Tabelle vollständiger Kundenakten darf zunächst noch 0 zeigen.
-6. Den Status prüfen. Beim alten r16-Lauf darf **Hier nicht aktiv · gespeicherter Lauf fortsetzbar** stehen: r16 hatte keine dauerhaft gespeicherte Pause. Das ist kein Verlust des Fortschritts und behauptet keinen globalen Serverstillstand.
-7. **HQ-Sync fortsetzen** einmal anklicken. Erwartung: Derselbe Lauf arbeitet ab seiner gespeicherten Seite weiter. Falls stattdessen nur **HQ synchronisieren** erscheint, vor dem Klicken den Status mitteilen.
-8. Die neue Firmenzahl beobachten. Erwartung: Sie steigt nach jeder erfolgreich gespeicherten Seite um bis zu 50; anschließend folgt **Firmenerfassung abgeschlossen** und der Import der Kundenakten.
-9. Wenn die Zahl über mehrere Minuten unverändert bleibt, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Zunächst **Anhalten angefordert · laufender Abschnitt endet noch**, danach **Angehalten · Fortschritt gespeichert**.
-10. Bei ausbleibender Anhaltebestätigung den aktuellen Abschnitt, Firmen-/Seitenzähler, Zeitpunkt und technischen Text mitteilen. Keinen zweiten Lauf oder Ersatzauftrag anlegen.
+5. **HQ-Sync fortsetzen** einmal anklicken. Erwartung: Derselbe Lauf bekommt einen neuen gemeinsamen Leseplan. Alte vollständige Kundenakten und Schreibhinweise bleiben erhalten. Falls **Hintergrundlauf noch nicht freigegeben** erscheint, Abschnitt 2a durchführen.
+6. Auf **Hintergrundlauf geplant · Google startet die Fortsetzung** achten. Erwartung: Google übernimmt den Start, meist nach kurzer Wartezeit; kein sekundengenauer Termin zugesagt.
+7. Die Meldung **Läuft bei Google · Browser und PC dürfen geschlossen werden** abwarten. Erwartung: Die Gelesen-Zähler und der Zeitstempel rücken weiter. Sie starten für die neue gemeinsame Lesebasis wieder bei 0; das löscht keine bisherigen Akten.
+8. Nach dem ersten sichtbaren Fortschritt die Web-App schließen. Der PC darf dann ebenfalls ausgeschaltet werden.
+9. Die Web-App später erneut öffnen.
+10. **Datenabgleich** öffnen. Erwartung: Fortschritt gegenüber dem vorherigen Stand oder ein Abschluss ist sichtbar; kein erneuter Start nötig.
+11. Falls **Seit über 10 Minuten kein Fortschritt** oder ein Fehler angezeigt wird, in Apps Script links **Ausführungen** öffnen.
+12. Die neueste Ausführung **salesSyncWorker_** öffnen. Erwartung: Status und gegebenenfalls Fehlertext sind sichtbar. Bei fehlendem Fortschritt den Status sowie technischen Fehlertext mitteilen, ohne Kundeninhalte oder Zugangsdaten. Keine Ersatzaufträge anlegen.
 
-Die vorhandenen Schreibfehler bleiben erhalten. Bei Fortsetzung ab der Firmenerfassung werden die schon durchlaufenen Schreibabschnitte nicht wiederholt. Daher kann der Lauf am Ende trotz erfolgreichem Leseimport weiterhin **Mit offenen Punkten beendet** melden. Geladene Zahlen und Ausgabenprüfung getrennt von den alten Schreibfehlern beurteilen; diese werden anschließend einzeln geklärt. Der folgende Detailimport umfasst weiterhin viele Abschnitte; keine feste Gesamtdauer zugesagt.
+Die vorhandenen Schreibfehler bleiben erhalten. Schon durchlaufene Schreibabschnitte werden beim Umstellen nicht wiederholt. Daher kann der Lauf trotz vollständiger Lesedaten **Mit offenen Punkten beendet** melden. Mengen und Ausgabenprüfung getrennt von alten Schreibhinweisen beurteilen. Erstimport dauert länger als ein späterer Änderungsabgleich; eine reale Dauer ist noch nicht gemessen. Google-Kontingente können die Fortsetzung verzögern.
 
 ## 4. Vorhandene App-Aufträge ansehen
 
@@ -90,9 +114,9 @@ Alle Unternehmen, Ansprechpartner und Historieneinträge werden unabhängig von 
 
 1. **Datenabgleich** öffnen.
 2. **HQ synchronisieren** anklicken. Erwartung: Zuerst offene Testaufträge, danach der Leseimport aller Unternehmen, Ansprechpartner und Historien sowie der ausgewählten Ausgaben.
-3. Den **Aktuellen Abschnitt** beobachten. Während der ersten Erfassung wächst zusätzlich **… von … Firmen erfasst** nach jeder gespeicherten Seite. Erwartung: Firmen werden in Stammdaten, Ansprechpartner, Belege, Projekte, Kontakthistorie und weitere Teilschritte aufgeteilt; die Zahl bekannter Abschnitte kann wachsen.
-4. Die App während des Laufs geöffnet lassen. Auch ein größerer Erstimport darf längere Zeit benötigen; Fortschritt wird nach Abschnitten gespeichert.
-5. Falls du unterbrechen möchtest, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Der laufende Abschnitt endet, danach erscheinen **HQ-Sync angehalten; später fortsetzbar.** und **Angehalten · Fortschritt gespeichert**. Die Pause bleibt beim erneuten Öffnen gespeichert.
+3. Den **Aktuellen Abschnitt** beobachten. Erwartung: Gemeinsame Abrufe je Datenart, danach Zuordnung der Kundenakten aus Firebase; Gelesen-Zähler und Zeitstempel rücken weiter. Die Zahl bekannter Abschnitte kann wachsen.
+4. Bei **Läuft bei Google · Browser und PC dürfen geschlossen werden** die App bei Bedarf schließen. Der Hintergrundlauf bleibt aktiv.
+5. Falls du wirklich unterbrechen möchtest, **Nach diesem Abschnitt anhalten** anklicken. Erwartung: Der laufende Abschnitt endet, danach erscheint **Angehalten · Fortschritt gespeichert**. Die Pause bleibt beim erneuten Öffnen gespeichert.
 6. Zum Fortsetzen **HQ-Sync fortsetzen** anklicken. Erwartung: Derselbe gespeicherte Lauf geht weiter, auch nach Schließen und erneutem Öffnen der App.
 7. Am Ende den Status prüfen. Erwartung: **HQ-Sync abgeschlossen.** und **Abgeschlossen · Zahlen geprüft**. Bei **Mit offenen Punkten beendet** die Hinweise nach dem nächsten Abschnitt prüfen.
 8. In der Tabelle die drei Zeilen **Unternehmen**, **Ansprechpartner** und **Historieneinträge** vergleichen. Erwartung: Die vollständig geladenen Anzahlen entsprechen jeweils der HQ-Gesamtzahl. Kontakte/Historie ohne bekannte Firmenzuordnung sind in diesen Anzahlen enthalten.
@@ -101,7 +125,19 @@ Alle Unternehmen, Ansprechpartner und Historieneinträge werden unabhängig von 
 
 Ein älterer Import mit Fehlermeldung wird vom neuen Gesamtabgleich abgelöst; erfolgreich gespeicherte Daten bleiben erhalten. Eine Zahl hinter „HQ-Unternehmen“ ist eine Firmenkennung und keine Anzahl. Ob alle Unternehmen vorhanden sind, ergibt sich erst aus den Abschlusszahlen und der Ausgabenprüfung.
 
-Während eines laufenden Abgleichs neu erfasste App-Aufträge werden beim nächsten neuen HQ-Sync berücksichtigt. Kein Nachtlauf. Der Lauf setzt sich nur über die geöffnete App fort. Ein abgeschlossener Lauf mit Fehlern wird beim nächsten Start vollständig neu gelesen; bestätigte Schreibaufträge werden dabei nicht nochmals ausgeführt.
+Während eines laufenden Abgleichs neu erfasste App-Aufträge werden beim nächsten neuen HQ-Sync berücksichtigt. Kein Nachtlauf. Nach dem Erstimport nutzen Historien, Belege und Projekte eigene Änderungsmarken; Firmen, Kontaktadressen und Planumsätze werden gesammelt kontrolliert. Nach sieben Tagen oder Mengenabweichungen wird beim nächsten manuellen Start vollständig kontrolliert. Bei Abruffehlern hält der Lauf am gespeicherten Abschnitt an; Fortsetzen setzt dort wieder an. Bestätigte Schreibaufträge werden nicht nochmals angelegt.
+
+## Nach dem erfolgreichen Erstimport den Änderungsabgleich testen
+
+1. In HQ ausschließlich eine von dir angelegte **TEST-Firma** öffnen.
+2. In deren Kontakthistorie eine kurze Notiz mit erfundenem Text ergänzen.
+3. In der Web-App **Datenabgleich** öffnen.
+4. **HQ synchronisieren** einmal anklicken. Erwartung: **Änderungsabgleich** erscheint. Bei **Erstimport / vollständiger Kontrollabgleich** den letzten Abschlussstatus prüfen; eventuell war die Mengenprüfung noch offen oder die Kontrollfrist ist erreicht.
+5. Den Hintergrundlauf abschließen lassen. Das Fenster darf geschlossen werden.
+6. Die TEST-Firma in der App öffnen. Erwartung: Die neue Notiz erscheint genau einmal.
+7. Unter **Datenabgleich** die Zeile **Kontakthistorie** ablesen. Erwartung: **Änderungen seit letztem Abgleich**, nicht erneut der gesamte alte Historienbestand. Falls **Sammelprüfung** steht, den angezeigten Hinweis mitteilen; HQ-Filter oder Änderungsdatum wurden dann nicht bestätigt.
+
+Firmen, Ansprechpartner und Planumsätze werden auch bei diesem Test gesammelt gelesen, damit Änderungen an Kontaktadressen und Schätzungen nicht übersehen werden. **Neu/geändert** darf bei unveränderten Daten 0 sein. Die Mengenprüfung ersetzt nicht den Vergleich einiger Kunden, Ansprechpartner und Rechnungssummen mit HQ.
 
 ## 7. Kunden und Magazinverkauf prüfen
 
@@ -187,7 +223,7 @@ E-Mail dokumentiert eine Kommunikation, verschickt aber keine Nachricht. Alte HQ
 
 ## Bestehende Einrichtung und nächster Ausbau
 
-Für r17 keine dieser Einstellungen erneut eintragen oder verändern:
+Bestehende Einstellungen nicht erneut eintragen oder verändern; die zusätzliche r18-Freigabe steht in Abschnitt 2a:
 
 | Skripteigenschaft | Vorhandener Zweck |
 | --- | --- |
