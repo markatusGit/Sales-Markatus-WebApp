@@ -934,3 +934,24 @@ Vorbereitete Leseseite einschließlich nächstem Zählerstand und alter/neuer Zu
 **Geprüfte Wiederaufnahme / neue Empfehlung:** Einen Firestore-429 beim Commit einer Planumsatzseite mit synthetischen Daten nachgestellt: gespeicherter Lauf pausiert, Trigger entfernt; erneuter Start nimmt dieselbe Lauf-ID und vorgemerkte Leseseite auf, zählt korrekt und erzeugt keine neuen HQ-Schreibaufrufe. Nach Sicherung des Fehlertextes darf der Nutzer jetzt einmal HQ-Sync fortsetzen anklicken; die alte Bitte zu warten ist damit erledigt. Seit dem Fehlerdatum 02.10. sind mehrere Tage vergangen; eine damalige reine Tagesquote wäre inzwischen zurückgesetzt, aktuelle Verfügbarkeit aber nicht geprüft. Erwartung: Planumsatzzähler steigt oder der nächste Abschnitt beginnt. Bei erneutem 429 nicht wiederholt klicken, sondern aktuellen Abschnitt/Zeitpunkt melden und Firestore-Nutzung prüfen. Die untere 0 bleibt bis zur nachgelagerten Aufbereitung der Firmenakten erwartbar. Ob Verarbeitung zeitlich nach dem Ausschalten erfolgte, bleibt ohne bekannten Ausschaltzeitpunkt bzw. Google-Ausführungsnachweis offen.
 
 **Offen für weiteren Ausbau:** 429 verständlicher diagnostizieren und eine begrenzte automatische Warte-/Wiederanlaufstrategie mit Kontingentbezug prüfen; r18 hält bei diesem Fehler derzeit bewusst bis zum manuellen Fortsetzen an. Kein Tarifwechsel, keine zusätzlichen laufenden Kosten oder externe Änderung beauftragt/ausgeführt. Kein Code-Upload nötig; Diagnose, Quellen und synthetisches Prüfergebnis werden mit diesem Nachtrag nach GitHub gesichert.
+
+### 05.10.2026 – Wiederaufnahme macht Fortschritt, erneut Firestore 429
+
+**Live-Rückmeldung:** Nach Fortsetzen ist der bestehende Lauf weitergekommen. Nutzer meldet 111 von 152 bekannten Abschnitten, einen nicht mehr fortschreitenden Zeitstempel und erneut Firestore HTTP 429 bei HQ-Abgleich. Bei Historieneinträgen steht Noch nicht bestätigt. Der genaue aktuelle Abschnitt sowie Firebase-Tarif und heutige Lese-/Schreibnutzung sind angefragt; noch keine Antwort. Keine Firmeninhalte übernommen.
+
+**Einordnung anhand des Codes:** Die Abschnittszahl zählt Verarbeitungsschritte, keine Firmen. Auf die sechs Sammelabrufe folgen Projekt- und Kundenaufbereitung in jeweils 64 Gruppen sowie Ausgaben und Abschlussprüfungen. 111 von 152 spricht bei diesem Lauf für bereits laufende Kundenaufbereitung; ohne aktuellen Abschnitt nicht als Live-Tatsache bestätigt. Noch nicht bestätigt in der unteren HQ-Gesamtzahl wird erst durch die Abschlussprüfung ersetzt und beweist nicht, dass keine Historie gelesen wurde. Der erneute 429 erklärt den Stillstand; unbegrenztes sofortiges Fortsetzen ist keine Lösung.
+
+**Kontingentbedarf:** Aus den gemeldeten Bestandsgrößen und dem aktuellen vollständigen Importpfad ergeben sich rechnerisch 16.977 Rohdaten-Dokumente für Firmen/Kontakte/Projekte/Belege, 3.885 Projektansichten sowie 6.378 Firmenakten-/Verzeichniseinträge, zusammen 27.240 Dokumentwrites über den gesamten Erstimport. Historie, Planumsätze, Checkpoints und große Teilpakete kommen hinzu. Dies ist eine Code-/Bestandsrechnung, keine Messung heutiger Nutzung oder bereits erfolgter Writes. Sammelcommits reduzieren HTTP-Aufrufe, nicht die Zahl geschriebener Dokumente. Laut https://firebase.google.com/docs/firestore/quotas beträgt die kostenlose Tagesquote 20.000 Writes und 50.000 Reads, Rücksetzung um Mitternacht pazifischer Zeit. Ein Tageslimit ist damit plausibel, aber ohne Tarif/Nutzungswerte bzw. genauere Fehlerantwort nicht als konkrete Ursache erwiesen. Der gesamte derzeitige Erstimport passt nicht in eine einzelne kostenlose Tages-Schreibquote.
+
+**Nächste Nutzeraktionen:**
+
+- Den Lauf vorerst angehalten lassen; nicht erneut Fortsetzen anklicken.
+- Die genaue Zeile Aktueller Abschnitt aus dem Datenabgleich mitteilen.
+- Die Firebase-Konsole öffnen und das App-Projekt auswählen.
+- Firestore Database beziehungsweise Databases & Storage → Firestore öffnen.
+- Nutzung beziehungsweise Usage öffnen.
+- Heutige Lese-/Schreibwerte und eine angezeigte Kontingentwarnung mitteilen.
+- Den angezeigten Projekttarif Spark oder Blaze mitteilen; keinen Tarifwechsel vornehmen.
+- Falls ein Menüpunkt fehlt, dies zurückmelden; keine Daten oder Aufträge löschen.
+
+**Arbeitsstand:** Diagnose und Dokumentation, keine neue App-Version, keine Änderungen an Skripteigenschaften oder Bereitstellung, kein Zugriff auf echte Firebase-/HQ-Daten und kein Tarifwechsel. Keine erneuten Codeprüfungen erforderlich, da keine Implementierung geändert. Bestehende r18-Wiederaufnahme bleibt erhalten; kontingentabhängige Fehlerbehandlung und Zugriffseffizienz sind weiter offen. Dieser Dokumentationsschritt wird gezielt committet und nach GitHub gesichert; fremde lokale Änderungen bleiben unberührt.
