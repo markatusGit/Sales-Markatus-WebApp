@@ -1042,3 +1042,21 @@ Die vollständige kleinschrittige Anleitung steht in sales-app/MANUELL-UEBERTRAG
 Keine neuen/geänderten Skripteigenschaften, Scopes, Zugriffsgruppen oder sonstigen Bereitstellungseinstellungen; nur eine neue Codeversion bereitstellen. Hintergrundfreigabe nicht erneut einrichten. Lokal fertig und synthetisch geprüft; manuelle Nutzerbereitstellung und Live-Prüfung noch offen. Änderungen einschließlich Anleitung/Tagebuch werden gezielt committet und nach GitHub übertragen; fremde Änderungen und temporäre Ausgaben bleiben ausgeschlossen. Das tatsächliche Push-Ergebnis wird im Abschluss gemeldet.
 
 **GitHub-Sicherung r19.1:** Commit 588d56f mit zwölf zugehörigen Dateien erfolgreich nach origin/main übertragen. Bekannte packed-refs.lock-Warnung bei der lokalen Git-Wartung, Commit und Push dennoch erfolgreich; Sperrdatei unverändert. Quellgleichheit des generierten Backends sowie Syntax des Backends und beider HTML-Skripte zusätzlich bestätigt. Dieser Statusvermerk wird separat versioniert. Apps-Script-Dateien sind weiterhin vom Nutzer manuell zu übertragen; Live-Erfolg noch nicht bestätigt.
+
+### 06.10.2026 – Rückmeldung zum Ausgabenstatus und nächste V1-Schritte
+
+**Nutzerrückmeldung:** Nach der r19.1-Übergabe meldet der Nutzer „passt“, sieht im Magazinverkauf jedoch weiterhin „noch nicht importiert“. Der bisherige Aufruffehler scheint damit behoben; ein vollständig erfolgreicher Verknüpfungslauf ist noch nicht bestätigt. Laufstatus und mögliche Hinweise wurden gezielt angefragt, Antwort steht aus.
+
+**Codebefund:** Die Ausgabenauswahl zeigt diesen Text, wenn loadedAt im aktuell geladenen Ausgabenobjekt fehlt. Auch eine leere, erfolgreich ausgewertete Ausgabe bekommt im Backend ein loadedAt; null Rechnungen allein erklären den Text daher nicht. Statuspolling und automatisches Nachladen beim Laufabschluss erfolgen nur in Datenabgleich. Wer vor Abschluss in Magazinverkauf wechselt, kann dort noch den alten Stand sehen. Eine veraltete Ansicht ist möglich, aber als Live-Ursache noch nicht bestätigt. Keine kosmetische Umbenennung und keine Vollständigkeitszusage.
+
+**Nächste Nutzeraktionen:**
+
+- Web-App einmal neu laden; dies liest den App-Stand aus Firebase und startet keinen HQ-Import.
+- Magazinverkauf öffnen.
+- Die betroffene Ausgabe auswählen; nach erfolgreicher Verknüpfung wird Stand mit Datum erwartet.
+- Falls noch nicht importiert stehen bleibt, Datenabgleich öffnen.
+- Den Status des letzten Ausgabenlaufs und etwaige technische Hinweise ohne Kundeninhalte/Zugangsdaten mitteilen; keinen neuen HQ-Gesamtimport als Ersatz starten.
+
+**Weitere Reihenfolge Richtung V1:** Zuerst Ausgabenverknüpfung und Kunden-/Umsatzzuordnung stichprobenartig abnehmen, danach den Änderungsabgleich mit begrenzter Teständerung prüfen. Anschließend die bereits gewünschte Roadmap fortsetzen: persönlicher Google-Zugang mit ausdrücklicher E-Mail-Freigabe; vorhandene Kommunikation um Wiedervorlagen und Stammdatenbearbeitung ergänzen; Buchungen und Redaktionsübergabe fertigstellen; aktuelle Ausgabe mit kleinem Team testen. Kontakthistorie und grundlegende Kommunikationsanlage bestehen bereits, nicht als komplett neu zu bauen darstellen. Magazinverkaufsfilter vor dem jeweiligen Ausbau gemeinsam konkretisieren. Nachtstart bleibt zurückgestellt, manueller Abgleich bleibt der Arbeitsweg.
+
+Nur Diagnose/Planung dokumentiert, kein App-Code verändert und keine neuen Austauschdateien oder Einstellungen nötig. Keine echten HQ-/Firebase-Daten gelesen oder geändert. Dieser Dokumentationsstand wird gezielt nach GitHub gesichert; Push-Erfolg wird im Chat gemeldet.
