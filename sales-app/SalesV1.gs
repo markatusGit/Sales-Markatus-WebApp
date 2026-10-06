@@ -15,7 +15,7 @@ function salesV1Known_(id){
 function getSalesV1State(){
   salesUser_();const state=getSalesState(),editions=salesV1Editions_(),index=salesV1Index_(),companies={};
   editions.forEach(e=>{(e.companies||[]).forEach(c=>{companies[c.id]=c;});(e.companyIds||[]).forEach(id=>{if(!companies[id])companies[id]={id,name:'HQ-Unternehmen '+id+' · Details fehlen',companyTypes:[],responsibleUsers:[],customFields:[],addresses:[]};});});index.entries.forEach(e=>{companies[e.company.id]=e.company;});
-  return {...state,editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
+  return {...state,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
 }
 function getSalesV1Company(id){
   salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);

@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 27. September 2026.
+Zuletzt aktualisiert: 6. Oktober 2026.
 
 ## Zweck und Pflege
 
@@ -1016,3 +1016,27 @@ Alle sechs Datenarten verwenden danach eigene Datumsfilter (updatedOn/createdOn,
 Die vollständige kleinschrittige Anleitung steht in sales-app/MANUELL-UEBERTRAGEN.md. Nur zwei Google-Dateien austauschen; SalesDelta.gs ist bereits eingebaut. Gegenüber r18 keine neuen/geänderten Skripteigenschaften, Scopes, Firestore-Regeln oder Zugriffsgruppen. Bestehende Hintergrundfreigabe bleibt bestehen; setupSalesSyncWorker nicht erneut nötig. Lokal fertig und synthetisch geprüft; manuelle Nutzerbereitstellung und Live-Prüfung noch offen. Zugehörige Dateien werden gezielt nach GitHub gesichert, unabhängige lokale Änderungen und temporäre Testausgaben nicht mitgenommen.
 
 **GitHub-Sicherung r19:** Commit 8a2d26b mit den 19 zugehörigen Dateien erfolgreich nach origin/main übertragen. Der erste Push wurde vor Ausführung wegen fehlenden Workspace-Guthabens in der automatischen Freigabeprüfung gestoppt, ausdrücklich kein Sicherheitsurteil. Nach erneutem Fortsetzungsauftrag über denselben Freigabeweg erfolgreich ausgeführt; keine Umgehung. Bekannte packed-refs.lock-Warnung bei lokaler Git-Wartung verhinderte den Commit nicht; Sperrdatei unverändert. Unabhängige lokale Änderungen, Anmeldedateien und temporäre Ausgaben nicht mitgenommen. Dieser Sicherungsvermerk wird separat versioniert. Apps-Script-Upload und Live-Abnahme bleiben beim Nutzer offen; kein automatisches Deployment erfolgt.
+
+### 06.10.2026 – r19.1: Fehler beim Start der Ausgabenverknüpfung
+
+**Live-Rückmeldung:** Gewünschte Ausgaben sind unter Bestehende Zuordnungen gespeichert. Beim Klick auf Ausgaben aus Firebase verknüpfen erscheint ein JavaScript-TypeError am dynamischen google.script.run-Aufruf (is not a function). Damit wird die Serverfunktion bei diesem Klick nicht erreicht. Der genaue Grund, warum die Nutzerbereitstellung die neue öffentliche Funktion nicht anbietet, ist lokal nicht nachgewiesen; kein bestätigter Fehler beim Kopieren und keine bestätigte Google-Störung. Der generierte r19-Backendstand enthält die öffentliche Funktion. Der bisherige Browsermock erzeugte jede beliebige Methode und bildete einen fehlenden Export deshalb nicht ab.
+
+**Korrektur lokal:** Oberfläche ruft die Ausgabenverknüpfung über den bestehenden Einstieg startSalesSync mit ausschließlich mode: editions auf. Server prüft Parameter und Berechtigung und leitet in den bestehenden getrennten Firebase-Ausgabenlauf weiter. Ungültige Parameter oder fehlendes Ausgabenmodul starten keinen normalen HQ-Abgleich. Die Startantwort meldet die Fähigkeit editionRefreshViaSync; alte Serverstände werden vor dem Aufruf verständlich zurückgewiesen. Fehlende RPC-Methoden erhalten einen lesbaren Hinweis mit Oberfläche-/Serverkennung. Keine Änderung an Verknüpfungsdaten, HQ-Schreibrechten, Änderungsmarken oder Importlogik.
+
+**Prüfung:** 101 Kern-, 15 V1-, 17 Speicher-/Sync- und 16 Delta-Prüfungen bestanden (149). Browserprüfung bestanden: Hintergrundstart, gespeichertes Anhalten, Fortsetzung ohne Browser, Änderungsabgleich, Projektzuordnung und Ausgabenabschluss ohne HQ-Aufruf. Der Browsermock bietet ausdrücklich keine startSalesEditionRefresh-Methode an; der korrigierte Zugang funktioniert dennoch. Fehlende Fähigkeit und fehlender startSalesSync-Export zeigen verständliche Fehler, ohne einen Lauf zu starten. Keine echten Kundeninhalte, keine live ausgeführten HQ-/Firebase-Aufrufe. Generierte Austauschdateien aus lokalen Quellen gebaut.
+
+**Übergabe / nächste Nutzeraktionen:**
+
+- Den gesamten Inhalt von hq-benchmark/SalesBackend.gs in der gleichnamigen Google-Datei ersetzen.
+- Den gesamten Inhalt von hq-benchmark/Sales.html in der gleichnamigen Google-Datei ersetzen.
+- Die Änderungen speichern.
+- Unter Bereitstellen → Bereitstellungen verwalten die bestehende Web-App auswählen.
+- Über das Stiftsymbol unter Version den Eintrag Neue Version auswählen.
+- Auf Bereitstellen klicken.
+- Die Web-App neu öffnen und Kennung 2026-10-06-r19.1 prüfen; bei Abweichung die Dateiersetzung/Bereitstellung kontrollieren.
+- Verwaltung öffnen; die vorhandenen Zuordnungen bleiben gespeichert und müssen nicht erneut ausgewählt werden.
+- Ausgaben aus Firebase verknüpfen einmal anklicken; erwartet wird ein Lauf mit derselben Bezeichnung im Datenabgleich.
+- Bei erneutem Fehler den genauen technischen Text melden; keinen normalen HQ-Sync als Ersatz starten.
+- Nach Ausgabenverknüpfung abgeschlossen die zusätzlichen Magazine/Ausgaben im Magazinverkauf prüfen.
+
+Keine neuen/geänderten Skripteigenschaften, Scopes, Zugriffsgruppen oder sonstigen Bereitstellungseinstellungen; nur eine neue Codeversion bereitstellen. Hintergrundfreigabe nicht erneut einrichten. Lokal fertig und synthetisch geprüft; manuelle Nutzerbereitstellung und Live-Prüfung noch offen. Änderungen einschließlich Anleitung/Tagebuch werden gezielt committet und nach GitHub übertragen; fremde Änderungen und temporäre Ausgaben bleiben ausgeschlossen. Das tatsächliche Push-Ergebnis wird im Abschluss gemeldet.

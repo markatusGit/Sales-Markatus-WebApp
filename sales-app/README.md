@@ -1,6 +1,12 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 06.10.2026 · **2026-10-06-r19** lokal vorbereitet. Der Nutzer hat den r18-Erstimport mit Mengenwarnung abgeschlossen. r19-Bereitstellung und Live-Prüfung stehen noch aus.
+Stand: 06.10.2026 · **2026-10-06-r19.1** lokal vorbereitet. Der Nutzer hat den r18-Erstimport mit Mengenwarnung abgeschlossen und in der r19-Oberfläche weitere Ausgaben zugeordnet. Der Verknüpfungsaufruf scheiterte live vor Erreichen des Servers. r19.1-Bereitstellung und Live-Prüfung stehen noch aus.
+
+## r19.1: Ausgabenbutton erreicht den Server über den vorhandenen Zugang
+
+Der Browser ruft für die Ausgabenverknüpfung jetzt `startSalesSync({mode:'editions'})` auf. Der Server leitet ausschließlich diesen ausdrücklich geprüften Modus in die Firebase-Auswertung. Unbekannte Parameter oder ein fehlendes Ausgabenmodul starten keinen HQ-Abgleich. `getSalesV1State` meldet die unterstützte Fähigkeit; eine alte Serverversion oder eine fehlende exportierte Methode führen zu einem lesbaren Fehler statt zum JavaScript-TypeError. Der genaue Grund für den fehlenden Export in der Nutzerbereitstellung ist lokal nicht nachgewiesen.
+
+Regression: Browsermock bietet nur tatsächlich vorhandene öffentliche Methoden an, die direkte Methode `startSalesEditionRefresh` fehlt absichtlich. Ausgabenbutton samt Hintergrundabschluss funktioniert dennoch ohne HQ-Aufruf. Fehlende Fähigkeit und fehlender Gateway werden separat ohne gestarteten Lauf geprüft. Bestehende Zuordnungen bleiben gespeichert; keine erneute Auswahl nötig. Zwei Austauschdateien, keine neue Konfiguration.
 
 ## r19: vorhandene Ausgangsbasis behalten
 

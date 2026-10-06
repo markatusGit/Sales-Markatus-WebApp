@@ -1,8 +1,10 @@
 # Sales Markatus manuell nach Google Apps Script übertragen
 
-Stand: 06.10.2026 · **2026-10-06-r19**. Neu: dauerhafter Änderungsabgleich ohne wiederkehrenden Gesamtimport und separate Ausgabenverknüpfung aus Firebase. Lokal vorbereitet und synthetisch geprüft; Bereitstellung und Live-Abnahme stehen aus.
+Stand: 06.10.2026 · **2026-10-06-r19.1**. Korrektur für „is not a function“ beim Button **Ausgaben aus Firebase verknüpfen**. Die Auswertung nutzt jetzt den bestehenden Serverzugang mit ausdrücklich getrenntem Ausgabenmodus. Lokal vorbereitet und synthetisch geprüft; Bereitstellung und Live-Abnahme stehen aus.
 
 **Austauschdateien:** [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-benchmark/Sales.html). Beide vollständig ersetzen. Bei deiner bereits eingerichteten r18-Version ist keine zusätzliche Google-Freigabe nötig. Abschnitt 2a nur bei fehlender Hintergrundfreigabe verwenden. Kein automatischer Upload durch Codex. Alte vollständige Firebase-Daten bleiben lesbar; nichts löschen.
+
+**Für bereits gespeicherte „Bestehende Zuordnungen“:** Nur Abschnitte 1, 2 und 3 ausführen, danach direkt Abschnitt 6. Die Projekte nicht erneut suchen oder zuordnen. Für diese Korrektur sind keine neuen/geänderten Skripteigenschaften, Berechtigungen oder Zugriffseinstellungen erforderlich. Bei einer Meldung über fehlende Serverunterstützung oder eine nicht verfügbare Serverfunktion keinen normalen HQ-Sync als Ersatz starten, sondern den genauen technischen Text melden.
 
 ## 1. Backend ersetzen
 
@@ -56,7 +58,7 @@ Damit ist die Fortsetzung freigegeben, aber noch kein Import gestartet. Die inte
 5. Auf **Bereitstellen** klicken.
 6. Die bisherige Web-App-Adresse mit **/exec** als info@markatus.de öffnen.
 7. Die Seite neu laden.
-8. Oben **2026-10-06-r19** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
+8. Oben **2026-10-06-r19.1** prüfen. Bei einer anderen Kennung oder unterschiedlichen Dateiständen zuerst die beiden Dateiersetzungen und die ausgewählte Bereitstellung kontrollieren; noch keinen Schreibtest starten.
 
 Nur Speichern aktualisiert die /exec-App nicht. Die zusätzlichen lokalen Quellmodule sind bereits in den beiden Austauschdateien enthalten und werden nicht zusätzlich in Google angelegt.
 
@@ -67,7 +69,7 @@ Der gemeldete Stand „152 von 152 … Mit offenen Punkten beendet“ wird als b
 1. Die zwei Dateien nach Abschnitt 1 und 2 ersetzen.
 2. Die bestehende Bereitstellung nach Abschnitt 3 auf **Neue Version** setzen.
 3. Die Web-App neu öffnen.
-4. Die Kennung **2026-10-06-r19** prüfen. Bei Abweichung zuerst die Bereitstellung korrigieren.
+4. Die Kennung **2026-10-06-r19.1** prüfen. Bei Abweichung zuerst die Bereitstellung korrigieren.
 5. **Kunden** öffnen. Erwartung: Bisherige Firmen sind weiterhin vorhanden, auch ohne Magazinbuchung. Bei fehlenden Firmen den Stand melden und nichts löschen.
 
 Keine neuen oder geänderten Skripteigenschaften, Scopes, Firestore-Regeln oder Bereitstellungseinstellungen gegenüber r18. Die vorhandene Hintergrundfreigabe bleibt bestehen. **SalesDelta.gs** ist bereits in **SalesBackend.gs** enthalten und wird nicht separat in Google angelegt. **FirebaseSync.gs** und **Code.gs** müssen nicht ersetzt werden.

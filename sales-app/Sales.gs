@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-06-r19';
+const SALES_RELEASE = '2026-10-06-r19.1';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -389,7 +389,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-10-06-r19','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-10-06-r19.1','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));

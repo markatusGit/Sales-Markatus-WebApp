@@ -28,7 +28,7 @@ test('edition-only run uses cached invoices and neither executes jobs nor change
  const f=bulkFixture();f.remote.Projects[570]={id:570,companyId:102,number:'P70',name:'Synthetic magazine #70',updatedOn:'2026-01-01'};f.doc(70,1);f.remote.Documents[1].updatedOn='2026-01-01';f.finishBulk();
  const e=f.ctx.saveSalesEditionConfig({magazine:'Synthetic magazine',issue:70,projectId:570}).id;
  const metadata=JSON.stringify(f.db['sales_meta/bulk']),customer=JSON.stringify(f.db['sales_companies/102']),calls=f.calls.length;
- f.ctx.startSalesEditionRefresh();finish(f);assert.equal(f.calls.length,calls);assert.equal(f.db['sales_editions/'+e].documents.length,1);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),metadata);assert.equal(JSON.stringify(f.db['sales_companies/102']),customer);
+ assert.equal(f.ctx.getSalesV1State().capabilities.editionRefreshViaSync,true);f.ctx.startSalesSync({mode:'editions'});finish(f);assert.equal(f.calls.length,calls);assert.equal(f.db['sales_editions/'+e].documents.length,1);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),metadata);assert.equal(JSON.stringify(f.db['sales_companies/102']),customer);
  assert.throws(()=>f.ctx.startSalesEditionRefresh(),/Keine neuen/);
 });
 test('edition grouping reads 6000 cached documents once for 60 editions sharing one bucket',()=>{
@@ -43,7 +43,16 @@ test('edition pause and lost commit recover the same run, no HQ calls',()=>{
  const f=bulkFixture();const e=f.config(70);f.doc(70,1);f.finishBulk();f.db['sales_editions/'+e].cacheLinkPending=true;f.ctx.startSalesEditionRefresh();const id=f.db['sales_meta/sync'].id;f.ctx.pauseSalesSync(id);assert.ok(f.db['sales_meta/sync'].paused);f.ctx.startSalesSync();assert.equal(f.db['sales_meta/sync'].id,id);const n=f.calls.length;f.worker();assert.equal(f.calls.length,n);assert.equal(f.db['sales_editions/'+e].cacheLinkPending,false);
 });
 test('unauthorized users cannot start cached edition processing',()=>{
- const f=bulkFixture();f.setEmail('outside@example.invalid');assert.throws(()=>f.ctx.startSalesEditionRefresh(),/Zugriff/);
+ const f=bulkFixture();f.setEmail('outside@example.invalid');assert.throws(()=>f.ctx.startSalesEditionRefresh(),/Zugriff/);assert.throws(()=>f.ctx.startSalesSync({mode:'editions'}),/Zugriff/);
+});
+test('invalid edition gateway requests cannot fall back to HQ sync',()=>{
+ const f=bulkFixture(),before=JSON.stringify(f.db),calls=f.calls.length;
+ for(const request of [null,{},[],{mode:'other'},{mode:'editions',extra:true}])assert.throws(()=>f.ctx.startSalesSync(request),/Unbekannter Abgleichmodus/);
+ assert.equal(JSON.stringify(f.db),before);assert.equal(f.calls.length,calls);
+});
+test('missing edition backend rejects gateway and advertises no capability',()=>{
+ const f=bulkFixture();f.ctx.startSalesEditionRefresh=undefined;assert.equal(f.ctx.getSalesV1State().capabilities.editionRefreshViaSync,false);const before=JSON.stringify(f.db),calls=f.calls.length;
+ assert.throws(()=>f.ctx.startSalesSync({mode:'editions'}),/Ausgabenverknüpfung fehlt/);assert.equal(JSON.stringify(f.db),before);assert.equal(f.calls.length,calls);
 });
 test('orphan summaries survive unchanged runs and later changes to only one stream',()=>{
  const f=bulkFixture();f.remote.ContactHistories[1]={id:1,companyId:null,content:'Synthetic orphan',updatedOn:'2026-01-01'};f.finishBulk();f.finishBulk();

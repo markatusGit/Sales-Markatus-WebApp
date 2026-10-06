@@ -5,7 +5,13 @@ function salesSyncSummary_(run){
   const discovery=run.tasks.find(t=>t.kind==='discover')?.collections?.companies;
   return {id:run.id,revision:run.revision,state:run.state,paused:run.paused===true,done:run.done,total:run.tasks.length,current:run.tasks[run.cursor]?.label||'',stage:run.tasks[run.cursor]?.stage||'',updatedAt:run.updatedAt,stats:run.stats,errors:run.errors,coverage:run.coverage||[],discovery:{count:run.companyIds.length,total:discovery?.total??run.stats.hqCompanies??null,pages:discovery?.pages||0,complete:run.discoveryComplete===true}};
 }
-function startSalesSync(){
+function startSalesSync(request){
+  if(request!==undefined){
+    salesUser_(true);
+    if(!request||typeof request!=='object'||Array.isArray(request)||request.mode!=='editions'||Object.keys(request).some(k=>k!=='mode'))throw new Error('Unbekannter Abgleichmodus. Kein HQ-Abgleich gestartet.');
+    if(typeof startSalesEditionRefresh!=='function')throw new Error('Ausgabenverknüpfung fehlt im Serverstand. SalesBackend.gs vollständig ersetzen und eine neue Version bereitstellen. Kein HQ-Abgleich gestartet.');
+    return startSalesEditionRefresh();
+  }
   if(typeof salesBulkStart_==='function')return salesBulkStart_();
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running'){

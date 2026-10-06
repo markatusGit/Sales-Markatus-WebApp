@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-06-r19';
+const SALES_RELEASE = '2026-10-06-r19.1';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -389,7 +389,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-10-06-r19','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-10-06-r19.1','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -877,7 +877,7 @@ function salesV1Known_(id){
 function getSalesV1State(){
   salesUser_();const state=getSalesState(),editions=salesV1Editions_(),index=salesV1Index_(),companies={};
   editions.forEach(e=>{(e.companies||[]).forEach(c=>{companies[c.id]=c;});(e.companyIds||[]).forEach(id=>{if(!companies[id])companies[id]={id,name:'HQ-Unternehmen '+id+' · Details fehlen',companyTypes:[],responsibleUsers:[],customFields:[],addresses:[]};});});index.entries.forEach(e=>{companies[e.company.id]=e.company;});
-  return {...state,editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
+  return {...state,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
 }
 function getSalesV1Company(id){
   salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);
@@ -1032,7 +1032,13 @@ function salesSyncSummary_(run){
   const discovery=run.tasks.find(t=>t.kind==='discover')?.collections?.companies;
   return {id:run.id,revision:run.revision,state:run.state,paused:run.paused===true,done:run.done,total:run.tasks.length,current:run.tasks[run.cursor]?.label||'',stage:run.tasks[run.cursor]?.stage||'',updatedAt:run.updatedAt,stats:run.stats,errors:run.errors,coverage:run.coverage||[],discovery:{count:run.companyIds.length,total:discovery?.total??run.stats.hqCompanies??null,pages:discovery?.pages||0,complete:run.discoveryComplete===true}};
 }
-function startSalesSync(){
+function startSalesSync(request){
+  if(request!==undefined){
+    salesUser_(true);
+    if(!request||typeof request!=='object'||Array.isArray(request)||request.mode!=='editions'||Object.keys(request).some(k=>k!=='mode'))throw new Error('Unbekannter Abgleichmodus. Kein HQ-Abgleich gestartet.');
+    if(typeof startSalesEditionRefresh!=='function')throw new Error('Ausgabenverknüpfung fehlt im Serverstand. SalesBackend.gs vollständig ersetzen und eine neue Version bereitstellen. Kein HQ-Abgleich gestartet.');
+    return startSalesEditionRefresh();
+  }
   if(typeof salesBulkStart_==='function')return salesBulkStart_();
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running'){
