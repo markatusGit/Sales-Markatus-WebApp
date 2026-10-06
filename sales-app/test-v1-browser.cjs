@@ -39,7 +39,7 @@ const {chromium}=require('playwright'),{setup}=require('./test-sales-v1.cjs');
   await row70.getByLabel('Als aktuelle Verkaufsausgabe verwenden',{exact:true}).check();
   await page.screenshot({path:path.join(os.tmpdir(),'sales-project-selection-qa.png'),fullPage:true});
   const startCalls=f.calls.length;
-  await page.getByRole('button',{name:'Auswahl für HQ-Sync speichern',exact:true}).click();
+  await page.getByRole('button',{name:'Auswahl speichern',exact:true}).click();
   await page.getByText('Auswahl in Firebase gespeichert.',{exact:false}).waitFor();
   assert.ok(!calls.includes('startSalesSync'));assert.ok(!calls.includes('startSalesImport'));
   await page.getByRole('button',{name:'Datenabgleich',exact:true}).click();

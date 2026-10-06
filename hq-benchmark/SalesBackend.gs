@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-02-r18';
+const SALES_RELEASE = '2026-10-06-r19';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -389,7 +389,7 @@ function salesContactDiagnostic_(actual,expected) {
     const value=String(object[key]??'').trim();
     return !value?'leer':!expectedEmail?'vorhanden (Firebase leer)':value===expectedEmail?'stimmt mit Firebase überein':'vorhanden, weicht von Firebase ab';
   }
-  const parts=['Kontaktprüfung 2026-10-02-r18','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
+  const parts=['Kontaktprüfung 2026-10-06-r19','E-Mail in Firebase: '+(expectedEmail?'vorhanden':'leer')];
   ['eMail','email','Email','EMail'].forEach(k=>parts.push('HQ '+k+': '+status(actual,k)));
   parts.push('HQ defaultAddress.email: '+status(actual.defaultAddress,'email'));
   parts.push('HQ-Kontaktadresse verknüpft: '+(actual.defaultAddressId?'ja':'nicht bestätigt'));
@@ -922,7 +922,7 @@ function saveSalesEditionConfig(input){
     if(old&&(old.magazine.toLocaleLowerCase('de')!==key||Number(old.issue)!==issue))throw new Error('Dieses HQ-Projekt ist bereits einer anderen Ausgabe zugeordnet.');
     const id=old?.id||'project-'+projectId;
     const value={...(old||{}),id,magazine,issue,projectId,projectNumber:String(project.number||''),projectName:project.name,companyIds:old?.companyIds||[],companies:old?.companies||[],documents:old?.documents||[],complete:old?.complete||false,settings:old?.settings||{targetCents:null,adDeadline:'',printDate:'',releaseDate:'',revision:0},changes:old?.changes||[],excludedDocumentIds:old?.excludedDocumentIds||[]};
-    value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
+    value.cacheLinkPending=!old?.loadedAt||old.cacheLinkPending===true||old.syncEnabled===false;value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
     if(input.current===true||input.current==='on')salesWrite_('sales_meta/preferences',{currentEditionId:id});
     return {id,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
   });
@@ -1021,7 +1021,7 @@ function setSalesDocumentExcluded(input){
     const id=salesKey_(input.editionId),e=salesRead_('sales_editions/'+id),documentId=String(salesId_(input.documentId));
     if(!e||![...(e.documents||[]),...(e.excludedDocuments||[])].some(d=>String(d.id)===documentId))throw new Error('Beleg gehört nicht zu dieser Ausgabe.');
     const ids=new Set(e.excludedDocumentIds||[]);if(input.excluded===true){ids.add(documentId);const doc=e.documents.find(d=>d.id===documentId);e.excludedDocuments=[...(e.excludedDocuments||[]).filter(d=>d.id!==documentId),{id:documentId,number:doc?.number||''}];e.documents=e.documents.filter(d=>d.id!==documentId);}else ids.delete(documentId);
-    e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
+    e.cacheLinkPending=true;e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
   });
 }
 
@@ -1186,7 +1186,7 @@ function runSalesSyncStep(id,revision){
   });
 }
 function setSalesEditionEnabled(id,enabled){
-  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const e=salesRead_('sales_editions/'+salesKey_(id));if(!e)throw new Error('Ausgabe fehlt.');if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Auswahl erst nach Abschluss des laufenden HQ-Sync ändern.');e.syncEnabled=enabled===true;salesWrite_('sales_editions/'+id,e);return {message:'Ausgaben-Auswahl in Firebase gespeichert. Wird beim nächsten HQ-Sync berücksichtigt.'};});
+  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const e=salesRead_('sales_editions/'+salesKey_(id));if(!e)throw new Error('Ausgabe fehlt.');if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Auswahl erst nach Abschluss des laufenden HQ-Sync ändern.');if(enabled===true&&e.syncEnabled===false)e.cacheLinkPending=true;e.syncEnabled=enabled===true;salesWrite_('sales_editions/'+id,e);return {message:'Ausgaben-Auswahl in Firebase gespeichert. Wird beim nächsten HQ-Sync berücksichtigt.'};});
 }
 
 /** Server-only Firestore transport. Indexed envelopes, chunked payloads, bounded commits. */
@@ -1248,32 +1248,22 @@ function salesBulkSelect_(entity,raw){
   const keys={Companies:['name','industrialSector','description','homepage','debitorNumber','companyTypes','responsibleUsers','defaultAddress','addresses','customFields'],ContactPersons:['companyId','firstName','lastName','position','phoneLandline','phoneMobile','eMail','salutation','salutationForm','defaultAddress','defaultAddressId'],Projects:['companyId','number','name','status','projectStatus','actualFinishDate','plannedFinishDate'],Documents:['companyId','projectId','number','date','currency','documentType','documentStatusEntity','netValue','createdFromId'],PlannedRevenues:['companyId','projectId','description','interval','startDate','endDate','dueMonth','dueDay','invoiceDate','currency','status','netTotal','estimations'],ContactHistories:['companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','syncId','responsibleUserIds','isReminder','recipientEmailAddress']};
   const row=salesPick_(raw,['id','updatedOn',...keys[entity]]);
   if(entity==='Companies'){
-    const address=a=>a?salesPick_(a,['id','street','houseNumber','zipCode','city','country','description','standardForDocumentType','website']):null;
+    const address=a=>a?salesPick_(a,['id','updatedOn','street','houseNumber','zipCode','city','country','description','standardForDocumentType','website']):null;
     row.defaultAddress=address(raw.defaultAddress);row.addresses=(raw.addresses||[]).map(address);row.customFields=(raw.customFields||[]).filter(f=>['Kundenklassifizierung','Kundenherkunft','Adressherkunft'].includes(f.name));
   }
   if(entity==='ContactPersons'&&raw.defaultAddress)row.defaultAddress=salesPick_(raw.defaultAddress,['id','email']);return row;
 }
 function salesBulkSummary_(run){
   const task=run.tasks[run.cursor],e=run.entities.Companies;
-  return {id:run.id,engine:2,revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.full?'Erstimport / vollständiger Kontrollabgleich':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:e?.seen||0,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,complete:!!run.entities[entity]?.complete,mode:run.entities[entity]?.full?'Sammelprüfung':'Änderungen seit letztem Abgleich'}))};
+  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
 }
 function salesBulkPrepare_(old){
-  const cache=salesRead_('sales_meta/bulk')||{},now=salesNow_(),full=!cache.completedAt||cache.needsFull||Date.parse(now)-Date.parse(cache.fullAt||0)>7*86400000;
-  // A legacy continuation retains only unexecuted write steps. Earlier writes are never replayed.
-  let tasks=[];if(old?.state==='running')tasks=old.tasks.slice(old.cursor).filter(t=>t.kind==='write');
-  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));jobs.filter(j=>j.kind!=='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
-  const run={id:old?.state==='running'?old.id:Utilities.getUuid(),engine:2,revision:(old?.revision||0)+1,state:'running',paused:false,cursor:0,done:0,tasks,errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],companyIds:[],loadedCompanyIds:[],startedAt:now,updatedAt:now,full,previousFullAt:cache.fullAt||null,stats:{companies:0,contacts:0,histories:0,editions:0,writes:0}};
-  if(old?.state==='running')run.note='Bisherige Kundenakten bleiben erhalten. Der alte Einzelabruf wurde auf den gemeinsamen Sammelimport umgestellt; bereits durchlaufene Schreibschritte werden nicht wiederholt.';
-  for(const entity of SALES_BULK_ENTITIES){
-    const prev=cache.entities?.[entity],all=full||!prev||prev.deltaSupported===false||['Companies','ContactPersons','PlannedRevenues'].includes(entity);
-    run.entities[entity]={full:all,generation:all?run.id:prev.generation,previousGeneration:prev?.generation||null,since:all?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),lastId:0,pages:0,seen:0,changed:0,count:all?0:prev.count,previousIds:all?(prev?.ids||[]):[],ids:[],deltaSupported:true};
-    tasks.push({kind:'bulkRead',id:entity,label:'HQ → Firebase: '+SALES_BULK_LABELS[entity]+' gesammelt lesen'});
-  }
-  if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
-  tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});return run;
+  return salesDeltaPrepare_(old);
 }
 function salesBulkDirty_(run,entity,row){
   if(!row)return;const company=entity==='Companies'?row.id:row.companyId,project=entity==='Projects'?row.id:row.projectId;
+  if(company&&run.changedCompanyIds&&!run.changedCompanyIds.includes(String(company)))run.changedCompanyIds.push(String(company));
+  if(project&&run.changedProjectIds&&!run.changedProjectIds.includes(String(project)))run.changedProjectIds.push(String(project));
   if(company&&!run.dirtyCompanies.includes(salesBulkBucket_(company)))run.dirtyCompanies.push(salesBulkBucket_(company));
   if(['Projects','Documents','PlannedRevenues'].includes(entity)&&project&&!run.dirtyProjects.includes(salesBulkBucket_(project)))run.dirtyProjects.push(salesBulkBucket_(project));
 }
@@ -1289,13 +1279,14 @@ function salesBulkRead_(run,task){
   const entity=task.id,m=run.entities[entity],collection=salesBulkCollection_(entity);
   if(m.complete)return true;
   if(task.pendingPage)return salesBulkCommitPage_(run,task);
-  const clauses=[];if(m.lastId)clauses.push('id gt '+m.lastId);if(m.since)clauses.push("updatedOn ge datetime'"+m.since+"'");
+  const clauses=[];if(m.lastId)clauses.push('id gt '+m.lastId);if(m.since)clauses.push(salesDeltaFilter_(entity,m.since));
   let page;try{page=salesBulkPage_(entity,clauses.join(' and '));}
-  catch(e){if(m.since&&/HTTP 400/.test(e.message)){Object.assign(m,{full:true,generation:run.id,since:null,lastId:0,pages:0,seen:0,changed:0,count:0,ids:[],deltaSupported:false});run.note=SALES_BULK_LABELS[entity]+': HQ akzeptiert den Änderungsfilter nicht. Diese Datenart wird gesammelt vollständig geprüft.';run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));return false;}throw e;}
+  catch(e){if(m.since&&/HTTP 400/.test(e.message))throw new Error(SALES_BULK_LABELS[entity]+': HQ hat den Änderungsfilter abgelehnt. Kein Gesamtimport als Ersatz. Gespeicherter Änderungsstand bleibt erhalten; technischen Filter prüfen.');throw e;}
+  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw new Error('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&!salesDeltaRecent_(entity,row,m.since))throw new Error('HQ-Änderungsfilter wurde nicht eingehalten. Kein Gesamtimport gestartet.');}
   page.rows=page.rows.map(row=>salesBulkSelect_(entity,row));
-  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw new Error('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&(!row.updatedOn||!Number.isFinite(Date.parse(row.updatedOn))||Date.parse(row.updatedOn)<Date.parse(m.since)))throw new Error('HQ-Änderungsfilter wurde nicht eingehalten.');if(!row.updatedOn||!Number.isFinite(Date.parse(row.updatedOn)))m.deltaSupported=false;}
   const paths=page.rows.map(r=>collection+'/'+r.id),old=salesBulkGet_(paths),entries=[];
   for(const row of page.rows){
+    if(run.policy===3){salesDeltaRecord_(run,entity,row,old[collection+'/'+row.id],entries);if(m.full)m.ids.push(String(row.id));continue;}
     const path=collection+'/'+row.id,prior=old[path],changed=!prior||prior.generation!==m.previousGeneration||JSON.stringify(prior.row)!==JSON.stringify(row);
     if(changed){salesBulkDirty_(run,entity,prior?.row);salesBulkDirty_(run,entity,row);m.changed++;}
     if(entity==='Projects'&&m.full)salesBulkDirty_(run,entity,row);
@@ -1313,7 +1304,7 @@ function salesBulkCommitPage_(run,task){
   if(!pending)throw new Error('Vorbereitete Sammelseite fehlt.');salesBulkPut_(pending.entries);
   if(!pending.done){delete task.pendingPage;return false;}
   if(m.full){
-    const ids=new Set(m.ids),removed=m.previousIds.filter(id=>!ids.has(id));
+    const ids=new Set(m.ids),removed=(m.previousIds||[]).filter(id=>!ids.has(id));
     const missing=salesBulkGet_(removed.map(id=>collection+'/'+id));Object.values(missing).forEach(v=>salesBulkDirty_(run,entity,v?.row));
     if(entity==='Companies'){run.companyIds=m.ids.slice();run.discoveryComplete=true;run.stats.hqCompanies=m.count;if(removed.length)run.errors.push({label:'Nicht mehr von HQ gelieferte Firmen',message:removed.length+' bisherige Firmen wurden nicht mehr geliefert. Ihre alten Kundenakten bleiben erhalten; Löschung oder Archivierung muss fachlich geprüft werden.'});}
   }
@@ -1322,12 +1313,13 @@ function salesBulkCommitPage_(run,task){
 function salesBulkProject_(run,task){
   const bucket=task.id,projects=salesBulkRows_(run,'Projects','projectBucket',bucket),docs=salesBulkRows_(run,'Documents','projectBucket',bucket),plans=salesBulkRows_(run,'PlannedRevenues','projectBucket',bucket),entries=[];
   for(const p of projects){
+    if(!run.full&&run.changedProjectIds&&!run.changedProjectIds.includes(String(p.id)))continue;
     const actualFinishDate=salesDate_(p.actualFinishDate),status=p.status||p.projectStatus?.name||'',completed=!!actualFinishDate||/^(abgeschlossen|completed|finished)$/i.test(status.trim()),b=salesBelegs_(docs.filter(d=>Number(d.projectId)===Number(p.id)));
     const row={id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,plannedRevenues:completed?[]:plans.filter(r=>Number(r.projectId)===Number(p.id)).map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
     entries.push({path:'sales_projectviews/'+p.id,value:{row,companyId:p.companyId,generation:run.entities.Projects.generation},index:{companyBucket:salesBulkBucket_(p.companyId),projectBucket:bucket}});salesBulkDirty_(run,'Projects',p);
   }
   // Project changes also affect invoice recipients and dispatch history outside the project-owning company.
-  docs.forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesWrite_('sales_meta/sync',run);salesBulkPut_(entries);return true;
+  docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesWrite_('sales_meta/sync',run);salesBulkPut_(entries);return true;
 }
 function salesBulkCompany_(run,task){
   const bucket=task.id,companies=salesBulkRows_(run,'Companies','companyBucket',bucket),contacts=salesBulkRows_(run,'ContactPersons','companyBucket',bucket),histories=salesBulkRows_(run,'ContactHistories','companyBucket',bucket),docs=salesBulkRows_(run,'Documents','companyBucket',bucket),projects=salesBulkRows_(run,'Projects','companyBucket',bucket);
@@ -1335,6 +1327,7 @@ function salesBulkCompany_(run,task){
   const rawProjects=salesBulkGet_(ids.map(id=>salesBulkCollection_('Projects')+'/'+id)),views=salesBulkGet_(projects.map(p=>'sales_projectviews/'+p.id)),byId={};
   Object.values(rawProjects).filter(v=>v&&v.generation===run.entities.Projects.generation).forEach(v=>{byId[v.row.id]=v.row;});
   const entries=[];for(const raw of companies){
+    if(!run.full&&run.changedCompanyIds&&!run.changedCompanyIds.includes(String(raw.id)))continue;
     const id=String(raw.id),company=salesCompany_(raw),cs=contacts.filter(c=>String(c.companyId)===id).map(salesContactView_),ds=docs.filter(d=>String(d.companyId)===id),hs=histories.filter(h=>String(h.companyId)===id).map(h=>salesHistory_(h,ds,byId));
     const ps=projects.filter(p=>String(p.companyId)===id).map(p=>{const v=views['sales_projectviews/'+p.id];if(!v||v.generation!==run.entities.Projects.generation)throw new Error('Projektübersicht fehlt; Kundenakte bleibt erhalten.');return v.row;});
     const value={company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
@@ -1342,13 +1335,13 @@ function salesBulkCompany_(run,task){
   }
   salesBulkPut_(entries);run.stats.companies+=companies.length;run.stats.contacts+=contacts.filter(c=>companies.some(p=>Number(p.id)===Number(c.companyId))).length;run.stats.histories+=histories.filter(h=>companies.some(p=>Number(p.id)===Number(h.companyId))).length;return true;
 }
-function salesBulkEdition_(run,task){
-  const e=salesRead_('sales_editions/'+salesKey_(task.id)),p=salesBulkGet_([salesBulkCollection_('Projects')+'/'+e.projectId])[salesBulkCollection_('Projects')+'/'+e.projectId];
+function salesBulkEdition_(run,task,cached){
+  const e=cached?.edition||salesRead_('sales_editions/'+salesKey_(task.id)),p=cached?cached.project:salesBulkGet_([salesBulkCollection_('Projects')+'/'+e.projectId])[salesBulkCollection_('Projects')+'/'+e.projectId];
   if(!p||p.generation!==run.entities.Projects.generation||p.row.name!==e.projectName||String(p.row.number)!==String(e.projectNumber))throw new Error('HQ-Projektzuordnung der Ausgabe wurde geändert oder nicht geliefert. In der Verwaltung prüfen.');
-  const docs=salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId)).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
+  const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId))).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
   const excludedDocuments=docs.filter(d=>excluded.has(String(d.id))).map(d=>({id:String(d.id),number:d.number||''}));excludedDocuments.forEach(d=>b.issues.push({id:d.id,reason:'Mehrere Ausgaben / Zuordnung ungeklärt: aus Summe ausgeschlossen'}));
   const companyIds=Array.from(new Set(docs.filter(d=>['Invoice','CreditNote'].includes(d.documentType)&&d.companyId).map(d=>String(d.companyId))));
-  salesWrite_('sales_editions/'+e.id,{...e,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
+  salesWrite_('sales_editions/'+e.id,{...e,cacheLinkPending:false,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
 }
 function salesBulkUnassigned_(run,task){
   const entity=task.id==='contacts'?'ContactPersons':'ContactHistories',known=new Set(run.companyIds),rows=[];
@@ -1360,34 +1353,160 @@ function salesBulkUnassigned_(run,task){
   salesWrite_('sales_meta/unassigned'+task.id,{rows:all,loadedAt:salesNow_()});run.stats[task.id==='contacts'?'unassignedContacts':'unassignedHistories']=all.length;return true;
 }
 function salesBulkAudit_(run){
-  let mismatch=false;for(const entity of SALES_BULK_ENTITIES){const total=salesV1Page_(entity,'',0,1).total,key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[entity];if(key)run.stats[key]=total;run.entities[entity].confirmedTotal=total;if(total===null||total!==run.entities[entity].count)mismatch=true;}
-  run.coverage=salesV1Editions_().filter(e=>e.syncEnabled!==false).map(e=>({id:e.id,label:e.magazine+' #'+e.issue,companies:(e.companyIds||[]).length,missingCompanyIds:(e.companyIds||[]).filter(id=>!run.companyIds.includes(id)),editionLoaded:run.tasks.some(t=>t.kind==='bulkEdition'&&t.id===e.id&&t.finished),belegsComplete:e.complete===true}));
-  if(run.coverage.some(e=>!e.editionLoaded||e.missingCompanyIds.length||!e.belegsComplete))run.errors.push({label:'Ausgabenprüfung',message:'Mindestens eine ausgewählte Ausgabe hat offene Beleg- oder Firmenzuordnungen. Siehe Ausgabenübersicht.'});
-  if(mismatch){const cache=salesRead_('sales_meta/bulk')||{};cache.needsFull=true;salesWrite_('sales_meta/bulk',cache);run.errors.push({label:'Vollständigkeitsprüfung',message:'HQ-Gesamtzahl verändert oder nicht bestätigt. Änderungsmarken nicht fortgeschrieben. Der nächste manuelle Lauf führt einen vollständigen Kontrollabgleich aus.'});}
-  else {
-    const entities={};for(const entity of SALES_BULK_ENTITIES){const m=run.entities[entity];entities[entity]={generation:m.generation,count:m.count,watermark:run.startedAt,deltaSupported:m.deltaSupported,ids:m.full?m.ids:[]};}
-    salesWrite_('sales_meta/bulk',{entities,completedAt:salesNow_(),fullAt:run.full?run.startedAt:run.previousFullAt,needsFull:false});
-    run.stats.companies=run.entities.Companies.count;run.stats.contacts=run.entities.ContactPersons.count-(run.stats.unassignedContacts||0);run.stats.histories=run.entities.ContactHistories.count-(run.stats.unassignedHistories||0);
-  }
-  salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});return true;
+  return salesDeltaAudit_(run);
+
 }
 function salesBulkStep_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task);run.stats.writes++;}catch(e){run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
+  else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
+  else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
+  else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}
   else if(task.kind==='bulkRead')done=salesBulkRead_(run,task);
   else if(task.kind==='bulkPlan'){run.tasks.push(...run.dirtyProjects.map(id=>({kind:'bulkProject',id,label:'Projektübersichten aus Firebase bilden · Gruppe '+id})),{kind:'bulkCompanyPlan',label:'Kundenübersichten vorbereiten'});done=true;}
   else if(task.kind==='bulkProject')done=salesBulkProject_(run,task);
   else if(task.kind==='bulkCompanyPlan'){
-    run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesV1Editions_().filter(e=>e.syncEnabled!==false).map(e=>({kind:'bulkEdition',id:e.id,label:e.magazine+' #'+e.issue})),{kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'},{kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
+    run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
+    if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
+    else run.tasks.push({kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='bulkCompany')done=salesBulkCompany_(run,task);
   else if(task.kind==='bulkEdition')done=salesBulkEdition_(run,task);
+  else if(task.kind==='deltaUnassigned')done=salesDeltaUnassigned_(run);
   else if(task.kind==='bulkUnassigned')done=salesBulkUnassigned_(run,task);
   else if(task.kind==='catalog')done=salesSyncCatalog_(run,task);
   else if(task.kind==='bulkAudit')done=salesBulkAudit_(run);
   else throw new Error('Unbekannter Sammelabschnitt.');
   if(done){task.finished=true;run.done++;run.cursor++;}run.revision++;run.updatedAt=salesNow_();
   if(run.cursor>=run.tasks.length)run.state=run.errors.length?'completedWithErrors':'completed';run.inFlight=null;salesWrite_('sales_meta/sync',run);return writeBoundary;
+}
+
+/** Persistent change cursors. No scheduled or mismatch-triggered full reread. */
+function salesDeltaCache_(old){
+  let cache=salesRead_('sales_meta/bulk')||{};
+  // r18 discarded its metadata on a count warning although all read/projection steps finished.
+  // Recover only from a durably completed run, never from a merely read/partially published run.
+  if(old?.engine===2&&old.policy!==3&&['completed','completedWithErrors'].includes(old.state)&&old.kind!=='editions'&&
+      old.cursor===old.tasks.length&&SALES_BULK_ENTITIES.every(e=>old.entities?.[e]?.complete)&&
+      (!cache.completedAt||Date.parse(old.updatedAt)>Date.parse(cache.completedAt))){
+    const entities={};
+    for(const e of SALES_BULK_ENTITIES){const m=old.entities[e],prev=cache.entities?.[e];
+      entities[e]={generation:m.generation,count:m.count,watermark:old.startedAt,ids:m.full?m.ids:(m.knownIds||prev?.ids||[]),checkOffset:prev?.checkOffset||0};
+    }
+    cache={...cache,entities,companyIds:old.companyIds,stats:old.stats,completedAt:old.updatedAt,policy:3,needsFull:false,
+      warnings:(old.errors||[]).filter(e=>e.label==='Vollständigkeitsprüfung').map(()=>({label:'Bestandsprüfung',message:'Der übernommene Erstimport enthält eine Mengenabweichung. Vorhandene Daten bleiben erhalten; kein erneuter Gesamtimport. Der nächste Änderungsabgleich zeigt die betroffene Datenart.'}))};
+    salesWrite_('sales_meta/bulk',cache);
+  }
+  if(cache.completedAt&&!SALES_BULK_ENTITIES.every(e=>cache.entities?.[e]?.generation&&Number.isFinite(Date.parse(cache.entities[e].watermark))))throw new Error('Gespeicherte Änderungsmarken unvollständig. Bestand bleibt erhalten; kein automatischer Gesamtimport. Einrichtung prüfen.');
+  return cache;
+}
+function salesDeltaPrepare_(old){
+  const cache=salesDeltaCache_(old),now=salesNow_(),full=!cache.completedAt;
+  // A new database needs one initial baseline. A known database is never silently reset.
+  if(full&&old?.engine===2&&old.state!=='running')throw new Error('Vorhandener Abgleich hat keine wiederherstellbare Ausgangsbasis. Kein erneuter Gesamtimport gestartet. Gespeicherten Lauf prüfen.');
+  let tasks=[];
+  if(old?.state==='running')tasks=old.tasks.slice(old.cursor).filter(t=>t.kind==='write');
+  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));jobs.filter(j=>j.kind!=='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
+  const run={id:old?.state==='running'?old.id:Utilities.getUuid(),engine:2,policy:3,revision:(old?.revision||0)+1,state:'running',paused:false,cursor:0,done:0,tasks,
+    errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
+    stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
+  for(const e of SALES_BULK_ENTITIES){const prev=cache.entities?.[e];
+    run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
+    tasks.push({kind:'bulkRead',id:e,label:'HQ → Firebase: '+SALES_BULK_LABELS[e]+(full?' erstmals lesen':' · Änderungen lesen')});
+  }
+  if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
+  if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
+  tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
+  return run;
+}
+function salesDeltaFilter_(entity,since){
+  const date="datetime'"+since+"'",parts=['updatedOn ge '+date,'createdOn ge '+date];
+  // Company addresses expose their own timestamp. Contact-address DTOs and estimations do not.
+  if(entity==='Companies')parts.push('defaultAddress/updatedOn ge '+date,'addresses/any(a: a/updatedOn ge '+date+')');
+  return '('+parts.join(' or ')+')';
+}
+function salesDeltaRecent_(entity,row,since){
+  const values=[row.updatedOn,row.createdOn];if(entity==='Companies')values.push(row.defaultAddress?.updatedOn,...(row.addresses||[]).map(a=>a.updatedOn));
+  return values.some(x=>Number.isFinite(Date.parse(x))&&Date.parse(x)>=Date.parse(since));
+}
+function salesDeltaRecord_(run,entity,row,prior,entries){
+  const m=run.entities[entity],path=salesBulkCollection_(entity)+'/'+row.id;
+  const exists=prior&&prior.generation===m.generation,changed=!exists||JSON.stringify(prior.row)!==JSON.stringify(row);
+  if(changed){salesBulkDirty_(run,entity,prior?.row);salesBulkDirty_(run,entity,row);m.changed++;m.touchedIds=m.touchedIds||[];if(!m.touchedIds.includes(String(row.id)))m.touchedIds.push(String(row.id));entries.push({path,value:{row,generation:m.generation},index:{companyBucket:salesBulkBucket_(entity==='Companies'?row.id:row.companyId),projectBucket:salesBulkBucket_(entity==='Projects'?row.id:row.projectId)}});}
+  if(!exists)m.count++;
+  const id=String(row.id);if(!m.knownIds.includes(id))m.knownIds.push(id);
+  if(entity==='Companies'&&!run.companyIds.includes(id))run.companyIds.push(id);
+}
+function salesDeltaProbe_(run,task){
+  // Bounded round-robin checks cover silent nested changes without scanning the whole database.
+  // A 404 is reported, never treated as permission to delete CRM data.
+  const m=run.entities[task.id];if(task.pendingPage){salesBulkPut_(salesRead_(task.pendingPage).entries);delete task.pendingPage;task.index++;return task.index>=task.ids.length;}
+  if(!task.ids){const ids=m.knownIds||[],n=Math.min(10,ids.length);task.ids=Array.from({length:n},(_,i)=>ids[(m.checkOffset+i)%ids.length]);m.checkOffset=ids.length?(m.checkOffset+n)%ids.length:0;task.index=0;}
+  if(task.index>=task.ids.length)return true;
+  const id=task.ids[task.index];let raw;
+  try{raw=salesHqGet_('/v2/'+task.id+'/'+salesId_(id)+(SALES_BULK_EXPAND[task.id]?'?expand='+encodeURIComponent(SALES_BULK_EXPAND[task.id]):'')).data;}
+  catch(e){if(!/HTTP 404/.test(e.message))throw e;run.errors.push({label:'HQ-Einzelprüfung · '+SALES_BULK_LABELS[task.id],message:'Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'});task.index++;return task.index>=task.ids.length;}
+  if(String(raw.id)!==id)throw new Error('HQ-Einzelprüfung liefert eine andere Kennung.');
+  const row=salesBulkSelect_(task.id,raw),path=salesBulkCollection_(task.id)+'/'+id,prior=salesBulkGet_([path])[path],entries=[];
+  salesDeltaRecord_(run,task.id,row,prior,entries);m.checked=(m.checked||0)+1;
+  if(!entries.length){task.index++;return task.index>=task.ids.length;}
+  task.pendingPage='sales_imports/'+run.id+'-probe-'+task.id+'-'+task.index;salesWrite_(task.pendingPage,{entries});salesWrite_('sales_meta/sync',run);
+  return salesDeltaProbe_(run,task);
+}
+function salesDeltaEditionTasks_(run,onlyPending){
+  const byBucket={};for(const e of salesV1Editions_().filter(e=>e.syncEnabled!==false)){
+    if(!onlyPending&&e.loadedAt&&!e.cacheLinkPending&&!run.full&&!(run.changedProjectIds||[]).includes(String(e.projectId)))continue;
+    if(onlyPending&&e.loadedAt&&!e.cacheLinkPending)continue;
+    const bucket=salesBulkBucket_(e.projectId);(byBucket[bucket]||(byBucket[bucket]=[])).push(e.id);
+  }
+  return Object.entries(byBucket).map(([id,editionIds])=>({kind:'deltaEditions',id,editionIds,label:'Magazinausgaben aus Firebase verknüpfen · Gruppe '+id}));
+}
+function salesDeltaEditions_(run,task){
+  const editions=task.editionIds.map(id=>salesRead_('sales_editions/'+salesKey_(id)));
+  if(editions.some(e=>!e))throw new Error('Ausgabenzuordnung fehlt.');
+  const paths=editions.map(e=>salesBulkCollection_('Projects')+'/'+e.projectId),projects=salesBulkGet_(paths),docs=salesBulkRows_(run,'Documents','projectBucket',task.id);
+  for(const e of editions){salesBulkEdition_(run,{id:e.id}, {edition:e,project:projects[salesBulkCollection_('Projects')+'/'+e.projectId],docs});}return true;
+}
+function startSalesEditionRefresh(){
+  salesUser_(true);return salesLock_(()=>{
+    salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running')throw new Error('Zuerst den gespeicherten Abgleich fortsetzen oder abschließen.');
+    const cache=salesDeltaCache_(old);if(!cache.completedAt)throw new Error('Es fehlt ein abgeschlossener Erstimport. Vorhandenen HQ-Abgleich zuerst abschließen.');
+    const now=salesNow_(),run={id:Utilities.getUuid(),engine:2,policy:3,kind:'editions',revision:0,state:'running',cursor:0,done:0,tasks:[],errors:(cache.warnings||[]).slice(),entities:cache.entities,companyIds:cache.companyIds||cache.entities.Companies.ids||[],startedAt:now,updatedAt:now,full:false,stats:{...cache.stats,editions:0,writes:0},note:'Nur neue oder zur Aktualisierung markierte Ausgaben aus Firebase. Kein HQ-Abruf und keine HQ-Schreibaufträge. Der Stand entspricht dem letzten HQ-Abgleich; bestehende Bestandswarnungen bleiben offen.'};
+    run.tasks=salesDeltaEditionTasks_(run,true);if(!run.tasks.length)throw new Error('Keine neuen oder geänderten Ausgabenzuordnungen vorhanden.');
+    run.tasks.push({kind:'deltaEditionAudit',label:'Ausgabenzuordnungen prüfen'});salesWorkerEnsure_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');salesWrite_('sales_meta/sync',run);return salesBulkSummary_(run);
+  });
+}
+function salesDeltaCoverage_(run){
+  const known=new Set(run.companyIds);run.coverage=salesV1Editions_().filter(e=>e.syncEnabled!==false).map(e=>({id:e.id,label:e.magazine+' #'+e.issue,companies:(e.companyIds||[]).length,missingCompanyIds:(e.companyIds||[]).filter(id=>!known.has(id)),editionLoaded:!!e.loadedAt&&!e.cacheLinkPending,belegsComplete:e.complete===true}));
+  if(run.coverage.some(e=>!e.editionLoaded||e.missingCompanyIds.length||!e.belegsComplete))run.errors.push({label:'Ausgabenprüfung',message:'Mindestens eine Ausgabe hat offene Beleg- oder Firmenzuordnungen. Siehe Ausgabenübersicht.'});
+}
+function salesDeltaUnassigned_(run){
+  const known=new Set(run.companyIds);let changed=false;
+  for(const [entity,key] of [['ContactPersons','contacts'],['ContactHistories','histories']]){
+    const ids=run.entities[entity].touchedIds||[];if(!ids.length&&!(run.entities.Companies.touchedIds||[]).length)continue;
+    const path='sales_meta/unassigned'+key,old=salesRead_(path)||{rows:[]},map=new Map(old.rows.map(r=>[String(r.id),r]));
+    for(const [id,row] of map)if(known.has(String(row.companyId)))map.delete(id);
+    const records=salesBulkGet_(ids.map(id=>salesBulkCollection_(entity)+'/'+id));
+    for(const id of ids){map.delete(id);const row=records[salesBulkCollection_(entity)+'/'+id]?.row;if(row&&!known.has(String(row.companyId)))map.set(id,entity==='ContactPersons'?salesContactView_(row):salesHistory_(row,[],{}));}
+    const rows=Array.from(map.values());if(JSON.stringify(rows)!==JSON.stringify(old.rows)){salesWrite_(path,{rows,loadedAt:salesNow_()});changed=true;}
+    run.stats[key==='contacts'?'unassignedContacts':'unassignedHistories']=rows.length;
+  }
+  if(changed)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts??run.previousStats.unassignedContacts??0,histories:run.stats.unassignedHistories??run.previousStats.unassignedHistories??0,updatedAt:salesNow_()});return true;
+}
+function salesDeltaAudit_(run){
+  const warnings=[];for(const e of SALES_BULK_ENTITIES){const total=salesV1Page_(e,'',0,1).total,m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
+    if(key)run.stats[key]=total;m.confirmedTotal=total;
+    if(total===null||total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+(total===null?'nicht bestätigt':total)+'. Mengenabweichung bleibt zur Prüfung offen. Änderungsstand gespeichert; kein erneuter Gesamtimport.'});
+  }
+  salesDeltaCoverage_(run);run.errors.push(...warnings);
+  const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:run.startedAt,ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
+  // Each stream was fully read and all affected projections published. Counts are diagnostics, not reset switches.
+  run.stats.companies=run.entities.Companies.count;run.stats.contacts=run.entities.ContactPersons.count;run.stats.histories=run.entities.ContactHistories.count;
+  // Cache totals include unassigned rows; UI must not add them a second time.
+  run.stats.totalsIncludeUnassigned=true;
+  if(run.full)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});
+  salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings});return true;
 }
 
 /** Temporary Apps Script continuation trigger. Never starts a new/nightly business sync. */

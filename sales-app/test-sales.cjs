@@ -126,7 +126,7 @@ test('contact email audit only reads HQ and reports fields without leaking conta
   const f=fixture(),r=f.ctx.saveSalesTestCompany({...f.input,eMail:'private-test@example.invalid'});finishCreate(f,r.id);
   const contact=f.remote.ContactPersons[202];contact.eMail=null;contact.defaultAddress={email:'private-test@example.invalid'};
   const before=f.calls.length,result=f.ctx.getSalesTestAudit(r.id).contactStatus;
-  assert.match(result,/Kontaktprüfung 2026-10-02-r18/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
+  assert.match(result,/Kontaktprüfung 2026-10-06-r19/);assert.match(result,/E-Mail in Firebase: vorhanden/);assert.match(result,/HQ eMail: leer/);
   assert.match(result,/defaultAddress.email: stimmt mit Firebase überein/);assert.match(result,/Abweichende Kontaktfelder: keine/);
   assert.equal(result.includes('private-test@'),false);assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
 });
@@ -507,7 +507,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-10-02-r18',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-10-06-r19',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-10-02-r18'));
+  assert.ok(root.innerHTML.includes('2026-10-06-r19'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

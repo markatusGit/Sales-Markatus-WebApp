@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{setup}=require('./test-sales-v1.cjs');
-const source=['SalesStorage.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesWorker.gs'].map(n=>fs.readFileSync(__dirname+'/'+n,'utf8')).join('\n');
+const source=['SalesStorage.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs'].map(n=>fs.readFileSync(__dirname+'/'+n,'utf8')).join('\n');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function bulkFixture(){
  const f=setup();vm.runInContext(source,f.ctx);const fields={},transport=[],triggers=[];let triggerNumber=0;
@@ -24,9 +24,11 @@ function bulkFixture(){
    }throw Error('Unexpected Firebase operation '+op);
  };
  const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=path=>{
+   const single=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\/(\d+)(?:\?|$)/.exec(path);
+   if(single){f.calls.push({method:'get',path});const row=f.remote[single[1]]?.[single[2]];if(!row)throw Error('HQ-Lesetest: HTTP 404');return {data:clone(row),headers:{}};}
    const m=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\?/.exec(path);if(!m)return get(path);
    f.calls.push({method:'get',path});const q=new URL('https://fixture'+path).searchParams,filter=q.get('$filter')||'';let rows=Object.values(f.remote[m[1]]||{}).map(clone).sort((a,b)=>a.id-b.id);
-   const id=/id gt (\d+)/.exec(filter),since=/updatedOn ge datetime'([^']+)'/.exec(filter);if(id)rows=rows.filter(r=>r.id>Number(id[1]));if(since)rows=rows.filter(r=>Date.parse(r.updatedOn)>=Date.parse(since[1]));
+   const id=/id gt (\d+)/.exec(filter),since=/updatedOn ge datetime'([^']+)'/.exec(filter);if(id)rows=rows.filter(r=>r.id>Number(id[1]));if(since)rows=rows.filter(r=>[r.updatedOn,r.createdOn,...(filter.includes('defaultAddress/updatedOn')?[r.defaultAddress?.updatedOn,...(r.addresses||[]).map(a=>a.updatedOn)]:[])].some(d=>Date.parse(d)>=Date.parse(since[1])));
    const top=Number(q.get('$top')||200),skip=Number(q.get('$skip')||0);return {data:rows.slice(skip,skip+top),headers:{'helloHQ-Count':rows.length}};
  };
  for(const entity of ['Companies','ContactPersons','ContactHistories','Projects','Documents','PlannedRevenues']){f.remote[entity]=f.remote[entity]||{};Object.values(f.remote[entity]).forEach(r=>r.updatedOn='2026-01-01T00:00:00Z');}
@@ -56,7 +58,7 @@ test('second run uses independent history/document/project change filters; uncha
 test('unchanged parent timestamp still picks up contact address changes and moved/deleted contacts',()=>{
  const f=bulkFixture();f.remote.ContactPersons[300]={id:300,companyId:102,firstName:'Synthetic',defaultAddress:{email:'one@example.invalid'},updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();
  f.remote.ContactPersons[300].companyId=101;f.remote.ContactPersons[300].defaultAddress.email='two@example.invalid';f.finishBulk();assert.ok(!f.db['sales_companies/102'].contacts.some(c=>String(c.id)==='300'));assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'&&c.eMail==='two@example.invalid'));
- delete f.remote.ContactPersons[300];f.finishBulk();assert.ok(!f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'));
+ delete f.remote.ContactPersons[300];const run=f.finishBulk();assert.equal(run.full,false);assert.ok(run.errors.some(e=>/nicht mehr gefunden/.test(e.message)));assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'));
 });
 test('lost cache commit response replays immutable page without losing counts or old associations',()=>{
  const f=bulkFixture();f.ctx.startSalesSync();f.failCommit='after';f.worker();let run=f.db['sales_meta/sync'];assert.ok(run.paused);assert.ok(run.tasks[run.cursor].pendingPage);assert.equal(f.db['sales_meta/bulk'],undefined);f.ctx.startSalesSync();run=f.finishBulk();assert.equal(run.stats.companies,2);assert.equal(run.entities.Companies.seen,2);assert.equal(run.state,'completed');
@@ -79,16 +81,17 @@ test('large Unicode cache payloads retain indexed envelopes and use immutable ch
 test('unassigned contacts and histories are retained without inventing company links',()=>{
  const f=bulkFixture();f.remote.ContactPersons[400]={id:400,companyId:999,firstName:'Unassigned',updatedOn:'2026-01-01T00:00:00Z'};f.remote.ContactHistories[500]={id:500,companyId:null,content:'Synthetic',updatedOn:'2026-01-01T00:00:00Z'};const run=f.finishBulk();assert.equal(run.state,'completed');assert.equal(f.db['sales_meta/unassignedcontacts'].rows.length,1);assert.equal(f.db['sales_meta/unassignedhistories'].rows.length,1);
 });
-test('weekly control pass detects removed histories; mismatched totals never advance cursors',()=>{
- const f=bulkFixture();f.remote.ContactHistories[1]={id:1,companyId:102,content:'Synthetic',updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();delete f.remote.ContactHistories[1];let run=f.finishBulk();assert.equal(run.state,'completedWithErrors');assert.equal(f.db['sales_meta/bulk'].needsFull,true);run=f.finishBulk();assert.equal(run.full,true);assert.equal(run.state,'completed');assert.equal(f.db['sales_companies/102'].histories.length,0);
+test('removed histories are flagged and retained; mismatched totals never force a full import',()=>{
+ const f=bulkFixture();f.remote.ContactHistories[1]={id:1,companyId:102,content:'Synthetic',updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();delete f.remote.ContactHistories[1];let run=f.finishBulk();assert.equal(run.state,'completedWithErrors');assert.equal(f.db['sales_meta/bulk'].needsFull,false);run=f.finishBulk();assert.equal(run.full,false);assert.equal(run.state,'completedWithErrors');assert.equal(f.db['sales_companies/102'].histories.length,1);
 });
 test('company creation and contact creation use different worker executions; uncertain jobs never post again',()=>{
  const f=bulkFixture(),saved=f.ctx.saveSalesTestCompany({...f.input,name:'TEST Worker Company'});const start=f.calls.length;f.ctx.startSalesSync();f.setEmail('');f.worker();assert.ok(f.db['sales_jobs/'+saved.id].companyConfirmedAt);assert.equal(f.calls.slice(start).filter(c=>c.method==='post'&&c.path==='/v2/ContactPersons').length,0);f.worker();assert.equal(f.calls.slice(start).filter(c=>c.method==='post'&&c.path==='/v2/ContactPersons').length,1);f.setEmail('pp@markatus.de');
  f.db['sales_jobs/'+saved.id].state='uncertain';f.finishBulk();const count=f.calls.filter(c=>c.method==='post').length;f.ctx.startSalesSync();f.worker();assert.equal(f.calls.filter(c=>c.method==='post').length,count);
 });
-test('unsupported HQ date filter falls back visibly; ignored keyset filter is stopped',()=>{
- const f=bulkFixture();f.finishBulk();const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/ContactHistories?')&&decodeURIComponent(p).includes('updatedOn ge'))throw Error('HQ-Lesetest: HTTP 400');return get(p);};let run=f.finishBulk();assert.equal(run.entities.ContactHistories.full,true);assert.equal(run.entities.ContactHistories.deltaSupported,false);assert.match(run.note,/akzeptiert/);
- f.remote.Companies={};for(let id=1;id<=201;id++)f.remote.Companies[id]={id,name:'Synthetic',updatedOn:'2026-01-01T00:00:00Z'};f.ctx.salesHqGet_=p=>get(p.replace(/&\$filter=[^&]+/,''));f.ctx.startSalesSync();f.worker();run=f.db['sales_meta/sync'];assert.ok(run.paused);assert.match(run.blockedMessage,/Fortsetzungsfilter/);
+test('unsupported HQ date filter pauses without fallback; ignored keyset filter is stopped',()=>{
+ const f=bulkFixture();f.finishBulk();const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/ContactHistories?')&&decodeURIComponent(p).includes('updatedOn ge'))throw Error('HQ-Lesetest: HTTP 400');return get(p);};f.ctx.startSalesSync();f.worker();let run=f.db['sales_meta/sync'];assert.equal(run.entities.ContactHistories.full,false);assert.ok(run.paused);assert.match(run.blockedMessage,/Kein Gesamtimport/);
+ f.ctx.salesHqGet_=get;f.finishBulk();
+ f.remote.Companies={};for(let id=1;id<=201;id++)f.remote.Companies[id]={id,name:'Synthetic',updatedOn:'2026-01-01T00:00:00Z'};f.ctx.salesHqGet_=p=>get(p.replace(/&\$filter=[^&]+/,''));f.ctx.startSalesSync();f.worker();run=f.db['sales_meta/sync'];assert.ok(run.paused);assert.match(run.blockedMessage,/Fortsetzungsfilter|Änderungsfilter/);
 });
 test('updates to already paged low IDs during import are caught by the next independent watermark',()=>{
  const f=bulkFixture();for(let id=1;id<=201;id++)f.remote.ContactHistories[id]={id,companyId:102,reason:'Before',updatedOn:'2026-01-01T00:00:00Z'};f.ctx.startSalesSync();let run=f.db['sales_meta/sync'];while(!(run.tasks[run.cursor].id==='ContactHistories'&&run.entities.ContactHistories.pages===1))run=f.step();f.remote.ContactHistories[1].reason='During import';f.remote.ContactHistories[1].updatedOn=new Date().toISOString();f.finishBulk();assert.equal(f.db['sales_companies/102'].histories.find(h=>h.id===1).reason,'Before');f.finishBulk();assert.equal(f.db['sales_companies/102'].histories.find(h=>h.id===1).reason,'During import');
@@ -97,7 +100,7 @@ test('pause request survives a busy worker lock and revoked admin cannot continu
  const f=bulkFixture(),run=f.ctx.startSalesSync();f.ctx.LockService={getScriptLock:()=>({tryLock:()=>false,releaseLock(){}})};assert.ok(f.ctx.pauseSalesSync(run.id).pauseRequested);f.ctx.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})};f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.equal(f.db['sales_meta/sync'].cursor,0);f.ctx.startSalesSync();f.props.SALES_ALLOWED_EMAILS='outside@example.invalid';assert.throws(()=>f.worker(),/autorisiert/);
 });
 test('ID pagination tolerates global counts and smaller pages; project deletions also trigger reconciliation',()=>{
- const f=bulkFixture();f.remote.Companies={};f.remote.ContactPersons={};for(let id=1;id<=400;id++)f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:'2026-01-01T00:00:00Z'};f.remote.Projects[100]={id:100,companyId:1,name:'Project',updatedOn:'2026-01-01T00:00:00Z'};const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v2/Companies?')){r.data=r.data.slice(0,100);r.headers['helloHQ-Count']=400;}return r;};let run=f.finishBulk();assert.equal(run.stats.companies,400);assert.equal(run.state,'completed');delete f.remote.Projects[100];run=f.finishBulk();assert.equal(run.state,'completedWithErrors');assert.ok(f.db['sales_meta/bulk'].needsFull);run=f.finishBulk();assert.equal(run.state,'completed');assert.equal(f.db['sales_companies/1'].projects.length,0);
+ const f=bulkFixture();f.remote.Companies={};f.remote.ContactPersons={};for(let id=1;id<=400;id++)f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:'2026-01-01T00:00:00Z'};f.remote.Projects[100]={id:100,companyId:1,name:'Project',updatedOn:'2026-01-01T00:00:00Z'};const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v2/Companies?')){r.data=r.data.slice(0,100);r.headers['helloHQ-Count']=400;}return r;};let run=f.finishBulk();assert.equal(run.stats.companies,400);assert.equal(run.state,'completed');delete f.remote.Projects[100];run=f.finishBulk();assert.equal(run.state,'completedWithErrors');assert.equal(f.db['sales_meta/bulk'].needsFull,false);run=f.finishBulk();assert.equal(run.full,false);assert.equal(f.db['sales_companies/1'].projects.length,1);
 });
 test('three unfinished server attempts stop instead of consuming quota forever',()=>{
  const f=bulkFixture();f.ctx.startSalesSync();const run=f.db['sales_meta/sync'];run.inFlight={key:'0::0:0:',attempts:3};const n=f.calls.length;f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.match(f.db['sales_meta/sync'].blockedMessage,/dreimal/);assert.equal(f.calls.length,n);assert.equal(f.triggers.length,0);

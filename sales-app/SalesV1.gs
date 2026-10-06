@@ -60,7 +60,7 @@ function saveSalesEditionConfig(input){
     if(old&&(old.magazine.toLocaleLowerCase('de')!==key||Number(old.issue)!==issue))throw new Error('Dieses HQ-Projekt ist bereits einer anderen Ausgabe zugeordnet.');
     const id=old?.id||'project-'+projectId;
     const value={...(old||{}),id,magazine,issue,projectId,projectNumber:String(project.number||''),projectName:project.name,companyIds:old?.companyIds||[],companies:old?.companies||[],documents:old?.documents||[],complete:old?.complete||false,settings:old?.settings||{targetCents:null,adDeadline:'',printDate:'',releaseDate:'',revision:0},changes:old?.changes||[],excludedDocumentIds:old?.excludedDocumentIds||[]};
-    value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
+    value.cacheLinkPending=!old?.loadedAt||old.cacheLinkPending===true||old.syncEnabled===false;value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
     if(input.current===true||input.current==='on')salesWrite_('sales_meta/preferences',{currentEditionId:id});
     return {id,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
   });
@@ -159,6 +159,6 @@ function setSalesDocumentExcluded(input){
     const id=salesKey_(input.editionId),e=salesRead_('sales_editions/'+id),documentId=String(salesId_(input.documentId));
     if(!e||![...(e.documents||[]),...(e.excludedDocuments||[])].some(d=>String(d.id)===documentId))throw new Error('Beleg gehört nicht zu dieser Ausgabe.');
     const ids=new Set(e.excludedDocumentIds||[]);if(input.excluded===true){ids.add(documentId);const doc=e.documents.find(d=>d.id===documentId);e.excludedDocuments=[...(e.excludedDocuments||[]).filter(d=>d.id!==documentId),{id:documentId,number:doc?.number||''}];e.documents=e.documents.filter(d=>d.id!==documentId);}else ids.delete(documentId);
-    e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
+    e.cacheLinkPending=true;e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
   });
 }

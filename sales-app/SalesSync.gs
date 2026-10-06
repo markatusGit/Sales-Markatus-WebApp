@@ -159,5 +159,5 @@ function runSalesSyncStep(id,revision){
   });
 }
 function setSalesEditionEnabled(id,enabled){
-  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const e=salesRead_('sales_editions/'+salesKey_(id));if(!e)throw new Error('Ausgabe fehlt.');if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Auswahl erst nach Abschluss des laufenden HQ-Sync ändern.');e.syncEnabled=enabled===true;salesWrite_('sales_editions/'+id,e);return {message:'Ausgaben-Auswahl in Firebase gespeichert. Wird beim nächsten HQ-Sync berücksichtigt.'};});
+  salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const e=salesRead_('sales_editions/'+salesKey_(id));if(!e)throw new Error('Ausgabe fehlt.');if(salesRead_('sales_meta/sync')?.state==='running')throw new Error('Auswahl erst nach Abschluss des laufenden HQ-Sync ändern.');if(enabled===true&&e.syncEnabled===false)e.cacheLinkPending=true;e.syncEnabled=enabled===true;salesWrite_('sales_editions/'+id,e);return {message:'Ausgaben-Auswahl in Firebase gespeichert. Wird beim nächsten HQ-Sync berücksichtigt.'};});
 }

@@ -1,28 +1,34 @@
 # Sales Markatus – Apps-Script-App
 
-Stand: 02.10.2026 · **2026-10-02-r18** lokal implementiert. Bereitstellung und Prüfung am echten HQ-Bestand übernimmt der Nutzer. Vollständiger Erstimport noch offen.
+Stand: 06.10.2026 · **2026-10-06-r19** lokal vorbereitet. Der Nutzer hat den r18-Erstimport mit Mengenwarnung abgeschlossen. r19-Bereitstellung und Live-Prüfung stehen noch aus.
 
-## r18: Sammelimport, Änderungsabgleich und Hintergrundfortsetzung
+## r19: vorhandene Ausgangsbasis behalten
 
-Sechs HQ-Datenarten werden in gemeinsamen Seiten à 200 gelesen. Benötigte Felder werden in Firebase zwischengespeichert und anhand Firmen-/Projektkennungen zugeordnet; keine HQ-Einzelabfrage je Firma. Firestore batchGet/commit und 64 Zuordnungsgruppen reduzieren Einzelzugriffe. Große Nutzdaten behalten unveränderliche Teile. Kundenakten werden erst nach vollständig gelesenen Datenarten und erfolgreicher Aufbereitung veröffentlicht. Der Gesamtbestand wird gruppenweise aktualisiert, nicht als globale Transaktion.
+- Kein automatischer erneuter Vollimport nach sieben Tagen, Mengenabweichungen oder Filterfehlern. Ein Erstimport findet nur bei einer neuen Datenbank ohne Ausgangsbasis statt.
+- Abgeschlossener r18-Lauf mit allen sechs gelesenen Datenarten wird bei fehlenden Metadaten anhand seiner gespeicherten Generationen und Startzeit übernommen. Keine rohen Datensätze werden dazu erneut geladen. Eine unvollständige Basis wird nicht als vollständig ausgegeben.
+- Alle sechs Datenarten nutzen eigene Datumsfilter mit zwei Minuten Überlappung. Firmen zusätzlich mit Adress-Zeitstempeln. HQ-Filterablehnung/Filterverletzung pausiert ohne ungefilterten Ersatzabruf. Marken erst nach vollständig gelesenen und veröffentlichten Änderungen fortschreiben.
+- Feste Cache-Generationen: Unveränderte Rohdaten bleiben unverändert. Nur betroffene Firmen und Projekte werden innerhalb ihrer Gruppen veröffentlicht. Gesamtzahlenabweichungen separat je Datenart melden; keine falsche Vollständigkeitszusage.
+- Pro Datenart bis zu zehn bekannte Objekte reihum mit expand prüfen. Stille Adress-/Planänderungen werden damit verzögert, nicht garantiert im nächsten Lauf entdeckt. 404 bleibt Prüfhinweis, keine automatische Datenlöschung. Ein zeitnaher verlässlicher HQ-Ereignis-/Löschkanal ist noch offen.
+- Kein erneuter Scan aller unzugeordneten Kontakte/Historien bei jedem Lauf. Nur betroffene Datensätze und vorhandene unzugeordnete Listen abgleichen. Eine neue Firma kann zuvor unzugeordnete Daten übernehmen.
+- Alle Firmen/Kontakte sind unabhängig von Magazinen gespeichert; keine Filterung auf Rechnungskunden.
 
-Historien, Dokumente und Projekte erhalten getrennte updatedOn-Marken, mit zwei Minuten Überlappung und id-Fortsetzung statt verschiebbarer Seitenoffsets. Marken werden erst nach Verarbeitung und Mengenprüfung fortgeschrieben. Firmen und Kontakte werden wegen verschachtelter Adressen, Planumsätze wegen Schätzungen weiterhin gesammelt gelesen. Identische Inhalte lösen keine erneute Kundenveröffentlichung aus. Fehlendes Änderungsdatum oder abgelehnter Datumsfilter führt für die Datenart zur vollständigen Sammelprüfung. Beim nächsten manuellen Start nach sieben Tagen erfolgt ein Kontroll-Vollabgleich, ebenso nach Mengenabweichungen. Löschungen in Delta-Daten können bis dahin unentdeckt bleiben; Mengenprüfung allein erkennt Löschen plus Neuanlage gleicher Anzahl nicht. Gelöschte Firmen bleiben zur fachlichen Klärung in der bisherigen App-Ansicht erhalten.
+## Magazine aus dem Cache
 
-Ein temporärer Apps-Script-Minuten-Trigger setzt ausschließlich den manuell gestarteten Lauf fort. Worker arbeiten etwa drei Minuten, prüfen Trigger-ID/Ausführungskonto/Adminfreigabe und speichern Abschnitte. Das ist kein Nachtplan. Pause kann auch bei belegtem Script-Lock angefordert werden. Bei Abschluss, Pause oder behandeltem Fehler wird der Trigger entfernt. Firmen- und Ansprechpartneranlage erfolgen in getrennten Trigger-Ausführungen. Unklare Schreibausgänge bleiben gesperrt. Browser-Schritt-RPCs treiben den neuen Lauf nicht an; die Oberfläche pollt nur den Firebase-Status.
+**Auswahl speichern** hinterlegt zugeordnete Projekte. **Ausgaben aus Firebase verknüpfen** startet einen getrennten Hintergrundlauf ohne HQ-Abrufe/Schreibaufträge. Nur neue/markierte Ausgaben verarbeiten, Rechnungen je Projektgruppe einmal gemeinsam lesen. Kein Verändern der HQ-Änderungsmarken. Vorhandene Bestandswarnungen bleiben sichtbar. Neue HQ-Projekte müssen zunächst durch einen Änderungsabgleich in den Cache gelangen.
 
-Ein r16/r17-Lauf behält ID und Schreibhinweise. Ausstehende Leseaufgaben werden durch eine neue gemeinsame Lesebasis ersetzt; alte vollständige Akten bleiben nutzbar. Bereits durchlaufene Schreibaufgaben werden nicht erneut eingeplant. Vorbereitete Seiten werden vor Cache-Writes dauerhaft protokolliert; bei verlorenen Antworten wird dieselbe Seite mit denselben Zählern wiederholt.
+Synthetische Transportmessung: 60 Ausgaben mit 6.000 Rechnungen derselben Gruppe benötigen 6.060 Projekt-/Beleg-Dokumentreads, keine HQ-Aufrufe. Zusätzliche Metadaten, UI-Aufrufe und Speicherteile sind nicht enthalten. Keine Live-Verbrauchs- oder Laufzeitzusage.
 
-Neue Quellen: SalesBulkStore.gs, SalesBulkSync.gs und SalesWorker.gs; alle werden in SalesBackend.gs eingebaut. Neue private Sammlungen: sales_rawcompanies, sales_rawcontacts, sales_rawhistories, sales_rawprojects, sales_rawdocuments, sales_rawplans, sales_projectviews. Nur benötigte Felder speichern, keine Rechnungspositionen oder Bankdaten ohne Verwendungszweck. Anonyme Zugriffe auf die neuen Sammlungen werden vor Verarbeitung geprüft.
+## Übergabe und Grenzen
 
-**Einrichtung:** Beide Austauschdateien ersetzen, Scope `https://www.googleapis.com/auth/script.scriptapp` prüfen, einmal `setupSalesSyncWorker` im Editor ausführen, anschließend Neue Version bereitstellen. Interne Eigenschaften SALES_SYNC_EXECUTOR, SALES_SYNC_ADMIN, SALES_SYNC_TRIGGER und SALES_SYNC_PAUSE werden automatisch angelegt. Keine weiteren Zugangsdaten oder geänderten Firestore-Regeln. Details: [manuelle Anleitung](MANUELL-UEBERTRAGEN.md).
+Nur **SalesBackend.gs** und **Sales.html** austauschen und neue Version bereitstellen. Neuer Quellbaustein **SalesDelta.gs** wird eingebaut, nicht separat hochgeladen. Gegenüber r18 keine neuen Skripteigenschaften, Berechtigungen, Regeln oder Zugriffsgruppen. Details und genaue Nutzeranleitung: [MANUELL-UEBERTRAGEN.md](MANUELL-UEBERTRAGEN.md).
 
-**Grenzen:** Eine Firebase-Gruppe ist auf 25.000 Datensätze pro Datenart begrenzt; darüber expliziter Stopp statt abgeschnittener Daten. Große Gruppen werden im Speicher zusammengeführt. Google-Kontingente, Firebase-Kosten und Browsergröße bleiben praktische Grenzen. Kein globaler HQ-Schnappschuss: spätere Änderungen werden im folgenden Lauf aufgeholt. Importjournale/alte Teile bleiben gespeichert; Bereinigung und Backupstrategie vor Teamfreigabe offen. Keine echte Laufzeit zugesagt.
+Der temporäre Google-Trigger arbeitet weiter wie in r18; kein regelmäßiger Nachtstart. Unsichere App→HQ-Aufträge bleiben gesperrt, Firmen- und Kontaktanlage zeitlich getrennt und auf eigene TEST-Ziele begrenzt. Große Firebase-Gruppen bleiben auf 25.000 Datensätze je Datenart begrenzt. Importjournale/alte Speicherteile bleiben erhalten; Aufbewahrung, Backup und Kontingentanzeige sind offen. Unveränderte Abgleiche verbrauchen weiterhin Metadatenzugriffe und begrenzte Kontrollreads, keine pauschale Kostenfreiheit.
 
-**Zusätzliche Prüfung:** `node sales-app/test-sales-bulk.cjs` sowie `node sales-app/test-worker-browser.cjs`. Synthetischer Bestand mit 3.202 Firmen: 17 gemeinsame Firmenseiten plus Mengenabfrage, keine HQ-Einzelabfrage pro Firma. Abbruch, verlorene Firebase-Antwort, Kontaktwechsel, Adressänderung ohne Eltern-Zeitstempel, Delta, Löschung, Filterfehler, Triggerrechte und Verarbeitung bei geschlossenem Testbrowser geprüft. Kein echter HQ-/Firebase-Zugriff durch Codex.
+Tests: test-sales.cjs, test-sales-v1.cjs, test-sales-sync.cjs, test-sales-bulk.cjs, test-sales-delta.cjs sowie Browserprüfungen. [Offizielle HQ-Filterdokumentation](https://developer.hellohq.io/) und gespeichertes öffentliches HQ-Schema geprüft. Keine echten HQ-/Firebase-Mutationen durch Codex.
 
-Referenzen: [HQ-v2-Filter und Seitennavigation](https://developer.hellohq.io/), [Google installierbare Trigger](https://developers.google.com/apps-script/guides/triggers/installable), [Firestore commit](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/commit), [batchGet](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/batchGet), [runQuery](https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents/runQuery).
+## Historische Implementierungsnotizen (durch r19 oben ersetzt)
 
-Die folgenden r16/r17-Abschnitte dokumentieren die bisherige Umsetzung. Angaben zum alten Einzelabruf, Browserbetrieb und vollständigen Neuladen wurden durch r18 oben ersetzt; Oberflächenfunktionen und TEST-Schreibgrenzen bleiben bestehen.
+Die nachfolgenden älteren Abschnitte dienen nur der Historie. Aussagen über vollständiges Neuladen oder alte Buttonnamen gelten nicht für r19.
 
 ## Korrektur r17
 
