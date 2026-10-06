@@ -1060,3 +1060,23 @@ Keine neuen/geänderten Skripteigenschaften, Scopes, Zugriffsgruppen oder sonsti
 **Weitere Reihenfolge Richtung V1:** Zuerst Ausgabenverknüpfung und Kunden-/Umsatzzuordnung stichprobenartig abnehmen, danach den Änderungsabgleich mit begrenzter Teständerung prüfen. Anschließend die bereits gewünschte Roadmap fortsetzen: persönlicher Google-Zugang mit ausdrücklicher E-Mail-Freigabe; vorhandene Kommunikation um Wiedervorlagen und Stammdatenbearbeitung ergänzen; Buchungen und Redaktionsübergabe fertigstellen; aktuelle Ausgabe mit kleinem Team testen. Kontakthistorie und grundlegende Kommunikationsanlage bestehen bereits, nicht als komplett neu zu bauen darstellen. Magazinverkaufsfilter vor dem jeweiligen Ausbau gemeinsam konkretisieren. Nachtstart bleibt zurückgestellt, manueller Abgleich bleibt der Arbeitsweg.
 
 Nur Diagnose/Planung dokumentiert, kein App-Code verändert und keine neuen Austauschdateien oder Einstellungen nötig. Keine echten HQ-/Firebase-Daten gelesen oder geändert. Dieser Dokumentationsstand wird gezielt nach GitHub gesichert; Push-Erfolg wird im Chat gemeldet.
+
+### 06.10.2026 – Ausgabenverknüpfung live abgeschlossen, alte Mengenwarnung bleibt
+
+**Bestätigter Nutzerbericht:** Der reine Firebase-Ausgabenlauf ist mit 12 von 12 erfolgreichen Abschnitten beendet, ohne aktuellen Abschnitt und mit genau einem Hinweis. Alle 23 aufgeführten Ausgaben sind als Ausgabe geladen gemeldet, jeweils ohne fehlende Firmen in der Zuordnungsprüfung. Sechs davon enthalten 0 von 0 zugeordnete Firmen. Die einzige Warnung ist die übernommene Mengenabweichung des Erstimports. Damit ist der korrigierte Button samt Verknüpfung live erfolgreich ausgeführt; eine vollständige fachliche Abnahme aller Umsätze sowie des globalen Kundenbestands ist das nicht.
+
+**Einordnung:** Null neue HQ-Datensätze ist im reinen Firebase-Lauf korrekt. Die gespeicherten Vergleichsmengen lauten Firmen 3189/3192, Kontakte 3985/3990 und Historie 9090/9118 (Differenzen 3, 5, 28). Diese HQ-Zahlen wurden bei diesem Lauf nicht erneut abgefragt. Sie beweisen weder eine aktuelle Fehlmenge noch deren Ursache. Neu hinzugekommene Datensätze sind möglich; ältere Erfassungslücken ebenfalls nicht ausgeschlossen. Der nächste Änderungsabgleich liest seit den gespeicherten Zeitmarken und aktualisiert die Mengenprüfung. Er garantiert keine Reparatur älterer, unveränderter Lücken. Falls Unterschiede bleiben, gezielt diagnostizieren statt Gesamtimport starten.
+
+**Anzeige / leere Ausgaben:** Nach Neuladen sollte Magazinverkauf für die geladenen Ausgaben Stand mit Datum zeigen. Bleibt noch nicht importiert sichtbar, ist das anhand dieses Berichts separat als Anzeige-/Auswahlproblem zu untersuchen. 0/0 bedeutet keine zugeordneten Firmen im gespeicherten Ausgabenbestand; nicht pauschal behaupten, dass in HQ keine Rechnungen vorhanden sind. Bei erwarteten Rechnungen die betroffene Ausgabe und Zuordnung gezielt prüfen.
+
+**Nächste Nutzeraktionen:**
+
+- Die Web-App einmal neu laden.
+- Magazinverkauf öffnen und eine bereits belegte Ausgabe auswählen; Stand mit Datum und zugeordnete Kunden erwarten.
+- Bei weiterhin noch nicht importiert die betroffene Ausgabe melden.
+- Anschließend Datenabgleich öffnen.
+- HQ synchronisieren einmal anklicken; erwartet wird Änderungsabgleich, kein erneuter Gesamtimport.
+- Bei einem Filterfehler oder Firestore 429 den Lauf angehalten lassen und den technischen Text melden.
+- Nach Abschluss die Mengenübersicht und verbleibenden Bestandswarnungen mitteilen; fortbestehende Differenzen werden gezielt untersucht.
+
+Die vorherige Bitte, vor Einsicht in den Laufbericht keinen HQ-Abgleich zu starten, ist durch diese Einordnung erledigt. Diesmal wird der normale Änderungsabgleich zur Aktualisierung geprüft, nicht als Ersatz für eine fehlgeschlagene Ausgabenverknüpfung. Offene freigegebene App-Aufträge können dabei wie vorgesehen zuerst verarbeitet werden; unklare HQ-Schreibausgänge bleiben gesperrt. Keine neue Teständerung nötig, bevor dieser erste Änderungsbericht vorliegt. Danach Datenstichprobe und persönlicher Google-Zugang gemäß festgehaltener V1-Reihenfolge. Keine Codeänderung, keine neuen Dateien oder Einstellungen für den Nutzer. Diagnose anhand des Berichts und lokalen Codes, keine Live-Datenzugriffe durch Codex; Dokumentation wird gezielt nach GitHub gesichert.
