@@ -4,7 +4,7 @@ Stand: 16.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bis
 
 ## Auftrag und Produktstand
 
-Interne Magazinvertriebs-App mit Google-Anmeldung, helloHQ und Firebase. Der zuletzt bestätigte Appstand heißt `2026-10-06-r19.1`. Ausgabenverknüpfung und Anzeige wurden vom Nutzer bestätigt. Die vollständige fachliche Prüfung von Bestand/Umsatz und der sparsame Betrieb mit zehn Personen sind offen. Die Erläuterung vom 07.10.2026 weist erhebliche unnötige Firestore-Lesezugriffe nach; deren Optimierung ist noch nicht implementiert.
+Interne Magazinvertriebs-App mit Google-Anmeldung, helloHQ und Firebase. Nutzer hat am 16.10.2026 die ausgewählten Ladeoptimierungen ausdrücklich beauftragt. r20 (`2026-10-16-r20`, geplanter Git-Tag `v0.20.0`) ist lokal umgesetzt und synthetisch geprüft; Veröffentlichung und Codevergleich werden am Ende dieses Dokuments bzw. in deployment.json nachgewiesen. Die zuvor vom Nutzer bestätigte Ausgabenverknüpfung bleibt erhalten. Vollständige fachliche Bestands-/Umsatzabnahme und Zehn-Personen-Test sind weiter offen.
 
 ## Neuer dauerhafter Auftrag vom 16.10.2026
 
@@ -62,8 +62,14 @@ Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen
 
 ## Nächster Schritt für den Nutzer
 
-- Die Entscheidungsliste D01–D22 in Abschnitt 10 des Analyseberichts bzw. der aktuellen Chatantwort lesen; sie trennt streichbare Vollabrufe, gezieltes Nachladen und Auswirkungen auf Aktualität/Bedienung.
-- Die gewünschten Punkte anhand ihrer Kennungen auswählen; bei automatischer Aktualisierung, Kundenwiederöffnung, Suche und Fortschrittsanzeige die bevorzugte Variante nennen. Noch keine konkrete Auswahl oder Umsetzung beschlossen.
-- Für diesen Diagnoseschritt keine App-Dateien übertragen und keinen zusätzlichen HQ-Sync als Test starten; der veröffentlichte Appstand bleibt unverändert.
+- Nach bestätigter Veröffentlichung die bestehende Dashboard-URL neu öffnen; Kennung 2026-10-16-r20 erwarten. Bei Abweichung die Kennung mitteilen.
+- Kunden einmal öffnen; der erste Namensindex-Aufbau kann einmalig länger dauern und ungefähr einen Verzeichnisabruf kosten. Bei einem Kontingentfehler den Fehlertext melden, nicht wiederholt starten.
+- Eine Kundenakte öffnen und über Zur Kundenliste dieselbe Akte erneut öffnen; Wiederöffnung ohne erneuten Ladeaufruf erwarten.
+- Die Akte über Aus Firebase neu laden ausdrücklich aktualisieren; nur diese Akte wird neu gelesen.
+- Über die zurückgestellten Punkte D08/D09/D11/D14/D17/D20–D22 nach der Erklärung im aktuellen Chat entscheiden; sie sind nicht pauschal mitoptimiert.
+
+### Bestätigte Auswahl und Umsetzung vom 16.10.2026
+
+Freigegeben: D01–D06, D10, D12, D13, D15, D16, D18, D19. D02 ausdrücklich ohne jeden Timer oder Änderungsstand für Arbeitsdaten; D05 ohne automatische Gültigkeits-/Versionsprüfung. Daten ändern sich durch bewusste Aktionen. Zurückgestellt: D07 in der Bedienung, D08/D09/D11/D14/D17/D20/D21/D22. D08 bleibt als ausdrückliche Ausnahme der Fortschritt eines manuell gestarteten Syncs; D09 bleibt dessen vollständiger Abschlussabruf. Namen/IDs reichen für die einfache Kundensuche, nicht für die bestehenden vollständigen Magazinfilter. Details und aktuelle Modellmengen stehen in Abschnitt 11 der Verbrauchsanalyse. Alle alten Aussagen „noch nicht ausgewählt/umgesetzt“ weiter oben bzw. im Tagebuch sind historische Zwischenstände, durch diese Auswahl abgelöst.
 
 Bedienfolge, Fehlerfälle und Login-Hilfe: [Veröffentlichungsanleitung](docs/VEROEFFENTLICHEN.md).

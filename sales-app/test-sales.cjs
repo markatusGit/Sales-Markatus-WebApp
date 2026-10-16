@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(__dirname+'/Sales.gs','utf8');
-function readUi(){return fs.readFileSync(__dirname+'/Sales.template.html','utf8').replace('// V1_FUNCTIONS',['SalesV1.js','SalesProjects.js'].map(file=>fs.readFileSync(__dirname+'/'+file,'utf8')).join('\n'));}
+function readUi(){return fs.readFileSync(__dirname+'/Sales.template.html','utf8').replace('// V1_FUNCTIONS',['SalesV1.js','SalesProjects.js','SalesLazy.js'].map(file=>fs.readFileSync(__dirname+'/'+file,'utf8')).join('\n'));}
 let count=0;
 function test(name,fn){fn();console.log('PASS',name);count++;}
 function fixture(){
@@ -8,7 +8,7 @@ function fixture(){
   const clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
   const ctx={console,Set,Date,JSON,Number,String,Object,Array,Math,Error,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},Session:{getActiveUser:()=>({getEmail:()=>email})},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{getUuid:()=>`test-${++seq}`,newBlob:x=>({getBytes:()=>Buffer.from(x)})},revenueToken_:()=> 'secret',revenueAmountCents_:x=>typeof x==='number'&&Number.isFinite(x)?Math.round(x*100):null};
   vm.createContext(ctx);vm.runInContext(source,ctx);
-  ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{db[p]=clone(v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
+  ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{db[p]=clone(v);if(typeof ctx.salesLeanAfterWrite_==='function')ctx.salesLeanAfterWrite_(p,v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
   ctx.salesHqGet_=path=>{
     calls.push({method:'get',path});const addressPath=/^\/v2\/Companies\/(\d+)\/Addresses$/.exec(path);if(addressPath)return {data:[clone(remote.Companies[addressPath[1]].defaultAddress)],headers:{}};
     const m=path.match(/^\/v2\/(\w+)(?:\/(\d+))?/),entity=m[1];
@@ -479,7 +479,7 @@ test('UI keeps sent email collapsed and separates billed and projected planning 
 });
 test('UI detects an old backend and displays its release before permitting actions',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   assert.ok(preboot.length>1000);
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
@@ -490,7 +490,7 @@ test('UI detects an old backend and displays its release before permitting actio
 });
 test('UI uses catalog dropdowns for industry and salutation and hides deferred custom fields',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+"state={release:APP_RELEASE,catalog:{industries:['Technik'],salutations:['Frau'],users:[],types:[],subsystems:[],fields:[]},user:{email:'test@example.invalid',admin:true},drafts:[],jobs:[],edition:null};globalThis.form=newCompany();})();",sandbox);
@@ -504,10 +504,10 @@ test('UI uses catalog dropdowns for industry and salutation and hides deferred c
 });
 test('UI shows a new Firebase company and its contact before HQ has assigned an ID',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-10-06-r19.1',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-10-16-r20',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -516,14 +516,14 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
 });
 test('UI reserves company/contact transfer for the common HQ sync',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state={user:{admin:true}};globalThis.first=createButton({id:'test',state:'pending',nextStep:'company'});globalThis.second=createButton({id:'test',state:'companyConfirmed',nextStep:'contact'});globalThis.blocked=createButton({id:'test',state:'uncertain',nextStep:'contact'});})();`,sandbox);
   assert.equal(sandbox.first,'');assert.equal(sandbox.second,'');assert.equal(sandbox.blocked,'');
 });
 test('email preview shows the target person, address and action in readable escaped form',()=>{
   const html=readUi(),scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)],script=scripts.at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state={user:{admin:true}};preview={job:{id:'email-1',draftId:'test-1',kind:'contactEmail',state:'pending',name:'TEST Example'},contact:{firstName:'Ada',lastName:'Example'},change:{eMail:'ada@example.invalid',contactAddress:{street:'<Testweg>',city:'Testort',country:'DE'},addressNote:'Vorhandene Kontaktanschrift bleibt erhalten.'}};globalThis.output=previewPage();})();`,sandbox);
   for(const value of ['Ada Example','ada@example.invalid','&lt;Testweg&gt;','gemeinsamen HQ-Sync','Zur Testfirma'])assert.ok(sandbox.output.includes(value));
@@ -534,7 +534,7 @@ test('email preview shows the target person, address and action in readable esca
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
 test('customer history offers separated filters, pending sync actions and collapsed safe long content',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   const rows=[{reason:'Call only',content:'A'.repeat(300)+'End & text',contactHistoryChannel:'Call',contactOn:'2026-09-26T10:15:00Z',jobId:'job-1',syncState:'pending'},{projectName:'Project only',content:'Automated full message',documentDispatch:true,contactOn:'2026-09-25',invoice:{netCents:10000,currency:'EUR'}}];
   vm.runInNewContext(preboot+`state={user:{admin:true},jobs:[{id:'test-1',state:'synced'}]};detail={histories:${JSON.stringify(rows)}};const c={id:'draft_test-1',hqId:'101',localDraftId:'test-1'};globalThis.all=historyPanel(c);historyFilter='documents';globalThis.documents=historyPanel(c);historyFilter='communication';globalThis.communication=historyPanel(c);})();`,sandbox);
@@ -552,7 +552,7 @@ test('ordinary email about an invoice stays communication unless HQ evidence ide
 });
 test('communication button works for own HQ and local identities and explains read-only or unfinished cases',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesState');});"));
+  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state={user:{admin:true},drafts:[{id:'own',hqId:101,testOnly:true}],jobs:[{id:'own',hqId:101,state:'contactCreated',historyReady:false}]};globalThis.local=communicationAction({localDraftId:'own'});globalThis.hq=communicationAction({id:'101'});globalThis.real=communicationAction({id:'999'});delete state.jobs[0].hqId;globalThis.unfinished=communicationAction({localDraftId:'own'});})();`,sandbox);
   for(const out of [sandbox.local,sandbox.hq]){assert.ok(out.includes('data-action="history-form"'));assert.ok(out.includes('data-id="own"'));assert.ok(!out.includes('disabled'));}
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-10-06-r19.1'));
+  assert.ok(root.innerHTML.includes('2026-10-16-r20'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

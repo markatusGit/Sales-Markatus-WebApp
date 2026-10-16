@@ -6,7 +6,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('n
  try{
    async function open({legacy=false,missingGateway=false}={}){
      const page=await browser.newPage({viewport:{width:1440,height:1080}});page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
-     await page.exposeFunction('fixtureRpc',async(name,args)=>{calls.push(name);if(name==='startSalesSync'&&args.length)assert.deepEqual(args,[{mode:'editions'}]);const value=JSON.parse(JSON.stringify(f.ctx[name](...args)));if(legacy&&name==='getSalesV1State')delete value.capabilities;return value;});
+     await page.exposeFunction('fixtureRpc',async(name,args)=>{calls.push(name);if(name==='startSalesSync'&&args.length)assert.deepEqual(args,[{mode:'editions'}]);const value=JSON.parse(JSON.stringify(f.ctx[name](...args)));if(legacy&&['getSalesV1State','getSalesLeanState'].includes(name))delete value.capabilities;return value;});
      const methods=Object.keys(f.ctx).filter(n=>typeof f.ctx[n]==='function'&&!n.endsWith('_')&&n!=='startSalesEditionRefresh'&&(!missingGateway||n!=='startSalesSync'));
      await page.evaluate(methods=>{const chain=(ok,fail)=>new Proxy({},{get(_,n){if(n==='withSuccessHandler')return f=>chain(f,fail);if(n==='withFailureHandler')return f=>chain(ok,f);if(!methods.includes(n))return undefined;return (...args)=>window.fixtureRpc(n,args).then(ok,fail);}});window.google={script:{run:chain(()=>{},()=>{})}};},methods);
      await page.setContent(fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8'));await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();await page.getByRole('button',{name:'Datenabgleich',exact:true}).click();return page;

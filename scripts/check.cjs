@@ -23,8 +23,8 @@ function check() {
   sources.forEach(dir => walk(path.join(root, dir)));
   ['package.json', 'deployment.json', 'firebase.json'].forEach(n => JSON.parse(fs.readFileSync(path.join(root, n), 'utf8')));
   const read = n => fs.readFileSync(path.join(root, 'sales-app', n), 'utf8');
-  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs'].map(read).join('\n');
-  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesV1.js','SalesProjects.js'].map(read).join('\n'));
+  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs','SalesLean.gs'].map(read).join('\n');
+  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesV1.js','SalesProjects.js','SalesLazy.js'].map(read).join('\n'));
   for (const [name, expected] of [['SalesBackend.gs', expectedBackend], ['Sales.html', expectedHtml]]) {
     if (canonical(name, fs.readFileSync(path.join(app, name), 'utf8')) !== canonical(name, expected)) throw Error(`${name} veraltet. Zuerst npm run build ausführen und Änderungen prüfen/committen.`);
   }
@@ -44,7 +44,8 @@ function tests() {
     const edge = [process.env['ProgramFiles(x86)'], process.env.ProgramFiles].filter(Boolean).map(p => path.join(p, 'Microsoft/Edge/Application/msedge.exe')).find(p => fs.existsSync(p));
     if (edge) env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = edge;
   }
-  const files = ['scripts/test-release.cjs', 'hq-benchmark/test-benchmark.cjs', 'hq-benchmark/test-revenue.cjs', 'hq-benchmark/test-revenue-ui.cjs', 'firebase-pilot/test-pilot.cjs', 'sales-app/test-sales.cjs', 'sales-app/test-sales-v1.cjs', 'sales-app/test-sales-sync.cjs', 'sales-app/test-sales-bulk.cjs', 'sales-app/test-sales-delta.cjs', 'sales-app/test-history-browser.cjs', 'sales-app/test-v1-browser.cjs', 'sales-app/test-worker-browser.cjs'];
+  const files = ['scripts/test-release.cjs', 'hq-benchmark/test-benchmark.cjs', 'hq-benchmark/test-revenue.cjs', 'hq-benchmark/test-revenue-ui.cjs', 'firebase-pilot/test-pilot.cjs', 'sales-app/test-sales.cjs', 'sales-app/test-sales-v1.cjs', 'sales-app/test-sales-sync.cjs', 'sales-app/test-sales-bulk.cjs', 'sales-app/test-sales-delta.cjs', 'sales-app/test-lean.cjs', 'sales-app/test-history-browser.cjs', 'sales-app/test-v1-browser.cjs', 'sales-app/test-worker-browser.cjs'];
+  files.push('sales-app/test-lean-browser.cjs');
   for (const name of files) {
     console.log(`Prüfe ${name}`);
     const output = run(process.execPath, [path.join(root, name)], {env});

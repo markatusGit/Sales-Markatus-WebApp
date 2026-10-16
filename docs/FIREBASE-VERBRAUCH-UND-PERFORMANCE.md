@@ -267,3 +267,46 @@ Weniger an den Browser zu senden spart Übertragungsvolumen. Für weniger Fireba
 Kleine Übersichten/Summen und Änderungsstände werden bei echten relevanten Datenänderungen aktualisiert. Sie müssen Änderungen durch andere Personen und durch den Sync berücksichtigen. Ein gemeinsamer Daten-Cache darf Rollen-/Freigabeprüfungen nicht ersetzen. Beim seitenweisen Laden bleiben bestandweite Such-/Historienfilter erhalten.
 
 Vorgeschlagener erster Umfang: D02/D04 sowie unnötige Vollabrufe nach Aktionen (D09–D16/D18/D19) beseitigen. Danach D01/D05–D08 zusammenhängend gestalten; die Wahl zu D07 beeinflusst, wie klein der Appstart werden kann. Der kleinere Sync-Status aus D08 kann bereits früher umgesetzt werden. D20–D22 nachgelagert mit eigenen Wiederaufnahme-/Bereinigungsprüfungen. Noch keine Auswahl des Nutzers oder Umsetzung dokumentiert.
+
+## 11. Bestätigte Auswahl und r20-Umsetzung vom 16.10.2026
+
+Die vorherigen Tabellen dokumentieren r19.1 und die damaligen Vorschläge. Der Nutzer hat jetzt D01–D06, D10, D12, D13, D15, D16, D18 und D19 beauftragt. D02 ausdrücklich ohne automatische Prüfung, auch ohne Änderungszeiger. Wiederöffnung verwendet den Sitzungsspeicher ohne automatische Gültigkeitsdauer; eigenes Speichern und ausdrückliches Aktualisieren berücksichtigen die betroffenen Daten. Ein Reload/neuer Tab beginnt eine neue Sitzung.
+
+Lokal umgesetzt in `SalesLean.gs` (gezielte Serverendpunkte/kompakte Projektionen) und `SalesLazy.js` (Ansichts-/Aktenzustand im Browser), integriert in die bestehenden Quellen und erzeugten Apps-Script-Dateien. Die Arbeit erfolgte in Backend-, Oberflächen- und Prüfabschnitten für eine zusammengehörige Veröffentlichung. Keine Funktionsauswahl aus den zurückgestellten Punkten abgeleitet.
+
+### Gemessene synthetische Mengen
+
+| Aktion | Einmaliger Aufbau vorhandener Daten | Nach Aufbau |
+| --- | --- | --- |
+| Startseite | Im Modell 26 Reads / 1 Write für Ausgabenübersicht | 2 Reads / 0 Writes; keine Kunden/Kontakte/Jobs beim Start |
+| Kundennamenliste | 3.193 Reads / 1 Write für kompakten Namensindex aus vorhandenen Verzeichnis-/Entwurfsdaten | 1 Read; Namen, IDs und ggf. HQ-Bezug eines eigenen Testentwurfs |
+| Namen eingeben | Kein weiterer Aufbau | 0 Reads pro Eingabe; lokale Suche wie bisher |
+| Normale Kundenakte | Im Modell 8 Reads / 2 Writes für kleine Testfirmen-/Kommunikationszuordnungen | 4 Reads plus wirklich zugehörige Kommunikationsaufträge und große Akten-/Indexteile |
+| Dieselbe Akte erneut öffnen | Innerhalb derselben Sitzung bereits vorhanden | 0 Serverabrufe; keine automatische Versionsprüfung |
+| Ziel/Termine speichern | Kompakte Übersicht ist bereits vorhanden | Im Modell 2 Reads / 2 Writes: ausgewählte Ausgabe plus kleine Ausgabenübersicht; kein Gesamtabruf |
+
+Die Aufbaumengen gelten für 3.189 künstliche Firmen, 23 Ausgaben und die beschriebenen leeren Zuordnungen. Es ist eine einmalige Migration auf ausdrücklichen Datenbedarf, kein wiederkehrender Vollabruf pro Person. Bei großen Namen-/Indexdaten kommen Speicherteile hinzu. Zusätzliche gezielte Pflegezugriffe entstehen, wenn echte Änderungen Projektionen betreffen; nicht behaupten, jede Zusatzprojektion sei kostenlos. Keine heutige Firebase-Abrechnung oder Live-Latenz gemessen.
+
+Namens-/Ausgabenprojektionen werden bei den bestehenden Einzel-/Sammelschreibwegen gepflegt. Testentwürfe bleiben auch nach neuer Sitzung sichtbar, bestätigte HQ-IDs werden mit dem Entwurf zusammengeführt. Kundenberechtigung, Eingabevalidierung, Revisionskonflikte, HQ-Schreibgrenzen und sichere Wiederaufnahme bleiben erhalten. Es werden keine realen Nutzdaten gelöscht.
+
+### Erklärung der ausdrücklich zurückgestellten Punkte
+
+| Punkt | Bedeutung und bestehender Aufwand |
+| --- | --- |
+| D07 | Reine Kundennamensuche benötigt nur Namen und Kennungen. Nach dem Namensindex-Aufbau ein Read beim ersten Öffnen je Sitzung, null pro Tastendruck und null beim erneuten Öffnen aus dem Sitzungsspeicher. Die umfangreichen Magazinfilter benötigen zusätzlich Ort/Branche/Betreuer und Ausgabenbelege. Diese Ansicht lädt beim ersten Bedarf weiterhin das vollständige Verzeichnis und die Ausgaben, im Modell etwa 3.213 Reads; danach lokale Filter ohne neue Reads. |
+| D08 | Während Datenabgleich mit laufendem manuell gestartetem Hintergrundjob geöffnet ist, fragt die Oberfläche alle fünf Sekunden den Fortschritt ab. Mindestens ein Read pro Abfrage, etwa 720 pro Stunde und offenem Tab bei einteiligem Laufstatus; mehr bei Teilpaketen. Diese explizit zurückgestellte Fortschrittsabfrage bleibt als Ausnahme zu D02 bestehen. |
+| D09 | Erkennt diese Statusabfrage den Abschluss, lädt sie wie bisher den vollständigen Appzustand nach. Im alten Vergleichsmodell etwa 3.221 Reads, einmal pro beobachtetem Abschluss und Tab. Kein erneuter HQ-Import durch diesen Abruf. |
+| D11 | Verwaltung → Freigegebene E-Mail-Adressen: Freigaben stehen in Script Properties. Das Speichern selbst braucht keine Firestore-Reads; der weiterhin vorhandene Vollabruf danach entspricht ungefähr dem alten Startabruf. |
+| D14 | Einzelne Kundenhistorie ausdrücklich aus HQ nach Firebase aktualisieren. Der bisherige Importpfad bleibt; er enthält mehrfache Verzeichnisprüfungen. Der bisherige Gesamtmodellwert 9.577 bezog sich auf die alte anschließende Aktenöffnung. Der gemeinsame neue Aktenlesepfad verkleinert diesen Nachabruf; der Historienimport selbst wurde nicht umgebaut. Im regulären Ablauf sind bestimmte alte Einzelimport-Buttons ohnehin ausgeblendet. |
+| D17 | Ohne Firmenzuordnung ansehen liest zwei Metadokumente mit unzugeordneten Kontakten/Historien; zusätzlich nötige Teile großer Dokumente. Keine dauerhafte Abfrage. |
+| D20 | Verarbeitung eines HQ-Syncs: Vergleichsreads, Projekt-/Kundenaufbereitung, Journale und Fortschrittswrites. Geschäfts-, Wiederaufnahme- und Checkpointlogik unverändert; zusätzlich werden die für D01/D04 benötigten kompakten Leseprojektionen an passenden bestehenden Schreibstellen gepflegt. Frühere Zahlen aus Abschnitt 5 sind weiterhin historische Modellfälle, keine universellen Kosten je Sync. |
+| D21 | Bis zu zehn Einzelprüfungen je sechs HQ-Datenarten, höchstens 60, erkennen stille Änderungen ohne zuverlässigen übergeordneten Zeitstempel. Mindestens der Vergleich eines gespeicherten Rohdatensatzes je erfolgreicher Prüfung, dazu Laufstatus/Checkpoints und ggf. geänderte Daten. Kein solcher Lauf pro Kundenklick. |
+| D22 | Alte technische Importjournale und Speicherteile; ihre bloße Existenz löst keine periodischen Reads aus. Eine Bereinigung müsste sie lesen, Verweise prüfen und löschen. Es wurde nichts gelöscht oder automatisch bereinigt. |
+
+### Prüfung und Abnahme
+
+`npm run audit:firestore` zählt jetzt den aktuellen r20-Lesepfad. Der bisherige Kompatibilitätsvergleich ist über `node scripts/audit-firestore.cjs --legacy` getrennt erreichbar; er unterdrückt neue Projektionspflege und ist kein aktueller Gesamtverbrauch. Ausgabeprotokolle bleiben unter `output/` ignoriert.
+
+Neue Backendprüfungen messen Budgets, erlaubte/abgelehnte Zugriffe, korrekte Kommunikationszuordnung, Aktualisierung der Namens-/Ausgabenprojektionen, Testentwürfe über Sitzungen und HQ-ID-Deduplizierung. Neuer Browsertest weist null Arbeitsdatenabrufe im Leerlauf, lokale Suche, Wiederöffnung ohne Abruf, ausdrückliches Aktualisieren und gezielte Speicherrückmeldungen nach. Bestehende Geschäfts-, Historien-, Such-, Ausgaben- und Workerprüfungen bleiben Teil des Prüflaufs.
+
+Google-Veröffentlichung und GitHub-Codevergleich werden im Projekttagebuch und in deployment.json nachgetragen. Keine neuen/geänderten Script Properties, Scopes oder Bereitstellungseinstellungen. Die echte Bedienabnahme mit dem Nutzer bleibt von den synthetischen Prüfungen getrennt.

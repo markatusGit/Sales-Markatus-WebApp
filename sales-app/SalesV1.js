@@ -39,7 +39,7 @@
   }
   function v1Home(){
     const e=state.edition,run=state.syncRun;return head('Mein Tag','Gemeinsamer Datenstand aus Firebase',button('Frisch aus Firebase laden','reload'))+editionSelectors()+
-      '<div class="m-summaries"><div class="m-summary"><span>Unternehmen im Bestand</span><b>'+v1Companies().length+'</b><small>Ohne doppelte HQ-Firmen</small></div><div class="m-summary"><span>Fakturierter Netto-Umsatz</span><b>'+(e?.loadedAt?money(revenue()):'Noch nicht importiert')+'</b><small>'+esc(editionLabel(e))+(e?.complete?'':' · vorläufig')+'</small></div><div class="m-summary"><span>Offene Übertragungen</span><b>'+state.jobs.filter(j=>!['synced','canceled'].includes(j.state)).length+'</b><small>Eigene Testfirmen</small></div></div>'+
+      '<div class="m-summaries"><div class="m-summary"><span>Unternehmen im Bestand</span><b>'+(loadedViews.has('customers')||loadedViews.has('magazine')?v1Companies().length:'Bei Kunden anzeigen')+'</b><small>Ohne doppelte HQ-Firmen</small></div><div class="m-summary"><span>Fakturierter Netto-Umsatz</span><b>'+(e?.loadedAt?money(revenue()):'Noch nicht importiert')+'</b><small>'+esc(editionLabel(e))+(e?.complete?'':' · vorläufig')+'</small></div><div class="m-summary"><span>Offene Übertragungen</span><b>'+(loadedViews.has('import')||loadedViews.has('test')?state.jobs.filter(j=>!['synced','canceled'].includes(j.state)).length:'Im Datenabgleich')+'</b><small>Eigene Testfirmen</small></div></div>'+
       (e?.changes?.length?'<p class="m-note">Ausgabe aktualisiert: Ziel '+money(e.changes[0].before.targetCents)+' → '+money(e.settings.targetCents)+' · '+esc(new Date(e.changes[0].at).toLocaleString('de-DE'))+'</p>':'')+
       '<section class="m-panel m-section"><div class="m-panel-head"><h2>'+esc(editionLabel(e))+'</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Zielumsatz</dt><dd>'+money(e?.settings?.targetCents)+'</dd><dt>Anzeigenschluss</dt><dd>'+esc(e?.settings?.adDeadline||'Noch offen')+'</dd><dt>Drucktermin</dt><dd>'+esc(e?.settings?.printDate||'Noch offen')+'</dd><dt>Veröffentlichung</dt><dd>'+esc(e?.settings?.releaseDate||'Noch offen')+'</dd></dl><p>Letzter Ausgabeimport: '+esc(e?.loadedAt?new Date(e.loadedAt).toLocaleString('de-DE'):'Noch keiner')+'</p>'+button('Datenabgleich öffnen','nav','import')+(run?.errors?.length?'<p class="m-note">Der letzte Import enthält '+run.errors.length+' fehlgeschlagene Abschnitte. Details im Datenabgleich.</p>':'')+'</div></section>';
   }
@@ -94,19 +94,19 @@
     if(a==='v1-editions'){continueV1Import(true).catch(e=>{error=e.message;render();});return true;}
     if(a==='v1-sync'){continueV1Import().catch(e=>{error=e.message;render();});return true;}
     if(a==='unassigned'){act(async()=>{unassignedData=await rpc('getSalesUnassigned');view='unassigned';});return true;}
-    if(a==='add-company'){act(()=>rpc('addSalesCompany',id),{reload:true});return true;}
-    if(a==='exclude-document'||a==='include-document'){act(()=>rpc('setSalesDocumentExcluded',{editionId:state.edition.id,documentId:id,excluded:a==='exclude-document'}),{reload:true});return true;}return false;
+    if(a==='add-company'){act(()=>rpc('addSalesCompany',id),{});return true;}
+    if(a==='exclude-document'||a==='include-document'){act(()=>rpc('setSalesDocumentExcluded',{editionId:state.edition.id,documentId:id,excluded:a==='exclude-document'}),{});return true;}return false;
   }
   let syncPollPending=false;
   async function pollSalesSync(){
     if(syncPollPending||busy||!state||view!=='import'||state.syncRun?.engine!==2||state.syncRun.state!=='running'||state.syncRun.paused)return;
-    syncPollPending=true;try{const before=state.syncRun;state.syncRun=await rpc('getSalesSyncStatus');if(before.state==='running'&&state.syncRun?.state!=='running'){state=await rpc('getSalesState');message=state.syncRun?.kind==='editions'?(state.syncRun.state==='completed'?'Ausgabenverknüpfung abgeschlossen.':'Ausgabenverknüpfung mit offenen Punkten beendet. Bitte Hinweise prüfen.'):state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.';}if(view==='import')render();}catch(e){error='Status konnte nicht geladen werden: '+e.message;if(view==='import')render();}finally{syncPollPending=false;}
+    syncPollPending=true;try{const before=state.syncRun;state.syncRun=await rpc('getSalesSyncStatus');if(before.state==='running'&&state.syncRun?.state!=='running'){state=await rpc('getSalesState');loadedViews.clear();viewCache.clear();companyCache.clear();editionCache.clear();message=state.syncRun?.kind==='editions'?(state.syncRun.state==='completed'?'Ausgabenverknüpfung abgeschlossen.':'Ausgabenverknüpfung mit offenen Punkten beendet. Bitte Hinweise prüfen.'):state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.';}if(view==='import')render();}catch(e){error='Status konnte nicht geladen werden: '+e.message;if(view==='import')render();}finally{syncPollPending=false;}
   }
   function v1Change(e){
     if(changeProjectChoice(e))return true;
     const name=e.target.name,value=e.target.value;
-    if(name==='v1Magazine'){state.edition=(state.editions||[]).filter(x=>x.magazine===value).sort((a,b)=>b.issue-a.issue)[0];selectedEditionId=state.edition.id;}
-    else if(name==='v1Edition'){selectedEditionId=value;state.edition=state.editions.find(x=>x.id===value);}
+    if(name==='v1Magazine'){const e=(state.editions||[]).filter(x=>x.magazine===value).sort((a,b)=>b.issue-a.issue)[0];act(()=>changeLeanEdition(e.id));return true;}
+    else if(name==='v1Edition'){act(()=>changeLeanEdition(value));return true;}
     else if(name==='v1History')customerHistoryFilter=value;else if(name==='v1Industry')industryFilter=value;else if(name==='v1City')cityFilter=value;else if(name==='v1Owner')ownerFilter=value;else return false;
     render();return true;
   }

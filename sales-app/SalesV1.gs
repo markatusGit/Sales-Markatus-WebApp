@@ -62,7 +62,7 @@ function saveSalesEditionConfig(input){
     const value={...(old||{}),id,magazine,issue,projectId,projectNumber:String(project.number||''),projectName:project.name,companyIds:old?.companyIds||[],companies:old?.companies||[],documents:old?.documents||[],complete:old?.complete||false,settings:old?.settings||{targetCents:null,adDeadline:'',printDate:'',releaseDate:'',revision:0},changes:old?.changes||[],excludedDocumentIds:old?.excludedDocumentIds||[]};
     value.cacheLinkPending=!old?.loadedAt||old.cacheLinkPending===true||old.syncEnabled===false;value.syncEnabled=true;salesWrite_('sales_editions/'+id,value);
     if(input.current===true||input.current==='on')salesWrite_('sales_meta/preferences',{currentEditionId:id});
-    return {id,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
+    return {id,edition:value,message:'Magazin und Ausgabe dem ausgewählten HQ-Projekt zugeordnet. Der Datenimport kann jetzt gestartet werden.'};
   });
 }
 function saveSalesV1EditionSettings(input){
@@ -73,14 +73,14 @@ function saveSalesV1EditionSettings(input){
     const settings={targetCents:Math.round(target*100),revision:e.settings.revision+1};
     for(const k of ['adDeadline','printDate','releaseDate']){settings[k]=salesText_(input[k],10,false);if(settings[k]&&salesDate_(settings[k])!==settings[k])throw new Error('Ungültiges Datum.');}
     if(settings.adDeadline&&settings.printDate&&settings.adDeadline>settings.printDate||settings.printDate&&settings.releaseDate&&settings.printDate>settings.releaseDate)throw new Error('Termine müssen in zeitlicher Reihenfolge liegen.');
-    e.changes=[{at:salesNow_(),actor:user.email,before:e.settings,after:settings},...(e.changes||[])].slice(0,50);e.settings=settings;salesWrite_('sales_editions/'+id,e);return {message:'Ziel und Termine dieser Ausgabe für alle Nutzer gespeichert.'};
+    e.changes=[{at:salesNow_(),actor:user.email,before:e.settings,after:settings},...(e.changes||[])].slice(0,50);e.settings=settings;salesWrite_('sales_editions/'+id,e);return {edition:e,message:'Ziel und Termine dieser Ausgabe für alle Nutzer gespeichert.'};
   });
 }
 function salesV1Scope_(id){
   id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
 }
-function salesV1LoadCompany_(id){
-  id=salesV1Scope_(id);const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
+function salesV1LoadCompany_(id,alreadyChecked){
+  id=alreadyChecked?String(salesId_(id)):salesV1Scope_(id);const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
   const contacts=salesCollect_('ContactPersons','companyId eq '+id,started,'DefaultAddress'),histories=salesCollect_('ContactHistories','companyId eq '+id,started),projects=salesCollect_('Projects','companyId eq '+id,started),documents=salesCollect_('Documents','companyId eq '+id,started);
   if([...contacts,...histories,...projects,...documents].some(x=>Number(x.companyId)!==Number(id)))throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
   const projectRows=projects.map(p=>{
@@ -90,7 +90,7 @@ function salesV1LoadCompany_(id){
     return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
   });
   const value={company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
-  salesWrite_('sales_companies/'+id,value);salesV1IndexCompany_(value,false);return {message:'Kundendetails einschließlich aller Kontakte, Historie und Projekte aktualisiert.'};
+  salesWrite_('sales_companies/'+id,value);salesV1IndexCompany_(value,false);return {detail:value,message:'Kundendetails einschließlich aller Kontakte, Historie und Projekte aktualisiert.'};
 }
 function syncSalesV1Company(id){salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();return salesV1LoadCompany_(id);});}
 function syncSalesV1History(id){
@@ -159,6 +159,6 @@ function setSalesDocumentExcluded(input){
     const id=salesKey_(input.editionId),e=salesRead_('sales_editions/'+id),documentId=String(salesId_(input.documentId));
     if(!e||![...(e.documents||[]),...(e.excludedDocuments||[])].some(d=>String(d.id)===documentId))throw new Error('Beleg gehört nicht zu dieser Ausgabe.');
     const ids=new Set(e.excludedDocumentIds||[]);if(input.excluded===true){ids.add(documentId);const doc=e.documents.find(d=>d.id===documentId);e.excludedDocuments=[...(e.excludedDocuments||[]).filter(d=>d.id!==documentId),{id:documentId,number:doc?.number||''}];e.documents=e.documents.filter(d=>d.id!==documentId);}else ids.delete(documentId);
-    e.cacheLinkPending=true;e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
+    e.cacheLinkPending=true;e.excludedDocumentIds=Array.from(ids);e.complete=false;e.issues=[...(e.issues||[]),{id:documentId,reason:'Belegzuordnung geändert: Ausgabe neu importieren.'}];salesWrite_('sales_editions/'+id,e);return {edition:e,message:'Zuordnung in Firebase markiert. Für eine neue vollständige Bewertung den Import starten. HQ bleibt unverändert.'};
   });
 }

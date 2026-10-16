@@ -88,9 +88,10 @@ function baseline(companyCount = 3189, editionCount = 23) {
   return {f, audit};
 }
 
-function main() {
+function legacyMain() {
   const result = {date: '2026-10-16', scope: 'offline-only; no real Firebase/HQ; document-operation model, not Google billing', scenarios: [], syncScenarios: []};
   const {f, audit} = baseline();
+  f.ctx.salesLeanAfterWrite_=()=>{};f.ctx.salesLeanNamesUpdate_=()=>{};
   const measure = (label, fn) => { const row = audit.measure(label, fn); delete row.result; result.scenarios.push(row); return row; };
   const initial = measure('Appstart / Frisch laden / Mein-Tag-Minutenabruf', () => f.ctx.getSalesV1State());
   assert.equal(initial.readDocumentsModel, 3221); assert.equal(initial.firebaseRequests, 42); assert.equal(initial.writtenDocuments, 0);
@@ -127,6 +128,7 @@ function main() {
 
   // Exercise actual worker checkpoints and sync joins, not the fixture's shortcut step().
   const s = bulkFixture(); s.config(70); s.doc(70, 1001);
+  s.ctx.salesLeanAfterWrite_=()=>{};s.ctx.salesLeanNamesUpdate_=()=>{};
   const m = instrument(s);
   function runSync(label, prepare = () => {}, editionsOnly = false) {
     prepare(); let observations = 0;
@@ -151,6 +153,7 @@ function main() {
   assert.equal(measure('Sync-Status mit künstlich aufgeteiltem Statusdokument', () => f.ctx.getSalesSyncStatus()).readDocumentsModel, 9);
 
   const p = bulkFixture(); p.config(70); p.doc(70, 1001);
+  p.ctx.salesLeanAfterWrite_=()=>{};p.ctx.salesLeanNamesUpdate_=()=>{};
   for (const [entityIndex, entity] of ['Companies', 'ContactPersons', 'Projects', 'Documents', 'PlannedRevenues', 'ContactHistories'].entries()) {
     for (let i = 0; Object.keys(p.remote[entity]).length < 10; i++) {
       const id = 20000 + entityIndex * 1000 + i;
@@ -168,5 +171,18 @@ function main() {
   for (const row of [...result.scenarios, ...result.syncScenarios]) console.log(`${row.label}: ${row.readDocumentsModel} Reads, ${row.writtenDocuments} Writes, ${row.firebaseRequests} Firebase-Requests, ${row.hqRequests} HQ-Requests`);
   console.log('Offline-Prüfungen bestanden. Messmodell: ' + output);
 }
-if (require.main === module) main();
+function main(){
+ const {f,audit}=baseline(),scenarios=[];
+ function measure(label,fn){const row=audit.measure(label,fn);delete row.result;scenarios.push(row);console.log(`${label}: ${row.readDocumentsModel} Reads, ${row.writtenDocuments} Writes, ${row.firebaseRequests} Firebase-Requests`);return row;}
+ measure('Startseite: einmaliger Aufbau der Ausgabenübersicht',()=>f.ctx.getSalesLeanState());
+ assert.equal(measure('Startseite: regulärer Aufruf',()=>f.ctx.getSalesLeanState()).readDocumentsModel,2);
+ measure('Kundenliste: einmaliger Aufbau des Namensindex',()=>f.ctx.getSalesLeanView('customers'));
+ assert.equal(measure('Kundenliste: regulärer Aufruf',()=>f.ctx.getSalesLeanView('customers')).readDocumentsModel,1);
+ measure('Kundenakte: einmaliger Aufbau kleiner Zuordnungsindizes',()=>f.ctx.getSalesLeanCompany('10001'));
+ assert.equal(measure('Kundenakte: reguläre erste Öffnung je Browsersitzung',()=>f.ctx.getSalesLeanCompany('10001')).readDocumentsModel,4);
+ measure('Ausgabeeinstellungen: nur betroffene Ausgabe und Übersicht',()=>f.ctx.saveSalesLeanEditionSettings({editionId:'project-501',revision:0,target:100}));
+ const output=path.join(root,'output','firestore-audit-r20.json');fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify({scope:'synthetic-only',release:'r20',companyCount:3189,editionCount:23,scenarios,ui:'0 idle Home requests and 0 repeat-open requests covered by test-lean-browser.cjs',deferred:['D07 magazine filters','D08 status','D09 completion full refresh','D11 access save full refresh','D14 legacy history sync','D17','D20','D21','D22']},null,2)+'\n');
+ console.log('PASS model assertions; output: '+output);
+}
+if (require.main === module) {if(process.argv.includes('--legacy'))legacyMain();else main();}
 module.exports = {instrument, baseline};

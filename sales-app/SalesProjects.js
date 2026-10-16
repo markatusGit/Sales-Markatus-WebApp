@@ -46,9 +46,9 @@
         const keys=choices.map(c=>c.magazine.trim().toLocaleLowerCase('de')+'#'+Number(c.issue));
         if(new Set(keys).size!==keys.length)throw new Error('Zwei ausgewählte Projekte haben dieselbe Magazin-/Ausgabenzuordnung. Bitte prüfen.');
         if(choices.some(c=>!c.magazine.trim()||!Number.isSafeInteger(Number(c.issue))||Number(c.issue)<1))throw new Error('Bitte Magazin und Ausgabennummer aller ausgewählten Projekte ausfüllen.');
-        for(const choice of choices){const r=await rpc('saveSalesEditionConfig',choice);ids.push(r.id);if(choice.current)selectedEditionId=r.id;}
-        for(const row of form.querySelectorAll('[data-project-row]')){const old=(state.editions||[]).find(e=>String(e.projectId)===row.dataset.projectRow);if(old&&!row.querySelector('[name="projectSelect"]').checked)await rpc('setSalesEditionEnabled',old.id,false);}
-        state=await rpc('getSalesState');return {message:'Auswahl in Firebase gespeichert. Jetzt „Ausgaben aus Firebase verknüpfen“ anklicken. Dafür ist kein HQ-Gesamtabgleich nötig.'};
+        for(const choice of choices){const old=state.editions.find(e=>String(e.projectId)===String(choice.projectId));if(old&&old.syncEnabled!==false&&!choice.current){ids.push(old.id);continue;}const r=await rpc('saveSalesEditionConfig',choice);ids.push(r.id);if(choice.current){selectedEditionId=r.id;state.edition=r.edition;}}
+        for(const row of form.querySelectorAll('[data-project-row]')){const old=(state.editions||[]).find(e=>String(e.projectId)===row.dataset.projectRow);if(old&&old.syncEnabled!==false&&!row.querySelector('[name="projectSelect"]').checked){await rpc('setSalesEditionEnabled',old.id,false);old.syncEnabled=false;}}
+        return {message:'Auswahl in Firebase gespeichert. Jetzt „Ausgaben aus Firebase verknüpfen“ anklicken. Dafür ist kein HQ-Gesamtabgleich nötig.'};
       }catch(e){projectSearchError='Auswahl noch nicht gestartet: '+e.message+' Bereits gespeicherte Zuordnungen bleiben erhalten; erneutes Übernehmen legt keine zweite Ausgabe an.';throw new Error(projectSearchError);}
     });
     if(error){root.querySelector('#project-results')?.scrollIntoView({block:'nearest'});return;}

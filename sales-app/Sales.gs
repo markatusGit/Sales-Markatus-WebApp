@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-06-r19.1';
+const SALES_RELEASE = '2026-10-16-r20';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -31,6 +31,7 @@ function salesRead_(path) {
 }
 function salesWrite_(path,value) {
   salesStorePayload_(path,value);
+  if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
 function salesList_(collection) {
   if (!/^sales_(jobs|drafts|editions|directory)$/.test(collection)) throw new Error('Ungültige Sammlung.');

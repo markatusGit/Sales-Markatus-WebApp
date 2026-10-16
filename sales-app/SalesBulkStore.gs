@@ -32,6 +32,7 @@ function salesBulkPut_(entries){
     const write={update:{name:salesBulkName_(e.path),fields}},size=Utilities.newBlob(JSON.stringify(write)).getBytes().length;
     if(writes.length>=100||bytes+size>4000000)flush();writes.push(write);bytes+=size;
   }flush();
+  if(typeof salesLeanNamesUpdate_==='function')salesLeanNamesUpdate_(entries);
 }
 function salesBulkQuery_(collection,field,value){
   if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!['companyBucket','projectBucket'].includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
