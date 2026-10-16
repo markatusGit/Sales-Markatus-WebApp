@@ -2,6 +2,10 @@
   "timeZone": "Europe/Berlin",
   "runtimeVersion": "V8",
   "exceptionLogging": "NONE",
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "MYSELF"
+  },
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/userinfo.email",

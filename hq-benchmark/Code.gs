@@ -12,7 +12,8 @@ const HQ_BENCH = Object.freeze({
   runProperty: 'HQ_BENCH_ACTIVE_RUN'
 });
 
-function doGet() {
+function doGet(e) {
+  if (!e || !e.parameter || e.parameter.view !== 'benchmark') return salesPage_();
   requireBenchUser_();
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('Magazinvertrieb – HQ-Test');
 }
