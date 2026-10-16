@@ -47,6 +47,8 @@ Lokalen Veröffentlichungsablauf, feste Bereitstellungszuordnung, Prüfskript un
 
 Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen Appänderung zum ersten Mal gegen Google ausgeführt. Seine Schutz-/Vergleichsfunktionen werden lokal getestet; eine erfolgreiche Einrichtung ist keine Live-Abnahme der App.
 
+**Abschluss bestätigt:** Einrichtung im Commit `9db8886` einschließlich Git-Tag `v0.19.1` erfolgreich nach GitHub übertragen. `release:verify` hat danach die feste Google-Version 30, den Google-Editor und den GitHub-Tag vollständig gleichgesetzt und die Zugehörigkeit zu `origin/main` bestätigt. Alle neun Vergleichs-/Schutzprüfungen bestanden. Google-Code/Bereitstellung unverändert; keine weitere Einrichtung durch den Nutzer nötig. Dieser Abschlussvermerk wird zusätzlich nach GitHub gesichert.
+
 ## Offene Punkte und spätere Wünsche
 
 - Ergebnis des nächsten HQ-Änderungsabgleichs und verbliebene Bestandsdifferenzen klären.
