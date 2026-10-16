@@ -7,6 +7,7 @@
     "build": "node sales-app/build.cjs",
     "check": "node scripts/check.cjs",
     "test": "node scripts/check.cjs --tests",
+    "audit:firestore": "node scripts/audit-firestore.cjs",
     "release:preflight": "node scripts/release.cjs preflight",
     "release:publish": "node scripts/release.cjs publish",
     "release:verify": "node scripts/release.cjs verify",

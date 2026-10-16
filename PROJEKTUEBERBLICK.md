@@ -51,6 +51,8 @@ Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen
 
 ## Offene Punkte und spätere Wünsche
 
+**Priorität vom 16.10.2026:** Nutzer meldet wiederkehrende Wartezeiten auf „Mein Tag“, 5–10 Sekunden beim Öffnen von Kunden und schnelle Überschreitung der Firebase-Tageslimits. Die detaillierte [Firebase-Verbrauchs- und Performanceanalyse](docs/FIREBASE-VERBRAUCH-UND-PERFORMANCE.md) ordnet sämtliche wesentlichen Bedien-/Timer-/Syncwege zu. Offline-Modell mit 3.189 Firmen/23 Ausgaben: Vollabruf 3.221 Reads, Kundenöffnung 3.193 Reads; „Mein Tag“ ruft alle 60 Sekunden vollständig ab. Weitere Befunde: Vollabrufe nach Speichern, Job-/Entwurfs-Gesamtlisten, wiederholte Verzeichnisprüfung, viele Sync-Statuswrites und keine Bereinigung alter App-Teilpakete/Importjournale. Alles mit künstlichen Daten nachgezählt; keine heutige Live-Abrechnung oder bestätigte Laufzeitmessung. Der verbindliche Wunsch ist bessere Grundperformance und geringerer Verbrauch. Vorgeschlagene erste Umsetzung: Minuten-Vollabruf beseitigen, Kundenakte gezielt lesen, nach Speichern nur Betroffenes nachladen; noch keine Appänderung umgesetzt.
+
 - Ergebnis des nächsten HQ-Änderungsabgleichs und verbliebene Bestandsdifferenzen klären.
 - Umsatz-/Kundenbestand anhand begrenzter Stichproben fachlich abnehmen.
 - Firestore-Zugriffe für Start, Minutenabruf und Kundenöffnung reduzieren; zehn Personen einschließlich Schreibkonflikten prüfen.
@@ -60,7 +62,7 @@ Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen
 
 ## Nächster Schritt für den Nutzer
 
-- Nach der GitHub-Sicherung die Abschlussmeldung dieses Chats prüfen; erwartet werden Git-Tag und bestätigter Codevergleich. Bei einem Fehler die technische Meldung ohne Zugangsdaten mitteilen.
-- Den nächsten gewünschten App-Arbeitsschritt im Chat nennen; die technische Veröffentlichung kann anschließend über den eingerichteten Ablauf erfolgen.
+- Die Verbrauchstabelle in der aktuellen Chatantwort bzw. im verlinkten Analysebericht lesen; sie zeigt Modellmengen und die vorgeschlagene Optimierungsreihenfolge.
+- Für diesen Diagnoseschritt keine App-Dateien übertragen und keinen zusätzlichen HQ-Sync als Test starten; der veröffentlichte Appstand bleibt unverändert.
 
 Bedienfolge, Fehlerfälle und Login-Hilfe: [Veröffentlichungsanleitung](docs/VEROEFFENTLICHEN.md).
