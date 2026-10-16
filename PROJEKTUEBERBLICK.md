@@ -4,7 +4,7 @@ Stand: 16.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bis
 
 ## Auftrag und Produktstand
 
-Interne Magazinvertriebs-App mit Google-Anmeldung, helloHQ und Firebase. Nutzer hat am 16.10.2026 die ausgewählten Ladeoptimierungen ausdrücklich beauftragt. r20 (`2026-10-16-r20`, geplanter Git-Tag `v0.20.0`) ist lokal umgesetzt und synthetisch geprüft; Veröffentlichung und Codevergleich werden am Ende dieses Dokuments bzw. in deployment.json nachgewiesen. Die zuvor vom Nutzer bestätigte Ausgabenverknüpfung bleibt erhalten. Vollständige fachliche Bestands-/Umsatzabnahme und Zehn-Personen-Test sind weiter offen.
+Interne Magazinvertriebs-App mit Google-Anmeldung, helloHQ und Firebase. Nutzer hat am 16.10.2026 die ausgewählten Ladeoptimierungen ausdrücklich beauftragt. r20 (`2026-10-16-r20`, Git-Tag `v0.20.0`) ist nach 15 erfolgreichen Prüfsuiten als Google-Version 31 unter derselben Dashboard-URL veröffentlicht. Feste Google-Version, Editorstand und GitHub-Tag erfolgreich auf Codegleichheit geprüft; Originalprojekt anschließend per Fast-Forward auf denselben Stand gebracht. Die zuvor vom Nutzer bestätigte Ausgabenverknüpfung bleibt erhalten. Echte r20-Bedienabnahme, vollständige fachliche Bestands-/Umsatzabnahme und Zehn-Personen-Test sind weiter offen.
 
 ## Neuer dauerhafter Auftrag vom 16.10.2026
 

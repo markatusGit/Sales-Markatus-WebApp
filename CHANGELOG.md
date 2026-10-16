@@ -23,7 +23,7 @@ Keine weiteren Appänderungen außerhalb des unten beschriebenen r20-Umfangs ver
 
 ### Prüfung / Grenze
 
-Im künstlichen Modell nach Aufbau: Start 2 Reads statt 3.221; Namensliste 1 Read und 0 pro Tastendruck; normale Akte 4 Reads plus zugehörige Jobs/Teile statt 3.193. Browsernachweis für null Leerlaufabrufe auf Mein Tag, Wiederöffnung aus Sitzungsspeicher und gezielte Speicherrückmeldungen. Einmaliger Modellaufbau: Ausgabenübersicht 26 Reads/1 Write, Namensliste 3.193 Reads/1 Write, kleine Kunden-Zuordnungsindizes 8 Reads/2 Writes. Zusätzliche Projektionen brauchen gezielte Pflegewrites. Keine Zusage echter Sekundenwerte oder heutiger Abrechnung. Keine neuen/geänderten Script Properties, Scopes, Zugriffsgruppen oder Ausführungsidentität. Veröffentlichung/Codevergleich werden nach erfolgreicher Prüfung in deployment.json zugeordnet; Live-Abnahme bleibt gesondert.
+Im künstlichen Modell nach Aufbau: Start 2 Reads statt 3.221; Namensliste 1 Read und 0 pro Tastendruck; normale Akte 4 Reads plus zugehörige Jobs/Teile statt 3.193. Browsernachweis für null Leerlaufabrufe auf Mein Tag, Wiederöffnung aus Sitzungsspeicher und gezielte Speicherrückmeldungen. Einmaliger Modellaufbau: Ausgabenübersicht 26 Reads/1 Write, Namensliste 3.193 Reads/1 Write, kleine Kunden-Zuordnungsindizes 8 Reads/2 Writes. Zusätzliche Projektionen brauchen gezielte Pflegewrites. Keine Zusage echter Sekundenwerte oder heutiger Abrechnung. Keine neuen/geänderten Script Properties, Scopes, Zugriffsgruppen oder Ausführungsidentität. Nach allen 15 Prüfsuiten als Google-Version 31 bereitgestellt; Codegleichheit mit GitHub-Tag v0.20.0 bestätigt und in deployment.json zugeordnet. Live-Abnahme bleibt gesondert.
 
 ### Vorangegangene Untersuchung und Entscheidungen
 
