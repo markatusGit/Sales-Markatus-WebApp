@@ -1,5 +1,7 @@
 # Magazinvertrieb für Markatus
 
+Aktueller Projektstand und Arbeitsablauf: [PROJEKTUEBERBLICK.md](PROJEKTUEBERBLICK.md) · [CHANGELOG.md](CHANGELOG.md) · [Geprüft veröffentlichen](docs/VEROEFFENTLICHEN.md). Seit 16.10.2026 sind clasp-Upload und Aktualisierung der bestehenden Bereitstellung beauftragt; ältere manuelle Übergabehinweise sind historisch.
+
 Pilotphase für eine Sales-App mit Google-Anmeldung und helloHQ-Anbindung. Der direkte HQ-Kunden-/Umsatzablauf wurde am 23.09.2026 mit 25,1 s für eine frische Ansicht gemessen. Ein Firebase-Pilot mit HQ-Abgleich und schnellerer Testseite ist im Code vorbereitet; ohne Firebase-Projekt ist er noch nicht live oder mit echten Daten gemessen.
 
 - [Start hier: ausführliche Anleitung für Vorschau und HQ-Test](docs/START-HIER.md)

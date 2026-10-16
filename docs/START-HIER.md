@@ -1,5 +1,7 @@
 # Start hier: Vorschau ansehen und den HQ-Test vorbereiten
 
+**Aktueller Ablauf seit 16.10.2026:** Der Nutzer hat die Veröffentlichung durch Codex mit clasp und derselben Dashboard-URL beauftragt. Die folgenden manuellen Übergabehinweise beschreiben den früheren Stand. Aktuelle Anleitung: [VEROEFFENTLICHEN.md](VEROEFFENTLICHEN.md); Projektstand: [PROJEKTUEBERBLICK.md](../PROJEKTUEBERBLICK.md).
+
 Stand: 23. September 2026. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 **Aktueller Hinweis:** Der erste kleine HQ-v2-Test wurde inzwischen erfolgreich ausgeführt. Für die neue Live-Ansicht mit Kunden und Netto-Umsatz siehe [Abschnitt 8](#8-neue-live-ansicht-für-kunden-und-netto-umsatz). Die Einrichtungsschritte unten beschreiben weiterhin den ursprünglichen Start.

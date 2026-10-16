@@ -14,3 +14,18 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# clasp-Anmeldung bleibt lokal; .clasp.json enthält nur die Projektzuordnung.
+.clasprc*
+**/.clasprc*
+client_secret*.json
+*service-account*.json
+*.pem
+*.key
+
+# Lokale Sicherungen, Veröffentlichungsprotokolle und Testausgaben.
+tmp/
+output/
+.release/
+playwright-report/
+test-results/

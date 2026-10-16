@@ -1,0 +1,15 @@
+{
+  "name": "sales-markatus-webapp",
+  "private": true,
+  "description": "Lokale Entwicklung und nachvollziehbare Apps-Script-Veröffentlichung",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node sales-app/build.cjs",
+    "check": "node scripts/check.cjs",
+    "test": "node scripts/check.cjs --tests",
+    "release:preflight": "node scripts/release.cjs preflight",
+    "release:publish": "node scripts/release.cjs publish",
+    "release:verify": "node scripts/release.cjs verify",
+    "release:recover": "node scripts/release.cjs recover"
+  }
+}

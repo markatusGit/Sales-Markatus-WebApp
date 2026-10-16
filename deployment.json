@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "scriptId": "1QWMae8m5upOmPusbq2bS_IkIqRm8fVZHnjo-7U7ea6K0RglzOR4y7ZkJ",
+  "deploymentId": "AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw",
+  "dashboardUrl": "https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec",
+  "dashboardConfirmedByUser": true,
+  "observedAppsScriptVersion": 30,
+  "observedOn": "2026-10-16",
+  "gitTag": "v0.19.1",
+  "appsScriptVersion": 30,
+  "sourceCommit": "8ad78e7b709d9321033faae37b0ab7ea424deecd",
+  "status": "google-version-verified",
+  "files": {
+    "Code.gs": "8e62d17cf9926f5abc41fe97dcfe35488c29a00e65a830d22f7c02c82a322216",
+    "FirebaseSync.gs": "c6f0062744894bc27f551b28e5c5a693ec4a99f520e6d8b2f297f80eedcb7992",
+    "Index.html": "d19c1ab2c6e561a7ac406e2219dc937bd49e1a5d21f1161adf411baf7f50e7a3",
+    "Revenue.gs": "b2ca0fab7b8b3f064eb6adb5d20f5d4e80b716bcffc4f88e2afdf2822ce6bc89",
+    "Sales.html": "35d38e74181f3eb880b99f004301590891ae8290601087a55ed319abd213d763",
+    "SalesBackend.gs": "5fed45b9472d7c57a8987ad4c8e8eb6599997ac886337eae032bcfe284707c4c",
+    "appsscript.json": "f32a769288ac07419c5845add764219f474d03f00cf234d51b00b42d11419c9c"
+  },
+  "note": "Vorhandene Google-Version 30 erstmals einem Git-Tag zugeordnet. Keine neue Google-Version. GitHub-Abschluss durch release:verify; Live-Funktionstest gesondert.",
+  "googleCodeVerifiedOn": "2026-10-16"
+}
