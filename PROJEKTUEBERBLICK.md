@@ -62,7 +62,8 @@ Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen
 
 ## Nächster Schritt für den Nutzer
 
-- Die Verbrauchstabelle in der aktuellen Chatantwort bzw. im verlinkten Analysebericht lesen; sie zeigt Modellmengen und die vorgeschlagene Optimierungsreihenfolge.
+- Die Entscheidungsliste D01–D22 in Abschnitt 10 des Analyseberichts bzw. der aktuellen Chatantwort lesen; sie trennt streichbare Vollabrufe, gezieltes Nachladen und Auswirkungen auf Aktualität/Bedienung.
+- Die gewünschten Punkte anhand ihrer Kennungen auswählen; bei automatischer Aktualisierung, Kundenwiederöffnung, Suche und Fortschrittsanzeige die bevorzugte Variante nennen. Noch keine konkrete Auswahl oder Umsetzung beschlossen.
 - Für diesen Diagnoseschritt keine App-Dateien übertragen und keinen zusätzlichen HQ-Sync als Test starten; der veröffentlichte Appstand bleibt unverändert.
 
 Bedienfolge, Fehlerfälle und Login-Hilfe: [Veröffentlichungsanleitung](docs/VEROEFFENTLICHEN.md).
