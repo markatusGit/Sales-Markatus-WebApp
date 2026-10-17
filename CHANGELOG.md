@@ -68,3 +68,5 @@ Im künstlichen Modell nach Aufbau: Start 2 Reads statt 3.221; Namensliste 1 Rea
 Codevergleich aller sieben Dateien mit Google-Version 30 und Editorstand erfolgreich. Alle 13 lokalen Prüfsuiten einschließlich Syntax-, Logik- und Browserprüfungen bestanden; neun Vergleichs-/Schutzprüfungen decken unter anderem nachträgliche Google-Änderungen ab. Abschlussnachweis im Projekttagebuch. Der schreibende Ablauf wird erstmals beim nächsten echten Apprelease verwendet. Bestehende Roadmap und noch ausstehende Live-Funktionstests bleiben erhalten. Keine Skripteigenschaften, Scopes oder Bereitstellungseinstellungen bei Google geändert.
 
 Veröffentlichungsnachweis für v0.20.0: Google-Version 31; 2026-10-16T15:26:15.416Z. Details in deployment.json.
+
+Veröffentlichungsnachweis für v0.21.0: Google-Version 32; 2026-10-17T21:25:58.165Z. Details in deployment.json.
