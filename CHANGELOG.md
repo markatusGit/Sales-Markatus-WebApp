@@ -4,6 +4,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+Dokumentation vom 17.10.2026: konkrete Lösungsvorschläge und Prioritäten für D07/D08/D09/D11/D14/D17/D20/D21/D22 ergänzt; keine Appänderung oder Bereinigung. Stille HQ-Prüfungen vorerst beibehalten empfohlen; geringe Häufigkeit bedeutet entsprechend langsame Bestandsabdeckung.
+
 Dokumentation vom 17.10.2026: bestehende gemeinsame Namensliste, einmalige Aufbaukosten und Vor-/Nachteile einer künftigen Pflege beim Nachtabgleich erläutert. Kein Nachtlauf eingerichtet, keine Appänderung.
 
 Keine weiteren Appänderungen außerhalb des unten beschriebenen r20-Umfangs veröffentlicht. Die zurückgestellten Entscheidungen bleiben offen.

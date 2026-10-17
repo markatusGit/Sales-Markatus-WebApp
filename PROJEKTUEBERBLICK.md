@@ -76,4 +76,6 @@ Freigegeben: D01–D06, D10, D12, D13, D15, D16, D18, D19. D02 ausdrücklich ohn
 
 Bedienfolge, Fehlerfälle und Login-Hilfe: [Veröffentlichungsanleitung](docs/VEROEFFENTLICHEN.md).
 
+**Lösungsvorschlag vom 17.10.2026:** Abschnitt 13 der Verbrauchsanalyse konkretisiert D07/D08/D09/D11/D14/D17/D20/D21/D22. Empfehlung: kompakte Magazinfilter, manuelle kleine Sync-Statusabfrage, keine Vollabrufe nach Sync/Freigaben; danach gezielter Historienimport und interne Sync-Optimierung mit sicherer Wiederaufnahme. Rotierende stille HQ-Prüfungen zunächst behalten; unzugeordnete Inhalte nur bei großer Menge aufteilen und technische Altbestände erst nach Inventur/Aufbewahrungsregel bereinigen. Vorschläge zur Auswahl, noch keine Umsetzung oder zusätzliche Freigabe; keine neuen Trigger.
+
 Veröffentlichung v0.20.0: Apps-Script-Version 31, bestehende Bereitstellung beibehalten. Quellcommit d7c2ec5959f82bccbc832aeb45a3871898d4b0bb. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen verändert. Live-Funktionstest offen. Zeitpunkt: 2026-10-16T15:26:15.416Z.
