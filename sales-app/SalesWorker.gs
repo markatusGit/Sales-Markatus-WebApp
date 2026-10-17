@@ -21,12 +21,14 @@ function salesBulkStart_(){
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();salesWorkerEnsure_();const old=salesRead_('sales_meta/sync');
     const run=old?.engine===2&&old.state==='running'?old:salesBulkPrepare_(old);
-    run.paused=false;run.blockedMessage='';run.inFlight=null;run.revision++;run.updatedAt=salesNow_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');
+    run.paused=false;run.blockedMessage='';run.inFlight=null;run.statusPublishedAt=null;run.revision++;run.updatedAt=salesNow_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');
     const legacy=salesRead_('sales_meta/import');if(legacy?.state==='running'){legacy.state='superseded';salesWrite_('sales_meta/import',legacy);}
     salesWrite_('sales_meta/sync',run);return salesBulkSummary_(run);
   });
 }
-function getSalesSyncStatus(){salesUser_();const run=salesRead_('sales_meta/sync');return salesSyncSummary_(run);}
+function getSalesSyncStatus(){
+  salesUser_();return salesLeanSyncStatus_();
+}
 function salesWorkerPause_(id){
   const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
   salesWorkerProps_().setProperty('SALES_SYNC_PAUSE',id);const lock=LockService.getScriptLock();
@@ -40,7 +42,7 @@ function salesSyncWorker_(event){
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
     try{
-      let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){salesWorkerStop_();return;}
+      let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){if(run?.engine===2)salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
       if(p.getProperty('SALES_SYNC_PAUSE')===run.id){run.paused=true;run.revision++;run.updatedAt=salesNow_();salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;}
       let writeBoundary=false;try{
         const task=run.tasks[run.cursor],key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':');
@@ -51,7 +53,9 @@ function salesSyncWorker_(event){
         writeBoundary=salesBulkStep_(run);
       }catch(e){
         // Reload the durable checkpoint: an interrupted page may already have an immutable replay journal.
-        run=salesRead_('sales_meta/sync');run.paused=true;run.blockedMessage=e.message||'Hintergrundabschnitt fehlgeschlagen.';run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
+        run=salesRead_('sales_meta/sync');
+        if(run&&run.state!=='running'){salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
+        run.paused=true;run.blockedMessage=e.message||'Hintergrundabschnitt fehlgeschlagen.';run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
       }
       if(run.state!=='running'){salesWorkerStop_();return;}
       // Each company/contact write is followed by a separate trigger execution, not just another function call.

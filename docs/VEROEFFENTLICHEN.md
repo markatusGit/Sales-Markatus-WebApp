@@ -74,3 +74,19 @@ Google und GitHub lassen sich nicht als gemeinsame atomare Transaktion aktualisi
 Kein blindes erneutes Veröffentlichen, kein Löschen der bestehenden Bereitstellung und kein Force-Push. Bei fehlenden GitHub-Rechten bleibt der lokale Commit erhalten und GitHub wird als offen gemeldet.
 
 Offizielle technische Referenz: [Google clasp – Befehle und Aktualisieren einer bestehenden Bereitstellung](https://github.com/google/clasp), [Google Apps Script API – Projektinhalt](https://developers.google.com/apps-script/api/reference/rest/v1/projects/getContent).
+
+## r21 prüfen
+
+Nach bestätigter Veröffentlichung ist keine manuelle Dateiersetzung nötig. Für die fachliche Bedienabnahme:
+
+- Die bisherige Dashboard-URL neu öffnen; oben „Stand 2026-10-17-r21“ erwarten. Bei anderer Kennung diese im Chat melden.
+- „Magazinverkauf“ öffnen; beim ersten Mal einmaligen Aufbau der kompakten Filterliste erwarten. Bei Kontingentfehler den Fehlertext melden und nicht wiederholt laden.
+- Im Feld „Ort“ einen vorhandenen Ort auswählen; nur passende Firmen erwarten. Bei falschen Treffern die Filterauswahl ohne Kundendaten im Chat beschreiben.
+- Im Feld „Historie“ den Wert „Mindestens einmal in den letzten 5 Ausgaben“ auswählen; passende Kunden oder einen ausdrücklichen Hinweis auf fehlende/unvollständige Ausgaben erwarten. Bei Abweichung den Hinweistext melden.
+- „Datenabgleich“ öffnen; gespeicherten Fortschritt mit Zeitstempel erwarten. Es startet dadurch kein neuer HQ-Abgleich.
+- „Fortschritt aktualisieren“ anklicken; ausschließlich eine neue Fortschrittsanzeige erwarten. Bei Fehler den technischen Text melden.
+- Für die Inventur „Verwaltung“ öffnen; den Abschnitt „Technischer Speicherbestand“ erwarten. Bei fehlendem Abschnitt die angezeigte Appkennung melden.
+- „Bestandsaufnahme starten“ anklicken; einen Teilstand für höchstens 50 gelesene Dokumente erwarten. Bei Fehler den technischen Text melden; nichts wird gelöscht.
+- Für jede gewünschte Folgeseite einmal „Nächste Inventurseite lesen“ anklicken; die Mengen müssen fortgeschrieben werden, bis „Durchlauf vollständig“ erscheint. Bei Fehlern den Teilstand erhalten und den Fehlertext melden.
+
+Die Inventur ist optional zur späteren Bereinigungsplanung, verbraucht selbst Lesezugriffe und ist keine Löschfreigabe. Eine Aufbewahrungsdauer wurde noch nicht festgelegt. Skripteigenschaften, Bereitstellungseinstellungen und Nachttrigger müssen für r21 nicht geändert werden.

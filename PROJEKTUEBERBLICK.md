@@ -1,8 +1,10 @@
 # Projektüberblick – Sales Markatus
 
-Stand: 16.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.
+Stand: 17.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.
 
 ## Auftrag und Produktstand
+
+**Aktueller Auftrag vom 17.10.2026:** Nutzer hat den Vorschlag aus Abschnitt 13 der Verbrauchsanalyse zur Umsetzung freigegeben: D07/D08/D09/D11/D14/D20 optimieren; D17 und D21 zunächst erhalten; D22 als Inventur vorbereiten, keine Löschung oder Nachtplanung. r21 (2026-10-17-r21, geplanter Tag v0.21.0) lokal umgesetzt und synthetisch geprüft; abschließende Vorprüfung und Veröffentlichung folgen. Bestätigter bisheriger Google-Stand bleibt bis dahin r20/Version 31. Frühere Vermerke „zurückgestellt/nicht freigegeben“ sind für den jetzt bestätigten Umfang historisch.
 
 Interne Magazinvertriebs-App mit Google-Anmeldung, helloHQ und Firebase. Nutzer hat am 16.10.2026 die ausgewählten Ladeoptimierungen ausdrücklich beauftragt. r20 (`2026-10-16-r20`, Git-Tag `v0.20.0`) ist nach 15 erfolgreichen Prüfsuiten als Google-Version 31 unter derselben Dashboard-URL veröffentlicht. Feste Google-Version, Editorstand und GitHub-Tag erfolgreich auf Codegleichheit geprüft; Originalprojekt anschließend per Fast-Forward auf denselben Stand gebracht. Die zuvor vom Nutzer bestätigte Ausgabenverknüpfung bleibt erhalten. Echte r20-Bedienabnahme, vollständige fachliche Bestands-/Umsatzabnahme und Zehn-Personen-Test sind weiter offen.
 
@@ -62,6 +64,7 @@ Der neue schreibende Veröffentlichungsablauf wird bei der ersten tatsächlichen
 
 ## Nächster Schritt für den Nutzer
 
+- Für r21 nach bestätigter Veröffentlichung die Bedienprüfung aus Abschnitt „r21 prüfen“ in docs/VEROEFFENTLICHEN.md verwenden; keine manuelle Dateiersetzung. Die folgenden r20-Schritte beschreiben die vorherige Veröffentlichung.
 - Nach bestätigter Veröffentlichung die bestehende Dashboard-URL neu öffnen; Kennung 2026-10-16-r20 erwarten. Bei Abweichung die Kennung mitteilen.
 - Kunden einmal öffnen; der erste Namensindex-Aufbau kann einmalig länger dauern und ungefähr einen Verzeichnisabruf kosten. Bei einem Kontingentfehler den Fehlertext melden, nicht wiederholt starten.
 - Eine Kundenakte öffnen und über Zur Kundenliste dieselbe Akte erneut öffnen; Wiederöffnung ohne erneuten Ladeaufruf erwarten.

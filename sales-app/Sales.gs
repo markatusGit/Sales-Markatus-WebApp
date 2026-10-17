@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-16-r20';
+const SALES_RELEASE = '2026-10-17-r21';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -30,7 +30,9 @@ function salesRead_(path) {
   return raw ? salesDecodeStored_(path,raw.payload,c) : null;
 }
 function salesWrite_(path,value) {
+  const status=typeof salesLeanPrepareWrite_==='function'?salesLeanPrepareWrite_(path,value):null;
   salesStorePayload_(path,value);
+  if(status)salesStorePayload_('sales_meta/lean_sync',status);
   if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
 function salesList_(collection) {

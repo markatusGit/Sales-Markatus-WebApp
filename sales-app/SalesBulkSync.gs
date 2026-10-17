@@ -52,6 +52,8 @@ function salesBulkRead_(run,task){
     if(changed||prior.generation!==m.generation)entries.push({path,value:{row,generation:m.generation},index:{companyBucket:salesBulkBucket_(entity==='Companies'?row.id:row.companyId),projectBucket:salesBulkBucket_(entity==='Projects'?row.id:row.projectId)}});
   }
   m.lastId=last;m.pages++;m.seen+=page.rows.length;task.stage=m.seen+' Datensätze gelesen';
+  // With no changes there is no data commit to replay. The normal end-of-step checkpoint is sufficient.
+  if(!entries.length)return salesBulkFinishPage_(run,task,page.done);
   // Journal the immutable page and next cursor before any raw-cache write. Lost responses replay exactly this page.
   task.pendingPage='sales_imports/'+run.id+'-bulk-'+entity+'-'+m.pages;
   salesWrite_(task.pendingPage,{entries,done:page.done});salesWrite_('sales_meta/sync',run);
@@ -60,7 +62,11 @@ function salesBulkRead_(run,task){
 function salesBulkCommitPage_(run,task){
   const entity=task.id,m=run.entities[entity],collection=salesBulkCollection_(entity),pending=salesRead_(task.pendingPage);
   if(!pending)throw new Error('Vorbereitete Sammelseite fehlt.');salesBulkPut_(pending.entries);
-  if(!pending.done){delete task.pendingPage;return false;}
+  return salesBulkFinishPage_(run,task,pending.done);
+}
+function salesBulkFinishPage_(run,task,done){
+  const entity=task.id,m=run.entities[entity],collection=salesBulkCollection_(entity);
+  if(!done){delete task.pendingPage;return false;}
   if(m.full){
     const ids=new Set(m.ids),removed=(m.previousIds||[]).filter(id=>!ids.has(id));
     const missing=salesBulkGet_(removed.map(id=>collection+'/'+id));Object.values(missing).forEach(v=>salesBulkDirty_(run,entity,v?.row));
@@ -77,7 +83,7 @@ function salesBulkProject_(run,task){
     entries.push({path:'sales_projectviews/'+p.id,value:{row,companyId:p.companyId,generation:run.entities.Projects.generation},index:{companyBucket:salesBulkBucket_(p.companyId),projectBucket:bucket}});salesBulkDirty_(run,'Projects',p);
   }
   // Project changes also affect invoice recipients and dispatch history outside the project-owning company.
-  docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesWrite_('sales_meta/sync',run);salesBulkPut_(entries);return true;
+  docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesBulkPut_(entries);return true;
 }
 function salesBulkCompany_(run,task){
   const bucket=task.id,companies=salesBulkRows_(run,'Companies','companyBucket',bucket),contacts=salesBulkRows_(run,'ContactPersons','companyBucket',bucket),histories=salesBulkRows_(run,'ContactHistories','companyBucket',bucket),docs=salesBulkRows_(run,'Documents','companyBucket',bucket),projects=salesBulkRows_(run,'Projects','companyBucket',bucket);
@@ -115,6 +121,10 @@ function salesBulkAudit_(run){
 
 }
 function salesBulkStep_(run){
+  salesBulkStepCache_={documents:new Map(),rows:new Map()};
+  try{return salesBulkStepWork_(run);}finally{salesBulkStepCache_=null;}
+}
+function salesBulkStepWork_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task);run.stats.writes++;}catch(e){run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);

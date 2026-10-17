@@ -4,6 +4,22 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+Keine zusätzlichen Appänderungen außerhalb des nachfolgenden r21-Umfangs beauftragt. D17 und D21 bleiben erhalten; D22 umfasst eine lesende Inventur, keine Bereinigung oder neue Aufbewahrungsregel.
+
+## [v0.21.0] – 2026-10-17
+
+- D07: gemeinsame kompakte Magazinfilter (Namen, Kundennummern/-typen, Ort, Branche und Betreuer) und vorzeichenrichtige Umsatzsummen je Kunde/Ausgabe. Historienfilter behalten Vollständigkeitsprüfung und importierte Ausgabenhistorie; keine vollständigen Akten oder Beleglisten für die Recherche. Einmaliger Aufbau beim ersten Bedarf, Pflege in bestehenden Schreibwegen.
+- D08/D09: keine automatische Fortschrittsabfrage mehr. „Fortschritt aktualisieren“ liest einen kompakten Status; dieser wird serverseitig ungefähr alle 15 Sekunden sowie bei Start, Pause und Abschluss gepflegt. Dauerhafte Wiederaufnahmepunkte bleiben unabhängig erhalten. Kein Vollabruf nach Sync-Abschluss; betroffene Sitzungsspeicher werden für folgende bewusste Navigation verworfen.
+- D11: E-Mail-Freigaben aus der bestätigten Speicherantwort anzeigen, ohne App-Nachabruf. Rechteprüfung und Speicherung in Script Properties unverändert.
+- D14: Kundenhistorie gezielt über Kunden-ID aktualisieren, vorhandene Akte einmal verwenden und aktualisierte Akte direkt zurückgeben. Vollständige Historie dieses Kunden und nötige Belegzuordnung bleiben erhalten; unvollständige/fremde HQ-Antworten ersetzen keinen Bestand.
+- D20: keine Journale ohne Datensatzänderung, keine redundante Zwischenspeicherung vor Projektansichts-Commit, Wiederverwendung bereits gelesener Dokumente/Partitionen je Abschnitt und deduplizierte Sammelabrufe. Journale vor tatsächlichen Datenänderungen sowie sichere Wiederaufnahme und HQ-Schreibgrenzen bleiben erhalten. Fehler einer kompakten Statusveröffentlichung nach bereits dauerhaftem Abschluss reparieren den Status ohne erneute Geschäftsverarbeitung.
+- D17/D21 wie beschlossen erhalten: unzugeordnete Inhalte nur bei Bedarf; höchstens zehn rotierende Einzelprüfungen je sechs HQ-Datenarten. Kein Nachtlauf eingerichtet.
+- D22: reine Inventurfunktion unter Verwaltung; höchstens 50 Dokumente pro ausdrücklichem Klick, Mengen/Bytes/Zeitspannen und technische Speicherverweise. Keine Geschäftsinhalte in der Antwort, keine automatische Abfrage, keine Löschfunktion. Der echte Bestandsdurchlauf und die Wahl einer Aufbewahrungsregel bleiben gesonderte Schritte.
+- Synthetische Budgets nach Aufbau: Magazinfilter 2 Reads/0 Writes; Freigaben 0/0; einzelne Kundenhistorie im Modell 5/1 einschließlich Aktenantwort; kompakter Status 1/0. Unveränderter Folgeabgleich mit 60 Einzelprüfungen: 136 Reads/144 Writes gegenüber 142/154 in r20. Erstaufbau der Magazinprojektionen im Modell 3.217 Reads/2 Writes; große Listen können weitere Speicherteile benötigen. Keine Live-Abrechnung oder Sekundenmessung.
+- Vor Veröffentlichung vollständige Syntax-, Logik-, Wiederaufnahme-, Fehler- und Browserprüfungen. Keine neuen/geänderten Script Properties, OAuth-Scopes, Zugriffsgruppe oder Ausführungsidentität. Veröffentlichung und Codevergleich werden in deployment.json und Projekttagebuch nachgewiesen; echte fachliche Live-Abnahme bleibt davon getrennt.
+
+### Vorbereitende Erläuterungen
+
 Dokumentation vom 17.10.2026: konkrete Lösungsvorschläge und Prioritäten für D07/D08/D09/D11/D14/D17/D20/D21/D22 ergänzt; keine Appänderung oder Bereinigung. Stille HQ-Prüfungen vorerst beibehalten empfohlen; geringe Häufigkeit bedeutet entsprechend langsame Bestandsabdeckung.
 
 Dokumentation vom 17.10.2026: bestehende gemeinsame Namensliste, einmalige Aufbaukosten und Vor-/Nachteile einer künftigen Pflege beim Nachtabgleich erläutert. Kein Nachtlauf eingerichtet, keine Appänderung.

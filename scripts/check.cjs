@@ -45,7 +45,7 @@ function tests() {
     if (edge) env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = edge;
   }
   const files = ['scripts/test-release.cjs', 'hq-benchmark/test-benchmark.cjs', 'hq-benchmark/test-revenue.cjs', 'hq-benchmark/test-revenue-ui.cjs', 'firebase-pilot/test-pilot.cjs', 'sales-app/test-sales.cjs', 'sales-app/test-sales-v1.cjs', 'sales-app/test-sales-sync.cjs', 'sales-app/test-sales-bulk.cjs', 'sales-app/test-sales-delta.cjs', 'sales-app/test-lean.cjs', 'sales-app/test-history-browser.cjs', 'sales-app/test-v1-browser.cjs', 'sales-app/test-worker-browser.cjs'];
-  files.push('sales-app/test-lean-browser.cjs');
+  files.push('sales-app/test-lean-browser.cjs','sales-app/test-performance.cjs');
   for (const name of files) {
     console.log(`Prüfe ${name}`);
     const output = run(process.execPath, [path.join(root, name)], {env});

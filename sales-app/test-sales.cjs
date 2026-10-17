@@ -8,7 +8,7 @@ function fixture(){
   const clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
   const ctx={console,Set,Date,JSON,Number,String,Object,Array,Math,Error,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},Session:{getActiveUser:()=>({getEmail:()=>email})},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{getUuid:()=>`test-${++seq}`,newBlob:x=>({getBytes:()=>Buffer.from(x)})},revenueToken_:()=> 'secret',revenueAmountCents_:x=>typeof x==='number'&&Number.isFinite(x)?Math.round(x*100):null};
   vm.createContext(ctx);vm.runInContext(source,ctx);
-  ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{db[p]=clone(v);if(typeof ctx.salesLeanAfterWrite_==='function')ctx.salesLeanAfterWrite_(p,v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
+  ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{const status=typeof ctx.salesLeanPrepareWrite_==='function'?ctx.salesLeanPrepareWrite_(p,v):null;db[p]=clone(v);if(status)ctx.salesWrite_('sales_meta/lean_sync',status);if(typeof ctx.salesLeanAfterWrite_==='function')ctx.salesLeanAfterWrite_(p,v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
   ctx.salesHqGet_=path=>{
     calls.push({method:'get',path});const addressPath=/^\/v2\/Companies\/(\d+)\/Addresses$/.exec(path);if(addressPath)return {data:[clone(remote.Companies[addressPath[1]].defaultAddress)],headers:{}};
     const m=path.match(/^\/v2\/(\w+)(?:\/(\d+))?/),entity=m[1];
@@ -507,7 +507,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-10-16-r20',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-10-17-r21',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-10-16-r20'));
+  assert.ok(root.innerHTML.includes('2026-10-17-r21'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

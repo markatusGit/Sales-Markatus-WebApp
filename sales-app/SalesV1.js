@@ -21,7 +21,7 @@
     const required=mode==='last5'?[1,2,3,4,5].map(n=>Number(current.issue)-n):[Number(current.issue)-1];
     const missing=required.filter(n=>!same.some(e=>Number(e.issue)===n&&e.loadedAt&&e.complete));
     if(missing.length)return {ids:new Set(),unknown:true,message:'Noch nicht auswertbar: '+current.magazine+' #'+missing.join(', #')+' fehlt oder ist unvollständig. Keine fehlende Buchung wird daraus abgeleitet.'};
-    const booked=e=>{const sums={};(e.documents||[]).forEach(d=>{sums[d.companyId]=(sums[d.companyId]||0)+d.cents;});return Object.keys(sums).filter(id=>sums[id]>0);};
+    const booked=e=>{const sums=e.companyRevenue||{};if(!e.companyRevenue)(e.documents||[]).forEach(d=>{sums[d.companyId]=(sums[d.companyId]||0)+d.cents;});return Object.keys(sums).filter(id=>sums[id]>0);};
     if(mode==='last5')return {ids:new Set(same.filter(e=>required.includes(Number(e.issue))).flatMap(booked)),message:'Mindestens einmal mit positivem Netto-Rechnungsbetrag in den fünf Ausgaben vor #'+current.issue+'.'};
     const last=new Set(booked(same.find(e=>Number(e.issue)===Number(current.issue)-1))),earlier=same.filter(e=>Number(e.issue)<Number(current.issue)-1&&e.loadedAt);
     if(!earlier.length)return {ids:new Set(),unknown:true,message:'Noch keine frühere Ausgabe vor der letzten Ausgabe importiert.'};
@@ -66,7 +66,7 @@
   function v1Import(){
     const run=state.syncRun,stats=run?.stats||{},open=state.jobs.filter(j=>!['synced','canceled'].includes(j.state)),background=run?.engine===2&&run.state==='running'&&!run.paused&&Date.now()-Date.parse(run.updatedAt)<600000;
     const rows=[['Unternehmen',stats.companies,stats.hqCompanies],['Ansprechpartner',stats.contacts===undefined?undefined:stats.contacts+(stats.totalsIncludeUnassigned?0:(stats.unassignedContacts||0)),stats.hqContacts],['Historieneinträge',stats.histories===undefined?undefined:stats.histories+(stats.totalsIncludeUnassigned?0:(stats.unassignedHistories||0)),stats.hqHistories]];
-    return head('HQ-Synchronisation','Firebase bleibt die Arbeitsdatenbank. Der Abgleich startet nur durch deinen Klick.')+'<section class="m-panel"><div class="m-panel-body"><p>Zuerst offene App-Aufträge nach HQ: Firma bestätigen, danach Ansprechpartner. Anschließend HQ-Daten gesammelt nach Firebase laden und Kundenakten sowie ausgewählte Magazinausgaben daraus aktualisieren.</p><p>'+open.length+' offene App-Aufträge. Schreibwege gelten weiterhin für eigene Testfirmen; Bearbeitung echter Bestandskunden folgt im nächsten Ausbau.</p>'+ (state.user.admin?(importLoop||background?'<button class="m-button m-primary" disabled>HQ-Sync läuft</button><button class="m-button" data-action="pause-import" '+(stopImport||run?.pauseRequested?'disabled':'')+'>Nach diesem Abschnitt anhalten</button>':button(run?.state==='running'?'HQ-Sync fortsetzen':'HQ synchronisieren','v1-sync','',true)):'')+
+    return head('HQ-Synchronisation','Firebase bleibt die Arbeitsdatenbank. Der Abgleich startet nur durch deinen Klick.',button('Fortschritt aktualisieren','sync-status'))+'<section class="m-panel"><div class="m-panel-body"><p>Zuerst offene App-Aufträge nach HQ: Firma bestätigen, danach Ansprechpartner. Anschließend HQ-Daten gesammelt nach Firebase laden und Kundenakten sowie ausgewählte Magazinausgaben daraus aktualisieren.</p><p>Offene App-Aufträge unter Aufträge und Konflikte ansehen. Schreibwege gelten weiterhin für eigene Testfirmen; Bearbeitung echter Bestandskunden folgt im nächsten Ausbau.</p>'+ (state.user.admin?(importLoop||background?'<button class="m-button m-primary" disabled>HQ-Sync läuft</button><button class="m-button" data-action="pause-import" '+(stopImport||run?.pauseRequested?'disabled':'')+'>Nach diesem Abschnitt anhalten</button>':button(run?.state==='running'?'HQ-Sync fortsetzen':'HQ synchronisieren','v1-sync','',true)):'')+
       (state.user.admin&&!importLoop&&!background&&run?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+
       (run?'<p>'+run.done+' von '+run.total+' bekannten Abschnitten erfolgreich · '+run.errors.length+' Hinweise/Fehler</p><p>'+esc(syncStatusLabel(run))+'</p><p>Aktueller Abschnitt: '+esc(run.current||'Keiner')+(run.stage?' · '+esc(run.stage):'')+'</p><p>Letzte Aktualisierung: '+esc(new Date(run.updatedAt).toLocaleString('de-DE'))+'</p>':'<p>Noch kein vollständiger HQ-Sync. Ein älterer Ausgabeimport bestätigt noch nicht den gesamten Firmenbestand.</p>')+
       (run?.discovery?'<p id="sync-discovery"><strong>'+run.discovery.count+' von '+(run.discovery.total??'noch unbekannt vielen')+' Firmen erfasst</strong> · '+run.discovery.pages+' Seiten gespeichert'+(run.discovery.complete?' · Firmenerfassung abgeschlossen':'')+'</p><p class="m-muted">Alle bekannten Firmen bleiben unabhängig von Magazinbuchungen gespeichert. Bei einem Änderungsabgleich werden nur betroffene Akten aktualisiert.</p>':'')+
@@ -77,7 +77,7 @@
   }
   function v1Admin(){
     let body=admin().replace('COBURGER #70 · Ziel und Termine',esc(editionLabel(state.edition))+' · Ziel und Termine');body=editionSelectors()+body;if(!state.user.admin)return body;
-    return body+projectSearchPanel()+(state.syncRun?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+'<p class="m-note">Alle eingelesenen HQ-Unternehmen und Ansprechpartner bleiben verfügbar, auch ohne Magazinrechnung. Weitere Ausgaben können aus dem gespeicherten Bestand verknüpft werden.</p><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
+    return body+storageInventoryPanel()+projectSearchPanel()+(state.syncRun?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+'<p class="m-note">Alle eingelesenen HQ-Unternehmen und Ansprechpartner bleiben verfügbar, auch ohne Magazinrechnung. Weitere Ausgaben können aus dem gespeicherten Bestand verknüpft werden.</p><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
   }
   async function continueV1Import(editionsOnly=false){
     if(importLoop)return;importLoop=true;stopImport=false;
@@ -86,10 +86,12 @@
       if(state.syncRun?.engine===2){view='import';message=(editionsOnly?'Ausgabenverknüpfung':'HQ-Sync')+' bei Google gestartet. Der Browser muss nicht geöffnet bleiben.';return;}
       while(!stopImport&&state.syncRun?.state==='running'&&!state.syncRun.paused){await act(async()=>{state.syncRun=await rpc('runSalesSyncStep',state.syncRun.id,state.syncRun.revision);});if(error)break;}
       if(stopImport&&state.syncRun?.state==='running'&&!error)await act(async()=>{state.syncRun=await rpc('pauseSalesSync',state.syncRun.id);});
-      const failure=error;await act(async()=>{state=await rpc('getSalesState');return {message:failure?'HQ-Sync unterbrochen: '+failure:state.syncRun?.paused?'HQ-Sync angehalten; später fortsetzbar.':state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.'};});
+      const failure=error;await act(async()=>{loadedViews.clear();viewCache.clear();companyCache.clear();editionCache.clear();return {message:failure?'HQ-Sync unterbrochen: '+failure:state.syncRun?.paused?'HQ-Sync angehalten; später fortsetzbar.':state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.'};});
     }finally{importLoop=false;render();}
   }
   function v1Click(a,id){
+    if(a==='inventory-start'||a==='inventory-next'){act(()=>readStorageInventory(a==='inventory-start'));return true;}
+    if(a==='sync-status'){act(refreshSalesSync);return true;}
     if(a==='pause-import'){stopImport=true;message='Der laufende Abschnitt wird noch abgeschlossen.';render();if(state.syncRun?.engine===2)rpc('pauseSalesSync',state.syncRun.id).then(run=>{state.syncRun=run;stopImport=false;render();}).catch(e=>{stopImport=false;error=e.message;render();});return true;}
     if(a==='v1-editions'){continueV1Import(true).catch(e=>{error=e.message;render();});return true;}
     if(a==='v1-sync'){continueV1Import().catch(e=>{error=e.message;render();});return true;}
@@ -97,10 +99,10 @@
     if(a==='add-company'){act(()=>rpc('addSalesCompany',id),{});return true;}
     if(a==='exclude-document'||a==='include-document'){act(()=>rpc('setSalesDocumentExcluded',{editionId:state.edition.id,documentId:id,excluded:a==='exclude-document'}),{});return true;}return false;
   }
-  let syncPollPending=false;
-  async function pollSalesSync(){
-    if(syncPollPending||busy||!state||view!=='import'||state.syncRun?.engine!==2||state.syncRun.state!=='running'||state.syncRun.paused)return;
-    syncPollPending=true;try{const before=state.syncRun;state.syncRun=await rpc('getSalesSyncStatus');if(before.state==='running'&&state.syncRun?.state!=='running'){state=await rpc('getSalesState');loadedViews.clear();viewCache.clear();companyCache.clear();editionCache.clear();message=state.syncRun?.kind==='editions'?(state.syncRun.state==='completed'?'Ausgabenverknüpfung abgeschlossen.':'Ausgabenverknüpfung mit offenen Punkten beendet. Bitte Hinweise prüfen.'):state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.';}if(view==='import')render();}catch(e){error='Status konnte nicht geladen werden: '+e.message;if(view==='import')render();}finally{syncPollPending=false;}
+  async function refreshSalesSync(){
+    // Invalidate future navigation only; never fetch or replace displayed working data here.
+    acceptSyncStatus(await rpc('getSalesSyncStatus'));
+    return {message:state.syncRun?.paused?'HQ-Sync angehalten; später fortsetzbar.':state.syncRun?.state==='running'?'Fortschritt aktualisiert.':state.syncRun?.kind==='editions'?(state.syncRun.state==='completed'?'Ausgabenverknüpfung abgeschlossen.':'Ausgabenverknüpfung mit offenen Punkten beendet. Bitte Hinweise prüfen.'):state.syncRun?.state==='completed'?'HQ-Sync abgeschlossen.':state.syncRun?'HQ-Sync mit offenen Punkten beendet. Bitte Hinweise prüfen.':'Noch kein HQ-Sync vorhanden.'};
   }
   function v1Change(e){
     if(changeProjectChoice(e))return true;

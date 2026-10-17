@@ -94,7 +94,7 @@ test('discovery of thousands of firms uses page writes without individual direct
  let r=f.ctx.startSalesSync();for(let i=0;i<100&&r.current.includes('alle Unternehmen');i++)r=f.ctx.runSalesSyncStep(r.id,r.revision);
  assert.equal(r.discovery.count,3202);assert.equal(r.discovery.pages,65);assert.equal(r.discovery.complete,true);assert.equal(r.stats.companies,0);
  assert.equal(writes.filter(p=>p.startsWith('sales_directory/')).length,65);assert.equal(reads.filter(p=>p.startsWith('sales_directory/')||p==='sales_meta/directory').length,0);
- assert.equal(writes.length,196);assert.equal(f.ctx.salesV1Index_().entries.length,3202);assert.equal(JSON.parse(raw['sales_meta/sync'].payload).tasks.filter(t=>t.kind==='company').length,3202);
+ assert.equal(writes.filter(p=>p!=='sales_meta/lean_sync').length,196);assert.ok(writes.filter(p=>p==='sales_meta/lean_sync').length<=3);assert.equal(f.ctx.salesV1Index_().entries.length,3202);assert.equal(JSON.parse(raw['sales_meta/sync'].payload).tasks.filter(t=>t.kind==='company').length,3202);
 });
 test('an r16 run resumes at its saved offset without resetting errors or replaying writes',()=>{
  const f=setup();for(let i=200;i<260;i++)f.remote.Companies[i]={...f.remote.Companies[102],id:i,name:'Synthetic legacy '+i};

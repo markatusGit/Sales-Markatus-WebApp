@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-16-r20';
+const SALES_RELEASE = '2026-10-17-r21';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -30,7 +30,9 @@ function salesRead_(path) {
   return raw ? salesDecodeStored_(path,raw.payload,c) : null;
 }
 function salesWrite_(path,value) {
+  const status=typeof salesLeanPrepareWrite_==='function'?salesLeanPrepareWrite_(path,value):null;
   salesStorePayload_(path,value);
+  if(status)salesStorePayload_('sales_meta/lean_sync',status);
   if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
 function salesList_(collection) {
@@ -1209,12 +1211,14 @@ function salesBulkDecode_(doc){
   const path=doc.name.split('/documents/')[1];return salesDecodeStored_(path,doc.fields.payload.stringValue,salesContext_());
 }
 function salesBulkGet_(paths){
-  const result={};for(let i=0;i<paths.length;i+=100){
+  paths=Array.from(new Set(paths));const result={},cache=salesBulkStepCache_?.documents;
+  if(cache){for(const path of paths)if(cache.has(path))result[path]=cache.get(path);paths=paths.filter(path=>!cache.has(path));}
+  for(let i=0;i<paths.length;i+=100){
     const batch=paths.slice(i,i+100),reply=salesBulkRest_('batchGet',{documents:batch.map(salesBulkName_)});
     if(!Array.isArray(reply))throw new Error('Firebase-Sammelantwort fehlt.');
     const seen=new Set();for(const row of reply){const name=row.found?.name||row.missing;if(!name)continue;const path=name.split('/documents/')[1];if(!batch.includes(path)||seen.has(path))throw new Error('Firebase-Sammelantwort widersprüchlich.');seen.add(path);result[path]=row.found?salesBulkDecode_(row.found):null;}
     if(seen.size!==batch.length)throw new Error('Firebase-Sammelantwort unvollständig.');
-  }return result;
+  }if(cache)for(const [path,value] of Object.entries(result))cache.set(path,value);return result;
 }
 function salesBulkPayload_(path,value){
   const payload=JSON.stringify(value);if(Utilities.newBlob(payload).getBytes().length<=650000)return payload;
@@ -1230,7 +1234,9 @@ function salesBulkPut_(entries){
     const write={update:{name:salesBulkName_(e.path),fields}},size=Utilities.newBlob(JSON.stringify(write)).getBytes().length;
     if(writes.length>=100||bytes+size>4000000)flush();writes.push(write);bytes+=size;
   }flush();
+  if(salesBulkStepCache_){salesBulkStepCache_.rows.clear();for(const e of entries)salesBulkStepCache_.documents.set(e.path,e.value);}
   if(typeof salesLeanNamesUpdate_==='function')salesLeanNamesUpdate_(entries);
+  if(typeof salesLeanFiltersUpdate_==='function')salesLeanFiltersUpdate_(entries);
 }
 function salesBulkQuery_(collection,field,value){
   if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!['companyBucket','projectBucket'].includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
@@ -1239,13 +1245,16 @@ function salesBulkQuery_(collection,field,value){
     const query={from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
     if(last)query.startAt={values:[{referenceValue:last}],before:false};
     const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
-    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');out.push(salesBulkDecode_(doc));}if(docs.length<250)return out;last=docs[docs.length-1].name;
+    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const value=salesBulkDecode_(doc);out.push(value);if(salesBulkStepCache_)salesBulkStepCache_.documents.set(doc.name.split('/documents/')[1],value);}if(docs.length<250)return out;last=docs[docs.length-1].name;
   }throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
 }
 function salesBulkBucket_(id){return Number(id)>0?String(Number(id)%64):'none';}
+let salesBulkStepCache_=null;
 function salesBulkRows_(run,entity,field,bucket){
   const generation=run.entities[entity].generation;
-  return salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+  const key=[generation,entity,field,bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
+  const rows=salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+  if(cache)cache.set(key,rows);return rows;
 }
 
 /** Global HQ pages, independent change cursors, Firebase-only joins. No HQ writes here. */
@@ -1302,6 +1311,8 @@ function salesBulkRead_(run,task){
     if(changed||prior.generation!==m.generation)entries.push({path,value:{row,generation:m.generation},index:{companyBucket:salesBulkBucket_(entity==='Companies'?row.id:row.companyId),projectBucket:salesBulkBucket_(entity==='Projects'?row.id:row.projectId)}});
   }
   m.lastId=last;m.pages++;m.seen+=page.rows.length;task.stage=m.seen+' Datensätze gelesen';
+  // With no changes there is no data commit to replay. The normal end-of-step checkpoint is sufficient.
+  if(!entries.length)return salesBulkFinishPage_(run,task,page.done);
   // Journal the immutable page and next cursor before any raw-cache write. Lost responses replay exactly this page.
   task.pendingPage='sales_imports/'+run.id+'-bulk-'+entity+'-'+m.pages;
   salesWrite_(task.pendingPage,{entries,done:page.done});salesWrite_('sales_meta/sync',run);
@@ -1310,7 +1321,11 @@ function salesBulkRead_(run,task){
 function salesBulkCommitPage_(run,task){
   const entity=task.id,m=run.entities[entity],collection=salesBulkCollection_(entity),pending=salesRead_(task.pendingPage);
   if(!pending)throw new Error('Vorbereitete Sammelseite fehlt.');salesBulkPut_(pending.entries);
-  if(!pending.done){delete task.pendingPage;return false;}
+  return salesBulkFinishPage_(run,task,pending.done);
+}
+function salesBulkFinishPage_(run,task,done){
+  const entity=task.id,m=run.entities[entity],collection=salesBulkCollection_(entity);
+  if(!done){delete task.pendingPage;return false;}
   if(m.full){
     const ids=new Set(m.ids),removed=(m.previousIds||[]).filter(id=>!ids.has(id));
     const missing=salesBulkGet_(removed.map(id=>collection+'/'+id));Object.values(missing).forEach(v=>salesBulkDirty_(run,entity,v?.row));
@@ -1327,7 +1342,7 @@ function salesBulkProject_(run,task){
     entries.push({path:'sales_projectviews/'+p.id,value:{row,companyId:p.companyId,generation:run.entities.Projects.generation},index:{companyBucket:salesBulkBucket_(p.companyId),projectBucket:bucket}});salesBulkDirty_(run,'Projects',p);
   }
   // Project changes also affect invoice recipients and dispatch history outside the project-owning company.
-  docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesWrite_('sales_meta/sync',run);salesBulkPut_(entries);return true;
+  docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesBulkPut_(entries);return true;
 }
 function salesBulkCompany_(run,task){
   const bucket=task.id,companies=salesBulkRows_(run,'Companies','companyBucket',bucket),contacts=salesBulkRows_(run,'ContactPersons','companyBucket',bucket),histories=salesBulkRows_(run,'ContactHistories','companyBucket',bucket),docs=salesBulkRows_(run,'Documents','companyBucket',bucket),projects=salesBulkRows_(run,'Projects','companyBucket',bucket);
@@ -1365,6 +1380,10 @@ function salesBulkAudit_(run){
 
 }
 function salesBulkStep_(run){
+  salesBulkStepCache_={documents:new Map(),rows:new Map()};
+  try{return salesBulkStepWork_(run);}finally{salesBulkStepCache_=null;}
+}
+function salesBulkStepWork_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task);run.stats.writes++;}catch(e){run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
@@ -1540,12 +1559,14 @@ function salesBulkStart_(){
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();salesWorkerEnsure_();const old=salesRead_('sales_meta/sync');
     const run=old?.engine===2&&old.state==='running'?old:salesBulkPrepare_(old);
-    run.paused=false;run.blockedMessage='';run.inFlight=null;run.revision++;run.updatedAt=salesNow_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');
+    run.paused=false;run.blockedMessage='';run.inFlight=null;run.statusPublishedAt=null;run.revision++;run.updatedAt=salesNow_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');
     const legacy=salesRead_('sales_meta/import');if(legacy?.state==='running'){legacy.state='superseded';salesWrite_('sales_meta/import',legacy);}
     salesWrite_('sales_meta/sync',run);return salesBulkSummary_(run);
   });
 }
-function getSalesSyncStatus(){salesUser_();const run=salesRead_('sales_meta/sync');return salesSyncSummary_(run);}
+function getSalesSyncStatus(){
+  salesUser_();return salesLeanSyncStatus_();
+}
 function salesWorkerPause_(id){
   const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');
   salesWorkerProps_().setProperty('SALES_SYNC_PAUSE',id);const lock=LockService.getScriptLock();
@@ -1559,7 +1580,7 @@ function salesSyncWorker_(event){
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
     try{
-      let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){salesWorkerStop_();return;}
+      let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){if(run?.engine===2)salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
       if(p.getProperty('SALES_SYNC_PAUSE')===run.id){run.paused=true;run.revision++;run.updatedAt=salesNow_();salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;}
       let writeBoundary=false;try{
         const task=run.tasks[run.cursor],key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':');
@@ -1570,7 +1591,9 @@ function salesSyncWorker_(event){
         writeBoundary=salesBulkStep_(run);
       }catch(e){
         // Reload the durable checkpoint: an interrupted page may already have an immutable replay journal.
-        run=salesRead_('sales_meta/sync');run.paused=true;run.blockedMessage=e.message||'Hintergrundabschnitt fehlgeschlagen.';run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
+        run=salesRead_('sales_meta/sync');
+        if(run&&run.state!=='running'){salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
+        run.paused=true;run.blockedMessage=e.message||'Hintergrundabschnitt fehlgeschlagen.';run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
       }
       if(run.state!=='running'){salesWorkerStop_();return;}
       // Each company/contact write is followed by a separate trigger execution, not just another function call.
@@ -1582,7 +1605,33 @@ function salesWorkerPrivate_(){
   const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}
 }
 
-/** Click-driven read endpoints. Legacy state/sync endpoints stay available for deferred D09/D11/D14. */
+/** Click-driven read endpoints and shared compact projections. */
+function salesLeanFilterRow_(c){
+  const address=c.defaultAddress||(c.addresses||[]).find(a=>a.standardForDocumentType==='Invoice');
+  return {id:String(c.id),name:c.name,industrialSector:c.industrialSector||'',defaultAddress:address?{city:address.city||''}:null,
+    companyTypes:(c.companyTypes||[]).map(t=>salesPick_(t,['name','number'])),responsibleUsers:(c.responsibleUsers||[]).map(u=>salesPick_(u,['id','userId','firstName','lastName']))};
+}
+function salesLeanBookingRow_(e){
+  const companyRevenue={};for(const d of e.documents||[])companyRevenue[String(d.companyId)]=(companyRevenue[String(d.companyId)]||0)+d.cents;
+  return {...salesLeanEdition_(e),companyRevenue};
+}
+function salesLeanProjection_(path,build){
+  const old=salesRead_(path);if(old)return old.rows;
+  return salesLock_(()=>{const again=salesRead_(path);if(again)return again.rows;const rows=build();salesWrite_(path,{rows});return rows;});
+}
+function salesLeanFilters_(){return salesLeanProjection_('sales_meta/lean_filters',()=>salesV1Index_().entries.map(e=>salesLeanFilterRow_(e.company)));}
+function salesLeanBookings_(){return salesLeanProjection_('sales_meta/lean_bookings',()=>salesV1Editions_().map(salesLeanBookingRow_));}
+function salesLeanSyncStatus_(){
+  const cached=salesRead_('sales_meta/lean_sync');if(cached)return {...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};
+  return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return summary;});
+}
+function salesLeanFiltersUpdate_(entries){
+  const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>salesLeanFilterRow_(e.value.company));
+  if(!changes.length)return;const path='sales_meta/lean_filters',old=salesRead_(path);if(!old)return;
+  const map=new Map(old.rows.map(c=>[c.id,c]));let changed=false;
+  for(const c of changes)if(JSON.stringify(map.get(c.id))!==JSON.stringify(c)){map.set(c.id,c);changed=true;}
+  if(changed)salesWrite_(path,{rows:Array.from(map.values())});
+}
 function salesLeanEdition_(e){
   return {id:e.id,magazine:e.magazine,issue:e.issue,projectId:e.projectId,projectNumber:e.projectNumber,projectName:e.projectName,syncEnabled:e.syncEnabled,loadedAt:e.loadedAt,complete:e.complete,cacheLinkPending:e.cacheLinkPending,settings:e.settings,changes:(e.changes||[]).slice(0,1),revenueCents:(e.documents||[]).reduce((n,d)=>n+d.cents,0),summaryOnly:true};
 }
@@ -1621,16 +1670,23 @@ function salesLeanHistoryIndex_(){
     salesWrite_(path,{rows});return rows;
   });
 }
+function salesLeanPrepareWrite_(path,value){
+  if(path!=='sales_meta/sync'||!(value.paused||value.state!=='running'||!value.inFlight&&!value.tasks?.[value.cursor]?.pendingPage))return null;
+  if(!value.paused&&value.state==='running'&&value.statusPublishedAt&&Date.now()-Date.parse(value.statusPublishedAt)<15000)return null;
+  value.statusPublishedAt=salesNow_();return salesSyncSummary_(value);
+}
 function salesLeanAfterWrite_(path,value){
-  if(/^sales_(directory|companies)\/\d+$/.test(path)||/^sales_drafts\//.test(path))salesLeanNamesUpdate_([{path,value}]);
+  if(/^sales_(directory|companies)\/\d+$/.test(path)||/^sales_drafts\//.test(path)){salesLeanNamesUpdate_([{path,value}]);salesLeanFiltersUpdate_([{path,value}]);}
   if(/^sales_jobs\//.test(path)&&value.kind==='history'){
     const key='sales_meta/lean_historyjobs',old=salesRead_(key);if(!old)return;
     const rows=old.rows.filter(j=>j.id!==value.id);if(value.state!=='canceled')rows.push({id:value.id,companyId:String(value.hqId)});rows.sort((a,b)=>a.id.localeCompare(b.id));
     if(JSON.stringify(rows)!==JSON.stringify(old.rows))salesWrite_(key,{rows});
   }
   if(/^sales_editions\//.test(path)){
-    const key='sales_meta/lean_editions',old=salesRead_(key);if(!old)return;
-    const e=salesLeanEdition_(value),rows=old.rows.filter(x=>x.id!==e.id);rows.push(e);rows.sort((a,b)=>a.id.localeCompare(b.id));salesWrite_(key,{rows});
+    for(const [key,project] of [['sales_meta/lean_editions',salesLeanEdition_],['sales_meta/lean_bookings',salesLeanBookingRow_]]){
+      const old=salesRead_(key);if(!old)continue;const e=project(value),rows=old.rows.filter(x=>x.id!==e.id);rows.push(e);rows.sort((a,b)=>a.id.localeCompare(b.id));
+      if(JSON.stringify(rows)!==JSON.stringify(old.rows))salesWrite_(key,{rows});
+    }
   }
   if(/^sales_drafts\//.test(path)&&value.hqId){const key='sales_meta/lean_testowners',old=salesRead_(key);if(old){old.rows[String(value.hqId)]=value.id;salesWrite_(key,old);}}
 }
@@ -1667,20 +1723,36 @@ function getSalesLeanCompany(id){
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
   if(name==='customers')return {companies:salesLeanNames_()};
-  if(name==='magazine')return {companies:salesV1Index_().entries.map(e=>e.company),editions:salesV1Editions_()};
+  if(name==='magazine')return {companies:salesLeanFilters_(),editions:salesLeanBookings_()};
   if(name==='contacts')return {directory:salesV1Index_().entries,drafts:salesList_('sales_drafts'),jobs:salesList_('sales_jobs').map(salesJobSummary_)};
   if(name==='invoices')return {editions:salesV1Editions_(),companies:salesLeanNames_()};
   if(name==='admin')return {editions:salesLeanRoster_(),access:user.admin?salesAccess_():null};
   if(name==='new'||name==='change')return {catalog:salesRead_('sales_meta/catalog')};
-  if(name==='test'||name==='import'){
+  if(name==='import')return {syncRun:salesLeanSyncStatus_(),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
+  if(name==='test'){
     const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),catalog=salesRead_('sales_meta/catalog');
     return {drafts,jobs:jobs.map(salesJobSummary_),catalog,localCompanies:drafts.map(d=>salesLocalCompany_(d,catalog,jobs.find(j=>j.id===d.id))),...(name==='import'?{syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')}: {})};
   }
   if(name==='home')return getSalesLeanState(selectedId);
   throw new Error('Unbekannte Ansicht.');
 }
+function syncSalesLeanHistory(id){
+  salesUser_(true);const result=salesLock_(()=>{
+    const isDraft=String(id).startsWith('draft_');let draft=null,companyId;
+    if(isDraft){draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.testOnly||!draft.hqId)throw new Error('Zuerst eigene Testfirma in HQ bestätigen.');companyId=String(salesId_(draft.hqId));}
+    else{companyId=String(salesId_(id));if(!salesLeanKnown_(companyId))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');}
+    const stored=salesRead_('sales_companies/'+companyId);if(!stored)throw new Error('Zuerst Kundendetails importieren.');salesAssertPrivate_();const started=Date.now();
+    const histories=salesCollect_('ContactHistories','companyId eq '+companyId,started),documents=salesCollect_('Documents','companyId eq '+companyId,started);
+    if([...histories,...documents].some(h=>Number(h.companyId)!==Number(companyId)))throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
+    stored.histories=salesHistoryRows_(histories,documents,[],started);stored.historyLoadedAt=salesNow_();salesWrite_('sales_companies/'+companyId,stored);
+    return {stored,draft,companyId};
+  });
+  const detail={...result.stored,histories:salesLeanHistories_(result.companyId,result.stored.histories)};
+  if(result.draft)detail.company={...detail.company,id:String(id),localDraftId:result.draft.id,hqId:result.companyId};
+  return {message:result.stored.histories.length+' HQ-Historieneinträge vollständig nach Firebase übertragen.',detail};
+}
 function getSalesLeanEdition(id){salesUser_();const e=salesRead_('sales_editions/'+salesKey_(id));if(!e)throw new Error('Ausgabe fehlt.');return e;}
-function saveSalesLeanEditionSettings(input){const result=saveSalesV1EditionSettings(input);return {...result,edition:salesLeanEdition_(result.edition)};}
+function saveSalesLeanEditionSettings(input){const result=saveSalesV1EditionSettings(input);return {...result,edition:salesLeanBookingRow_(result.edition)};}
 function syncSalesLeanCompany(id){
   salesUser_(true);id=String(salesId_(id));const own=salesLeanOwnDraft_(id);const result=salesLock_(()=>{
     salesAssertPrivate_();const draft=own?salesRead_('sales_drafts/'+salesKey_(own)):null;if(!salesLeanKnown_(id)&&!(draft?.testOnly&&String(draft.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
@@ -1697,4 +1769,27 @@ function mutateSalesLean(name,args){
   const job=salesRead_('sales_jobs/'+salesKey_(id)),draft=job?salesRead_('sales_drafts/'+salesKey_(job.draftId)):null;
   const localCompany=draft?salesLocalCompany_(draft,salesRead_('sales_meta/catalog'),job):null;
   return {...result,patch:{job:job?{...salesJobSummary_(job),...(job.kind==='history'?{history:job.history}:{})}:null,draft,localCompany},...(name==='saveSalesTestCompany'?{detail:{company:localCompany,contacts:[{...draft.contact,id:'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:'pending'}],histories:[],projects:[],detailVersion:3}}:{})};
+}
+
+/** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
+function getSalesStorageInventoryPage(input){
+  salesUser_(true);input=input||{};
+  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
+  const collection=input.collection||collections[0],index=collections.indexOf(collection),token=input.pageToken||'';
+  if(index<0||typeof token!=='string'||token.length>5000||/[\r\n]/.test(token))throw new Error('Ungültige Inventurseite.');
+  const c=salesContext_(),page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=50'+(token?'&pageToken='+encodeURIComponent(token):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
+  const refs=new Set(),groups={},result={collection,documents:0,payloadBytes:0,splitRoots:0,unreadable:0,oldest:null,newest:null,references:[],chunkGroups:[],next:null};
+  for(const doc of page.documents||[]){
+    if(!doc.name?.split('/documents/')[1]?.startsWith(collection+'/'))throw new Error('Inventurantwort passt nicht zur Sammlung.');
+    result.documents++;const text=doc.fields?.payload?.stringValue||'';result.payloadBytes+=Utilities.newBlob(text).getBytes().length;
+    if(doc.updateTime){if(!result.oldest||doc.updateTime<result.oldest)result.oldest=doc.updateTime;if(!result.newest||doc.updateTime>result.newest)result.newest=doc.updateTime;}
+    let value;try{value=JSON.parse(text);}catch(_){result.unreadable++;continue;}
+    if(value?.storageFormat==='sales-parts-v1'&&value.generation){result.splitRoots++;refs.add(value.generation);}
+    if(collection==='sales_chunks'){
+      const key=doc.name.split('/').pop(),match=/^(.+)-\d+$/.exec(key);if(match)groups[match[1]]=(groups[match[1]]||0)+1;else result.unreadable++;
+    }
+  }
+  result.references=Array.from(refs);result.chunkGroups=Object.entries(groups).map(([generation,count])=>({generation,count}));
+  result.next=page.nextPageToken?{collection,pageToken:page.nextPageToken}:index+1<collections.length?{collection:collections[index+1]}:null;
+  return result;
 }

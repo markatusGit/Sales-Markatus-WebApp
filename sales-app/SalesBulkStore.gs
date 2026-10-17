@@ -11,12 +11,14 @@ function salesBulkDecode_(doc){
   const path=doc.name.split('/documents/')[1];return salesDecodeStored_(path,doc.fields.payload.stringValue,salesContext_());
 }
 function salesBulkGet_(paths){
-  const result={};for(let i=0;i<paths.length;i+=100){
+  paths=Array.from(new Set(paths));const result={},cache=salesBulkStepCache_?.documents;
+  if(cache){for(const path of paths)if(cache.has(path))result[path]=cache.get(path);paths=paths.filter(path=>!cache.has(path));}
+  for(let i=0;i<paths.length;i+=100){
     const batch=paths.slice(i,i+100),reply=salesBulkRest_('batchGet',{documents:batch.map(salesBulkName_)});
     if(!Array.isArray(reply))throw new Error('Firebase-Sammelantwort fehlt.');
     const seen=new Set();for(const row of reply){const name=row.found?.name||row.missing;if(!name)continue;const path=name.split('/documents/')[1];if(!batch.includes(path)||seen.has(path))throw new Error('Firebase-Sammelantwort widersprüchlich.');seen.add(path);result[path]=row.found?salesBulkDecode_(row.found):null;}
     if(seen.size!==batch.length)throw new Error('Firebase-Sammelantwort unvollständig.');
-  }return result;
+  }if(cache)for(const [path,value] of Object.entries(result))cache.set(path,value);return result;
 }
 function salesBulkPayload_(path,value){
   const payload=JSON.stringify(value);if(Utilities.newBlob(payload).getBytes().length<=650000)return payload;
@@ -32,7 +34,9 @@ function salesBulkPut_(entries){
     const write={update:{name:salesBulkName_(e.path),fields}},size=Utilities.newBlob(JSON.stringify(write)).getBytes().length;
     if(writes.length>=100||bytes+size>4000000)flush();writes.push(write);bytes+=size;
   }flush();
+  if(salesBulkStepCache_){salesBulkStepCache_.rows.clear();for(const e of entries)salesBulkStepCache_.documents.set(e.path,e.value);}
   if(typeof salesLeanNamesUpdate_==='function')salesLeanNamesUpdate_(entries);
+  if(typeof salesLeanFiltersUpdate_==='function')salesLeanFiltersUpdate_(entries);
 }
 function salesBulkQuery_(collection,field,value){
   if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!['companyBucket','projectBucket'].includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
@@ -41,11 +45,14 @@ function salesBulkQuery_(collection,field,value){
     const query={from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
     if(last)query.startAt={values:[{referenceValue:last}],before:false};
     const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
-    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');out.push(salesBulkDecode_(doc));}if(docs.length<250)return out;last=docs[docs.length-1].name;
+    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const value=salesBulkDecode_(doc);out.push(value);if(salesBulkStepCache_)salesBulkStepCache_.documents.set(doc.name.split('/documents/')[1],value);}if(docs.length<250)return out;last=docs[docs.length-1].name;
   }throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
 }
 function salesBulkBucket_(id){return Number(id)>0?String(Number(id)%64):'none';}
+let salesBulkStepCache_=null;
 function salesBulkRows_(run,entity,field,bucket){
   const generation=run.entities[entity].generation;
-  return salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+  const key=[generation,entity,field,bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
+  const rows=salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+  if(cache)cache.set(key,rows);return rows;
 }

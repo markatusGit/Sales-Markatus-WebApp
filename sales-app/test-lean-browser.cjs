@@ -7,7 +7,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   await page.exposeFunction('fixtureRpc',(name,args)=>{calls.push({name,args});return JSON.parse(JSON.stringify(f.ctx[name](...args)));});
   await page.evaluate(()=>{window.auditTimers=[];const real=window.setInterval;window.setInterval=(fn,ms)=>{window.auditTimers.push({fn,ms});return real(fn,ms);};const chain=(ok,fail)=>new Proxy({},{get(_,name){if(name==='withSuccessHandler')return f=>chain(f,fail);if(name==='withFailureHandler')return f=>chain(ok,f);return (...args)=>window.fixtureRpc(name,args).then(ok,fail);}});window.google={script:{run:chain(()=>{},()=>{})}};});
   await page.setContent(fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8'));await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();
-  assert.deepEqual(calls.map(c=>c.name),['getSalesLeanState']);assert.deepEqual(await page.evaluate(()=>auditTimers.map(t=>t.ms)),[5000]);
+  assert.deepEqual(calls.map(c=>c.name),['getSalesLeanState']);assert.deepEqual(await page.evaluate(()=>auditTimers.map(t=>t.ms)),[]);
   for(let i=0;i<24;i++)await page.evaluate(()=>Promise.all(auditTimers.map(t=>t.fn())));
   assert.equal(calls.length,1,'No idle data polling or version checks on Home');
   await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByLabel('Nach Namen suchen',{exact:true}).waitFor();
@@ -24,7 +24,14 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   await page.getByLabel('Zielumsatz netto (€)',{exact:true}).fill('321');await page.getByRole('button',{name:'Für alle in Firebase speichern',exact:true}).click();
   await page.getByText('Ziel und Termine dieser Ausgabe für alle Nutzer gespeichert.',{exact:false}).waitFor();
   assert.ok(calls.some(c=>c.name==='saveSalesLeanEditionSettings'));assert.ok(!calls.some(c=>c.name==='getSalesV1State'));
+  const accessStart=calls.length;await page.getByLabel('Eine Adresse pro Zeile',{exact:false}).fill('pp@markatus.de\nsynthetic@example.invalid');await page.getByRole('button',{name:'Freigaben speichern',exact:true}).click();await page.getByText('E-Mail-Freigaben gespeichert.',{exact:true}).waitFor();
+  assert.deepEqual(calls.slice(accessStart).map(c=>c.name),['saveSalesAccess']);assert.ok((await page.getByLabel('Eine Adresse pro Zeile',{exact:false}).inputValue()).includes('synthetic@example.invalid'));
+  f.ctx.getSalesStorageInventoryPage=input=>({collection:input?.collection||'sales_meta',documents:1,payloadBytes:100,splitRoots:0,unreadable:0,references:[],chunkGroups:[],next:input?.collection?null:{collection:'sales_chunks'}});
+  const inventoryStart=calls.length;await page.getByRole('button',{name:'Bestandsaufnahme starten',exact:true}).click();await page.getByText('Teilstand · weitere Seiten fehlen',{exact:false}).waitFor();assert.equal(calls.length,inventoryStart+1);
+  await page.getByRole('button',{name:'Nächste Inventurseite lesen',exact:true}).click();await page.getByText('Durchlauf vollständig',{exact:false}).waitFor();assert.equal(calls.length,inventoryStart+2);assert.equal(calls.at(-1).name,'getSalesStorageInventoryPage');
   await page.getByRole('button',{name:'Mein Tag',exact:true}).click();await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();assert.ok((await page.locator('main').innerText()).includes('321,00'));
+  await page.getByRole('button',{name:'Magazinverkauf',exact:true}).click();await page.getByRole('heading',{name:'Magazinverkauf',exact:true}).waitFor();
+  const filterStart=calls.length;await page.getByLabel('Kunden suchen',{exact:true}).fill('Synthetic');await page.getByLabel('Historie',{exact:true}).selectOption('last5');assert.equal(calls.length,filterStart);
   assert.deepEqual(errors,[]);console.log('PASS idle has zero data calls; names search stays local; reopen uses cache; explicit refresh and settings patch stay scoped');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
