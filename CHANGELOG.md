@@ -4,6 +4,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+Dokumentation vom 17.10.2026: bestehende gemeinsame Namensliste, einmalige Aufbaukosten und Vor-/Nachteile einer künftigen Pflege beim Nachtabgleich erläutert. Kein Nachtlauf eingerichtet, keine Appänderung.
+
 Keine weiteren Appänderungen außerhalb des unten beschriebenen r20-Umfangs veröffentlicht. Die zurückgestellten Entscheidungen bleiben offen.
 
 ## [v0.20.0] – 2026-10-16
