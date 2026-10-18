@@ -43,13 +43,13 @@ function salesLeanNames_(){
     const again=salesRead_(path);if(again)return again.rows;
     // Once, on the first explicit Customers click: migrate the existing directory to names only.
     const map=new Map(salesV1Index_().entries.map(e=>[String(e.company.id),{id:String(e.company.id),name:e.company.name}]));
-    for(const d of salesList_('sales_drafts'))if(d.testOnly)map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
+    for(const d of salesList_('sales_drafts'))if(d.company)map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:map.get(String(d.hqId))?.name||d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
     const rows=Array.from(map.values());salesWrite_(path,{rows});return rows;
   });
 }
 function salesLeanNamesUpdate_(entries){
   const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>({id:String(e.value.company.id),name:e.value.company.name}));
-  for(const e of entries)if(/^sales_drafts\//.test(e.path)&&e.value.testOnly)changes.push({id:'draft_'+e.value.id,name:e.value.company.name,...(e.value.hqId?{hqId:String(e.value.hqId)}:{})});
+  for(const e of entries)if(/^sales_drafts\//.test(e.path)&&e.value.company)changes.push({id:'draft_'+e.value.id,name:e.value.company.name,...(e.value.hqId?{hqId:String(e.value.hqId)}:{})});
   if(!changes.length)return;const path='sales_meta/lean_names',old=salesRead_(path);if(!old)return;
   const map=new Map(old.rows.map(c=>[c.hqId||c.id,c]));let changed=false;
   for(let c of changes){const key=c.hqId||c.id;if(c.hqId&&map.delete(c.id))changed=true;const prior=map.get(key);if(!c.id.startsWith('draft_')&&prior?.id.startsWith('draft_'))c={...prior,name:c.name};if(JSON.stringify(prior)!==JSON.stringify(c)){map.set(key,c);changed=true;}}
@@ -85,7 +85,7 @@ function salesLeanAfterWrite_(path,value){
 }
 function salesLeanOwnDraft_(id){
   const path='sales_meta/lean_testowners',old=salesRead_(path);if(old)return old.rows[String(id)]||null;
-  return salesLock_(()=>{const again=salesRead_(path);if(again)return again.rows[String(id)]||null;const rows={};for(const d of salesList_('sales_drafts'))if(d.testOnly&&d.hqId)rows[String(d.hqId)]=d.id;salesWrite_(path,{rows});return rows[String(id)]||null;});
+  return salesLock_(()=>{const again=salesRead_(path);if(again)return again.rows[String(id)]||null;const rows={};for(const d of salesList_('sales_drafts'))if(d.hqId)rows[String(d.hqId)]=d.id;salesWrite_(path,{rows});return rows[String(id)]||null;});
 }
 function salesLeanHistories_(id,rows){
   const out=(rows||[]).map(h=>({...h,source:'hq'}));
@@ -105,13 +105,14 @@ function salesLeanKnown_(id){
 function getSalesLeanCompany(id){
   salesUser_();
   if(String(id).startsWith('draft_')){
-    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.testOnly)throw new Error('Firebase-Firma fehlt.');
+    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company)throw new Error('Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog'),local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     const contacts=draft.contact?[{...draft.contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
-    return {...(stored||{}),company:job?.state==='synced'&&stored?{...stored.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local,contacts:stored?.contacts?.length?stored.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:local}};
+    const visible=stored&&typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local;
+    return {...(visible||{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return getSalesLeanCompany('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
-  const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesLeanHistories_(id,stored.histories)}:null;
+  const stored=salesRead_('sales_companies/'+id);return stored?{...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
@@ -132,7 +133,7 @@ function getSalesLeanView(name,selectedId){
 function syncSalesLeanHistory(id){
   salesUser_(true);const result=salesLock_(()=>{
     const isDraft=String(id).startsWith('draft_');let draft=null,companyId;
-    if(isDraft){draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.testOnly||!draft.hqId)throw new Error('Zuerst eigene Testfirma in HQ bestätigen.');companyId=String(salesId_(draft.hqId));}
+    if(isDraft){draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company||!draft.hqId)throw new Error('Zuerst eigene Firma in HQ bestätigen.');companyId=String(salesId_(draft.hqId));}
     else{companyId=String(salesId_(id));if(!salesLeanKnown_(companyId))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');}
     const stored=salesRead_('sales_companies/'+companyId);if(!stored)throw new Error('Zuerst Kundendetails importieren.');salesAssertPrivate_();const started=Date.now();
     const histories=salesCollect_('ContactHistories','companyId eq '+companyId,started),documents=salesCollect_('Documents','companyId eq '+companyId,started);
@@ -148,20 +149,20 @@ function getSalesLeanEdition(id){salesUser_();const e=salesRead_('sales_editions
 function saveSalesLeanEditionSettings(input){const result=saveSalesV1EditionSettings(input);return {...result,edition:salesLeanBookingRow_(result.edition)};}
 function syncSalesLeanCompany(id){
   salesUser_(true);id=String(salesId_(id));const own=salesLeanOwnDraft_(id);const result=salesLock_(()=>{
-    salesAssertPrivate_();const draft=own?salesRead_('sales_drafts/'+salesKey_(own)):null;if(!salesLeanKnown_(id)&&!(draft?.testOnly&&String(draft.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
+    salesAssertPrivate_();const draft=own?salesRead_('sales_drafts/'+salesKey_(own)):null;if(!salesLeanKnown_(id)&&!(draft?.company&&String(draft.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
     // Existing complete HQ detail loader, with its membership check already satisfied by a direct lookup.
     return salesV1LoadCompany_(id,true);
   });result.detail.histories=salesLeanHistories_(id,result.detail.histories);return result;
 }
 function mutateSalesLean(name,args){
   salesUser_();if(!Array.isArray(args))throw new Error('Ungültige Parameter.');
-  const allowed={saveSalesTestCompany,saveSalesHistory,saveSalesCompanyChange,queueSalesContactEmail,queueSalesMarkerCleanup,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding};
+  const allowed={bindSalesCompanyResult,saveSalesCompany,saveSalesTestCompany,saveSalesHistory,saveSalesCompanyChange,queueSalesContactEmail,queueSalesMarkerCleanup,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding};
   if(!Object.prototype.hasOwnProperty.call(allowed,name))throw new Error('Aktion nicht freigegeben.');
   const result=allowed[name](...args),id=result.id||(['runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding'].includes(name)?args[0]:null);
   if(!id)return result;
-  const job=salesRead_('sales_jobs/'+salesKey_(id)),draft=job?salesRead_('sales_drafts/'+salesKey_(job.draftId)):null;
+  const job=salesRead_('sales_jobs/'+salesKey_(id)),draft=job?.draftId?salesRead_('sales_drafts/'+salesKey_(job.draftId)):null;
   const localCompany=draft?salesLocalCompany_(draft,salesRead_('sales_meta/catalog'),job):null;
-  return {...result,patch:{job:job?{...salesJobSummary_(job),...(job.kind==='history'?{history:job.history}:{})}:null,draft,localCompany},...(name==='saveSalesTestCompany'?{detail:{company:localCompany,contacts:[{...draft.contact,id:'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:'pending'}],histories:[],projects:[],detailVersion:3}}:{})};
+  return {...result,patch:{job:job?{...salesJobSummary_(job),...(job.kind==='history'?{history:job.history}:{})}:null,draft,localCompany},...(['saveSalesCompany','saveSalesTestCompany'].includes(name)?{detail:{company:localCompany,contacts:[{...draft.contact,id:'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:'pending'}],histories:[],projects:[],detailVersion:3}}:{})};
 }
 
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */

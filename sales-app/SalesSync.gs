@@ -42,8 +42,9 @@ function pauseSalesSync(id){
 function salesSyncWrite_(task){
   const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
   if(job.state==='synced'||job.state==='canceled')return;
+  if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
-  if(!draft?.testOnly||!/^TEST[ -]/i.test(draft.company?.name||'')||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Testziel. Auftrag nicht übertragen.');
+  if(!draft?.company||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Firmenziel. Auftrag nicht übertragen.');
   if(!['createCompany','history','companyChange','contactEmail','cleanupMarker'].includes(job.kind)||job.history?.contactHistoryChannel==='Task')throw new Error('Auftragsart nicht für den HQ-Sync freigegeben.');
   if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state))throw new Error('Auftrag '+job.state+': Ausgang oder Konflikt zuerst in der Auftragsübersicht klären. Kein erneuter Schreibversuch.');
   if(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company)return;

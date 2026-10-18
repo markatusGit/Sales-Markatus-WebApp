@@ -2,6 +2,8 @@
 
 Stand: 18.10.2026. Geprüfte Quellenbasis: r21 / v0.21.0 / Apps-Script-Version 32. Bestandsaufnahme und Vorschlag für die nächsten Bauabschnitte; keine Freigabe zusätzlicher HQ-Schreibwege oder Änderung von Zugriffsrechten. Kein neuer Live-Datenabruf für diesen Bericht.
 
+**Spätere Entscheidung vom 18.10.2026:** T01/T02/T03/T04/T06/T09 wurden anschließend ausdrücklich beauftragt; T04 auf Firmen, Adressen und Ansprechpartner eingegrenzt. Umsetzung r22 und Erklärung T05/T07/T08 in [KUNDENPFLEGE-R22.md](KUNDENPFLEGE-R22.md), aktueller Veröffentlichungsstand im [Projektüberblick](../PROJEKTUEBERBLICK.md). Die folgende Tabelle ist die erhaltene Bestandsaufnahme vor diesem Auftrag. Erster Ansprechpartner bleibt Pflicht; zusätzliche Kontakt-/Adressanlage und die übrigen Produktivlücken bleiben offen. T07/T08 weiterhin erhalten.
+
 ## 1. Was „mit echten Daten live“ hier bedeutet
 
 Die veröffentlichte App liest bereits echte HQ-Daten aus Firebase. Sie ist keine Oberfläche mit ersatzweise erfundenen Kunden. Der produktive Vertriebsablauf ist trotzdem noch unvollständig: Schreibziele sind an selbst angelegte TEST-Firmen gebunden, Teamzugang ist nicht nachgewiesen, Wiedervorlagen/Buchungserfassung/Redaktionsmeldung fehlen.

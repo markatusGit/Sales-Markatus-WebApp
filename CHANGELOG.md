@@ -6,7 +6,17 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L01–L14 anhand r21-Quellen sortiert, bestehende echte Lesefunktionen von Test-Schreibwegen und reinen Konzept-/Demofunktionen getrennt. Prioritäten und Abnahmekriterien für Teamzugang, echte Kundenarbeit und vollständigen Verkaufsablauf festgehalten; V1-Plan mit aktuellem Einstieg versehen. Kein Appumbau, keine Bereinigung oder Rechteänderung.
 
-Keine zusätzlichen Appänderungen außerhalb des nachfolgenden r21-Umfangs beauftragt. D17 und D21 bleiben erhalten; D22 umfasst eine lesende Inventur, keine Bereinigung oder neue Aufbewahrungsregel.
+Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Abschnitt dokumentiert. D17 und D21 bleiben erhalten; D22 umfasst weiterhin nur eine lesende Inventur.
+
+## [v0.22.0] – 2026-10-18
+
+- T01/T02: normale Firmenanlage ohne TEST-Präfix und ohne Testkategorie. Technische lokale Kennungen und Altaufträge bleiben kompatibel; erster Ansprechpartner bleibt Pflicht. Keine pauschale Umbenennung bestehender Daten.
+- T03: Kommunikation für gespeicherte Bestandskunden; serverseitige Firmen-/Kontaktbindung, Autor, eindeutige Übertragungskennung und Wiederholsicherheit. Kein E-Mail-Versand.
+- T04: dokumentierte Firmen-, Firmenart-/Nummern-, Adress- und Ansprechpartnerpflege anhand des öffentlichen HQ-v2-Schemas. Geänderte Felder als Firebase-Auftrag speichern und als kleine Änderungsantwort anzeigen; keine komplette Aktennachladung. Aktuelle unbeteiligte HQ-Felder erhalten, Konflikte und unklare Ausgänge prüfen. Offene lokale Änderungen überleben HQ-Importe. Projekte/Rechnungen bleiben lesbar; nicht dokumentiert schreibbare Beziehungen bleiben geschützt.
+- T06: neue Anlagen ohne sichtbaren Testmarker. Verlorene Firmen-POST-Antwort ohne ID sperrt den Auftrag bis zur ausdrücklich manuell geprüften HQ-ID-Zuordnung; keine automatische Namensübernahme und keine zweite Firmenanlage. Alte offene markierte Aufträge bleiben sicher verarbeitbar; keine pauschale Löschung/Bereinigung echter Daten.
+- T09: nicht versionierte lokale Demo, HTML-Wegweiser und Vorschau aus aktiver Ablage entfernt; nur ignorierte lokale Wiederherstellungskopie. README auf tatsächliche App umgestellt. Automatisierte synthetische Tests bleiben erhalten.
+- T05/T07/T08 mit Grenzen und Bedienabnahme in docs/KUNDENPFLEGE-R22.md erklärt. Zusätzliche Kontakt-/Adressanlage, neue Zusatzfelddefinitionen und weitere Vertriebs-/Teamfunktionen bleiben offen.
+- 18 Syntax-/Logik-/Browser-Prüfsuiten einschließlich zwölf neuer Produktivprüfungen erfolgreich; keine Live-Kundendaten für diese Tests verändert. Veröffentlichung und anschließender Codevergleich werden gesondert nachgewiesen. Keine neuen/geänderten Script Properties, Scopes oder Bereitstellungseinstellungen.
 
 ## [v0.21.0] – 2026-10-17
 

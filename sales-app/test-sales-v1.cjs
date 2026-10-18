@@ -107,7 +107,7 @@ test('history filters distinguish missing coverage, magazine scope, previous fiv
  editions[5].complete=false;assert.equal(sandbox.choose(editions,editions[6],'lapsed').unknown,true);
 });
 test('an imported additional contact can be selected only within the own TEST company',()=>{
- const f=setup(),draft=Object.values(f.db).find(v=>v.testOnly),input={draftId:draft.id,reason:'TEST contact',content:'Test',channel:'Meeting',contactOn:'2026-09-28T10:00:00Z',contactPersonId:203};
+ const f=setup(),draft=Object.values(f.db).find(v=>v.company&&v.contact),input={draftId:draft.id,reason:'TEST contact',content:'Test',channel:'Meeting',contactOn:'2026-09-28T10:00:00Z',contactPersonId:203};
  f.remote.ContactPersons[203]={id:203,companyId:101,firstName:'Other',lastName:'Test'};f.db['sales_companies/101'].contacts.push(f.remote.ContactPersons[203]);
  const h=f.ctx.saveSalesHistory(input);assert.equal(f.ctx.runSalesJob(h.id).state,'synced');assert.equal(f.remote.ContactHistories[303].contactPersonId,203);
  const again=f.ctx.saveSalesHistory(input),n=f.calls.length;f.remote.ContactPersons[203].companyId=102;assert.notEqual(f.ctx.runSalesJob(again.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));

@@ -1,5 +1,5 @@
   const companyCache=new Map(),loadedViews=new Set(),editionCache=new Map(),viewCache=new Map();
-  const leanMutations=new Set(['saveSalesTestCompany','saveSalesHistory','saveSalesCompanyChange','queueSalesContactEmail','queueSalesMarkerCleanup','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding']);
+  const leanMutations=new Set(['bindSalesCompanyResult','saveSalesCompany','saveSalesTestCompany','saveSalesHistory','saveSalesCompanyChange','queueSalesContactEmail','queueSalesMarkerCleanup','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding']);
   function mergeLean(patch){
     if(!patch)return;
     if(patch.lean){state.preferences=patch.preferences;state.editions=patch.editions.map(e=>editionCache.get(e.id)||e);state.edition=patch.edition;selectedEditionId=state.edition?.id||'';return;}

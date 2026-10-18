@@ -90,12 +90,13 @@ function salesBulkCompany_(run,task){
   const ids=Array.from(new Set([...docs,...histories].map(r=>r.projectId).filter(Boolean).concat(projects.map(p=>p.id)))).map(String);
   const rawProjects=salesBulkGet_(ids.map(id=>salesBulkCollection_('Projects')+'/'+id)),views=salesBulkGet_(projects.map(p=>'sales_projectviews/'+p.id)),byId={};
   Object.values(rawProjects).filter(v=>v&&v.generation===run.entities.Projects.generation).forEach(v=>{byId[v.row.id]=v.row;});
+  const prior=typeof salesBusinessView_==='function'?salesBulkGet_(companies.filter(c=>run.full||!run.changedCompanyIds||run.changedCompanyIds.includes(String(c.id))).map(c=>'sales_companies/'+c.id)):{};
   const entries=[];for(const raw of companies){
     if(!run.full&&run.changedCompanyIds&&!run.changedCompanyIds.includes(String(raw.id)))continue;
     const id=String(raw.id),company=salesCompany_(raw),cs=contacts.filter(c=>String(c.companyId)===id).map(salesContactView_),ds=docs.filter(d=>String(d.companyId)===id),hs=histories.filter(h=>String(h.companyId)===id).map(h=>salesHistory_(h,ds,byId));
     const ps=projects.filter(p=>String(p.companyId)===id).map(p=>{const v=views['sales_projectviews/'+p.id];if(!v||v.generation!==run.entities.Projects.generation)throw new Error('Projektübersicht fehlt; Kundenakte bleibt erhalten.');return v.row;});
-    const value={company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
-    entries.push({path:'sales_companies/'+id,value},{path:'sales_directory/'+id,value:{company,contacts:cs,loadedAt:value.loadedAt,explicit:false}});
+    const value={...(prior['sales_companies/'+id]?.pendingChanges?{pendingChanges:prior['sales_companies/'+id].pendingChanges}:{}),company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
+    const visible=typeof salesBusinessView_==='function'?salesBusinessView_(value):value;entries.push({path:'sales_companies/'+id,value},{path:'sales_directory/'+id,value:{company:visible.company,contacts:visible.contacts,loadedAt:value.loadedAt,explicit:false}});
   }
   salesBulkPut_(entries);run.stats.companies+=companies.length;run.stats.contacts+=contacts.filter(c=>companies.some(p=>Number(p.id)===Number(c.companyId))).length;run.stats.histories+=histories.filter(h=>companies.some(p=>Number(p.id)===Number(h.companyId))).length;return true;
 }

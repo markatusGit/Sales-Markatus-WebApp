@@ -105,5 +105,9 @@ test('ID pagination tolerates global counts and smaller pages; project deletions
 test('three unfinished server attempts stop instead of consuming quota forever',()=>{
  const f=bulkFixture();f.ctx.startSalesSync();const run=f.db['sales_meta/sync'];run.inFlight={key:'0::0:0:',attempts:3};const n=f.calls.length;f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.match(f.db['sales_meta/sync'].blockedMessage,/dreimal/);assert.equal(f.calls.length,n);assert.equal(f.triggers.length,0);
 });
+test('fresh HQ imports preserve pending local changes and projected names',()=>{
+ const f=bulkFixture();f.ctx.salesWrite_('sales_companies/102',{company:{id:'102',name:'Synthetic old'},contacts:[],pendingChanges:[{jobId:'synthetic-pending',entity:'company',targetId:102,change:{name:'Synthetic pending name'}}]});
+ f.finishBulk();const saved=f.ctx.salesRead_('sales_companies/102');assert.equal(saved.company.name,'Synthetic prospect');assert.equal(saved.pendingChanges.length,1);assert.equal(f.ctx.getSalesLeanCompany(102).company.name,'Synthetic pending name');assert.equal(f.ctx.salesRead_('sales_directory/102').company.name,'Synthetic pending name');
+});
 if(require.main===module){let count=0;for(const c of cases){c.fn();console.log('PASS',c.name);count++;}console.log(count+' bulk/worker checks passed.');}
 module.exports={bulkFixture};

@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-17-r21';
+const SALES_RELEASE = '2026-10-18-r22';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -203,7 +203,7 @@ function getSalesCompany(id) {
   salesUser_();
   if(typeof id==='string'&&id.startsWith('draft_')) {
     const draft=salesRead_('sales_drafts/'+salesKey_(id.slice(6)));
-    if(!draft?.testOnly) throw new Error('Firebase-Firma fehlt.');
+    if(!draft?.company) throw new Error('Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog');
     const local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     const contacts=draft.contact?[{...draft.contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
@@ -211,7 +211,7 @@ function getSalesCompany(id) {
       contacts:stored?.contacts?.length?stored.contacts:contacts,histories:draft.hqId?salesVisibleHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase'};
   }
   id=String(salesId_(id));const edition=salesRead_('sales_editions/'+SALES.edition),drafts=salesList_('sales_drafts');
-  const own=drafts.filter(d=>d.testOnly&&String(d.hqId)===id);
+  const own=drafts.filter(d=>String(d.hqId)===id);
   if(own.length>1)throw new Error('HQ-Firma ist mehreren Testentwürfen zugeordnet. Zuordnung zuerst prüfen.');
   if(own.length===1)return getSalesCompany('draft_'+own[0].id);
   if(!edition?.companies.some(c=>c.id===id)&&!drafts.some(d=>String(d.hqId)===id)) throw new Error('Firma gehört nicht zum freigegebenen Pilotbestand.');
@@ -266,7 +266,7 @@ function salesLocalCompany_(draft,catalog,job) {
 function syncSalesCompany(id) {
   salesUser_(true);id=String(salesId_(id));return salesLock_(()=>{
     const edition=salesRead_('sales_editions/'+SALES.edition),drafts=salesList_('sales_drafts');
-    if(!edition?.companies.some(c=>c.id===id)&&!drafts.some(d=>String(d.hqId)===id&&d.testOnly)) throw new Error('Firma gehört nicht zum Pilotbestand.');
+    if(!edition?.companies.some(c=>c.id===id)&&!drafts.some(d=>String(d.hqId)===id)) throw new Error('Firma gehört nicht zum Pilotbestand.');
     salesAssertPrivate_();const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
     const contacts=salesCollect_('ContactPersons','companyId eq '+id,started,'DefaultAddress'),histories=salesCollect_('ContactHistories','companyId eq '+id,started),projects=salesCollect_('Projects','companyId eq '+id,started);
     if([...contacts,...histories,...projects].some(x=>Number(x.companyId)!==Number(id))) throw new Error('HQ-Firmenfilter wurde nicht eingehalten.');
@@ -300,13 +300,12 @@ function saveSalesEditionSettings(input) {
 }
 
 function salesJobSummary_(j) {
-  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','contactId','conflict','steps','companyConfirmedAt','lastWrite']);
+  const out=salesPick_(j,['id','kind','draftId','name','state','createdAt','updatedAt','message','hqId','contactId','conflict','steps','companyConfirmedAt','lastWrite','markerMode','entity','targetId','business']);
   if(j.kind==='createCompany') {out.nextStep=j.companyConfirmedAt?'contact':'company';out.historyReady=salesHistoryReady_(salesRead_('sales_drafts/'+j.id),j);}
   return out;
 }
 function salesDraftInput_(input,catalog) {
   const name=salesText_(input.name,150,true);
-  if(!/^TEST[ -]/i.test(name)) throw new Error('Schreibtests müssen mit TEST beginnen.');
   const typeName=input.kind==='Kunde'?'Kunde':'Interessent',type=catalog.types.find(t=>t.name.toLowerCase()===typeName.toLowerCase());
   if(!type) throw new Error('HQ-Firmentyp '+typeName+' fehlt in den eingelesenen Auswahllisten.');
   const userId=salesId_(input.responsibleUserId);if(!catalog.users.some(u=>Number(u.id)===userId)) throw new Error('Verantwortlichen HQ-Benutzer auswählen.');
@@ -335,24 +334,24 @@ function salesSalutationForm_(value) {
 }
 function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
-    const value=salesDraftInput_(input,cat),id=Utilities.getUuid(),draft={id,testOnly:true,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
+    const value=salesDraftInput_(input,cat),id=Utilities.getUuid(),draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
     salesWrite_('sales_drafts/'+id,draft);
-    const job={id,kind:'createCompany',draftId:id,name:value.company.name,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
+    const job={id,kind:'createCompany',markerMode:'none',draftId:id,name:value.company.name,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
 }
 function getSalesJobPreview(id) {
-  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');const d=salesRead_('sales_drafts/'+job.draftId);
-  return {job:salesJobSummary_(job),company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Testfirma. Adressherkunft bleibt vorerst in Firebase. Kein Projekt-/Rechnungsschreibzugriff.'};
+  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,history:job.history,note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
+  return {job:salesJobSummary_(job),company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Firma. Adressherkunft bleibt vorerst in Firebase. Kein Projekt-/Rechnungsschreibzugriff.'};
 }
 function getSalesTestAudit(id) {
   salesUser_(true);const d=salesRead_('sales_drafts/'+salesKey_(id));
-  if(!d?.testOnly||!d.hqId||!/^TEST[ -]/i.test(d.company.name)) throw new Error('Nur eine eigene bestätigte Testfirma kann geprüft werden.');
+  if(!d?.company||!d.hqId) throw new Error('Nur eine eigene bestätigte Firma kann geprüft werden.');
   const actual=salesOne_('Companies',d.hqId),stored=salesRead_('sales_companies/'+d.hqId),website=salesWebsite_(actual),job=salesRead_('sales_jobs/'+d.id);
-  if(actual.name!==d.company.name) throw new Error('HQ-Ziel ist nicht mehr die eigene Testfirma.');
+  if(actual.name!==d.company.name) throw new Error('HQ-Ziel ist nicht mehr die eigene Firma.');
   let contactStatus=d.contact?'Noch nicht in HQ bestätigt':'Kein Ansprechpartner im Entwurf gespeichert.';
   if(d.contact&&job?.contactId){
     let contact=salesOne_('ContactPersons',job.contactId),addressNote='';
-    if(Number(contact.companyId)!==Number(d.hqId)) throw new Error('HQ-Kontakt gehört nicht zur gespeicherten Testfirma. Prüfung angehalten.');
+    if(Number(contact.companyId)!==Number(d.hqId)) throw new Error('HQ-Kontakt gehört nicht zur gespeicherten Firma. Prüfung angehalten.');
     if(contact.defaultAddressId&&!contact.defaultAddress){
       try {
         const expanded=salesHqGet_('/v2/ContactPersons/'+salesId_(job.contactId)+'?expand=DefaultAddress').data;
@@ -405,7 +404,7 @@ function salesContactAddressFields_(address) {
 }
 function salesContactEmailState_(draft,contactId) {
   const creation=salesRead_('sales_jobs/'+draft.id);
-  if(!draft.testOnly||!/^TEST[ -]/i.test(draft.company.name)||creation?.kind!=='createCompany'||Number(creation.hqId)!==Number(draft.hqId)||Number(creation.contactId)!==Number(contactId)) throw new Error('Kontakt ist nicht der selbst angelegte Ansprechpartner dieser Testfirma.');
+  if(!draft.company||creation?.kind!=='createCompany'||Number(creation.hqId)!==Number(draft.hqId)||Number(creation.contactId)!==Number(contactId)) throw new Error('Kontakt ist nicht der selbst angelegte Ansprechpartner dieser Firma.');
   const company=salesOne_('Companies',draft.hqId);
   if(company.name!==draft.company.name) throw new Error('HQ-Firmenzuordnung wurde verändert.');
   const contact=salesHqGet_('/v2/ContactPersons/'+salesId_(contactId)+'?expand=DefaultAddress,CustomFields').data;
@@ -435,7 +434,7 @@ function salesAssertOwnContactAddress_(draft,contactId,addressId) {
 }
 function queueSalesContactEmail(id) {
   salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(id)),creation=salesRead_('sales_jobs/'+id);
-    if(!draft?.testOnly||creation?.state!=='contactCreated'||!creation.contactId) throw new Error('Zuerst den eigenen Ansprechpartner anlegen. Diese Korrektur gilt nur für eine offene Kontakt-Rückprüfung.');
+    if(!draft?.company||creation?.state!=='contactCreated'||!creation.contactId) throw new Error('Zuerst den eigenen Ansprechpartner anlegen. Diese Korrektur gilt nur für eine offene Kontakt-Rückprüfung.');
     const existing=salesList_('sales_jobs').find(j=>j.kind==='contactEmail'&&j.draftId===id&&j.state!=='canceled');
     if(existing)return {id:existing.id,message:'Der E-Mail-Auftrag ist bereits vorhanden. Bitte dessen Ergebnis prüfen.'};
     const email=salesText_(draft.contact?.eMail,200,true),base=salesContactEmailState_(draft,creation.contactId);
@@ -478,7 +477,7 @@ function salesRunContactEmail_(job,draft) {
 }
 function queueSalesMarkerCleanup(id) {
   const user=salesUser_(true);return salesLock_(()=>{
-    const d=salesRead_('sales_drafts/'+salesKey_(id));if(!d?.testOnly||!d.hqId||!/^TEST[ -]/i.test(d.company.name)) throw new Error('Nur die eigene bestätigte Testfirma kann bereinigt werden.');
+    const d=salesRead_('sales_drafts/'+salesKey_(id));if(!d?.company||!d.hqId) throw new Error('Nur die eigene bestätigte Firma kann bereinigt werden.');
     const creation=salesRead_('sales_jobs/'+d.id);if(creation?.state!=='synced') throw new Error('Firmenanlage muss zuerst vollständig bestätigt sein.');
     const actual=salesOne_('Companies',d.hqId),marker='[Sales-Test '+d.id+']';
     if(actual.name!==d.company.name||String(actual.description||'').replace(/\r\n/g,'\n')!==[d.company.description,marker].filter(Boolean).join('\n')) throw new Error('Technische Kennzeichnung fehlt oder Beschreibung wurde verändert.');
@@ -491,7 +490,7 @@ function queueSalesMarkerCleanup(id) {
 function salesCompanyPut_(actual) {return salesPick_(actual,['name','industrialSector','description','homepage','iban','bic','vatId','financesChargeRateId','standardDeliveryConditionId','standardPaymentConditionId','debitorNumber','creditorNumber','documentDefaultMailEntityId','routingId','eInvoiceType']);}
 function salesCleanMarker_(job,draft) {
   const actual=salesOne_('Companies',job.hqId),desired=draft.company.description,marked=[desired,'[Sales-Test '+draft.id+']'].filter(Boolean).join('\n');
-  if(actual.name!==draft.company.name) throw new Error('Testfirma stimmt nicht mit dem HQ-Ziel überein.');
+  if(actual.name!==draft.company.name) throw new Error('Firma stimmt nicht mit dem HQ-Ziel überein.');
   const current=String(actual.description||'').replace(/\r\n/g,'\n');
   if(current===desired)return;
   if(current!==marked) throw new Error('Beschreibung wurde in HQ geändert. Keine automatische Bereinigung.');
@@ -508,6 +507,7 @@ function salesRunMarkerCleanup_(job,draft) {
 }
 function salesWriteHq_(job,path,method,body) {
   // Never accept an arbitrary destination or payload from the browser.
+  if(job.business===1)return salesBusinessTransport_(job,path,method,body);
   if(job.state!=='running') throw new Error('Kein laufender Auftrag.');
   const allowed=job.kind==='createCompany'&&((!job.hqId&&path==='/v2/Companies'&&method==='post')||(job.hqId&&path==='/v2/ContactPersons'&&method==='post'&&Number(body.companyId)===Number(job.hqId))) ||
     job.kind==='contactEmail'&&method==='put'&&path==='/v2/ContactPersons/'+job.contactId&&Number(salesRead_('sales_jobs/'+job.draftId)?.contactId)===Number(job.contactId)&&JSON.stringify(body)===JSON.stringify(job.targetContact?.payload) ||
@@ -516,7 +516,7 @@ function salesWriteHq_(job,path,method,body) {
     job.kind==='companyChange'&&method==='put'&&(path==='/v2/Companies/'+job.hqId||job.addressId&&path==='/v2/Companies/'+job.hqId+'/Addresses/'+job.addressId&&body.website===job.change.homepage);
   if(!allowed) throw new Error('Dieser HQ-Schreibpfad ist gesperrt.');
   const draft=salesRead_('sales_drafts/'+job.draftId);
-  if(!draft||!draft.testOnly||!/^TEST[ -]/i.test(draft.company.name)||job.hqId&&Number(draft.hqId)!==Number(job.hqId)) throw new Error('HQ-Schreibziel ist keine selbst angelegte Testfirma.');
+  if(!draft||!draft.company||job.hqId&&Number(draft.hqId)!==Number(job.hqId)) throw new Error('HQ-Schreibziel ist keine selbst angelegte Firma.');
   job.writeAttempted=true;job.phaseWriteAttempted=true;
   job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};
   salesWrite_('sales_jobs/'+job.id,job);
@@ -546,7 +546,7 @@ function salesRunJobLocked_(id,step) {
   salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
     if(job.state==='synced') return {message:'Bereits synchronisiert. Keine erneute Anlage.'};
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
-    const draft=salesRead_('sales_drafts/'+job.draftId);if(!draft?.testOnly) throw new Error('Testfirma fehlt.');
+    const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
     if(job.kind==='createCompany') {
       step=step||'company';
       if(!['company','contact'].includes(step)) throw new Error('Unbekannter Anlageschritt.');
@@ -555,7 +555,8 @@ function salesRunJobLocked_(id,step) {
     const priorState=job.state;
     job.state='running';job.safeStage=priorState;job.phaseWriteAttempted=false;job.updatedAt=salesNow_();job.message='Übertragung gestartet.';salesWrite_('sales_jobs/'+id,job);
     try {
-      if(job.kind==='createCompany') salesRunCreate_(job,draft,step);
+      if(job.business===1)salesBusinessRun_(job,false);
+      else if(job.kind==='createCompany') salesRunCreate_(job,draft,step);
       else if(job.kind==='history') salesRunHistory_(job,draft);
       else if(job.kind==='companyChange') salesRunChange_(job,draft);
       else if(job.kind==='cleanupMarker') salesRunMarkerCleanup_(job,draft);
@@ -563,7 +564,7 @@ function salesRunJobLocked_(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail','history'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+      if(['companyChange','contactEmail','history','entityChange'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
@@ -572,7 +573,7 @@ function salesRunJobLocked_(id,step) {
 function salesRunCreate_(job,draft,step) {
   if(!job.hqId) {
     // Marker persists in HQ for reconciliation after a lost response; no arbitrary name-based adoption.
-    const marker='[Sales-Test '+job.id+']';job.marker=marker;salesWrite_('sales_jobs/'+job.id,job);
+    const marker=job.markerMode==='none'?'':'[Sales-Test '+job.id+']';if(marker)job.marker=marker;salesWrite_('sales_jobs/'+job.id,job);
     const payload=Object.assign({},draft.company,{description:[draft.company.description,marker].filter(Boolean).join('\n')});
     const result=salesWriteHq_(job,'/v2/Companies','post',payload);job.hqId=salesId_(result&&result.id);draft.hqId=job.hqId;
     salesWrite_('sales_drafts/'+draft.id,draft);salesWrite_('sales_jobs/'+job.id,job);
@@ -612,7 +613,7 @@ function salesRunCreate_(job,draft,step) {
   }
   if(draft.contact&&!job.steps.contact){
     const contact=salesContactWithAddress_(job.contactId);
-    if(Number(contact.companyId)!==Number(job.hqId)) throw new Error('Ansprechpartner gehört in HQ nicht zur gespeicherten Testfirma.');
+    if(Number(contact.companyId)!==Number(job.hqId)) throw new Error('Ansprechpartner gehört in HQ nicht zur gespeicherten Firma.');
     const differences=salesContactDifferences_(contact,draft.contact);
     if(differences.length) throw new Error('Ansprechpartner noch nicht bestätigt. Abweichende Kontaktfelder: '+differences.join(', ')+'. Bitte auf der Daten-Testseite „Homepage in HQ prüfen“ ausführen und den Text bei „Ansprechpartner“ mitteilen.');
     job.steps.contact=true;salesWrite_('sales_jobs/'+job.id,job);
@@ -624,8 +625,7 @@ function salesRunCreate_(job,draft,step) {
   if(!(actual.responsibleUsers||[]).some(u=>Number(u.userId||u.id)===Number(draft.company.responsibleUserIds[0]))) throw new Error('Verantwortlicher HQ-Benutzer wurde noch nicht bestätigt.');
   if(!(actual.subsystems||[]).some(s=>Number(s.id)===Number(draft.company.subsystemIds[0]))) throw new Error('HQ-Unternehmensbereich wurde noch nicht bestätigt.');
   if((draft.company.customFields||[]).some(f=>!(actual.customFields||[]).some(a=>a.name===f.name&&String(a.value)===String(f.value)))) throw new Error('Eigene Felder stimmen nicht überein.');
-  salesCleanMarker_(job,draft);
-  job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);
+  if(job.markerMode!=='none'){salesCleanMarker_(job,draft);job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);}
   const cleanCompany=salesOne_('Companies',job.hqId);
   if(!salesHomepageConfirmed_(cleanCompany,draft.company.homepage)||!salesEqualFields_(cleanCompany.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Homepage oder Adresse nach Bereinigung in HQ nicht mehr bestätigt.');
   const stored=salesRead_('sales_companies/'+job.hqId)||{histories:[],projects:[]};
@@ -639,7 +639,7 @@ function salesPrepareSalutationRetry_(job,draft) {
   // timeout, another endpoint/status, an already fixed payload or a known contact.
   if(job.state!=='uncertain'||job.kind!=='createCompany'||!job.contactAttempted||job.contactId||job.steps?.contact||job.markerCleanupAttempted||draft.contact?.salutationForm||job.salutationRetryPreparedAt||
      rejection?.method!=='POST'||rejection.resource!=='/v2/ContactPersons'||rejection.status!==400||!rejection.fields?.includes('salutationForm')) return false;
-  if(!draft.contact||!draft.testOnly||!/^TEST[ -]/i.test(draft.company.name)||!job.companyConfirmedAt||!job.steps?.company||!job.hqId||Number(draft.hqId)!==Number(job.hqId)) throw new Error('Firmenzuordnung für die Kontaktkorrektur nicht bestätigt. Auftrag bleibt gesperrt.');
+  if(!draft.contact||!draft.company||!job.companyConfirmedAt||!job.steps?.company||!job.hqId||Number(draft.hqId)!==Number(job.hqId)) throw new Error('Firmenzuordnung für die Kontaktkorrektur nicht bestätigt. Auftrag bleibt gesperrt.');
   const actual=salesOne_('Companies',job.hqId),marked=[draft.company.description,'[Sales-Test '+job.id+']'].filter(Boolean).join('\n');
   if(actual.name!==draft.company.name||String(actual.description||'').replace(/\r\n/g,'\n')!==marked) throw new Error('HQ-Firma oder Testkennung inzwischen verändert. Auftrag bleibt gesperrt.');
   const contacts=salesCollect_('ContactPersons','companyId eq '+job.hqId,Date.now());
@@ -654,8 +654,8 @@ function salesPrepareSalutationRetry_(job,draft) {
 }
 function reconcileSalesJob(id) {
   salesUser_(true);return salesLock_(()=>{const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job||!['uncertain','running'].includes(job.state)) throw new Error('Kein unklarer Auftrag.');
-    const draft=salesRead_('sales_drafts/'+job.draftId);if(!draft?.testOnly) throw new Error('Testfirma fehlt.');
-    if(job.kind==='contactEmail') {
+    const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
+    if(job.business===1){salesBusinessRun_(job,true);if(job.state!=='conflict'){job.state='synced';job.message='HQ-Ergebnis nur lesend bestätigt.';}}else if(job.kind==='contactEmail') {
       const current=salesContactEmailState_(draft,job.contactId);
       if(!salesContactEmailEqual_(current,job.targetContact)) throw new Error('E-Mail-Korrektur in HQ noch nicht vollständig bestätigt. Kein weiterer Schreibversuch freigegeben.');
       job.state='synced';job.message='E-Mail-Korrektur nur lesend bestätigt. Jetzt den ursprünglichen Anlageauftrag abschließen.';
@@ -670,7 +670,8 @@ function reconcileSalesJob(id) {
         else throw new Error('Beschreibung in HQ verändert. Auftrag bleibt gesperrt.');
         job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);return salesJobSummary_(job);
       }
-      const list=salesCollect_('Companies',"name eq '"+draft.company.name.replace(/'/g,"''")+"'",Date.now()).filter(x=>x.name===draft.company.name&&(x.description||'').includes('[Sales-Test '+job.id+']'));
+      if(job.markerMode==='none'&&!job.hqId)throw new Error('HQ-Antwort ohne gespeicherte Firmen-ID. Auftrag bleibt gesperrt. HQ manuell prüfen; keine automatische Namenszuordnung oder erneute Anlage.');
+      const list=job.markerMode==='none'?[salesOne_('Companies',job.hqId)]:salesCollect_('Companies',"name eq '"+draft.company.name.replace(/'/g,"''")+"'",Date.now()).filter(x=>x.name===draft.company.name&&(x.description||'').includes('[Sales-Test '+job.id+']'));
       if(list.length!==1) throw new Error('Keine eindeutige Firmenanlage gefunden. Auftrag bleibt gesperrt; HQ manuell prüfen.');
       const found=list[0];if(job.hqId&&Number(job.hqId)!==Number(found.id)) throw new Error('Abweichende HQ-ID.');job.hqId=salesId_(found.id);draft.hqId=job.hqId;salesWrite_('sales_drafts/'+draft.id,draft);
       if(draft.contact&&job.contactAttempted) {
@@ -680,7 +681,7 @@ function reconcileSalesJob(id) {
       job.state='ready';job.message='Gefundene HQ-Anlage zugeordnet. Fortsetzen führt die Rückprüfung und nur noch ausstehende Schritte aus.';
     } else if(job.kind==='cleanupMarker') {
       const checked=salesOne_('Companies',job.hqId),marker=[draft.company.description,'[Sales-Test '+draft.id+']'].filter(Boolean).join('\n');
-      if(checked.name!==draft.company.name) throw new Error('HQ-Ziel stimmt nicht mit der Testfirma überein.');
+      if(checked.name!==draft.company.name) throw new Error('HQ-Ziel stimmt nicht mit der Firma überein.');
       if(String(checked.description||'')===draft.company.description) {job.state='synced';job.message='Beschreibung in HQ bereinigt und bestätigt.';}
       else if(String(checked.description||'').replace(/\r\n/g,'\n')===marker) {job.state='ready';job.message='Technische Kennzeichnung noch vorhanden. Bereinigung kann fortgesetzt werden.';}
       else throw new Error('Beschreibung wurde in HQ verändert. Auftrag bleibt gesperrt.');
@@ -690,7 +691,7 @@ function reconcileSalesJob(id) {
       job.state='synced';job.message='Historieneintrag in HQ nur lesend bestätigt. Kein weiterer Schreibversuch.';
     } else if(job.kind==='companyChange') {
       const actual=salesOne_('Companies',job.hqId),website=actual.defaultAddress?.website||'';
-      if(actual.name!==draft.company.name) throw new Error('HQ-Ziel stimmt nicht mit der Testfirma überein.');
+      if(actual.name!==draft.company.name) throw new Error('HQ-Ziel stimmt nicht mit der Firma überein.');
       if(actual.industrialSector===job.change.industrialSector&&(actual.homepage||'')===job.change.homepage&&website===job.change.homepage || actual.industrialSector===job.change.industrialSector&&!(actual.homepage||'')&&website===job.change.homepage) {job.state='synced';job.message='Homepage und Branche in HQ bestätigt.';}
       else if([job.base.industrialSector,job.change.industrialSector].includes(actual.industrialSector)&&[job.base.homepage,job.change.homepage].includes(actual.homepage||'')&&[job.baseAddressWebsite||'',job.change.homepage].includes(website)) {job.state='ready';job.message='Teilübertragung geprüft. Offene Schritte kontrolliert fortsetzen.';}
       else throw new Error('HQ-Werte weichen vom Auftrag ab. Auftrag bleibt gesperrt.');
@@ -702,7 +703,7 @@ function salesHistoryDate_(raw) {
   return new Date(Math.floor(Date.parse(raw)/1000)*1000).toISOString();
 }
 function salesHistoryCompanyBinding_(draft,creation) {
-  if(!draft?.testOnly||!/^TEST[ -]/i.test(draft.company?.name||'')||creation?.kind!=='createCompany'||creation.id!==draft.id||!draft.hqId||Number(creation.hqId)!==Number(draft.hqId)||!creation.steps?.company||!creation.companyConfirmedAt||creation.state==='canceled')throw new Error('Eigene HQ-Firmenzuordnung zuerst bestätigen. Anlageauftrag öffnen; keine neue Firma anlegen.');
+  if(!draft?.company||creation?.kind!=='createCompany'||creation.id!==draft.id||!draft.hqId||Number(creation.hqId)!==Number(draft.hqId)||!creation.steps?.company||!creation.companyConfirmedAt||creation.state==='canceled')throw new Error('Eigene HQ-Firmenzuordnung zuerst bestätigen. Anlageauftrag öffnen; keine neue Firma anlegen.');
 }
 function salesHistoryReady_(draft,creation) {
   try{salesHistoryCompanyBinding_(draft,creation);}catch(_){return false;}
@@ -733,9 +734,9 @@ function checkSalesHistoryBinding(draftId) {
   });
 }
 function saveSalesHistory(input) {
-  const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const draft=salesRead_('sales_drafts/'+salesKey_(input.draftId)),creation=salesRead_('sales_jobs/'+input.draftId);
+  const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const general=input.companyId!==undefined&&!input.draftId,data=general?salesBusinessKnown_(input.companyId):null,draft=general?{hqId:salesId_(input.companyId),company:data.company}:salesRead_('sales_drafts/'+salesKey_(input.draftId)),creation=general?null:salesRead_('sales_jobs/'+input.draftId);
     // Capturing is Firebase-only. The HQ read-back belongs to the later transfer.
-    salesHistoryCompanyBinding_(draft,creation);
+    if(!general)salesHistoryCompanyBinding_(draft,creation);
     const history={reason:salesText_(input.reason,200,true),content:salesText_(input.content,10000,true),contactOn:salesHistoryDate_(input.channel==='Mail'?salesNow_():input.contactOn||salesNow_()),contactHistoryChannel:input.channel,companyId:draft.hqId};
     if(!['Note','Mail','Call','Meeting','Visit'].includes(history.contactHistoryChannel)) throw new Error('Unzulässige Kontaktart. Aufgaben werden später über awork angebunden.');
     if(input.channel==='Call'){
@@ -748,22 +749,23 @@ function saveSalesHistory(input) {
       history.recipientEmailAddress=Array.from(new Set(emails)).join(',');
     }
     if(['Call','Meeting','Visit'].includes(input.channel)){
-      const contactId=input.contactPersonId||(input.contactTarget==='contact'?creation.contactId:null);
+      const contactId=input.contactPersonId||(input.contactTarget==='contact'?creation?.contactId:null);
       const contacts=salesRead_('sales_companies/'+draft.hqId)?.contacts||[];
-      if(!contactId||Number(contactId)!==Number(creation.contactId)&&!contacts.some(c=>Number(c.id)===Number(contactId)&&Number(c.companyId)===Number(draft.hqId)))throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
+      if(!contactId||Number(contactId)!==Number(creation?.contactId)&&!contacts.some(c=>Number(c.id)===Number(contactId)&&Number(c.companyId)===Number(draft.hqId)))throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
       history.contactPersonId=salesId_(contactId);
     }
-    const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',draftId:draft.id,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
+    const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',...(general?{business:1}:{}),draftId:draft.id||null,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
 function salesHistoryTarget_(job,draft) {
+  if(job.business===1){salesBusinessKnown_(job.hqId);salesOne_('Companies',job.hqId);}else{
   const creation=salesRead_('sales_jobs/'+draft.id);
-  if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Testfirma.');
-  salesCheckHistoryBinding_(draft,creation);
+  if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Firma.');
+  salesCheckHistoryBinding_(draft,creation);}
   const allowed=['reason','content','contactOn','contactHistoryChannel','contactHistoryStatus','companyId','contactPersonId','syncId','recipientEmailAddress'];
   if(Object.keys(job.history).some(k=>!allowed.includes(k))||!['Note','Mail','Call','Meeting','Visit'].includes(job.history.contactHistoryChannel)||Number(job.history.companyId)!==Number(job.hqId)||job.history.syncId!=='sales-'+job.id)throw new Error('Historienauftrag enthält unzulässige Zielfelder. Aufgaben werden nicht mehr nach HQ übertragen.');
   if(job.history.contactPersonId){
     const contact=salesOne_('ContactPersons',job.history.contactPersonId);
-    if(Number(contact.companyId)!==Number(job.hqId))throw new Error('Ansprechpartner gehört nicht mehr zur Testfirma.');
+    if(Number(contact.companyId)!==Number(job.hqId))throw new Error('Ansprechpartner gehört nicht mehr zur Firma.');
   }
 }
 function salesHistoryDifferences_(actual,expected) {
@@ -794,7 +796,7 @@ function salesRunHistory_(job,draft) {
   salesConfirmHistory_(job);
 }
 function saveSalesCompanyChange(input) {
-  const user=salesUser_();return salesLock_(()=>{const d=salesRead_('sales_drafts/'+salesKey_(input.draftId));if(!d?.testOnly||!d.hqId) throw new Error('Nur eigene Testfirmen können geändert werden.');
+  const user=salesUser_();return salesLock_(()=>{const d=salesRead_('sales_drafts/'+salesKey_(input.draftId));if(!d?.company||!d.hqId) throw new Error('Nur eigene Firmen können geändert werden.');
     const data=salesRead_('sales_companies/'+d.hqId);if(!data) throw new Error('Zuerst Firmendetails importieren.');
     const industry=salesText_(input.industrialSector,150,false),known=salesRead_('sales_meta/catalog')?.industries||[];
     if(industry&&!known.includes(industry)&&industry!==data.company.industrialSector) throw new Error('Bitte eine Branche aus der aktuellen HQ-Auswahlliste wählen.');
@@ -813,7 +815,7 @@ function salesAddressForWrite_(actual) {
 }
 function salesRunChange_(job) {
   const actual=salesOne_('Companies',job.hqId),draft=salesRead_('sales_drafts/'+job.draftId);
-  if(!draft?.testOnly||actual.name!==draft.company.name||!/^TEST[ -]/i.test(actual.name)) throw new Error('Ziel ist keine eigene Testfirma mehr.');
+  if(!draft?.company||actual.name!==draft.company.name) throw new Error('Ziel ist keine eigene Firma mehr.');
   const website=actual.defaultAddress?.website||'',companyCompatible=Object.keys(job.change).every(k=>[String(job.base[k]??''),String(job.change[k]??'')].includes(String(actual[k]??''))),addressCompatible=[job.baseAddressWebsite||'',job.change.homepage].includes(website);
   if(!companyCompatible||!addressCompatible) {job.state='conflict';job.conflict={before:{...job.base,addressWebsite:job.baseAddressWebsite||''},app:{...job.change,addressWebsite:job.change.homepage},hq:{...salesPick_(actual,Object.keys(job.change)),addressWebsite:website}};job.message='HQ und App unterscheiden sich. Bitte entscheiden.';return;}
   const addressNeedsWrite=website!==job.change.homepage;
@@ -829,7 +831,11 @@ function salesRunChange_(job) {
 function salesHomepageConfirmed_(actual,expected) {return String(actual.homepage||'')===expected||!!expected&&!actual.homepage&&String(actual.defaultAddress?.website||'')===expected;}
 function resolveSalesConflict(id,choice) {
   salesUser_(true);return salesLock_(()=>{const j=salesRead_('sales_jobs/'+salesKey_(id));if(j?.state!=='conflict') throw new Error('Kein offener Konflikt.');
-    if(choice==='hq') {j.state='canceled';j.message='HQ-Wert behalten. App-Änderung verworfen.';}
+    if(j.business===1){
+      if(choice==='hq'){j.state='canceled';const actual=salesBusinessTarget_(j.hqId,j.entity,j.targetId);salesBusinessFinish_(j,actual);j.message='HQ-Werte behalten.';}
+      else if(choice==='app'){j.base=j.conflict.hq;j.state='pending';j.writeAttempted=false;j.message='App-Werte ausgewählt. HQ wird vor dem Schreiben erneut geprüft.';}
+      else throw new Error('Bitte HQ oder App wählen.');
+    }else if(choice==='hq') {j.state='canceled';j.message='HQ-Wert behalten. App-Änderung verworfen.';}
     else if(choice==='app') {j.base=salesPick_(j.conflict.hq,['industrialSector','homepage']);j.baseAddressWebsite=j.conflict.hq.addressWebsite||'';j.state='pending';j.message='App-Werte ausgewählt. Beim nächsten Abgleich wird HQ erneut auf weitere Änderungen geprüft.';}
     else throw new Error('Bitte HQ oder App wählen.');j.conflict=null;j.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,j);return salesJobSummary_(j);});
 }
@@ -883,7 +889,7 @@ function getSalesV1State(){
   return {...state,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
 }
 function getSalesV1Company(id){
-  salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);
+  salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>String(d.hqId)===String(id)))return getSalesCompany(id);
   id=String(salesId_(id));if(!salesV1Known_(id))throw new Error('Firma ist noch nicht ausdrücklich in den App-Bestand aufgenommen.');
   const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesVisibleHistories_(id,stored.histories)}:null;
 }
@@ -942,7 +948,7 @@ function saveSalesV1EditionSettings(input){
   });
 }
 function salesV1Scope_(id){
-  id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
+  id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
 }
 function salesV1LoadCompany_(id,alreadyChecked){
   id=alreadyChecked?String(salesId_(id)):salesV1Scope_(id);const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
@@ -1072,8 +1078,9 @@ function pauseSalesSync(id){
 function salesSyncWrite_(task){
   const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
   if(job.state==='synced'||job.state==='canceled')return;
+  if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
-  if(!draft?.testOnly||!/^TEST[ -]/i.test(draft.company?.name||'')||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Testziel. Auftrag nicht übertragen.');
+  if(!draft?.company||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Firmenziel. Auftrag nicht übertragen.');
   if(!['createCompany','history','companyChange','contactEmail','cleanupMarker'].includes(job.kind)||job.history?.contactHistoryChannel==='Task')throw new Error('Auftragsart nicht für den HQ-Sync freigegeben.');
   if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state))throw new Error('Auftrag '+job.state+': Ausgang oder Konflikt zuerst in der Auftragsübersicht klären. Kein erneuter Schreibversuch.');
   if(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company)return;
@@ -1349,12 +1356,13 @@ function salesBulkCompany_(run,task){
   const ids=Array.from(new Set([...docs,...histories].map(r=>r.projectId).filter(Boolean).concat(projects.map(p=>p.id)))).map(String);
   const rawProjects=salesBulkGet_(ids.map(id=>salesBulkCollection_('Projects')+'/'+id)),views=salesBulkGet_(projects.map(p=>'sales_projectviews/'+p.id)),byId={};
   Object.values(rawProjects).filter(v=>v&&v.generation===run.entities.Projects.generation).forEach(v=>{byId[v.row.id]=v.row;});
+  const prior=typeof salesBusinessView_==='function'?salesBulkGet_(companies.filter(c=>run.full||!run.changedCompanyIds||run.changedCompanyIds.includes(String(c.id))).map(c=>'sales_companies/'+c.id)):{};
   const entries=[];for(const raw of companies){
     if(!run.full&&run.changedCompanyIds&&!run.changedCompanyIds.includes(String(raw.id)))continue;
     const id=String(raw.id),company=salesCompany_(raw),cs=contacts.filter(c=>String(c.companyId)===id).map(salesContactView_),ds=docs.filter(d=>String(d.companyId)===id),hs=histories.filter(h=>String(h.companyId)===id).map(h=>salesHistory_(h,ds,byId));
     const ps=projects.filter(p=>String(p.companyId)===id).map(p=>{const v=views['sales_projectviews/'+p.id];if(!v||v.generation!==run.entities.Projects.generation)throw new Error('Projektübersicht fehlt; Kundenakte bleibt erhalten.');return v.row;});
-    const value={company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
-    entries.push({path:'sales_companies/'+id,value},{path:'sales_directory/'+id,value:{company,contacts:cs,loadedAt:value.loadedAt,explicit:false}});
+    const value={...(prior['sales_companies/'+id]?.pendingChanges?{pendingChanges:prior['sales_companies/'+id].pendingChanges}:{}),company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
+    const visible=typeof salesBusinessView_==='function'?salesBusinessView_(value):value;entries.push({path:'sales_companies/'+id,value},{path:'sales_directory/'+id,value:{company:visible.company,contacts:visible.contacts,loadedAt:value.loadedAt,explicit:false}});
   }
   salesBulkPut_(entries);run.stats.companies+=companies.length;run.stats.contacts+=contacts.filter(c=>companies.some(p=>Number(p.id)===Number(c.companyId))).length;run.stats.histories+=histories.filter(h=>companies.some(p=>Number(p.id)===Number(h.companyId))).length;return true;
 }
@@ -1650,13 +1658,13 @@ function salesLeanNames_(){
     const again=salesRead_(path);if(again)return again.rows;
     // Once, on the first explicit Customers click: migrate the existing directory to names only.
     const map=new Map(salesV1Index_().entries.map(e=>[String(e.company.id),{id:String(e.company.id),name:e.company.name}]));
-    for(const d of salesList_('sales_drafts'))if(d.testOnly)map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
+    for(const d of salesList_('sales_drafts'))if(d.company)map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:map.get(String(d.hqId))?.name||d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
     const rows=Array.from(map.values());salesWrite_(path,{rows});return rows;
   });
 }
 function salesLeanNamesUpdate_(entries){
   const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>({id:String(e.value.company.id),name:e.value.company.name}));
-  for(const e of entries)if(/^sales_drafts\//.test(e.path)&&e.value.testOnly)changes.push({id:'draft_'+e.value.id,name:e.value.company.name,...(e.value.hqId?{hqId:String(e.value.hqId)}:{})});
+  for(const e of entries)if(/^sales_drafts\//.test(e.path)&&e.value.company)changes.push({id:'draft_'+e.value.id,name:e.value.company.name,...(e.value.hqId?{hqId:String(e.value.hqId)}:{})});
   if(!changes.length)return;const path='sales_meta/lean_names',old=salesRead_(path);if(!old)return;
   const map=new Map(old.rows.map(c=>[c.hqId||c.id,c]));let changed=false;
   for(let c of changes){const key=c.hqId||c.id;if(c.hqId&&map.delete(c.id))changed=true;const prior=map.get(key);if(!c.id.startsWith('draft_')&&prior?.id.startsWith('draft_'))c={...prior,name:c.name};if(JSON.stringify(prior)!==JSON.stringify(c)){map.set(key,c);changed=true;}}
@@ -1692,7 +1700,7 @@ function salesLeanAfterWrite_(path,value){
 }
 function salesLeanOwnDraft_(id){
   const path='sales_meta/lean_testowners',old=salesRead_(path);if(old)return old.rows[String(id)]||null;
-  return salesLock_(()=>{const again=salesRead_(path);if(again)return again.rows[String(id)]||null;const rows={};for(const d of salesList_('sales_drafts'))if(d.testOnly&&d.hqId)rows[String(d.hqId)]=d.id;salesWrite_(path,{rows});return rows[String(id)]||null;});
+  return salesLock_(()=>{const again=salesRead_(path);if(again)return again.rows[String(id)]||null;const rows={};for(const d of salesList_('sales_drafts'))if(d.hqId)rows[String(d.hqId)]=d.id;salesWrite_(path,{rows});return rows[String(id)]||null;});
 }
 function salesLeanHistories_(id,rows){
   const out=(rows||[]).map(h=>({...h,source:'hq'}));
@@ -1712,13 +1720,14 @@ function salesLeanKnown_(id){
 function getSalesLeanCompany(id){
   salesUser_();
   if(String(id).startsWith('draft_')){
-    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.testOnly)throw new Error('Firebase-Firma fehlt.');
+    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company)throw new Error('Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog'),local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     const contacts=draft.contact?[{...draft.contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
-    return {...(stored||{}),company:job?.state==='synced'&&stored?{...stored.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local,contacts:stored?.contacts?.length?stored.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:local}};
+    const visible=stored&&typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local;
+    return {...(visible||{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return getSalesLeanCompany('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
-  const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesLeanHistories_(id,stored.histories)}:null;
+  const stored=salesRead_('sales_companies/'+id);return stored?{...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
@@ -1739,7 +1748,7 @@ function getSalesLeanView(name,selectedId){
 function syncSalesLeanHistory(id){
   salesUser_(true);const result=salesLock_(()=>{
     const isDraft=String(id).startsWith('draft_');let draft=null,companyId;
-    if(isDraft){draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.testOnly||!draft.hqId)throw new Error('Zuerst eigene Testfirma in HQ bestätigen.');companyId=String(salesId_(draft.hqId));}
+    if(isDraft){draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company||!draft.hqId)throw new Error('Zuerst eigene Firma in HQ bestätigen.');companyId=String(salesId_(draft.hqId));}
     else{companyId=String(salesId_(id));if(!salesLeanKnown_(companyId))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');}
     const stored=salesRead_('sales_companies/'+companyId);if(!stored)throw new Error('Zuerst Kundendetails importieren.');salesAssertPrivate_();const started=Date.now();
     const histories=salesCollect_('ContactHistories','companyId eq '+companyId,started),documents=salesCollect_('Documents','companyId eq '+companyId,started);
@@ -1755,20 +1764,20 @@ function getSalesLeanEdition(id){salesUser_();const e=salesRead_('sales_editions
 function saveSalesLeanEditionSettings(input){const result=saveSalesV1EditionSettings(input);return {...result,edition:salesLeanBookingRow_(result.edition)};}
 function syncSalesLeanCompany(id){
   salesUser_(true);id=String(salesId_(id));const own=salesLeanOwnDraft_(id);const result=salesLock_(()=>{
-    salesAssertPrivate_();const draft=own?salesRead_('sales_drafts/'+salesKey_(own)):null;if(!salesLeanKnown_(id)&&!(draft?.testOnly&&String(draft.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
+    salesAssertPrivate_();const draft=own?salesRead_('sales_drafts/'+salesKey_(own)):null;if(!salesLeanKnown_(id)&&!(draft?.company&&String(draft.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
     // Existing complete HQ detail loader, with its membership check already satisfied by a direct lookup.
     return salesV1LoadCompany_(id,true);
   });result.detail.histories=salesLeanHistories_(id,result.detail.histories);return result;
 }
 function mutateSalesLean(name,args){
   salesUser_();if(!Array.isArray(args))throw new Error('Ungültige Parameter.');
-  const allowed={saveSalesTestCompany,saveSalesHistory,saveSalesCompanyChange,queueSalesContactEmail,queueSalesMarkerCleanup,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding};
+  const allowed={bindSalesCompanyResult,saveSalesCompany,saveSalesTestCompany,saveSalesHistory,saveSalesCompanyChange,queueSalesContactEmail,queueSalesMarkerCleanup,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding};
   if(!Object.prototype.hasOwnProperty.call(allowed,name))throw new Error('Aktion nicht freigegeben.');
   const result=allowed[name](...args),id=result.id||(['runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding'].includes(name)?args[0]:null);
   if(!id)return result;
-  const job=salesRead_('sales_jobs/'+salesKey_(id)),draft=job?salesRead_('sales_drafts/'+salesKey_(job.draftId)):null;
+  const job=salesRead_('sales_jobs/'+salesKey_(id)),draft=job?.draftId?salesRead_('sales_drafts/'+salesKey_(job.draftId)):null;
   const localCompany=draft?salesLocalCompany_(draft,salesRead_('sales_meta/catalog'),job):null;
-  return {...result,patch:{job:job?{...salesJobSummary_(job),...(job.kind==='history'?{history:job.history}:{})}:null,draft,localCompany},...(name==='saveSalesTestCompany'?{detail:{company:localCompany,contacts:[{...draft.contact,id:'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:'pending'}],histories:[],projects:[],detailVersion:3}}:{})};
+  return {...result,patch:{job:job?{...salesJobSummary_(job),...(job.kind==='history'?{history:job.history}:{})}:null,draft,localCompany},...(['saveSalesCompany','saveSalesTestCompany'].includes(name)?{detail:{company:localCompany,contacts:[{...draft.contact,id:'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:'pending'}],histories:[],projects:[],detailVersion:3}}:{})};
 }
 
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
@@ -1792,4 +1801,574 @@ function getSalesStorageInventoryPage(input){
   result.references=Array.from(refs);result.chunkGroups=Object.entries(groups).map(([generation,count])=>({generation,count}));
   result.next=page.nextPageToken?{collection,pageToken:page.nextPageToken}:index+1<collections.length?{collection:collections[index+1]}:null;
   return result;
+}
+
+/** Writable HQ v2 fields. Source: https://api.hellohq.io/swagger/v2/swagger.json; checked 2026-10-18. */
+const SALES_HQ_FIELDS={
+  "CompanyPut": {
+    "type": "object",
+    "required": [
+      "name"
+    ],
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "industrialSector": {
+        "type": "string",
+        "nullable": true
+      },
+      "description": {
+        "type": "string",
+        "nullable": true
+      },
+      "iban": {
+        "type": "string",
+        "nullable": true
+      },
+      "bic": {
+        "type": "string",
+        "nullable": true
+      },
+      "homepage": {
+        "type": "string",
+        "nullable": true
+      },
+      "vatId": {
+        "type": "string",
+        "nullable": true
+      },
+      "financesChargeRateId": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32"
+      },
+      "standardDeliveryConditionId": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32",
+        "deprecated": true
+      },
+      "standardPaymentConditionId": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32",
+        "deprecated": true
+      },
+      "debitorNumber": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32"
+      },
+      "creditorNumber": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32"
+      },
+      "documentDefaultMailEntityId": {
+        "type": "integer",
+        "nullable": true,
+        "format": "int32"
+      },
+      "routingId": {
+        "type": "string",
+        "nullable": true
+      },
+      "eInvoiceType": {
+        "type": "string",
+        "enum": [
+          "None",
+          "XRechnung"
+        ]
+      },
+      "customFields": {
+        "type": "array",
+        "nullable": true,
+        "items": {
+          "type": "object",
+          "required": [
+            "name",
+            "type"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Text",
+                "TextMultiline",
+                "Date",
+                "Dropdown",
+                "DropdownCheckbox",
+                "Boolean",
+                "Upload",
+                "UserSelection",
+                "CompanySelection",
+                "ProjectSelection",
+                "ResourceSelection",
+                "ContactSelection",
+                "Link",
+                "Float",
+                "Integer",
+                "Token",
+                "NumericText"
+              ]
+            },
+            "value": {
+              "nullable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "CompanyAddressBase": {
+    "type": "object",
+    "required": [
+      "city",
+      "country",
+      "description",
+      "street",
+      "zipCode"
+    ],
+    "properties": {
+      "alternativeCompanyName": {
+        "type": "string",
+        "nullable": true
+      },
+      "additionalInformation": {
+        "type": "string",
+        "nullable": true
+      },
+      "street": {
+        "type": "string",
+        "minLength": 1
+      },
+      "houseNumber": {
+        "type": "string",
+        "nullable": true
+      },
+      "zipCode": {
+        "type": "string",
+        "minLength": 1
+      },
+      "city": {
+        "type": "string",
+        "minLength": 1
+      },
+      "country": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": {
+        "type": "string",
+        "minLength": 1
+      },
+      "phone": {
+        "type": "string",
+        "nullable": true
+      },
+      "email": {
+        "type": "string",
+        "nullable": true
+      },
+      "fax": {
+        "type": "string",
+        "nullable": true
+      },
+      "website": {
+        "type": "string",
+        "nullable": true
+      },
+      "addressLine2": {
+        "type": "string",
+        "nullable": true
+      },
+      "standardForDocumentType": {
+        "type": "string",
+        "enum": [
+          "Quotation",
+          "Invoice",
+          "DeliveryNote",
+          "Warning",
+          "Reminder",
+          "Cancellation",
+          "CreditNote",
+          "Confirmation",
+          "IncomingInvoice",
+          "Undefined",
+          "Order",
+          "PriceInquiry",
+          "Letter",
+          "Minute",
+          "AdvancedInvoice",
+          "PlannedRevenueStandard",
+          "PlannedRevenueTimeAndMaterial",
+          "PlannedCost",
+          "FinalInvoice"
+        ]
+      }
+    }
+  },
+  "ContactPersonPut": {
+    "type": "object",
+    "properties": {
+      "firstName": {
+        "type": "string",
+        "nullable": true
+      },
+      "lastName": {
+        "type": "string",
+        "nullable": true
+      },
+      "position": {
+        "type": "string",
+        "nullable": true
+      },
+      "phoneLandline": {
+        "type": "string",
+        "nullable": true
+      },
+      "phoneMobile": {
+        "type": "string",
+        "nullable": true
+      },
+      "eMail": {
+        "type": "string",
+        "nullable": true
+      },
+      "salutation": {
+        "type": "string",
+        "nullable": true
+      },
+      "salutationForm": {
+        "type": "string",
+        "enum": [
+          "Formal",
+          "Informal",
+          "Neutral"
+        ]
+      },
+      "language": {
+        "type": "string",
+        "nullable": true
+      },
+      "birthdate": {
+        "type": "string",
+        "nullable": true
+      },
+      "note": {
+        "type": "string",
+        "nullable": true
+      },
+      "defaultAddress": {
+        "type": "object",
+        "required": [
+          "city",
+          "country",
+          "description",
+          "street",
+          "zipCode"
+        ],
+        "properties": {
+          "alternativeCompanyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "additionalInformation": {
+            "type": "string",
+            "nullable": true
+          },
+          "street": {
+            "type": "string",
+            "minLength": 1
+          },
+          "houseNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "zipCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fax": {
+            "type": "string",
+            "nullable": true
+          },
+          "website": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "standardForDocumentType": {
+            "type": "string",
+            "enum": [
+              "Quotation",
+              "Invoice",
+              "DeliveryNote",
+              "Warning",
+              "Reminder",
+              "Cancellation",
+              "CreditNote",
+              "Confirmation",
+              "IncomingInvoice",
+              "Undefined",
+              "Order",
+              "PriceInquiry",
+              "Letter",
+              "Minute",
+              "AdvancedInvoice",
+              "PlannedRevenueStandard",
+              "PlannedRevenueTimeAndMaterial",
+              "PlannedCost",
+              "FinalInvoice"
+            ]
+          }
+        }
+      },
+      "customFields": {
+        "type": "array",
+        "nullable": true,
+        "items": {
+          "type": "object",
+          "required": [
+            "name",
+            "type"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Text",
+                "TextMultiline",
+                "Date",
+                "Dropdown",
+                "DropdownCheckbox",
+                "Boolean",
+                "Upload",
+                "UserSelection",
+                "CompanySelection",
+                "ProjectSelection",
+                "ResourceSelection",
+                "ContactSelection",
+                "Link",
+                "Float",
+                "Integer",
+                "Token",
+                "NumericText"
+              ]
+            },
+            "value": {
+              "nullable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "CompanyTypeToCompaniesPutWithoutNumberSchema": {
+    "type": "object",
+    "required": [
+      "companyTypeId"
+    ],
+    "properties": {
+      "number": {
+        "type": "string",
+        "nullable": true
+      },
+      "companyTypeId": {
+        "type": "integer",
+        "format": "int32"
+      }
+    }
+  }
+};
+
+/** Production customer edits. Only documented HQ fields; no project/document writes. */
+function salesBusinessCanonical_(value){
+  if(Array.isArray(value)){
+    const rows=value.map(salesBusinessCanonical_);
+    if(rows.length&&rows.every(v=>v&&typeof v==='object'&&!Array.isArray(v)&&v.companyTypeId!==undefined))rows.sort((a,b)=>Number(a.companyTypeId)-Number(b.companyTypeId));
+    else if(rows.length&&rows.every(v=>v&&typeof v==='object'&&!Array.isArray(v)&&v.name!==undefined))rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    return rows;
+  }
+  if(value&&typeof value==='object'){const out=Object.create(null);Object.keys(value).sort().forEach(k=>{out[k]=salesBusinessCanonical_(value[k]);});return out;}return value;
+}
+function salesBusinessEqual_(actual,expected){
+  return Object.keys(expected).every(k=>expected[k]&&typeof expected[k]==='object'?JSON.stringify(salesBusinessCanonical_(actual[k]))===JSON.stringify(salesBusinessCanonical_(expected[k])):String(actual[k]??'')===String(expected[k]??''));
+}
+function saveSalesCompany(input){return saveSalesTestCompany(input);}
+function bindSalesCompanyResult(id,hqId){
+  salesUser_(true);return salesLock_(()=>{
+    salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));
+    if(job?.kind!=='createCompany'||job.markerMode!=='none'||job.state!=='uncertain'||job.hqId||!job.writeAttempted)throw new Error('Keine offene Firmenzuordnung.');
+    const draft=salesRead_('sales_drafts/'+job.draftId),actual=salesOne_('Companies',salesId_(hqId));
+    if(!draft?.company||!salesBusinessEqual_(actual,salesPick_(draft.company,['name','description','industrialSector']))||!salesHomepageConfirmed_(actual,draft.company.homepage)||!salesBusinessEqual_(actual.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website'])))throw new Error('Die ausgewählte HQ-Firma stimmt nicht vollständig mit der gespeicherten Anlage überein. Auftrag bleibt gesperrt.');
+    if(!(actual.companyTypes||[]).some(t=>Number(t.companyTypeId)===Number(draft.company.companyTypes?.[0]?.companyTypeId))||!(actual.responsibleUsers||[]).some(u=>Number(u.userId||u.id)===Number(draft.company.responsibleUserIds?.[0]))||!(actual.subsystems||[]).some(s=>Number(s.id)===Number(draft.company.subsystemIds?.[0]))||(draft.company.customFields||[]).some(f=>!(actual.customFields||[]).some(a=>a.name===f.name&&String(a.value)===String(f.value))))throw new Error('Firmenart, Verantwortlicher, Unternehmensbereich oder eigene HQ-Felder stimmen nicht überein.');
+    if(salesCollect_('ContactPersons','companyId eq '+actual.id,Date.now()).length)throw new Error('Die ausgewählte Firma besitzt bereits Ansprechpartner. Bitte die vorhandene HQ-Anlage gesondert prüfen; keine neue Kontaktanlage freigegeben.');
+    job.hqId=salesId_(actual.id);draft.hqId=job.hqId;job.state='ready';job.updatedAt=salesNow_();job.message='Manuell ausgewählte HQ-Firma nur lesend zugeordnet. Fortsetzung prüft die vorhandene Anlage; kein erneuter Firmen-POST.';
+    salesWrite_('sales_drafts/'+draft.id,draft);salesWrite_('sales_jobs/'+job.id,job);return {id:job.id,message:job.message};
+  });
+}
+function salesBusinessSchema_(entity){
+  if(entity==='types')return {type:'object',required:['companyTypes'],properties:{companyTypes:{type:'array',items:SALES_HQ_FIELDS.CompanyTypeToCompaniesPutWithoutNumberSchema}}};
+  const names={company:'CompanyPut',address:'CompanyAddressBase',contact:'ContactPersonPut'};
+  if(!names[entity])throw new Error('Unbekannte Stammdatenart.');
+  return SALES_HQ_FIELDS[names[entity]];
+}
+function salesBusinessValidate_(value,schema,path){
+  if(value===null){if(!schema.nullable)throw new Error('Feld darf nicht leer sein: '+path);return;}
+  if(schema.enum&&!schema.enum.includes(value))throw new Error('Ungültige Auswahl: '+path);
+  if(schema.type==='object'){
+    if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Ungültige Felder: '+path);
+    for(const k of Object.keys(value)){if(!Object.prototype.hasOwnProperty.call(schema.properties,k))throw new Error('Nicht schreibbares Feld: '+path+'.'+k);salesBusinessValidate_(value[k],schema.properties[k],path+'.'+k);}
+    for(const k of schema.required||[])if(value[k]===undefined||!schema.properties[k].nullable&&(value[k]===null||value[k]===''))throw new Error('Pflichtfeld fehlt: '+path+'.'+k);
+  }else if(schema.type==='array'){
+    if(!Array.isArray(value)||value.length>500)throw new Error('Ungültige Liste: '+path);
+    value.forEach(v=>salesBusinessValidate_(v,schema.items,path));
+  }else if(schema.type==='string'){
+    if(typeof value!=='string'||value.length>20000||value.length<(schema.minLength||0))throw new Error('Ungültiger Text: '+path);
+  }else if(schema.type==='integer'&&(!Number.isInteger(value)||value<-2147483648||value>2147483647))throw new Error('Ungültige Ganzzahl: '+path);
+  else if(schema.type==='number'&&(typeof value!=='number'||!Number.isFinite(value)))throw new Error('Ungültige Zahl: '+path);
+  else if(schema.type==='boolean'&&typeof value!=='boolean')throw new Error('Ungültige Auswahl: '+path);
+}
+function salesBusinessPick_(raw,schema){
+  const out={};for(const k of Object.keys(schema.properties||{}))if(raw[k]!==undefined){const s=schema.properties[k];out[k]=s.type==='object'&&raw[k]!==null?salesBusinessPick_(raw[k],s):s.type==='array'&&s.items.type==='object'&&Array.isArray(raw[k])?raw[k].map(v=>salesBusinessPick_(v,s.items)):raw[k];}return out;
+}
+function salesBusinessKnown_(id){
+  id=String(salesId_(id));const data=salesRead_('sales_companies/'+id);
+  if(!data?.company||String(data.company.id)!==id)throw new Error('Kundendetails zuerst über den HQ-Sync importieren.');return data;
+}
+function salesBusinessTarget_(hqId,entity,targetId){
+  hqId=salesId_(hqId);targetId=salesId_(targetId);
+  if(entity==='company'||entity==='types'){if(targetId!==hqId)throw new Error('Abweichendes Firmenziel.');return salesOne_('Companies',hqId);}
+  if(entity==='contact'){const c=salesHqGet_('/v2/ContactPersons/'+targetId+'?expand=DefaultAddress,CustomFields').data;if(Number(c?.id)!==targetId||Number(c.companyId)!==hqId)throw new Error('Ansprechpartner gehört nicht zur Firma.');return {...c,eMail:salesContactEmail_(c)};}
+  if(entity==='address'){
+    const result=salesHqGet_('/v2/Companies/'+hqId+'/Addresses').data,rows=Array.isArray(result)?result:result?.data||result?.value;
+    if(!Array.isArray(rows))throw new Error('Firmenadressen unvollständig.');const matches=rows.filter(a=>Number(a.id)===targetId);
+    if(matches.length!==1)throw new Error('Adresse gehört nicht eindeutig zur Firma.');return matches[0];
+  }throw new Error('Unbekannte Stammdatenart.');
+}
+function getSalesEditor(input){
+  salesUser_();salesAssertPrivate_();const id=salesId_(input.companyId),schema=salesBusinessSchema_(input.entity),data=salesBusinessKnown_(id);
+  const pending=(data.pendingChanges||[]).filter(p=>p.entity===input.entity&&Number(p.targetId)===Number(input.targetId));
+  if(pending.length)throw new Error('Für diese Stammdaten ist bereits eine Änderung offen. Bitte zuerst den HQ-Sync abschließen oder den Konflikt in der Auftragsübersicht klären.');
+  const raw=salesBusinessTarget_(id,input.entity,input.targetId);
+  return {companyId:id,companyName:data.company.name,entity:input.entity,targetId:salesId_(input.targetId),schema,base:salesBusinessPick_(raw,schema),...(input.entity==='types'?{types:salesRead_('sales_meta/catalog')?.types||[]}:{})};
+}
+function salesBusinessView_(value){
+  const data=JSON.parse(JSON.stringify(value));
+  for(const p of data.pendingChanges||[]){
+    if(p.entity==='company'){Object.assign(data.company,p.change);if(p.change.homepage!==undefined){data.company.homepageDisplay=p.change.homepage||'';data.company.homepageSource='App';}}
+    if(p.entity==='types')data.company.companyTypes=p.change.companyTypes.map(t=>({...t,name:p.typeNames?.[t.companyTypeId]||'HQ-Firmenart '+t.companyTypeId}));
+    if(p.entity==='contact'){const contact=(data.contacts||[]).find(c=>Number(c.id)===Number(p.targetId));if(contact)Object.assign(contact,p.change);}
+    if(p.entity==='address')for(const a of [data.company.defaultAddress,...data.company.addresses||[]])if(a&&Number(a.id)===Number(p.targetId))Object.assign(a,p.change);
+  }return data;
+}
+function salesBusinessStore_(id,data){
+  salesWrite_('sales_companies/'+id,data);const visible=salesBusinessView_(data),directory=salesRead_('sales_directory/'+id);
+  if(directory)salesWrite_('sales_directory/'+id,{...directory,company:salesCompany_(visible.company),contacts:visible.contacts});
+}
+function saveSalesEntityChange(input){
+  const user=salesUser_();return salesLock_(()=>{
+    salesAssertPrivate_();const hqId=salesId_(input.companyId),targetId=salesId_(input.targetId),entity=input.entity,schema=salesBusinessSchema_(entity),data=salesBusinessKnown_(hqId);
+    if(['company','types'].includes(entity)&&targetId!==hqId||entity==='contact'&&!(data.contacts||[]).some(c=>Number(c.id)===targetId&&Number(c.companyId)===hqId)||entity==='address'&&![data.company.defaultAddress,...data.company.addresses||[]].some(a=>Number(a?.id)===targetId))throw new Error('Stammdatenziel gehört nicht zum geladenen Kunden.');
+    if((data.pendingChanges||[]).some(p=>p.entity===entity&&Number(p.targetId)===targetId))throw new Error('Für diese Stammdaten ist bereits eine Änderung offen. Zuerst synchronisieren.');
+    const change=input.change;if(!change||typeof change!=='object'||Array.isArray(change)||!Object.keys(change).length)throw new Error('Keine Änderungen eingegeben.');
+    if(entity==='contact'&&change.defaultAddress?.email!==undefined){if(change.eMail!==undefined&&change.eMail!==change.defaultAddress.email)throw new Error('Die beiden Kontakt-E-Mail-Felder müssen übereinstimmen.');change.eMail=change.defaultAddress.email;}
+    const base={};for(const k of Object.keys(change)){
+      if(!Object.prototype.hasOwnProperty.call(schema.properties,k))throw new Error('Nicht schreibbares Feld: '+k);
+      salesBusinessValidate_(change[k],schema.properties[k],k);base[k]=input.base?.[k]??null;
+      if(entity==='contact'&&['firstName','lastName'].includes(k)&&!String(change[k]||'').trim())throw new Error('Vor- und Nachname des Ansprechpartners bleiben Pflichtfelder.');
+      if(schema.required?.includes(k)&&(change[k]===null||change[k]===''))throw new Error('Pflichtfeld fehlt: '+k);
+    }
+    const typeNames={};if(entity==='types'){
+      const types=salesRead_('sales_meta/catalog')?.types||[];types.forEach(t=>typeNames[t.id]=t.name);
+      if(!change.companyTypes?.length||new Set(change.companyTypes.map(t=>t.companyTypeId)).size!==change.companyTypes.length||change.companyTypes.some(t=>!Object.prototype.hasOwnProperty.call(typeNames,t.companyTypeId)))throw new Error('Bitte mindestens eine bekannte HQ-Firmenart auswählen.');
+    }
+    // Base values are expected values, never a destination or a complete PUT body.
+    const id=Utilities.getUuid(),job={id,kind:'entityChange',business:1,hqId,targetId,entity,name:data.company.name,change,base,state:'pending',actor:user.email,createdAt:salesNow_(),updatedAt:salesNow_(),message:'Stammdatenänderung in Firebase gespeichert; HQ-Abgleich offen.'};
+    data.pendingChanges=[...(data.pendingChanges||[]),{jobId:id,entity,targetId,change,...(entity==='types'?{typeNames}:{})}];
+    salesWrite_('sales_jobs/'+id,job);salesBusinessStore_(hqId,data);
+    return {id,message:job.message,entityPatch:{companyId:hqId,entity,targetId,change,...(entity==='types'?{typeNames}:{})},patch:{job:salesJobSummary_(job)}};
+  });
+}
+function salesBusinessFinish_(job,actual){
+  const data=salesBusinessKnown_(job.hqId);data.pendingChanges=(data.pendingChanges||[]).filter(p=>p.jobId!==job.id);
+  if(job.entity==='company')data.company={...data.company,...salesCompany_(actual)};
+  if(job.entity==='types')data.company.companyTypes=salesCompany_(actual).companyTypes;
+  if(job.entity==='contact')data.contacts=(data.contacts||[]).map(c=>Number(c.id)===Number(job.targetId)?{...c,...salesContactView_(actual)}:c);
+  if(job.entity==='address')for(const a of [data.company.defaultAddress,...data.company.addresses||[]])if(a&&Number(a.id)===Number(job.targetId))Object.assign(a,salesBusinessPick_(actual,salesBusinessSchema_('address')));
+  salesBusinessStore_(job.hqId,data);
+}
+function salesBusinessRun_(job,verifyOnly){
+  if(job.kind==='history'){
+    if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);return;}
+    salesRunHistory_(job,null);return;
+  }
+  if(job.kind!=='entityChange'||job.business!==1)throw new Error('Unbekannter Stammdatenauftrag.');
+  salesBusinessKnown_(job.hqId);const actual=salesBusinessTarget_(job.hqId,job.entity,job.targetId),schema=salesBusinessSchema_(job.entity),current=salesBusinessPick_(actual,schema);
+  const conflicts=Object.keys(job.change).filter(k=>!salesBusinessEqual_(current,{[k]:job.change[k]})&&!salesBusinessEqual_(current,{[k]:job.base[k]}));
+  if(conflicts.length){job.state='conflict';job.conflict={before:job.base,app:job.change,hq:salesPick_(current,Object.keys(job.change))};job.message='HQ und App unterscheiden sich. Bitte die Stammdatenwerte in der Auftragsübersicht vergleichen.';return;}
+  let wrote=false;
+  if(!salesBusinessEqual_(current,job.change)){
+    if(verifyOnly){job.state='conflict';job.conflict={before:job.base,app:job.change,hq:salesPick_(current,Object.keys(job.change))};job.message='HQ-Ergebnis stimmt noch nicht mit der Änderung überein. HQ-Werte behalten verwirft den Auftrag; App-Werte verwenden bereitet eine erneut geprüfte Übertragung vor.';return;}
+    if(job.entity==='contact'&&(job.change.defaultAddress!==undefined||job.change.eMail!==undefined)){
+      if(!actual.defaultAddressId)throw new Error('Kontaktadresse ist nicht eindeutig zugeordnet. Bitte zuerst in HQ prüfen.');
+      salesAssertOwnContactAddress_({hqId:job.hqId},job.targetId,salesId_(actual.defaultAddressId));
+    }
+    const payload={...current,...job.change};
+    // Embedded address updates are optional. Do not resubmit an unrelated address
+    // (older HQ contacts can have an incomplete address which cannot be PUT).
+    if(job.entity==='contact'&&job.change.eMail!==undefined)payload.defaultAddress={...(payload.defaultAddress||{}),email:job.change.eMail};
+    else if(job.entity==='contact'&&job.change.defaultAddress===undefined)delete payload.defaultAddress;
+    salesBusinessValidate_(payload,schema,job.entity);
+    const path=job.entity==='types'?'/v2/Companies/'+job.hqId+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+job.hqId:job.entity==='contact'?'/v2/ContactPersons/'+job.targetId:'/v2/Companies/'+job.hqId+'/Addresses/'+job.targetId;
+    salesBusinessTransport_(job,path,job.entity==='types'?'post':'put',job.entity==='types'?payload.companyTypes:payload);
+    wrote=true;
+  }
+  const after=wrote?salesBusinessTarget_(job.hqId,job.entity,job.targetId):actual;
+  if(job.entity==='contact'&&job.change.defaultAddress===undefined){const expected=salesBusinessPick_(actual.defaultAddress||{},salesBusinessSchema_('address'));if(job.change.eMail!==undefined)expected.email=job.change.eMail;if(String(after.defaultAddressId??'')!==String(actual.defaultAddressId??'')||!salesBusinessEqual_(after.defaultAddress||{},expected))throw new Error('Kontaktadresse wurde unerwartet verändert. Rückprüfung offen.');}
+  if(!salesBusinessEqual_(salesBusinessPick_(after,schema),job.change))throw new Error('Stammdaten-Rückprüfung noch offen.');
+  salesBusinessFinish_(job,after);
+}
+function salesBusinessTransport_(job,path,method,body){
+  const expected=job.kind==='history'?'/v2/ContactHistories':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
+  if(job.business!==1||job.state!=='running'||path!==expected||method!==(job.kind==='history'||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
+  job.writeAttempted=true;job.phaseWriteAttempted=true;job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};salesWrite_('sales_jobs/'+job.id,job);
+  const result=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
+  job.lastWrite.status=result.getResponseCode();salesWrite_('sales_jobs/'+job.id,job);
+  if(job.lastWrite.status<200||job.lastWrite.status>=300)throw new Error('HQ-Schreiben: HTTP '+job.lastWrite.status+'. Ausgang vor Wiederholung prüfen.');
+  return result.getContentText()?JSON.parse(result.getContentText()):null;
 }

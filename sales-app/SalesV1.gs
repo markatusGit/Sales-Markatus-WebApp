@@ -18,7 +18,7 @@ function getSalesV1State(){
   return {...state,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},editions,companies:Object.values(companies),directory:index.entries,preferences:salesRead_('sales_meta/preferences')||{},importRun:salesRead_('sales_meta/import'),syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
 }
 function getSalesV1Company(id){
-  salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===String(id)))return getSalesCompany(id);
+  salesUser_();if(String(id).startsWith('draft_')||salesList_('sales_drafts').some(d=>String(d.hqId)===String(id)))return getSalesCompany(id);
   id=String(salesId_(id));if(!salesV1Known_(id))throw new Error('Firma ist noch nicht ausdrücklich in den App-Bestand aufgenommen.');
   const stored=salesRead_('sales_companies/'+id);return stored?{...stored,histories:salesVisibleHistories_(id,stored.histories)}:null;
 }
@@ -77,7 +77,7 @@ function saveSalesV1EditionSettings(input){
   });
 }
 function salesV1Scope_(id){
-  id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>d.testOnly&&String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
+  id=String(salesId_(id));if(!salesV1Known_(id)&&!salesList_('sales_drafts').some(d=>String(d.hqId)===id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');return id;
 }
 function salesV1LoadCompany_(id,alreadyChecked){
   id=alreadyChecked?String(salesId_(id)):salesV1Scope_(id);const started=Date.now(),company=salesCompany_(salesOne_('Companies',id));
