@@ -1,5 +1,7 @@
 # Weg zur ersten nutzbaren Sales-App
 
+**Aktuelle Einordnung vom 18.10.2026:** Die nachfolgenden r17/r18-Zwischenstände und manuellen Dateiübergaben sind historisch. Verbindliche aktuelle Sortierung der Testbestandteile, fehlenden Produktivfunktionen und empfohlenen Bauabschnitte: [LIVE-BETRIEB-UND-TESTRESTE.md](LIVE-BETRIEB-UND-TESTRESTE.md). Veröffentlichter Code: r21/v0.21.0, Google-Version 32. Es gelten die aktuellen clasp-Anleitungen und die bestätigte ausschließlich manuelle Browseraktualisierung; keine alten Gesamtimport-/Timerregeln übernehmen. Frühere Wünsche bleiben als Verlauf erhalten.
+
 Stand: 02.10.2026 · **2026-10-02-r17 lokal implementiert und synthetisch geprüft**. Nutzer bestätigt den bisherigen Schreibweg und teilweise den Ausgabeimport, meldet aber einen zu großen Firmendatensatz. Vollständigkeit des echten Bestands bleibt offen. Neue verbindliche Folge: alle Daten korrekt in Firebase, gemeinsamer manueller HQ-Sync und getrennte Kunden-/Magazinansichten; danach Schritte 4–7 unten. Nachtlauf zurückgestellt.
 
 **Nachtrag r17:** Erste Firmenerfassung auf seitenweises Speichern beschleunigt; Firmen-/Seitenzahl sichtbar und bestätigte Pause dauerhaft gespeichert. Angehaltenen r16-Lauf nach Dateiaustausch mit HQ-Sync fortsetzen weiterführen, keine neue Auswahl und kein Neustart nötig. Alte Schreibfehler bleiben separat offen. Live-Gesamtabnahme weiterhin ausstehend.

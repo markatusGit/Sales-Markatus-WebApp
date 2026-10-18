@@ -1,8 +1,10 @@
 # Projektüberblick – Sales Markatus
 
-Stand: 17.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.
+Stand: 18.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.
 
 ## Auftrag und Produktstand
+
+**Bestandsaufnahme vom 18.10.2026:** Testbestandteile T01–T09, fehlende/unbestätigte Produktivbausteine L01–L14 und empfohlene Reihenfolge in [LIVE-BETRIEB-UND-TESTRESTE.md](docs/LIVE-BETRIEB-UND-TESTRESTE.md) sortiert. Echte Lesedaten sind bereits angebunden; produktive Kommunikation/Stammdatenpflege hängen noch an TEST-Firmen, Google-Zugriff steht auf MYSELF, Wiedervorlagen/Buchungserfassung/Redaktionsmeldung fehlen. Unterscheidung zwischen Recherchefreigabe, echter Kundenarbeit und vollständigem Verkaufsablauf. Reine Analyse, keine weitere Funktionsfreigabe oder neue Google-Version; R01–R13/N01–N10 erhalten.
 
 **Aktueller Stand vom 17.10.2026:** Nutzer hat den Vorschlag aus Abschnitt 13 der Verbrauchsanalyse zur Umsetzung freigegeben: D07/D08/D09/D11/D14/D20 optimieren; D17 und D21 zunächst erhalten; D22 als Inventur vorbereiten, keine Löschung oder Nachtplanung. r21 (2026-10-17-r21, Git-Tag v0.21.0) nach allen 16 erfolgreichen Prüfsuiten als Google-Version 32 unter derselben Dashboard-URL veröffentlicht. Feste Google-Version, Google-Editor und GitHub-Tag/main auf gleichen Code geprüft. Quellcommit dc34481, Releasecommit 446750d; Zuordnung in deployment.json. Keine neuen/geänderten Script Properties oder Bereitstellungseinstellungen. Echte Bedienabnahme und Inventurdurchlauf bleiben offen; aktuell kein Browser für eine Liveprüfung verbunden. Frühere Vermerke „zurückgestellt/nicht freigegeben“ sind für den jetzt bestätigten Umfang historisch.
 

@@ -4,6 +4,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L01–L14 anhand r21-Quellen sortiert, bestehende echte Lesefunktionen von Test-Schreibwegen und reinen Konzept-/Demofunktionen getrennt. Prioritäten und Abnahmekriterien für Teamzugang, echte Kundenarbeit und vollständigen Verkaufsablauf festgehalten; V1-Plan mit aktuellem Einstieg versehen. Kein Appumbau, keine Bereinigung oder Rechteänderung.
+
 Keine zusätzlichen Appänderungen außerhalb des nachfolgenden r21-Umfangs beauftragt. D17 und D21 bleiben erhalten; D22 umfasst eine lesende Inventur, keine Bereinigung oder neue Aufbewahrungsregel.
 
 ## [v0.21.0] – 2026-10-17
