@@ -2,6 +2,8 @@
 
 Stand: 18.10.2026. Beauftragter Umfang: T01, T02, T03, T04, T06 und T09. T04 wurde ausdrücklich auf **Firmen, Adressen und Ansprechpartner** eingegrenzt. HQ-Projekte und Rechnungen bleiben lesbar. T05, T07 und T08 werden erläutert; daraus entstehen keine zusätzlichen Lösch- oder Rechteaufträge.
 
+**Technisch veröffentlicht:** r22/v0.22.0 als Google-Version 33 unter der bestehenden Dashboard-URL. Alle 18 Prüfsuiten bestanden; feste Google-Version, Google-Editor und GitHub-Tag/main auf Codegleichheit geprüft. Echte fachliche Bedienabnahme noch offen.
+
 ## Umsetzung
 
 | Punkt | Verhalten |

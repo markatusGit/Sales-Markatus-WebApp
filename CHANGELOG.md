@@ -16,7 +16,7 @@ Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Ab
 - T06: neue Anlagen ohne sichtbaren Testmarker. Verlorene Firmen-POST-Antwort ohne ID sperrt den Auftrag bis zur ausdrücklich manuell geprüften HQ-ID-Zuordnung; keine automatische Namensübernahme und keine zweite Firmenanlage. Alte offene markierte Aufträge bleiben sicher verarbeitbar; keine pauschale Löschung/Bereinigung echter Daten.
 - T09: nicht versionierte lokale Demo, HTML-Wegweiser und Vorschau aus aktiver Ablage entfernt; nur ignorierte lokale Wiederherstellungskopie. README auf tatsächliche App umgestellt. Automatisierte synthetische Tests bleiben erhalten.
 - T05/T07/T08 mit Grenzen und Bedienabnahme in docs/KUNDENPFLEGE-R22.md erklärt. Zusätzliche Kontakt-/Adressanlage, neue Zusatzfelddefinitionen und weitere Vertriebs-/Teamfunktionen bleiben offen.
-- 18 Syntax-/Logik-/Browser-Prüfsuiten einschließlich zwölf neuer Produktivprüfungen erfolgreich; keine Live-Kundendaten für diese Tests verändert. Veröffentlichung und anschließender Codevergleich werden gesondert nachgewiesen. Keine neuen/geänderten Script Properties, Scopes oder Bereitstellungseinstellungen.
+- 18 Syntax-/Logik-/Browser-Prüfsuiten einschließlich zwölf neuer Produktivprüfungen erfolgreich, ebenso in sauberer Veröffentlichungskopie; keine Live-Kundendaten für diese Tests verändert. Als Google-Version 33 unter derselben Dashboard-URL veröffentlicht; release:verify bestätigt feste Version, Editor und GitHub-Tag/main auf gleichen Code. Quellcommit 034c23e, Releasecommit 5e0f656, Zuordnung in deployment.json. Keine neuen/geänderten Script Properties, Scopes oder Bereitstellungseinstellungen. Fachliche Live-Abnahme bleibt offen.
 
 ## [v0.21.0] – 2026-10-17
 
