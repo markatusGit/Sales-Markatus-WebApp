@@ -22,6 +22,7 @@
     }
   }
   function businessBindPanel(p){
+    if(state.user.admin&&p.job.kind==='createContact'&&p.job.state==='uncertain'&&!p.job.contactId)return '<form data-form="bind-customer-contact" class="m-form"><p class="m-full">HQ-Anlageantwort fehlt. Den Ansprechpartner zuerst in HQ manuell prüfen. Nur die eindeutig geprüfte ID zuordnen; keinen zweiten Kontakt anlegen.</p>'+field('Manuell geprüfte HQ-Kontakt-ID','hqId','','number',true)+'<button class="m-button">Vorhandenen HQ-Kontakt prüfen und zuordnen</button></form>';
     if(!state.user.admin||p.job.kind!=='createCompany'||p.job.markerMode!=='none'||p.job.hqId||p.job.state!=='uncertain')return '';
     return '<form data-form="bind-company" class="m-form"><p class="m-full">Die Antwort auf die Firmenanlage fehlt. Zuerst in HQ prüfen, ob genau diese Firma angelegt wurde. Nur deren vorhandene HQ-ID zuordnen; keine neue Firma anlegen.</p>'+field('Manuell geprüfte HQ-Firmen-ID','hqId','','number',true)+'<button class="m-button">Vorhandene HQ-Firma prüfen und zuordnen</button></form>';
   }
@@ -67,6 +68,10 @@
     const [entity,targetId]=b.dataset.id.split(':');act(async()=>{const companyId=['company','types'].includes(entity)?targetId:detail.company.hqId||detail.company.id;if(String(detail?.company?.hqId||detail?.company?.id)!==String(companyId)){detail=await loadCompany(companyId);selected=detail.company.id;}businessEditor=await rpc('getSalesEditor',{companyId,entity,targetId});view='business';});
   });
   root.addEventListener('submit',e=>{
+    if(e.target.dataset.form==='bind-customer-contact'){
+      e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
+      const hqId=e.target.elements.hqId.value;act(async()=>{const r=await rpc('bindSalesCustomerContact',preview.job.id,hqId);preview=await rpc('getSalesJobPreview',preview.job.id);return r;});return;
+    }
     if(e.target.dataset.form==='bind-company'){
       e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
       const hqId=e.target.elements.hqId.value;act(async()=>{const r=await rpc('bindSalesCompanyResult',preview.job.id,hqId);preview=await rpc('getSalesJobPreview',preview.job.id);return r;});return;

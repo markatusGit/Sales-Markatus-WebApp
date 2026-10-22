@@ -70,7 +70,8 @@ const {chromium}=require('playwright'),{setup}=require('./test-sales-v1.cjs');
   await page.getByRole('button',{name:'Ansprechpartner',exact:true}).click();await page.getByLabel('Ansprechpartner suchen',{exact:true}).fill('Ada');
   assert.equal(await page.getByRole('heading',{name:'Ada Probe',exact:true}).count(),1);
   await page.getByRole('button',{name:'Synthetic prospect',exact:true}).click();await page.getByRole('heading',{name:'Synthetic prospect',exact:true}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'Kommunikation erfassen',exact:true}).first().isDisabled(),false);
+  assert.equal(await page.getByRole('button',{name:'Speichern',exact:true}).isDisabled(),false);
+  assert.equal(await page.getByLabel('Gespräch / Notiz',{exact:true}).isVisible(),true);
   assert.deepEqual(errors,[]);assert.ok(!calls.includes('runSalesJob'));
   console.log('PASS browser search, explicit edition selection without import, full common sync, pause/resume, GET-only HQ calls, simple customer search, magazine filters and shared contacts');console.log('Visual QA screenshot: '+screenshot);
  }finally{await browser.close();}

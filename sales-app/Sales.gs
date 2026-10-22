@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-18-r22';
+const SALES_RELEASE = '2026-10-22-r23';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -340,7 +340,7 @@ function saveSalesTestCompany(input) {
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
 }
 function getSalesJobPreview(id) {
-  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,history:job.history,note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
+  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,contact:job.contact,companyRef:job.companyRef,history:job.history||(job.kind==='communication'?{reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',content:job.capture.content||'Nicht erreicht',contactOn:job.capture.contactOn,contactHistoryChannel:job.capture.notReached?'Call':'Note',contactPersonId:job.capture.contactRef}:null),note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
   return {job:salesJobSummary_(job),company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Firma. Adressherkunft bleibt vorerst in Firebase. Kein Projekt-/Rechnungsschreibzugriff.'};
 }
 function getSalesTestAudit(id) {
@@ -544,7 +544,7 @@ function runSalesJob(id,step) {
 }
 function salesRunJobLocked_(id,step) {
   salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
-    if(job.state==='synced') return {message:'Bereits synchronisiert. Keine erneute Anlage.'};
+    if(job.state==='synced') {if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return {message:'Bereits synchronisiert. Keine erneute Anlage.'};}
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
     const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
     if(job.kind==='createCompany') {
@@ -564,11 +564,11 @@ function salesRunJobLocked_(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail','history','entityChange'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+      if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
-    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);return salesJobSummary_(job);
+    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);
 }
 function salesRunCreate_(job,draft,step) {
   if(!job.hqId) {
@@ -696,7 +696,7 @@ function reconcileSalesJob(id) {
       else if([job.base.industrialSector,job.change.industrialSector].includes(actual.industrialSector)&&[job.base.homepage,job.change.homepage].includes(actual.homepage||'')&&[job.baseAddressWebsite||'',job.change.homepage].includes(website)) {job.state='ready';job.message='Teilübertragung geprüft. Offene Schritte kontrolliert fortsetzen.';}
       else throw new Error('HQ-Werte weichen vom Auftrag ab. Auftrag bleibt gesperrt.');
     }
-    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);return salesJobSummary_(job);});
+    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);});
 }
 function salesHistoryDate_(raw) {
   if(typeof raw!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(raw)||!Number.isFinite(Date.parse(raw))||new Date(raw).toISOString().slice(0,19)!==raw.slice(0,19))throw new Error('Bitte einen gültigen Kontaktzeitpunkt oder Termin angeben.');

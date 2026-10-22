@@ -13,3 +13,63 @@
 @media(max-width:880px){#magazin-vertrieb .m-layout{grid-template-columns:156px minmax(0,1fr)}#magazin-vertrieb .m-main{padding:20px}#magazin-vertrieb .m-nav button{font-size:.84em}#magazin-vertrieb .m-columns{grid-template-columns:1fr}#magazin-vertrieb .m-top{padding:18px 20px}}
 @media(max-width:650px){#magazin-vertrieb .m-layout{display:block}#magazin-vertrieb .m-side{border-right:0;border-bottom:1px solid var(--m-line);padding:12px;gap:0}#magazin-vertrieb .m-nav{flex-direction:row;flex-wrap:wrap;gap:4px}#magazin-vertrieb .m-nav button{width:auto;padding:10px 8px;font-size:.82em}#magazin-vertrieb .m-nav-title,#magazin-vertrieb .m-side-bottom,#magazin-vertrieb .m-admin-nav{display:none}#magazin-vertrieb .m-main{padding:20px 14px}#magazin-vertrieb .m-top{padding:18px 14px}#magazin-vertrieb .m-summaries{gap:7px}#magazin-vertrieb .m-summary{padding:12px 9px}#magazin-vertrieb .m-summary span{font-size:.78em}#magazin-vertrieb .m-hero h1{font-size:1.95em}#magazin-vertrieb .m-listitem{grid-template-columns:1fr}#magazin-vertrieb .m-list-end{align-items:flex-start;flex-direction:row;justify-content:space-between;text-align:left;flex-wrap:wrap}#magazin-vertrieb .m-filterbar,#magazin-vertrieb .m-form{grid-template-columns:1fr}#magazin-vertrieb .m-search .m-button{padding:10px}#magazin-vertrieb .m-search .m-search-word{display:none}#magazin-vertrieb .m-dl{grid-template-columns:85px 1fr}#magazin-vertrieb .m-footer{padding:13px 14px}}
 @media(max-width:440px){#magazin-vertrieb .m-summaries{grid-template-columns:1fr}#magazin-vertrieb .m-summary{padding:14px}#magazin-vertrieb .m-summary span{font-size:.86em}}
+
+/* Customer workspace: independent detail/history scrolling; capture stays visible. */
+body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
+#magazin-vertrieb.m-customer-open{height:100dvh;min-height:0;display:flex;flex-direction:column}
+#magazin-vertrieb.m-customer-open .m-layout{flex:1;min-height:0;overflow:hidden}
+#magazin-vertrieb.m-customer-open .m-side{overflow:auto}
+#magazin-vertrieb.m-customer-open .m-main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding:18px}
+#magazin-vertrieb .m-customer-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,1fr);gap:20px;flex:1;min-height:0}
+#magazin-vertrieb .m-customer-details{overflow:auto;min-height:0;padding-right:10px;overscroll-behavior:contain}
+#magazin-vertrieb .m-customer-details .m-pagehead{margin-bottom:18px}
+#magazin-vertrieb .m-communication-column{min-height:0;display:flex;min-width:0}
+#magazin-vertrieb .m-communication{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1;box-shadow:0 5px 24px #0002}
+#magazin-vertrieb .m-capture{padding:16px 18px;border-bottom:1px solid var(--m-line);flex:none}
+#magazin-vertrieb .m-capture h2{font-size:1.12em;margin:0 0 4px}
+#magazin-vertrieb .m-customer-label{font-size:.82em;margin-bottom:12px;overflow-wrap:anywhere}
+#magazin-vertrieb .m-capture-fields{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+#magazin-vertrieb .m-capture textarea{height:clamp(65px,11vh,125px);min-height:55px;max-height:22vh;resize:vertical}
+#magazin-vertrieb .m-capture-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+#magazin-vertrieb .m-history-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+#magazin-vertrieb .m-history-scroll>.m-section{margin-top:0;border:0;box-shadow:none}
+#magazin-vertrieb .m-history-scroll .m-panel-head{padding:14px 18px}
+#magazin-vertrieb .m-history-scroll .m-panel-head h2{font-size:1em}
+#magazin-vertrieb .m-history-scroll .m-panel-body{padding:8px 18px 12px}
+#magazin-vertrieb .m-history-scroll .m-test-actions{margin:0}
+#magazin-vertrieb .m-history-scroll .m-panel-body>.m-muted{margin-top:8px;font-size:.76em}
+#magazin-vertrieb .m-customer-tabs{display:none}
+#magazin-vertrieb .m-contact-dialog{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:10px;padding:24px;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+#magazin-vertrieb .m-contact-dialog::backdrop{background:#0009}
+#magazin-vertrieb .m-contact-dialog .m-form{gap:12px;margin:18px 0}
+#magazin-vertrieb .m-dialog-error{color:var(--m-warn)}
+@media(max-width:1050px){
+ #magazin-vertrieb .m-customer-tabs{display:flex;gap:8px;flex:none;margin-bottom:12px}
+ #magazin-vertrieb .m-customer-tabs button{padding:10px 14px;border:1px solid var(--m-line);border-radius:6px;background:var(--m-surface);color:var(--m-text)}
+ #magazin-vertrieb .m-customer-tabs button[aria-selected=true]{background:var(--m-yellow);color:var(--m-ink)}
+ #magazin-vertrieb .m-customer-workspace{display:flex}
+ #magazin-vertrieb .m-customer-workspace>div{flex:1;min-width:0}
+ #magazin-vertrieb .m-customer-workspace[data-tab=details]>.m-communication-column,#magazin-vertrieb .m-customer-workspace[data-tab=communication]>.m-customer-details{display:none}
+}
+@media(max-width:650px){
+ #magazin-vertrieb.m-customer-open .m-layout{display:flex;flex-direction:column}
+ #magazin-vertrieb.m-customer-open .m-main{flex:1;padding:10px;min-height:0}
+ #magazin-vertrieb.m-customer-open .m-side{flex:none;max-height:125px}
+ #magazin-vertrieb.m-customer-open .m-footer{display:none}
+ #magazin-vertrieb .m-capture{padding:12px}
+ #magazin-vertrieb .m-capture-fields{gap:8px}
+ #magazin-vertrieb .m-capture-fields label{font-size:.78em}
+ #magazin-vertrieb .m-capture-fields input,#magazin-vertrieb .m-capture-fields select{padding:8px 5px;font-size:13px}
+}
+@media(max-height:600px){#magazin-vertrieb .m-capture textarea{height:55px}#magazin-vertrieb .m-customer-label{display:none}#magazin-vertrieb .m-capture{padding:8px 12px}#magazin-vertrieb .m-capture-fields{margin-bottom:6px}#magazin-vertrieb .m-capture-actions{margin-top:6px}}
+
+@media(max-width:650px){
+ #magazin-vertrieb.m-customer-open .m-top{padding:8px 10px;gap:6px}
+ #magazin-vertrieb.m-customer-open .m-top>strong{font-size:11px}
+ #magazin-vertrieb.m-customer-open .m-top .m-actions small{display:none}
+ #magazin-vertrieb.m-customer-open .m-top .m-actions button{font-size:12px;padding:7px}
+ #magazin-vertrieb.m-customer-open .m-status{padding:8px 10px;font-size:.8em}
+ #magazin-vertrieb.m-customer-open .m-side{padding:4px 10px;max-height:none}
+ #magazin-vertrieb.m-customer-open .m-nav{flex-wrap:nowrap;overflow-x:auto;gap:6px}
+ #magazin-vertrieb.m-customer-open .m-nav button{white-space:nowrap;flex-shrink:0;min-height:38px;padding:6px}
+}

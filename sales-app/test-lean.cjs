@@ -18,13 +18,13 @@ test('names index bootstraps once and later costs one read without contacts or d
 });
 test('company membership is direct and only matching pending histories are overlaid',()=>{
  const {f,audit}=baseline();f.ctx.getSalesLeanCompany('10001');
- const row=audit.measure('warm detail',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(row.readDocumentsModel,4);assert.equal(row.writtenDocuments,0);assert.equal(row.hqRequests,0);
+ const row=audit.measure('warm detail',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(row.readDocumentsModel,5);assert.equal(row.writtenDocuments,0);assert.equal(row.hqRequests,0);
  assert.equal(row.readsByCollection.sales_directory,1);assert.equal(row.readsByCollection.sales_companies,1);
  const history={id:'own-history',kind:'history',hqId:10001,state:'pending',history:{reason:'Synthetic pending',content:'synthetic',syncId:'synthetic-sync'}};
  f.ctx.salesWrite_('sales_jobs/own-history',history);
- const next=audit.measure('detail with own history',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(next.readDocumentsModel,5);assert.equal(next.result.histories.length,1);
+ const next=audit.measure('detail with own history',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(next.readDocumentsModel,6);assert.equal(next.result.histories.length,1);
  f.ctx.salesWrite_('sales_jobs/other-history',{...history,id:'other-history',hqId:10002});
- const again=audit.measure('no foreign jobs',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(again.readDocumentsModel,5);assert.equal(again.result.histories.length,1);
+ const again=audit.measure('no foreign jobs',()=>f.ctx.getSalesLeanCompany('10001'));assert.equal(again.readDocumentsModel,6);assert.equal(again.result.histories.length,1);
 });
 test('all new endpoints reject missing identity before reads/writes and reject unknown mutations',()=>{
  const {f,audit}=baseline();f.setEmail('');

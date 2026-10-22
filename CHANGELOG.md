@@ -8,6 +8,15 @@ Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L0
 
 Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Abschnitt dokumentiert. D17 und D21 bleiben erhalten; D22 umfasst weiterhin nur eine lesende Inventur.
 
+## [v0.23.0] – 2026-10-22
+
+- Feste Kommunikationserfassung rechts in jeder Kundenakte; Kundendaten links und Historie rechts scrollen unabhängig. Auf schmalen Bildschirmen Reiter, gleichwertige helle/dunkle Darstellung.
+- Eine Erfassung „Gespräch / Notiz“ mit Firmen-Ansprechpartner, automatischer/änderbarer Zeit, Speichern und „Nicht erreicht“. Team-Vorauswahl nach jüngstem gültigem Gespräch. Kein Pflichtbetreff, keine Kontaktartauswahl, keine Wiedervorlage und kein E-Mail-Versand.
+- Zusätzliche Ansprechpartner im kleinen Fenster anlegen: Vor-/Nachname Pflicht, Position/E-Mail/Telefone optional. Sofort in Firebase und Kundenansicht verwendbar; bestehender HQ-Abgleich verarbeitet Firmen, Kontakte und abhängige Kommunikation in dieser Reihenfolge.
+- Stabile Speicherkennungen, Erhalt von Entwürfen, Import-unabhängiger Kundenbestand, geprüfte Firmen-/Kontaktbindung und gesperrte unklare HQ-Anlagen. Verlorene Kontaktantwort ohne ID ausschließlich durch manuell geprüfte ID-Zuordnung auflösen. Keine automatische Namensübernahme oder zweite Anlage.
+- Gezielte Änderungsantworten statt Gesamtneuabrufen. Im synthetischen Modell drei Reads/zwei Writes je normaler Erfassung, identische bestätigte Wiederholung ohne Writes. Ein zusätzlicher gezielter Kommunikationsabruf pro frisch geladener Kundenakte; keinerlei Datenbankaufrufe für Tippen, Auswahl, Scrollen oder Uhr.
+- Alle 20 Prüfsuiten erfolgreich, einschließlich elf neuer Backendfälle und der neuen Browserprüfung; ergänzende visuelle Prüfung von Desktop, Handy und heller Ansicht. Abschließende Veröffentlichung wird separat nachgewiesen. Anleitung: docs/KUNDENKOMMUNIKATION-R23.md. Keine neuen Script Properties, Scopes oder Bereitstellungseinstellungen. Fachliche Live-Abnahme offen.
+
 ## [v0.22.0] – 2026-10-18
 
 - T01/T02: normale Firmenanlage ohne TEST-Präfix und ohne Testkategorie. Technische lokale Kennungen und Altaufträge bleiben kompatibel; erster Ansprechpartner bleibt Pflicht. Keine pauschale Umbenennung bestehender Daten.

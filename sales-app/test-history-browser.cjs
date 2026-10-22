@@ -28,23 +28,13 @@ const {chromium}=require('playwright');
     });
     const preboot=main.slice(0,main.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
     await page.addScriptTag({content:preboot+`state=${JSON.stringify(state)};detail=${JSON.stringify(detail)};selected='draft_${id}';view='company';globalThis.historyTools={historyContent,historyRow,historyPreview};render();})();`});
-    const button=page.getByRole('button',{name:'Kommunikation erfassen',exact:true}).first();
-    assert.equal(await button.isEnabled(),true);assert.equal(await button.evaluate(b=>getComputedStyle(b).cursor),'pointer');
-    await button.click();await page.getByLabel('Betreff',{exact:true}).fill('TEST Browser');
-    for(const channel of ['Note','Mail','Call','Meeting','Visit']){
-      const typeControl=page.locator('select[name="channel"]');assert.equal(await typeControl.count(),1,'Missing channel before '+channel+'; browser errors: '+errors.join('; '));await typeControl.selectOption(channel);
-      const visible=await page.locator('form[data-form="history"]').evaluate(form=>Array.from(new FormData(form).keys()).sort());
-      const expected=['channel','reason','content',...(channel==='Mail'?['recipientEmailAddress']:['contactOn']),...(['Call','Meeting','Visit'].includes(channel)?['contactPersonId']:[]),...(channel==='Call'?['status']:[])].sort();
-      assert.deepEqual(visible,expected);assert.equal(await page.getByLabel('Betreff',{exact:true}).inputValue(),'TEST Browser');
-    }
-    assert.equal(await page.getByLabel('Kontaktart',{exact:true}).locator('option[value="Task"]').count(),0);
-    await page.getByLabel('Kontaktart',{exact:true}).selectOption('Note');
-    await page.getByLabel('Notiz / Text',{exact:true}).fill('Nur Firebase zuerst');
-    const n=f.calls.length;await page.getByRole('button',{name:'In Firebase speichern',exact:true}).click();
-    await page.getByRole('heading',{name:'TEST Browser',exact:true}).waitFor();
-    assert.equal(f.calls.length,n);assert.ok(rpcCalls.includes('saveSalesHistory'));assert.ok(!rpcCalls.includes('checkSalesHistoryBinding'));assert.ok(!rpcCalls.includes('runSalesJob'));
+    const note=page.getByLabel('Gespräch / Notiz',{exact:true});await note.fill('Nur Firebase zuerst');
+    assert.equal(await page.getByLabel('Ansprechpartner',{exact:true}).inputValue(),'202');
+    const n=f.calls.length;await page.getByRole('button',{name:'Speichern',exact:true}).click();
+    await page.getByText('Nur Firebase zuerst',{exact:true}).waitFor();
+    assert.equal(f.calls.length,n);assert.ok(rpcCalls.includes('saveSalesCommunication'));assert.ok(!rpcCalls.includes('checkSalesHistoryBinding'));assert.ok(!rpcCalls.includes('runSalesJob'));
     assert.equal(await page.locator('#magazin-vertrieb').getAttribute('aria-busy'),'false');
-    console.log('PASS actual button click, five type-specific field sets and Firebase save with open creation and no historyReady proof');
+    console.log('PASS inline customer capture stores Firebase communication without a separate form or HQ call');
     const checks=await page.evaluate(()=>{
       const {historyContent,historyRow,historyPreview}=historyTools;
       const rich='<p>Hallo <strong>Welt</strong> &amp; Team</p><p>Zweite Zeile<br>Weiter</p><ul><li>Eintrag</li></ul><span style="font-weight:700;font-style:italic;text-decoration:underline">Format</span><table><tr><td>Summe</td><td>10 EUR</td></tr></table>';

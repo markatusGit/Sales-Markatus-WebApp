@@ -116,6 +116,7 @@ function salesBusinessFinish_(job,actual){
   salesBusinessStore_(job.hqId,data);
 }
 function salesBusinessRun_(job,verifyOnly){
+  if(['communication','createContact'].includes(job.kind)){salesCommunicationRun_(job,verifyOnly);return;}
   if(job.kind==='history'){
     if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);return;}
     salesRunHistory_(job,null);return;
@@ -147,8 +148,9 @@ function salesBusinessRun_(job,verifyOnly){
   salesBusinessFinish_(job,after);
 }
 function salesBusinessTransport_(job,path,method,body){
-  const expected=job.kind==='history'?'/v2/ContactHistories':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
-  if(job.business!==1||job.state!=='running'||path!==expected||method!==(job.kind==='history'||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
+  const expected=['history','communication'].includes(job.kind)?'/v2/ContactHistories':job.kind==='createContact'?'/v2/ContactPersons':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
+  if(job.business!==1||job.state!=='running'||path!==expected||method!==(['history','communication','createContact'].includes(job.kind)||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
+  if(['communication','createContact'].includes(job.kind)&&Number(body.companyId)!==Number(job.hqId))throw new Error('Abweichendes Firmenziel.');
   job.writeAttempted=true;job.phaseWriteAttempted=true;job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};salesWrite_('sales_jobs/'+job.id,job);
   const result=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
   job.lastWrite.status=result.getResponseCode();salesWrite_('sales_jobs/'+job.id,job);

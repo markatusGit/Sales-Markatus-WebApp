@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=['Sales.gs','SalesFields.gs','SalesBusiness.gs'].map(n=>fs.readFileSync(__dirname+'/'+n,'utf8')).join('\n');
-function readUi(){return fs.readFileSync(__dirname+'/Sales.template.html','utf8').replace('// V1_FUNCTIONS',['SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js'].map(file=>fs.readFileSync(__dirname+'/'+file,'utf8')).join('\n'));}
+const source=['Sales.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs'].map(n=>fs.readFileSync(__dirname+'/'+n,'utf8')).join('\n');
+function readUi(){return fs.readFileSync(__dirname+'/Sales.template.html','utf8').replace('// V1_FUNCTIONS',['SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js'].map(file=>fs.readFileSync(__dirname+'/'+file,'utf8')).join('\n'));}
 let count=0;
 function test(name,fn){fn();console.log('PASS',name);count++;}
 function fixture(){
@@ -9,6 +9,12 @@ function fixture(){
   const ctx={console,Set,Date,JSON,Number,String,Object,Array,Math,Error,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},Session:{getActiveUser:()=>({getEmail:()=>email})},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},Utilities:{getUuid:()=>`test-${++seq}`,newBlob:x=>({getBytes:()=>Buffer.from(x)})},revenueToken_:()=> 'secret',revenueAmountCents_:x=>typeof x==='number'&&Number.isFinite(x)?Math.round(x*100):null};
   vm.createContext(ctx);vm.runInContext(source,ctx);
   ctx.salesRead_=p=>clone(db[p]||null);ctx.salesWrite_=(p,v)=>{const status=typeof ctx.salesLeanPrepareWrite_==='function'?ctx.salesLeanPrepareWrite_(p,v):null;db[p]=clone(v);if(status)ctx.salesWrite_('sales_meta/lean_sync',status);if(typeof ctx.salesLeanAfterWrite_==='function')ctx.salesLeanAfterWrite_(p,v);};ctx.salesList_=col=>Object.entries(db).filter(([k])=>k.startsWith(col+'/')).map(([,v])=>clone(v));ctx.salesAssertPrivate_=()=>{};
+  ctx.salesBulkName_=p=>p;ctx.salesBulkPayload_=(p,v)=>JSON.stringify(v);
+  ctx.salesBulkRest_=(operation,body)=>{
+    if(operation!=='commit')throw Error('Unexpected fixture operation '+operation);
+    const before=clone(db);try{for(const w of body.writes)ctx.salesWrite_(w.update.name,JSON.parse(w.update.fields.payload.stringValue));}
+    catch(e){for(const k of Object.keys(db))delete db[k];Object.assign(db,before);throw e;}return {writeResults:body.writes.map(()=>({}))};
+  };
   ctx.salesHqGet_=path=>{
     calls.push({method:'get',path});const addressPath=/^\/v2\/Companies\/(\d+)\/Addresses$/.exec(path);if(addressPath)return {data:[clone(remote.Companies[addressPath[1]].defaultAddress)],headers:{}};
     const m=path.match(/^\/v2\/(\w+)(?:\/(\d+))?/),entity=m[1];
@@ -507,7 +513,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-10-18-r22',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-10-22-r23',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -538,7 +544,7 @@ test('customer history offers separated filters, pending sync actions and collap
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   const rows=[{reason:'Call only',content:'A'.repeat(300)+'End & text',contactHistoryChannel:'Call',contactOn:'2026-09-26T10:15:00Z',jobId:'job-1',syncState:'pending'},{projectName:'Project only',content:'Automated full message',documentDispatch:true,contactOn:'2026-09-25',invoice:{netCents:10000,currency:'EUR'}}];
   vm.runInNewContext(preboot+`state={user:{admin:true},jobs:[{id:'test-1',state:'synced'}]};detail={histories:${JSON.stringify(rows)}};const c={id:'draft_test-1',hqId:'101',localDraftId:'test-1'};globalThis.all=historyPanel(c);historyFilter='documents';globalThis.documents=historyPanel(c);historyFilter='communication';globalThis.communication=historyPanel(c);})();`,sandbox);
-  assert.ok(sandbox.all.includes('Kommunikation erfassen'));assert.ok(!sandbox.all.includes('data-action="sync-history"'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
+  assert.ok(!sandbox.all.includes('data-action="history-form"'));assert.ok(!sandbox.all.includes('data-action="sync-history"'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
   assert.ok(sandbox.communication.includes('In Firebase · HQ offen'));assert.ok(sandbox.communication.includes('Übertragung ansehen'));assert.ok(!sandbox.communication.includes('Project only'));
   assert.ok(sandbox.communication.indexOf('End &amp; text')>sandbox.communication.indexOf('<details>'));assert.ok(!sandbox.communication.includes('<img'));
   assert.ok(!sandbox.documents.includes('Call only'));assert.ok(sandbox.documents.includes('100,00 EUR netto'));assert.ok(sandbox.documents.indexOf('Automated full message')>sandbox.documents.indexOf('<details>'));
@@ -550,19 +556,15 @@ test('ordinary email about an invoice stays communication unless HQ evidence ide
   assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1'},[doc],{}).documentDispatch,true);
   assert.equal(ctx.salesHistory_({...raw,reason:'Rechnung RE-1',syncId:'sales-local-job'},[doc],{}).documentDispatch,false);
 });
-test('communication button is available for ordinary HQ customers and waits for a confirmed new-company ID',()=>{
-  const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
-  const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null}};
-  vm.runInNewContext(preboot+`state={user:{admin:true},drafts:[{id:'own',hqId:101}],jobs:[]};globalThis.local=communicationAction({localDraftId:'own'});globalThis.real=communicationAction({id:'999'});globalThis.unfinished=communicationAction({localDraftId:'pending'});})();`,sandbox);
-  assert.ok(sandbox.local.includes('data-id="101"'));assert.ok(sandbox.real.includes('data-id="999"'));assert.ok(sandbox.real.includes('data-action="history-form"'));assert.ok(!sandbox.unfinished.includes('data-action="history-form"'));
+test('customer capture has one note, contact/date fields and no channel or subject selector',()=>{
+ const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+ const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
+ const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null}};
+ vm.runInNewContext(preboot+"state={user:{admin:true}};selected='101';detail={company:{id:'101',name:'Synthetic'},contacts:[{id:202,firstName:'Synthetic',lastName:'Contact'}],histories:[]};globalThis.capture=communicationPanel();})();",sandbox);
+ for(const field of ['communicationContact','communicationTime','communicationText'])assert.ok(sandbox.capture.includes('name="'+field+'"'));
+ assert.ok(sandbox.capture.includes('Nicht erreicht'));assert.ok(sandbox.capture.includes('Neuen Ansprechpartner anlegen'));assert.ok(!sandbox.capture.includes('name="channel"'));assert.ok(!sandbox.capture.includes('name="reason"'));
 });
 
-test('communication form offers only the five requested types',()=>{
- const html=readUi();const form=html.slice(html.indexOf('function historyForm'),html.indexOf('function changeForm'));
- for(const type of ['Note','Mail','Call','Meeting','Visit'])assert.ok(form.includes("id:'"+type+"'"));
- assert.ok(!form.includes("id:'Task'"));assert.ok(form.includes('recipientEmailAddress'));assert.ok(form.includes('contactPersonId'));
-});
 test('startup guard replaces a stalled static screen with a useful release hint',()=>{
   const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   const guard=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
@@ -572,7 +574,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-10-18-r22'));
+  assert.ok(root.innerHTML.includes('2026-10-22-r23'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

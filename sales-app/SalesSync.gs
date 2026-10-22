@@ -21,7 +21,7 @@ function startSalesSync(request){
     const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
     // Separate executions for company and contact, with all companies scheduled first.
     for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:step==='company'?'App → HQ: Firma anlegen/bestätigen':'App → HQ: Ansprechpartner anlegen/bestätigen'}));
-    jobs.filter(j=>j.kind!=='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));
+    salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));
     tasks.push({kind:'discover',id:'all',label:'HQ → Firebase: alle Unternehmen erfassen'});
     tasks.push({kind:'catalog',id:'lists',label:'HQ → Firebase: Auswahllisten'});
     salesV1Editions_().filter(e=>e.syncEnabled!==false).forEach(e=>tasks.push({kind:'edition',id:e.id,label:e.magazine+' #'+e.issue,skip:0,pages:0}));
@@ -41,7 +41,7 @@ function pauseSalesSync(id){
 }
 function salesSyncWrite_(task){
   const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
-  if(job.state==='synced'||job.state==='canceled')return;
+  if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
   if(!draft?.company||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Firmenziel. Auftrag nicht übertragen.');

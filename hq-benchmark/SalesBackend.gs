@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-18-r22';
+const SALES_RELEASE = '2026-10-22-r23';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -340,7 +340,7 @@ function saveSalesTestCompany(input) {
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
 }
 function getSalesJobPreview(id) {
-  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,history:job.history,note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
+  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,contact:job.contact,companyRef:job.companyRef,history:job.history||(job.kind==='communication'?{reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',content:job.capture.content||'Nicht erreicht',contactOn:job.capture.contactOn,contactHistoryChannel:job.capture.notReached?'Call':'Note',contactPersonId:job.capture.contactRef}:null),note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
   return {job:salesJobSummary_(job),company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Firma. Adressherkunft bleibt vorerst in Firebase. Kein Projekt-/Rechnungsschreibzugriff.'};
 }
 function getSalesTestAudit(id) {
@@ -544,7 +544,7 @@ function runSalesJob(id,step) {
 }
 function salesRunJobLocked_(id,step) {
   salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
-    if(job.state==='synced') return {message:'Bereits synchronisiert. Keine erneute Anlage.'};
+    if(job.state==='synced') {if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return {message:'Bereits synchronisiert. Keine erneute Anlage.'};}
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
     const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
     if(job.kind==='createCompany') {
@@ -564,11 +564,11 @@ function salesRunJobLocked_(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail','history','entityChange'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+      if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
       else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
       else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
     }
-    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);return salesJobSummary_(job);
+    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);
 }
 function salesRunCreate_(job,draft,step) {
   if(!job.hqId) {
@@ -696,7 +696,7 @@ function reconcileSalesJob(id) {
       else if([job.base.industrialSector,job.change.industrialSector].includes(actual.industrialSector)&&[job.base.homepage,job.change.homepage].includes(actual.homepage||'')&&[job.baseAddressWebsite||'',job.change.homepage].includes(website)) {job.state='ready';job.message='Teilübertragung geprüft. Offene Schritte kontrolliert fortsetzen.';}
       else throw new Error('HQ-Werte weichen vom Auftrag ab. Auftrag bleibt gesperrt.');
     }
-    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);return salesJobSummary_(job);});
+    job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);});
 }
 function salesHistoryDate_(raw) {
   if(typeof raw!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(raw)||!Number.isFinite(Date.parse(raw))||new Date(raw).toISOString().slice(0,19)!==raw.slice(0,19))throw new Error('Bitte einen gültigen Kontaktzeitpunkt oder Termin angeben.');
@@ -1057,7 +1057,7 @@ function startSalesSync(request){
     const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
     // Separate executions for company and contact, with all companies scheduled first.
     for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:step==='company'?'App → HQ: Firma anlegen/bestätigen':'App → HQ: Ansprechpartner anlegen/bestätigen'}));
-    jobs.filter(j=>j.kind!=='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));
+    salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));
     tasks.push({kind:'discover',id:'all',label:'HQ → Firebase: alle Unternehmen erfassen'});
     tasks.push({kind:'catalog',id:'lists',label:'HQ → Firebase: Auswahllisten'});
     salesV1Editions_().filter(e=>e.syncEnabled!==false).forEach(e=>tasks.push({kind:'edition',id:e.id,label:e.magazine+' #'+e.issue,skip:0,pages:0}));
@@ -1077,7 +1077,7 @@ function pauseSalesSync(id){
 }
 function salesSyncWrite_(task){
   const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
-  if(job.state==='synced'||job.state==='canceled')return;
+  if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
   if(!draft?.company||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Firmenziel. Auftrag nicht übertragen.');
@@ -1442,7 +1442,7 @@ function salesDeltaPrepare_(old){
   if(full&&old?.engine===2&&old.state!=='running')throw new Error('Vorhandener Abgleich hat keine wiederherstellbare Ausgangsbasis. Kein erneuter Gesamtimport gestartet. Gespeicherten Lauf prüfen.');
   let tasks=[];
   if(old?.state==='running')tasks=old.tasks.slice(old.cursor).filter(t=>t.kind==='write');
-  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));jobs.filter(j=>j.kind!=='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
+  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
   const run={id:old?.state==='running'?old.id:Utilities.getUuid(),engine:2,policy:3,revision:(old?.revision||0)+1,state:'running',paused:false,cursor:0,done:0,tasks,
     errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
     stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
@@ -1717,7 +1717,8 @@ function salesLeanKnown_(id){
   if((salesRead_('sales_meta/directory')?.entries||[]).some(e=>String(e.company.id)===id))return true;
   return salesV1Editions_().some(e=>(e.companyIds||[]).map(String).includes(id)||(e.companies||[]).some(c=>String(c.id)===id));
 }
-function getSalesLeanCompany(id){
+function getSalesLeanCompany(id){return salesCommunicationMerge_(salesLeanCompanyBase_(id));}
+function salesLeanCompanyBase_(id){
   salesUser_();
   if(String(id).startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company)throw new Error('Firebase-Firma fehlt.');
@@ -1726,8 +1727,10 @@ function getSalesLeanCompany(id){
     const visible=stored&&typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local;
     return {...(visible||{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
-  id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return getSalesLeanCompany('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
-  const stored=salesRead_('sales_companies/'+id);return stored?{...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)}:null;
+  id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
+  const stored=salesRead_('sales_companies/'+id);
+  if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
+  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
@@ -1783,7 +1786,7 @@ function mutateSalesLean(name,args){
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
 function getSalesStorageInventoryPage(input){
   salesUser_(true);input=input||{};
-  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
+  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
   const collection=input.collection||collections[0],index=collections.indexOf(collection),token=input.pageToken||'';
   if(index<0||typeof token!=='string'||token.length>5000||/[\r\n]/.test(token))throw new Error('Ungültige Inventurseite.');
   const c=salesContext_(),page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=50'+(token?'&pageToken='+encodeURIComponent(token):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
@@ -2333,6 +2336,7 @@ function salesBusinessFinish_(job,actual){
   salesBusinessStore_(job.hqId,data);
 }
 function salesBusinessRun_(job,verifyOnly){
+  if(['communication','createContact'].includes(job.kind)){salesCommunicationRun_(job,verifyOnly);return;}
   if(job.kind==='history'){
     if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);return;}
     salesRunHistory_(job,null);return;
@@ -2364,11 +2368,154 @@ function salesBusinessRun_(job,verifyOnly){
   salesBusinessFinish_(job,after);
 }
 function salesBusinessTransport_(job,path,method,body){
-  const expected=job.kind==='history'?'/v2/ContactHistories':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
-  if(job.business!==1||job.state!=='running'||path!==expected||method!==(job.kind==='history'||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
+  const expected=['history','communication'].includes(job.kind)?'/v2/ContactHistories':job.kind==='createContact'?'/v2/ContactPersons':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
+  if(job.business!==1||job.state!=='running'||path!==expected||method!==(['history','communication','createContact'].includes(job.kind)||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
+  if(['communication','createContact'].includes(job.kind)&&Number(body.companyId)!==Number(job.hqId))throw new Error('Abweichendes Firmenziel.');
   job.writeAttempted=true;job.phaseWriteAttempted=true;job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};salesWrite_('sales_jobs/'+job.id,job);
   const result=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
   job.lastWrite.status=result.getResponseCode();salesWrite_('sales_jobs/'+job.id,job);
   if(job.lastWrite.status<200||job.lastWrite.status>=300)throw new Error('HQ-Schreiben: HTTP '+job.lastWrite.status+'. Ausgang vor Wiederholung prüfen.');
   return result.getContentText()?JSON.parse(result.getContentText()):null;
 }
+
+/** Customer-scoped overlays. Capture never calls HQ; stable request IDs make retries safe. */
+function salesCommunicationCompany_(ref){
+  ref=salesKey_(String(ref));
+  if(ref.startsWith('draft_')){
+    const draft=salesRead_('sales_drafts/'+ref.slice(6));
+    if(!draft?.company)throw new Error('Kunde nicht im App-Bestand.');
+    const stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
+    return {ref,draft,hqId:draft.hqId||null,company:stored?.company||draft.company,contacts:stored?.contacts||[],name:draft.company.name};
+  }
+  const id=salesId_(ref),data=salesRead_('sales_companies/'+id)||salesRead_('sales_directory/'+id);
+  if(!data?.company||Number(data.company.id)!==id)throw new Error('Kunde nicht im bestätigten App-Bestand.');
+  return {ref,hqId:id,company:data.company,contacts:data.contacts||[],name:data.company.name};
+}
+function salesCommunicationData_(ref){return salesRead_('sales_communication/'+ref)||{contacts:[],histories:[]};}
+function salesCommunicationView_(data,base){
+  const contacts=(base.contacts||[]).slice(),aliases=new Map();
+  if(base.company?.localDraftId){const first=contacts.find(c=>c.localDraftId===base.company.localDraftId||base.patch?.job?.contactId&&String(c.id)===String(base.patch.job.contactId));if(first)aliases.set('draft_'+base.company.localDraftId+'_contact',first.id);}
+  for(const c of data.contacts){
+    const i=c.hqId?contacts.findIndex(x=>Number(x.id)===Number(c.hqId)):-1;
+    const value={...(i<0?c:contacts[i]),id:c.hqId||c.id,localContactId:c.id,jobId:c.jobId,syncState:c.syncState};
+    if(i<0)contacts.push(value);else contacts[i]=value;
+    aliases.set(c.id,value.id);
+  }
+  const histories=(base.histories||[]).slice();
+  for(const h of data.histories){
+    const i=histories.findIndex(x=>x.syncId===h.syncId||h.historyId&&String(x.id)===String(h.historyId));
+    const value={...h,contactPersonId:aliases.get(h.contactRef)||h.contactPersonId||h.contactRef,source:'app'};
+    if(i<0)histories.push(value);else histories[i]={...histories[i],jobId:h.jobId,syncState:h.syncState,actor:h.actor};
+  }
+  return {...base,contacts,histories};
+}
+function salesCommunicationMerge_(value){
+  if(!value?.company)return value;
+  const ref=value.company.localDraftId?'draft_'+value.company.localDraftId:String(value.company.id);
+  return {...salesCommunicationView_(salesCommunicationData_(ref),value),communicationRef:ref};
+}
+function salesCommunicationInput_(input,kind){
+  if(!input||typeof input!=='object')throw new Error('Ungültige Eingabe.');
+  const out={companyRef:salesKey_(String(input.companyRef)),requestId:salesKey_(String(input.requestId))};
+  if(kind==='createContact'){
+    for(const k of ['firstName','lastName','position','eMail','phoneMobile','phoneLandline'])out[k]=salesText_(input[k],200,['firstName','lastName'].includes(k));
+    if(out.eMail&&!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(out.eMail))throw new Error('Bitte eine gültige E-Mail-Adresse eingeben.');
+  }else{
+    if(typeof input.notReached!=='boolean')throw new Error('Ungültiges Kontaktergebnis.');
+    out.notReached=input.notReached;out.content=salesText_(input.content,10000,!input.notReached);
+    out.contactRef=salesKey_(String(input.contactRef));out.contactOn=salesHistoryDate_(input.contactOn);
+  }
+  return out;
+}
+function salesCommunicationContact_(ctx,data,ref){
+  const local=data.contacts.find(c=>c.id===ref||c.hqId&&String(c.hqId)===ref);
+  if(local)return {ref:local.id,hqId:local.syncState==='synced'?local.hqId||null:null};
+  const contact=ctx.contacts.find(c=>String(c.id)===ref&&Number(c.companyId)===Number(ctx.hqId));
+  if(contact)return {ref,hqId:salesId_(contact.id)};
+  if(ctx.draft?.contact){
+    const creation=salesRead_('sales_jobs/'+ctx.draft.id);
+    if(ref==='draft_'+ctx.draft.id+'_contact'||creation?.contactId&&String(creation.contactId)===ref)return {ref:'draft_'+ctx.draft.id+'_contact',hqId:creation?.steps?.contact?creation.contactId:null};
+  }
+  throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
+}
+function salesCommunicationApplyJob_(job,data){
+  if(job.kind==='createContact'){
+    const c={...job.contact,id:'local_'+job.id,jobId:job.id,...(job.contactId?{hqId:job.contactId}:{}),syncState:job.state};
+    const i=data.contacts.findIndex(x=>x.jobId===job.id);if(i<0)data.contacts.push(c);else data.contacts[i]=c;
+  }else{
+    const h={id:'local_'+job.id,jobId:job.id,syncId:'sales-'+job.id,contactRef:job.capture.contactRef,contactOn:job.capture.contactOn,content:job.capture.content||'Nicht erreicht',reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',contactHistoryChannel:job.capture.notReached?'Call':'Note',...(job.capture.notReached?{contactHistoryStatus:'NotReached'}:{}),actor:job.actor,syncState:job.state,...(job.historyId?{historyId:job.historyId}:{})};
+    const i=data.histories.findIndex(x=>x.jobId===job.id);if(i<0)data.histories.push(h);else data.histories[i]=h;
+  }
+  return data;
+}
+function salesCommunicationResult_(job,data){
+  const result={id:job.id,message:job.state==='synced'?'Bereits gespeichert und in HQ bestätigt.':job.kind==='createContact'?'Ansprechpartner gespeichert; HQ-Abgleich offen.':'Kommunikation gespeichert; HQ-Abgleich offen.',patch:{job:salesJobSummary_(job)}};
+  if(job.kind==='createContact')result.contact=data.contacts.find(c=>c.jobId===job.id);
+  else result.communication=data.histories.find(h=>h.jobId===job.id);
+  return result;
+}
+function salesCommunicationCommit_(job,data){
+  const entries=[{path:'sales_jobs/'+job.id,value:job},{path:'sales_communication/'+job.companyRef,value:data}];
+  // Existing chunk writer prepares any large payload first; publish both root documents atomically.
+  const writes=entries.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}}));
+  salesBulkRest_('commit',{writes});
+}
+function salesCommunicationSave_(input,kind){
+  const user=salesUser_(),capture=salesCommunicationInput_(input,kind);
+  return salesLock_(()=>{
+    salesAssertPrivate_();const id=salesKey_('comm_'+capture.requestId),path='sales_jobs/'+id,old=salesRead_(path);
+    if(old){
+      if(old.actor!==user.email||old.kind!==kind||JSON.stringify(old.capture)!==JSON.stringify(capture))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');
+      const data=salesCommunicationData_(old.companyRef),before=JSON.stringify(data);salesCommunicationApplyJob_(old,data);if(JSON.stringify(data)!==before)salesWrite_('sales_communication/'+old.companyRef,data);return salesCommunicationResult_(old,data);
+    }
+    const ctx=salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
+    if(kind!=='createContact')salesCommunicationContact_(ctx,data,capture.contactRef);
+    if(kind==='createContact'&&[...ctx.contacts,...data.contacts].some(c=>String(c.firstName).trim().toLocaleLowerCase('de')===capture.firstName.toLocaleLowerCase('de')&&String(c.lastName).trim().toLocaleLowerCase('de')===capture.lastName.toLocaleLowerCase('de')))throw new Error('Ein Ansprechpartner mit diesem Namen ist bereits vorhanden. Bitte den vorhandenen Kontakt auswählen.');
+    const job={id,kind,business:1,companyRef:ctx.ref,hqId:ctx.hqId,name:ctx.name,capture,actor:user.email,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),message:'In Firebase gespeichert; kontrollierter HQ-Abgleich offen.'};
+    if(kind==='createContact')job.contact=salesPick_(capture,['firstName','lastName','position','eMail','phoneMobile','phoneLandline']);
+    salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data);
+    return salesCommunicationResult_(job,data);
+  });
+}
+function saveSalesCommunication(input){return salesCommunicationSave_(input,'communication');}
+function createSalesCustomerContact(input){return salesCommunicationSave_(input,'createContact');}
+function salesCommunicationAfterJob_(job){
+  if(!['communication','createContact'].includes(job.kind))return;
+  const data=salesCommunicationData_(job.companyRef),before=JSON.stringify(data);salesCommunicationApplyJob_(job,data);if(JSON.stringify(data)!==before)salesWrite_('sales_communication/'+job.companyRef,data);
+}
+function salesCommunicationRun_(job,verifyOnly){
+  const ctx=salesCommunicationCompany_(job.companyRef);
+  if(!ctx.hqId)throw new Error('Firmenanlage noch offen; Kontakt und Kommunikation bleiben in Firebase.');
+  if(ctx.draft){const parent=salesRead_('sales_jobs/'+ctx.draft.id);if(!parent?.steps?.contact||!parent.steps.company)throw new Error('Firmenanlage zuerst vollständig bestätigen.');}
+  job.hqId=salesId_(ctx.hqId);
+  if(job.kind==='createContact'){
+    const company=salesOne_('Companies',job.hqId);if(Number(company.id)!==job.hqId)throw new Error('HQ-Firmenziel nicht bestätigt.');
+    if(!job.contactId){
+      if(verifyOnly||job.writeAttempted)throw new Error('HQ-Anlage ohne bestätigte Kontakt-ID. Auftrag bleibt gesperrt; HQ manuell prüfen und die geprüfte ID zuordnen.');
+      const payload={companyId:job.hqId,salutationForm:'Formal'};
+      for(const [k,v] of Object.entries(job.contact))if(v)payload[k]=v;
+      if(job.contact.eMail)payload.defaultAddress={...salesContactAddressFields_(company.defaultAddress||{}),email:job.contact.eMail};
+      const result=salesWriteHq_(job,'/v2/ContactPersons','post',payload);job.contactId=salesId_(result?.id);salesWrite_('sales_jobs/'+job.id,job);
+    }
+    const actual=salesContactWithAddress_(job.contactId);
+    if(Number(actual.companyId)!==job.hqId||salesContactDifferences_(actual,job.contact).length)throw new Error('HQ-Kontakt stimmt nicht vollständig mit dem Anlageauftrag überein.');
+    return;
+  }
+  const contact=salesCommunicationContact_(ctx,salesCommunicationData_(ctx.ref),job.capture.contactRef);
+  if(!contact.hqId)throw new Error('Ansprechpartner noch nicht in HQ bestätigt; Kommunikation bleibt in Firebase.');
+  job.history={companyId:job.hqId,contactPersonId:salesId_(contact.hqId),reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',content:job.capture.content||'Nicht erreicht',contactOn:job.capture.contactOn,contactHistoryChannel:job.capture.notReached?'Call':'Note',...(job.capture.notReached?{contactHistoryStatus:'NotReached'}:{}),syncId:'sales-'+job.id};
+  salesWrite_('sales_jobs/'+job.id,job);
+  if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);}else salesRunHistory_(job,null);
+}
+function bindSalesCustomerContact(id,hqId){
+  salesUser_(true);return salesLock_(()=>{
+    const job=salesRead_('sales_jobs/'+salesKey_(id));
+    if(job?.kind!=='createContact'||!['uncertain','running'].includes(job.state)||job.contactId||!job.writeAttempted)throw new Error('Keine unklare Kontaktanlage ohne ID.');
+    const ctx=salesCommunicationCompany_(job.companyRef),actual=salesContactWithAddress_(salesId_(hqId));
+    if(Number(actual.companyId)!==Number(ctx.hqId)||salesContactDifferences_(actual,job.contact).length)throw new Error('Die geprüfte Kontakt-ID passt nicht vollständig zu Firma und Anlageauftrag.');
+    const data=salesCommunicationData_(job.companyRef);if(data.contacts.some(c=>c.jobId!==job.id&&Number(c.hqId)===Number(hqId)))throw new Error('Kontakt-ID ist bereits einem anderen Anlageauftrag zugeordnet.');
+    job.hqId=ctx.hqId;job.contactId=salesId_(hqId);job.state='synced';job.updatedAt=salesNow_();job.message='Manuell geprüfte HQ-Kontakt-ID zugeordnet; kein weiterer Anlageversuch.';
+    salesWrite_('sales_jobs/'+job.id,job);salesCommunicationAfterJob_(job);return {id:job.id,message:job.message,patch:{job:salesJobSummary_(job)}};
+  });
+}
+function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind==='createContact'?0:1)-(b.kind==='createContact'?0:1));}

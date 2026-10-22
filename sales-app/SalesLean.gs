@@ -102,7 +102,8 @@ function salesLeanKnown_(id){
   if((salesRead_('sales_meta/directory')?.entries||[]).some(e=>String(e.company.id)===id))return true;
   return salesV1Editions_().some(e=>(e.companyIds||[]).map(String).includes(id)||(e.companies||[]).some(c=>String(c.id)===id));
 }
-function getSalesLeanCompany(id){
+function getSalesLeanCompany(id){return salesCommunicationMerge_(salesLeanCompanyBase_(id));}
+function salesLeanCompanyBase_(id){
   salesUser_();
   if(String(id).startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company)throw new Error('Firebase-Firma fehlt.');
@@ -111,8 +112,10 @@ function getSalesLeanCompany(id){
     const visible=stored&&typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local;
     return {...(visible||{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
-  id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return getSalesLeanCompany('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
-  const stored=salesRead_('sales_companies/'+id);return stored?{...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)}:null;
+  id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
+  const stored=salesRead_('sales_companies/'+id);
+  if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
+  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
@@ -168,7 +171,7 @@ function mutateSalesLean(name,args){
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
 function getSalesStorageInventoryPage(input){
   salesUser_(true);input=input||{};
-  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
+  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
   const collection=input.collection||collections[0],index=collections.indexOf(collection),token=input.pageToken||'';
   if(index<0||typeof token!=='string'||token.length>5000||/[\r\n]/.test(token))throw new Error('Ungültige Inventurseite.');
   const c=salesContext_(),page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=50'+(token?'&pageToken='+encodeURIComponent(token):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});

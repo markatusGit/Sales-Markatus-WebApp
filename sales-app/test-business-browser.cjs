@@ -24,8 +24,8 @@ const {chromium}=require('playwright'),{productionFixture}=require('./test-busin
   const address=Object.values(f.db).find(j=>j.kind==='entityChange'&&j.entity==='address');assert.deepEqual(Object.keys(address.change),['city']);f.ctx.salesSyncWrite_({id:address.id});
   await page.getByRole('button',{name:'Firmenart bearbeiten',exact:true}).click();await page.locator('input[name="type.2"]').uncheck();await page.locator('input[name="type.3"]').check();await page.getByLabel('Nummer · Kunde',{exact:true}).fill('synthetic-number');
   await page.getByRole('button',{name:'Änderungen in Firebase speichern',exact:true}).click();await page.getByRole('heading',{name:'Synthetic browser customer',exact:true}).waitFor();const types=Object.values(f.db).find(j=>j.entity==='types');assert.equal(types.change.companyTypes[0].companyTypeId,3);assert.equal(types.change.companyTypes[0].number,'synthetic-number');
-  await page.getByRole('button',{name:'Kommunikation erfassen',exact:true}).first().click();await page.getByLabel('Betreff',{exact:true}).fill('Synthetic ordinary activity');await page.getByLabel('Notiz / Text',{exact:true}).fill('Synthetic customer note');
-  const lastWrite=f.calls.filter(c=>c.method!=='get').length;await page.getByRole('button',{name:'In Firebase speichern',exact:true}).click();await page.getByRole('heading',{name:'Synthetic ordinary activity',exact:true}).waitFor();assert.equal(f.calls.filter(c=>c.method!=='get').length,lastWrite);
+  await page.getByLabel('Gespräch / Notiz',{exact:true}).fill('Synthetic customer note');
+  const lastWrite=f.calls.filter(c=>c.method!=='get').length;await page.getByRole('button',{name:'Speichern',exact:true}).click();await page.getByText('Synthetic customer note',{exact:true}).waitFor();assert.equal(f.calls.filter(c=>c.method!=='get').length,lastWrite);
   assert.deepEqual(errors,[]);assert.ok(!calls.some(c=>c.name==='getSalesV1State'));console.log('PASS ordinary customer: targeted editor, changed fields only, pending display, contact/address edits and Firebase-only activity');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
