@@ -1,9 +1,14 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-23-r25';
+const SALES_RELEASE = '2026-10-23-r26';
 let salesContextCache_;
 
 function salesUser_(admin) {
+  if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){
+    const request=salesAuthRequest_;if(!request?.user)throw Error('AUTH_REQUIRED: Bitte zuerst anmelden.');
+    if(admin&&!request.user.admin&&!['sync.run','settings.edit'].includes(request.requiredPermission))throw Error('AUTH_DENIED: Aktion nicht freigegeben.');
+    return salesAuthPublicUser_(request.user);
+  }
   const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
   const p = PropertiesService.getScriptProperties();
   const owner = String(p.getProperty('SALES_ADMIN_EMAIL') || SALES.admin).toLowerCase();
@@ -11,7 +16,11 @@ function salesUser_(admin) {
   if (!email || !allowed.includes(email) || (admin && email !== owner)) throw new Error('Zugriff nicht freigegeben. Bitte mit einem ausdrücklich freigegebenen Google-Konto anmelden.');
   return {email,admin:email===owner};
 }
-function salesPage_() {
+function salesPage_(event) {
+  if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){
+    try{const cfg=salesAuthConfig_(),invite=event?.parameter?.invite||'';if(invite)salesAuthKey_(invite);return HtmlService.createHtmlOutput(HtmlService.createHtmlOutputFromFile('Sales').getContent().replace('"AUTH_RUNTIME_CONFIG"',JSON.stringify({enabled:true,origin:cfg.origin,invitation:invite}).replace(/</g,'\\u003c'))).setTitle('Sales Markatus').addMetaTag('viewport','width=device-width, initial-scale=1');}
+    catch(_){return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><h1>Anmeldung wird eingerichtet</h1><p>Aktuell werden keine Kundendaten ausgeliefert.</p>');}
+  }
   try {salesUser_();} catch (_) {return HtmlService.createHtmlOutput('<!doctype html><html lang="de"><meta charset="utf-8"><h1>Zugriff nicht freigegeben</h1><p>Bitte diese App mit deinem freigegebenen Google-Konto öffnen. Wenn Google deine Identität nicht übermittelt, muss die Bereitstellung geprüft werden.</p></html>');}
   return HtmlService.createHtmlOutputFromFile('Sales').setTitle('Sales Markatus').addMetaTag('viewport','width=device-width, initial-scale=1');
 }
@@ -296,7 +305,7 @@ function saveSalesEditionSettings(input) {
     const settings={targetCents:Math.round(target*100),revision:e.settings.revision+1};
     ['adDeadline','printDate','releaseDate'].forEach(k=>{const v=salesText_(input[k],10,false);if(v&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)) throw new Error('Ungültiges Datum.');settings[k]=v;});
     if(settings.adDeadline&&settings.printDate&&settings.adDeadline>settings.printDate || settings.printDate&&settings.releaseDate&&settings.printDate>settings.releaseDate) throw new Error('Termine müssen in zeitlicher Reihenfolge liegen.');
-    e.changes=[{at:salesNow_(),actor:user.email,before:e.settings,after:settings}].concat(e.changes||[]).slice(0,50);e.settings=settings;salesWrite_('sales_editions/'+SALES.edition,e);return {message:'Ziel und Termine für alle Nutzer gespeichert.'};});
+    e.changes=[{at:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),before:e.settings,after:settings}].concat(e.changes||[]).slice(0,50);e.settings=settings;salesWrite_('sales_editions/'+SALES.edition,e);return {message:'Ziel und Termine für alle Nutzer gespeichert.'};});
 }
 
 function salesJobSummary_(j) {
@@ -336,7 +345,7 @@ function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
     const value=salesDraftInput_(input,cat),id=Utilities.getUuid(),draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
     salesWrite_('sales_drafts/'+id,draft);
-    const job={id,kind:'createCompany',markerMode:'none',draftId:id,name:value.company.name,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
+    const job={id,kind:'createCompany',markerMode:'none',draftId:id,name:value.company.name,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid}:{}),createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
 }
 function getSalesJobPreview(id) {
@@ -483,7 +492,7 @@ function queueSalesMarkerCleanup(id) {
     if(actual.name!==d.company.name||String(actual.description||'').replace(/\r\n/g,'\n')!==[d.company.description,marker].filter(Boolean).join('\n')) throw new Error('Technische Kennzeichnung fehlt oder Beschreibung wurde verändert.');
     const existing=salesList_('sales_jobs').find(j=>j.kind==='cleanupMarker'&&j.draftId===d.id&&!['synced','canceled'].includes(j.state));
     if(existing) return {id:existing.id,message:'Bereinigungsauftrag ist bereits vorhanden. Bitte ansehen.'};
-    const job={id:Utilities.getUuid(),kind:'cleanupMarker',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Beschreibung bereinigen: Auftrag prüfen, dann bewusst nach HQ übertragen.'};
+    const job={id:Utilities.getUuid(),kind:'cleanupMarker',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Beschreibung bereinigen: Auftrag prüfen, dann bewusst nach HQ übertragen.'};
     salesWrite_('sales_jobs/'+job.id,job);return {id:job.id,message:job.message};
   });
 }
@@ -506,6 +515,7 @@ function salesRunMarkerCleanup_(job,draft) {
   if(stored){stored.company=salesCompany_(salesOne_('Companies',job.hqId));stored.loadedAt=salesNow_();salesWrite_('sales_companies/'+job.hqId,stored);}
 }
 function salesWriteHq_(job,path,method,body) {
+  if(typeof salesAuthSource_==='function')salesAuthSource_(job);
   // Never accept an arbitrary destination or payload from the browser.
   if(job.business===1)return salesBusinessTransport_(job,path,method,body);
   if(job.state!=='running') throw new Error('Kein laufender Auftrag.');
@@ -754,7 +764,7 @@ function saveSalesHistory(input) {
       if(!contactId||Number(contactId)!==Number(creation?.contactId)&&!contacts.some(c=>Number(c.id)===Number(contactId)&&Number(c.companyId)===Number(draft.hqId)))throw new Error('Bitte einen Ansprechpartner dieses Kunden auswählen.');
       history.contactPersonId=salesId_(contactId);
     }
-    const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',...(general?{business:1}:{}),draftId:draft.id||null,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
+    const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',...(general?{business:1}:{}),draftId:draft.id||null,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
 function salesHistoryTarget_(job,draft) {
   if(job.business===1){salesBusinessKnown_(job.hqId);salesOne_('Companies',job.hqId);}else{
@@ -801,7 +811,7 @@ function saveSalesCompanyChange(input) {
     const industry=salesText_(input.industrialSector,150,false),known=salesRead_('sales_meta/catalog')?.industries||[];
     if(industry&&!known.includes(industry)&&industry!==data.company.industrialSector) throw new Error('Bitte eine Branche aus der aktuellen HQ-Auswahlliste wählen.');
     const change={industrialSector:industry,homepage:salesWebsiteInput_(input.homepage)};
-    const base=salesPick_(data.company,Object.keys(change)),baseAddressWebsite=data.company.defaultAddress?.website||'',id=Utilities.getUuid();const job={id,kind:'companyChange',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',change,base,baseAddressWebsite,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,message:'Änderung in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
+    const base=salesPick_(data.company,Object.keys(change)),baseAddressWebsite=data.company.defaultAddress?.website||'',id=Utilities.getUuid();const job={id,kind:'companyChange',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',change,base,baseAddressWebsite,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Änderung in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
 function salesAddressForWrite_(actual) {
   const address=actual.defaultAddress;if(!address?.id) throw new Error('HQ hat keine eindeutige Standardadress-ID geliefert. Keine Änderung.');
@@ -1211,6 +1221,7 @@ function salesBulkCollection_(entity){
   if(!names[entity])throw new Error('Unbekannte HQ-Datenart.');return 'sales_raw'+names[entity];
 }
 function salesBulkRest_(operation,body){
+  if(operation==='commit'&&typeof salesAuthProtectWrites_==='function')body={...body,writes:salesAuthProtectWrites_(body.writes)};
   const c=salesContext_();return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':'+operation,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify(body)});
 }
 function salesBulkName_(path){return 'projects/'+salesContext_().project+'/databases/(default)/documents/'+salesPath_(path);}
@@ -1584,6 +1595,9 @@ function salesWorkerPause_(id){
 function salesSyncWorker_(event){
   const p=salesWorkerProps_(),owner=p.getProperty('SALES_SYNC_EXECUTOR'),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase(),allowed=String(p.getProperty('SALES_ALLOWED_EMAILS')||admin).split(',').map(x=>x.trim().toLowerCase());
   if(!event?.triggerUid||String(event.triggerUid)!==p.getProperty('SALES_SYNC_TRIGGER')||String(Session.getEffectiveUser().getEmail()||'').toLowerCase()!==owner||p.getProperty('SALES_SYNC_ADMIN')!==admin||!allowed.includes(admin))throw new Error('Hintergrundauftrag nicht autorisiert.');
+  // Only a validated installable trigger may establish this server-only context.
+  if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){const cfg=salesAuthConfig_();salesAuthRequest_={user:salesAuthPrincipal_({uid:cfg.ownerUid,email:cfg.ownerEmail}),worker:true};}
+  try{
   const until=Date.now()+180000;let checked=false;
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
@@ -1608,6 +1622,7 @@ function salesSyncWorker_(event){
       if(writeBoundary)return;
     }finally{lock.releaseLock();}
   }
+  }finally{if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
 function salesWorkerPrivate_(){
   const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}
@@ -2321,7 +2336,7 @@ function saveSalesEntityChange(input){
       if(!change.companyTypes?.length||new Set(change.companyTypes.map(t=>t.companyTypeId)).size!==change.companyTypes.length||change.companyTypes.some(t=>!Object.prototype.hasOwnProperty.call(typeNames,t.companyTypeId)))throw new Error('Bitte mindestens eine bekannte HQ-Firmenart auswählen.');
     }
     // Base values are expected values, never a destination or a complete PUT body.
-    const id=Utilities.getUuid(),job={id,kind:'entityChange',business:1,hqId,targetId,entity,name:data.company.name,change,base,state:'pending',actor:user.email,createdAt:salesNow_(),updatedAt:salesNow_(),message:'Stammdatenänderung in Firebase gespeichert; HQ-Abgleich offen.'};
+    const id=Utilities.getUuid(),job={id,kind:'entityChange',business:1,hqId,targetId,entity,name:data.company.name,change,base,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid}:{}),createdAt:salesNow_(),updatedAt:salesNow_(),message:'Stammdatenänderung in Firebase gespeichert; HQ-Abgleich offen.'};
     data.pendingChanges=[...(data.pendingChanges||[]),{jobId:id,entity,targetId,change,...(entity==='types'?{typeNames}:{})}];
     salesWrite_('sales_jobs/'+id,job);salesBusinessStore_(hqId,data);
     return {id,message:job.message,entityPatch:{companyId:hqId,entity,targetId,change,...(entity==='types'?{typeNames}:{})},patch:{job:salesJobSummary_(job)}};
@@ -2471,7 +2486,7 @@ function salesCommunicationSave_(input,kind){
     const ctx=salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
     if(kind!=='createContact')salesCommunicationContact_(ctx,data,capture.contactRef);
     if(kind==='createContact'&&[...ctx.contacts,...data.contacts].some(c=>String(c.firstName).trim().toLocaleLowerCase('de')===capture.firstName.toLocaleLowerCase('de')&&String(c.lastName).trim().toLocaleLowerCase('de')===capture.lastName.toLocaleLowerCase('de')))throw new Error('Ein Ansprechpartner mit diesem Namen ist bereits vorhanden. Bitte den vorhandenen Kontakt auswählen.');
-    const job={id,kind,business:1,companyRef:ctx.ref,hqId:ctx.hqId,name:ctx.name,capture,actor:user.email,state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),message:'In Firebase gespeichert; kontrollierter HQ-Abgleich offen.'};
+    const job={id,kind,business:1,companyRef:ctx.ref,hqId:ctx.hqId,name:ctx.name,capture,actor:user.email,...(user.uid?{actorUid:user.uid}:{}),state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),message:'In Firebase gespeichert; kontrollierter HQ-Abgleich offen.'};
     if(kind==='createContact')job.contact=salesPick_(capture,['firstName','lastName','position','eMail','phoneMobile','phoneLandline']);
     salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data);
     return salesCommunicationResult_(job,data);
@@ -2519,3 +2534,231 @@ function bindSalesCustomerContact(id,hqId){
   });
 }
 function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind==='createContact'?0:1)-(b.kind==='createContact'?0:1));}
+
+/** Spark: Google's REST endpoint validates tokens. Decoding alone NEVER authenticates. */
+let salesAuthRequest_=null;
+const SALES_AUTH_APP_URL='https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec';
+function salesAuthEnabled_(){const mode=PropertiesService.getScriptProperties().getProperty('SALES_AUTH_MODE');if(mode&&mode!=='firebase')throw Error('AUTH_REQUIRED: Ungültige Anmeldekonfiguration.');return mode==='firebase';}
+function salesAuthConfig_(){
+  const p=PropertiesService.getScriptProperties(),project=p.getProperty('FIREBASE_PROJECT_ID'),apiKey=p.getProperty('SALES_FIREBASE_WEB_API_KEY'),origin=p.getProperty('SALES_AUTH_ORIGIN');
+  if(project!=='sales-markatus'||!/^AIza[\w-]{30,60}$/.test(apiKey||'')||origin!=='https://sales-markatus.web.app')throw Error('AUTH_REQUIRED: Benutzeranmeldung noch nicht eingerichtet.');
+  return {project,apiKey,origin,ownerUid:p.getProperty('SALES_AUTH_OWNER_UID'),ownerEmail:String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).toLowerCase()};
+}
+function salesAuthHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value)).map(b=>('0'+(b&255).toString(16)).slice(-2)).join('');}
+function salesAuthRandom_(){return salesAuthHash_(Utilities.getUuid()+Utilities.getUuid()+Utilities.getUuid());}
+function salesAuthKey_(value){if(typeof value!=='string'||!/^[-\w]{32,128}$/.test(value))throw Error('AUTH_REQUIRED: Ungültige Anmeldung.');return value;}
+function salesAuthEmail_(value){value=String(value||'').trim().toLowerCase();if(value.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(value))throw Error('Bitte eine gültige E-Mail-Adresse eingeben.');return value;}
+function salesAuthDocument_(kind,id){if(!['users','sessions','attempts','invites','emails','audit'].includes(kind)||!/^[-\w]{1,128}$/.test(id))throw Error('Ungültiger Auth-Datenpfad.');return 'sales_auth'+kind+'/'+id;}
+function salesAuthRead_(kind,id){
+  const c=salesContext_(),path=salesAuthDocument_(kind,id),r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',headers:{Authorization:'Bearer '+c.token},muteHttpExceptions:true});
+  if(r.getResponseCode()===404)return null;if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
+  const doc=JSON.parse(r.getContentText());return {...JSON.parse(doc.fields.payload.stringValue),_path:path,_updateTime:doc.updateTime};
+}
+function salesAuthCommit_(entries,checks=[]){
+  const c=salesContext_(),base='projects/'+c.project+'/databases/(default)/documents/';
+  const writes=checks.map(d=>({verify:base+d._path,currentDocument:{updateTime:d._updateTime}}));
+  for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)}}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
+  return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes})});
+}
+function salesAuthIdentity_(idToken){
+  const cfg=salesAuthConfig_();if(typeof idToken!=='string'||idToken.length>10000)throw Error('AUTH_REQUIRED: Ungültige Anmeldung.');
+  // Never log the response: Firebase may include confidential account fields.
+  const r=UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+cfg.apiKey,{method:'post',contentType:'application/json',payload:JSON.stringify({idToken}),muteHttpExceptions:true});
+  if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Anmeldung ungültig oder abgelaufen.');
+  const users=JSON.parse(r.getContentText()).users;if(!Array.isArray(users)||users.length!==1)throw Error('AUTH_REQUIRED: Konto nicht eindeutig.');
+  const u=users[0];let claims;try{claims=JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(idToken.split('.')[1])).getDataAsString());}catch{throw Error('AUTH_REQUIRED: Anmeldung ungültig.');}
+  if(u.disabled||u.emailVerified!==true||claims.email_verified!==true||claims.sub!==u.localId||claims.aud!==cfg.project||claims.iss!=='https://securetoken.google.com/'+cfg.project||!Number.isFinite(claims.exp)||claims.exp<=Date.now()/1000||!Number.isFinite(claims.auth_time)||claims.auth_time<Number(u.validSince||0))throw Error('AUTH_REQUIRED: Konto unbestätigt, gesperrt oder Anmeldung widerrufen.');
+  return {uid:u.localId,email:salesAuthEmail_(u.email),authTime:claims.auth_time,tokenExpiresAt:claims.exp*1000};
+}
+function salesAuthPrincipal_(identity){
+  const cfg=salesAuthConfig_(),record=salesAuthRead_('users',identity.uid);
+  if(!record||record.status!=='active'||record.email!==identity.email)throw Error('AUTH_DENIED: Zugriff nicht freigegeben.');
+  const admin=identity.uid===cfg.ownerUid&&identity.email===cfg.ownerEmail;
+  return {uid:identity.uid,email:identity.email,admin,permissions:salesPermissions_(record.permissions,admin),revision:record.revision,record};
+}
+function salesAuthVerify_(session){
+  const id=salesAuthHash_(salesAuthKey_(session));let entry=salesAuthRead_('sessions',id);
+  if(!entry||entry.expiresAt<=Date.now()||entry.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');
+  if(entry.tokenExpiresAt<Date.now()+60000)entry=salesLock_(()=>{
+    const current=salesAuthRead_('sessions',id);if(!current||current.expiresAt<=Date.now()||current.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet.');if(current.tokenExpiresAt>=Date.now()+60000)return current;
+    const r=UrlFetchApp.fetch('https://securetoken.googleapis.com/v1/token?key='+salesAuthConfig_().apiKey,{method:'post',contentType:'application/x-www-form-urlencoded',payload:'grant_type=refresh_token&refresh_token='+encodeURIComponent(current.refreshToken),muteHttpExceptions:true});
+    if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Bitte erneut anmelden.');const refreshed=JSON.parse(r.getContentText());
+    if(refreshed.user_id!==current.uid||![salesAuthConfig_().project,'539269099884'].includes(refreshed.project_id))throw Error('AUTH_REQUIRED: Anmeldung passt nicht zum Projekt.');
+    const updated={...current,idToken:refreshed.id_token,refreshToken:refreshed.refresh_token,tokenExpiresAt:Date.now()+Number(refreshed.expires_in)*1000};salesAuthCommit_([{kind:'sessions',id,value:updated,prior:current}]);return updated;
+  });
+  const identity=salesAuthIdentity_(entry.idToken);if(identity.uid!==entry.uid||identity.email!==entry.email)throw Error('AUTH_REQUIRED: Konto wurde geändert.');
+  const user=salesAuthPrincipal_(identity);if(user.record.sessionEpoch!==entry.sessionEpoch)throw Error('AUTH_REQUIRED: Sitzung wurde gesperrt.');return user;
+}
+function getSalesLoginConfig(){return {enabled:salesAuthEnabled_(),release:SALES_RELEASE,...(salesAuthEnabled_()?{origin:salesAuthConfig_().origin}:{})};}
+function beginSalesLogin(input){
+  if(!salesAuthEnabled_())salesUser_(true);
+  const allowed=JSON.parse(PropertiesService.getScriptProperties().getProperty('SALES_AUTH_ALLOWED_ORIGINS')||'[]');
+  if(!input||!allowed.includes(input.origin)||!/^[-\w]{43}$/.test(input.challenge||'')||!/^[-\w]{32,128}$/.test(input.state||''))throw Error('AUTH_REQUIRED: Anmeldeursprung nicht freigegeben.');
+  // Bound anonymous writes and token-validation traffic; this is a quota guard, not an identity check.
+  salesAuthThrottle_('begin',30);
+  const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin};
+}
+function salesAuthThrottle_(key,limit){
+  salesLock_(()=>{const cache=CacheService.getScriptCache(),slot='sales-auth-'+key+'-'+Math.floor(Date.now()/60000),count=Number(cache.get(slot)||0);if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');cache.put(slot,String(count+1),120);});
+}
+function finishSalesLogin(input){
+  salesAuthThrottle_('finish',30);
+  const identity=salesAuthIdentity_(input?.idToken),hash=salesAuthHash_(salesAuthKey_(input?.attempt));
+  return salesLock_(()=>{
+    const attempt=salesAuthRead_('attempts',hash),verifier=salesAuthKey_(input?.verifier),challenge=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,verifier)).replace(/=+$/,'');
+    if(!attempt||attempt.used||attempt.expiresAt<=Date.now()||attempt.state!==input.state||attempt.challenge!==challenge||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||Date.now()/1000-identity.authTime>300||identity.authTime>Date.now()/1000+60)throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
+    if(!salesAuthEnabled_()){
+      const legacy=salesUser_(true);if(identity.email!==legacy.email)throw Error('AUTH_DENIED: Bitte mit dem bisherigen Administratorkonto anmelden.');
+      if(salesAuthConfig_().ownerUid&&salesAuthConfig_().ownerUid!==identity.uid)throw Error('AUTH_DENIED: Administrator bereits gebunden.');
+      if(!salesAuthRead_('users',identity.uid))salesAuthCommit_([{kind:'users',id:identity.uid,create:true,value:{uid:identity.uid,email:identity.email,status:'active',permissions:salesPermissions_({},true),revision:1,sessionEpoch:0,createdAt:salesNow_()}}]);
+      PropertiesService.getScriptProperties().setProperty('SALES_AUTH_OWNER_UID',identity.uid);
+    }
+    if(input.invitation)salesAuthActivate_(input.invitation,identity);
+    const user=salesAuthPrincipal_(identity),session=salesAuthRandom_();
+    salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt:Date.now()+8*3600000,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,user:salesAuthPublicUser_(user)};
+  });
+}
+function salesAuthPublicUser_(user){return {uid:user.uid,email:user.email,admin:user.admin,permissions:user.permissions,revision:user.revision};}
+function salesAuthActivate_(token,identity){
+  const id=salesAuthHash_(salesAuthKey_(token)),invite=salesAuthRead_('invites',id),reservation=salesAuthRead_('emails',salesAuthHash_(identity.email));
+  if(!invite||invite.used||invite.expiresAt<=Date.now()||invite.email!==identity.email||reservation?.latestInvite!==id||reservation.uid||salesAuthRead_('users',identity.uid))throw Error('AUTH_DENIED: Einladung passt nicht zu diesem bestätigten Konto.');
+  salesAuthCommit_([{kind:'users',id:identity.uid,create:true,value:{uid:identity.uid,email:identity.email,status:'active',permissions:salesPermissions_(invite.permissions),revision:1,sessionEpoch:0,createdAt:salesNow_()}},{kind:'invites',id,prior:invite,value:{...invite,used:true}},{kind:'emails',id:salesAuthHash_(identity.email),prior:reservation,value:{email:identity.email,uid:identity.uid}}]);
+}
+function salesAuthenticatedRpc(session,method,args){
+  if(!salesAuthEnabled_()||salesAuthRequest_)throw Error('AUTH_REQUIRED: Anmeldung erforderlich.');
+  const user=salesAuthVerify_(session);salesAuthRequest_={user,session,method,args};
+  try{return {result:salesAuthFilter_(salesAuthDispatch_(method,args),user,method),identity:salesAuthPublicUser_(user)};}finally{salesAuthRequest_=null;}
+}
+function salesAuthRequire_(key){const user=salesAuthRequest_?.user;if(!user||!user.admin&&!user.permissions[key])throw Error('AUTH_DENIED: Diese Aktion ist nicht freigegeben.');return user;}
+function salesAuthOwner_(){const user=salesAuthRequest_?.user;if(!user?.admin)throw Error('AUTH_DENIED: Benutzerverwaltung nur für den Administrator.');return user;}
+
+/** Explicit operation registry. Old public RPCs cannot establish an authenticated context. */
+function salesAuthRule_(method,args){
+  const rules={getSalesLeanState:'home.read',getSalesLeanCompany:'customers.read',getSalesLeanEdition:'magazine.read',saveSalesCompany:'company.create',saveSalesTestCompany:'company.create',saveSalesCompanyChange:'company.edit',saveSalesCommunication:'communication.create',saveSalesHistory:'communication.create',createSalesCustomerContact:'contact.create',getSalesSyncStatus:'sync.read',startSalesSync:'sync.run',pauseSalesSync:'sync.run',runSalesSyncStep:'sync.run',syncSalesLeanCompany:'sync.run',syncSalesLeanHistory:'sync.run',saveSalesLeanEditionSettings:'settings.edit',searchSalesProjects:'settings.edit',searchSalesCompanies:'sync.run',addSalesCompany:'sync.run',saveSalesEditionConfig:'settings.edit',setSalesEditionEnabled:'settings.edit',getSalesUnassigned:'sync.read',getSalesJobPreview:'sync.read'};
+  if(method==='getSalesLeanView')return ({home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',admin:'settings.read',import:'sync.read',new:'company.create',change:'company.edit',test:'owner'})[args[0]]||'deny';
+  if(method==='getSalesEditor'||method==='saveSalesEntityChange')return args[0]?.entity==='contact'?'contact.edit':['company','address','types'].includes(args[0]?.entity)?'company.edit':'deny';
+  if(['getSalesStorageInventoryPage','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding','queueSalesContactEmail','queueSalesMarkerCleanup','bindSalesCompanyResult','bindSalesCustomerContact','listSalesUsers','createSalesUserInvitation','updateSalesUser','getSalesAuthSetup','saveSalesAuthSetup','setSalesDocumentExcluded','startSalesEditionRefresh'].includes(method))return 'owner';
+  if(method==='logoutSalesUser')return 'home.read';
+  return rules[method]||'deny';
+}
+function salesAuthDispatch_(method,args){
+  if(typeof method!=='string'||!Array.isArray(args)||args.length>5)throw Error('AUTH_DENIED: Ungültige Aktion.');
+  if(method==='mutateSalesLean'){
+    if(typeof args[0]!=='string'||!Array.isArray(args[1])||args[0]==='mutateSalesLean')throw Error('AUTH_DENIED: Ungültige Aktion.');
+    const rule=salesAuthRule_(args[0],args[1]);if(rule==='owner')salesAuthOwner_();else salesAuthRequire_(rule);
+    salesAuthValidateWrite_(args[0],args[1]);salesAuthRequest_.requiredPermission=rule;return mutateSalesLean(args[0],args[1]);
+  }
+  let rule=salesAuthRule_(method,args);
+  if(method==='getSalesLeanEdition'&&salesAuthRequest_.user.permissions['finance.read'])rule='finance.read';
+  if(method==='getSalesLeanView'&&args[0]==='admin'&&salesAuthRequest_.user.admin)rule='owner';
+  if(rule==='owner')salesAuthOwner_();else salesAuthRequire_(rule);
+  salesAuthRequest_.requiredPermission=rule;
+  const methods={getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh};
+  if(!Object.prototype.hasOwnProperty.call(methods,method))throw Error('AUTH_DENIED: Aktion nicht freigegeben.');
+  salesAuthValidateWrite_(method,args);
+  return methods[method](...args);
+}
+function salesAuthValidateWrite_(method,args){
+  if(['searchSalesProjects','saveSalesEditionConfig'].includes(method)&&!salesAuthRequest_.user.admin&&!salesAuthRequest_.user.permissions['projects.read'])throw Error('AUTH_DENIED: Projekte nicht freigegeben.');
+  if(salesAuthRequest_.user.permissions['finance.read'])return;
+  if(method==='saveSalesLeanEditionSettings')throw Error('AUTH_DENIED: Ziele und Termine benötigen zusätzlich die Finanzfreigabe.');
+  function financial(value){return value&&typeof value==='object'&&Object.entries(value).some(([k,v])=>salesAuthFinancialKey_(k)||financial(v));}
+  if(['saveSalesEntityChange','saveSalesCompanyChange','saveSalesCompany','saveSalesTestCompany','saveSalesLeanEditionSettings'].includes(method)&&financial(args[0]))throw Error('AUTH_DENIED: Finanzfelder nicht freigegeben.');
+}
+function salesAuthFinancialKey_(key){return /revenue|amount|cents|invoice|document|iban|bic|debitor|creditor|financ|payment|vatId|routing|chargeRate|netValue|grossValue|tax|price|currency|discount|rebate/i.test(key);}
+function salesAuthFilter_(result,user,method){
+  if(user.admin)return result;
+  function project(value,key){
+    if(Array.isArray(value))return value.filter(row=>!(row&&typeof row==='object'&&!user.permissions['finance.read']&&(row.documentDispatch||row.contactHistoryChannel==='SentDocument'||row.invoice))).map(row=>project(row,''));
+    if(!value||typeof value!=='object')return value;
+    const out={};for(const [k,v] of Object.entries(value)){
+      if(k==='record'||k==='access'||k==='actorUid'||k==='credentials'||k==='idToken'||k==='refreshToken')continue;
+      if(k==='user'){out.user=salesAuthPublicUser_(user);continue;}
+      if(!user.permissions['finance.read']&&(salesAuthFinancialKey_(k)||k==='changes'))continue;
+      if(!user.permissions['projects.read']&&(k==='projects'||k==='plannedRevenues')){out[k]=[];continue;}
+      if(!user.permissions['projects.read']&&/^project/i.test(k))continue;
+      if(!user.permissions['sync.read']&&['jobs','syncRun','importRun','unassignedSummary','pendingChanges'].includes(k))continue;
+      if(k==='patch'&&!user.permissions['sync.read']){out.patch={};if(v?.localCompany)out.patch.localCompany=project(v.localCompany,'company');if(v?.draft&&method==='saveSalesCompany')out.patch.draft=project(v.draft,'draft');continue;}
+      out[k]=project(v,k);
+    }return out;
+  }
+  return project(result,'');
+}
+function salesAuthProtectWrites_(writes){
+  if(!salesAuthRequest_)return writes;
+  const r=salesAuthRequest_.user.record;if(!r?._path||!r._updateTime)throw Error('AUTH_REQUIRED: Freigabestand fehlt.');
+  return [{verify:'projects/'+salesContext_().project+'/databases/(default)/documents/'+r._path,currentDocument:{updateTime:r._updateTime}},...writes];
+}
+function salesAuthSource_(job){
+  if(!salesAuthEnabled_())return;
+  const cfg=salesAuthConfig_();if(!job.actorUid){if(job.actor===cfg.ownerEmail||job.createdBy===cfg.ownerEmail)return;throw Error('Bisheriger Auftrag benötigt Administratorprüfung der Autorenzuordnung.');}
+  const u=salesAuthRead_('users',job.actorUid),key=({createCompany:'company.create',createContact:'contact.create',history:'communication.create',communication:'communication.create',companyChange:'company.edit',entityChange:job.entity==='contact'?'contact.edit':'company.edit'})[job.kind];
+  if(!u||u.status!=='active'||u.email!==job.actor||job.actorUid!==cfg.ownerUid&&(!key||!salesPermissions_(u.permissions)[key]))throw Error('Autor oder Schreibrecht inzwischen gesperrt. Auftrag angehalten.');
+  if(job.actorUid!==cfg.ownerUid&&!u.permissions['finance.read']&&job.change&&JSON.stringify(job.change)!==JSON.stringify(salesAuthFilter_(job.change,{...u,admin:false},'job')))throw Error('Finanzrecht für diesen Auftrag inzwischen gesperrt.');
+}
+function listSalesUsers(cursor){
+  salesAuthOwner_();if(cursor!==undefined&&cursor!==null&&(typeof cursor!=='string'||cursor.length>2000||/[\r\n]/.test(cursor)))throw Error('Ungültige Benutzerseite.');
+  const c=salesContext_(),url=pilotUrl_(c.project,'sales_authusers')+'?pageSize=50'+(cursor?'&pageToken='+encodeURIComponent(cursor):'');
+  const page=pilotCall_(url,{method:'get',headers:{Authorization:'Bearer '+c.token}});
+  return {users:(page.documents||[]).map(d=>{const u=JSON.parse(d.fields.payload.stringValue);return salesPick_(u,['uid','email','status','permissions','revision','createdAt']);}),next:page.nextPageToken||null};
+}
+function createSalesUserInvitation(input){
+  const actor=salesAuthOwner_(),email=salesAuthEmail_(input?.email),permissions=salesPermissions_(input?.permissions);
+  const url=PropertiesService.getScriptProperties().getProperty('SALES_APP_URL');if(!/^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/[\w-]+\/exec$/.test(url||''))throw Error('Feste App-Adresse fehlt.');
+  return salesLock_(()=>{
+    const emailId=salesAuthHash_(email),prior=salesAuthRead_('emails',emailId);if(prior?.uid)throw Error('Benutzer bereits angelegt. Bitte dessen Rechte bearbeiten.');
+    const invitation=salesAuthRandom_(),id=salesAuthHash_(invitation),expiresAt=Date.now()+48*3600000;
+    salesAuthCommit_([{kind:'invites',id,create:true,value:{email,permissions,expiresAt,createdBy:actor.uid}},{kind:'emails',id:emailId,prior,create:!prior,value:{email,latestInvite:id}},{kind:'audit',id:salesAuthRandom_(),create:true,value:{action:'invite',actor:actor.uid,target:emailId,at:salesNow_()}}],[actor.record]);
+    return {url:url+'?invite='+invitation,expiresAt,message:'Einladung angelegt. Link persönlich weitergeben.'};
+  });
+}
+function updateSalesUser(input){
+  const actor=salesAuthOwner_(),cfg=salesAuthConfig_(),uid=input?.uid;if(typeof uid!=='string'||!/^[-\w]{1,128}$/.test(uid))throw Error('Ungültiger Benutzer.');
+  if(uid===cfg.ownerUid)throw Error('Das Administratorkonto bleibt unverändert freigegeben.');
+  if(!['active','disabled'].includes(input.status))throw Error('Ungültiger Status.');const permissions=salesPermissions_(input.permissions);
+  return salesLock_(()=>{
+    const prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
+    salesAuthCommit_([{kind:'users',id:uid,prior,value:{...prior,status:input.status,permissions,revision:prior.revision+1,sessionEpoch:(prior.sessionEpoch||0)+1}},{kind:'audit',id:salesAuthRandom_(),create:true,value:{action:'access-'+input.status,actor:actor.uid,target:uid,at:salesNow_()}}],[actor.record]);
+    return {message:input.status==='disabled'?'Zugang und laufende Sitzungen gesperrt.':'Rechte gespeichert. Bestehende Sitzungen müssen sich erneut anmelden.'};
+  });
+}
+function logoutSalesUser(){const current=salesAuthRead_('sessions',salesAuthHash_(salesAuthRequest_.session));if(current)salesAuthCommit_([{kind:'sessions',id:salesAuthHash_(salesAuthRequest_.session),prior:current,value:{disabled:true,expiresAt:Date.now()}}]);return {message:'Abgemeldet.'};}
+function getSalesAuthSetup(){
+  if(salesAuthEnabled_())salesAuthOwner_();else salesUser_(true);
+  const p=PropertiesService.getScriptProperties();return {configured:!!p.getProperty('SALES_AUTH_OWNER_UID'),origin:p.getProperty('SALES_AUTH_ORIGIN')||'https://sales-markatus.web.app',allowedOrigins:JSON.parse(p.getProperty('SALES_AUTH_ALLOWED_ORIGINS')||'[]'),enabled:salesAuthEnabled_()};
+}
+function saveSalesAuthSetup(input){
+  if(salesAuthEnabled_())salesAuthOwner_();else salesUser_(true);
+  if(!input||!Array.isArray(input.allowedOrigins)||!input.allowedOrigins.length||input.allowedOrigins.length>10||input.allowedOrigins.some(v=>!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(v)))throw Error('Exakte App-Ursprünge erforderlich.');
+  const config=pilotCall_('https://sales-markatus.web.app/__/firebase/init.json',{method:'get'});
+  if(config.projectId!=='sales-markatus'||!/^AIza[\w-]{30,60}$/.test(config.apiKey||''))throw Error('Öffentliche Firebase-Konfiguration passt nicht zum Projekt.');
+  const p=PropertiesService.getScriptProperties();p.setProperty('SALES_FIREBASE_WEB_API_KEY',config.apiKey);p.setProperty('SALES_AUTH_ORIGIN','https://sales-markatus.web.app');p.setProperty('SALES_AUTH_ALLOWED_ORIGINS',JSON.stringify(input.allowedOrigins));p.setProperty('SALES_APP_URL',SALES_AUTH_APP_URL);
+  return {message:'Anmeldung vorbereitet. Bestehender Google-Zugang bleibt unverändert geschützt.'};
+}
+function enableSalesLogin(session){
+  if(salesAuthEnabled_())throw Error('Anmeldung bereits aktiviert.');
+  const legacy=salesUser_(true),user=salesAuthVerify_(session);if(!user.admin||user.email!==legacy.email)throw Error('AUTH_DENIED: Bestätigtes Administratorkonto erforderlich.');
+  PropertiesService.getScriptProperties().setProperty('SALES_AUTH_MODE','firebase');return {message:'Benutzeranmeldung aktiviert. Bitte die App neu öffnen.'};
+}
+
+// Shared by the browser, Apps Script and the authentication service.
+const SALES_PERMISSION_CATALOG = Object.freeze([
+  ['home.read','Mein Tag','Bereiche'],['customers.read','Kunden','Bereiche'],
+  ['magazine.read','Magazinverkauf','Bereiche'],['directory.read','Adressbuch aller Ansprechpartner','Bereiche'],
+  ['finance.read','Buchungen, Rechnungen und Umsätze','Bereiche'],['projects.read','Kundenprojekte','Bereiche'],
+  ['sync.read','Datenabgleich ansehen','Bereiche'],['sync.run','Datenabgleich ausführen und anhalten','Bereiche'],
+  ['settings.read','Fachliche Verwaltung ansehen','Bereiche'],['settings.edit','Ausgabeziele und Termine ändern','Bereiche'],
+  ['company.read','Firmendaten lesen','Firmen'],['company.create','Firma hinzufügen','Firmen'],['company.edit','Firmendaten und Adressen ändern','Firmen'],
+  ['contact.read','Ansprechpartner lesen','Ansprechpartner'],['contact.create','Ansprechpartner hinzufügen','Ansprechpartner'],['contact.edit','Ansprechpartner ändern','Ansprechpartner'],
+  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation']
+]);
+const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
+function salesPermissions_(input,owner=false){
+  if(input!==undefined&&(!input||typeof input!=='object'||Array.isArray(input)))throw Error('Ungültige Rechte.');
+  const known=new Set(SALES_PERMISSION_CATALOG.map(p=>p[0]));
+  for(const [key,value] of Object.entries(input||{}))if(!known.has(key)||typeof value!=='boolean')throw Error('Unbekanntes oder ungültiges Recht: '+key);
+  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
+  for(const [write,read] of [['sync.run','sync.read'],['settings.edit','settings.read'],['company.create','company.read'],['company.edit','company.read'],['contact.create','contact.read'],['contact.edit','contact.read'],['communication.create','communication.read']])if(out[write])out[read]=true;
+  return out;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,salesPermissions_};

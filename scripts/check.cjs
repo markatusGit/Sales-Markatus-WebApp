@@ -23,8 +23,8 @@ function check() {
   sources.forEach(dir => walk(path.join(root, dir)));
   ['package.json', 'deployment.json', 'firebase.json'].forEach(n => JSON.parse(fs.readFileSync(path.join(root, n), 'utf8')));
   const read = n => fs.readFileSync(path.join(root, 'sales-app', n), 'utf8');
-  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs','SalesLean.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs'].map(read).join('\n');
-  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js'].map(read).join('\n'));
+  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs','SalesLean.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs','SalesAuth.gs','SalesAuthorization.gs','SalesPermissions.js'].map(read).join('\n');
+  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesPermissions.js','SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js','SalesAuth.js'].map(read).join('\n'));
   for (const [name, expected] of [['SalesBackend.gs', expectedBackend], ['Sales.html', expectedHtml]]) {
     if (canonical(name, fs.readFileSync(path.join(app, name), 'utf8')) !== canonical(name, expected)) throw Error(`${name} veraltet. Zuerst npm run build ausführen und Änderungen prüfen/committen.`);
   }
@@ -48,6 +48,7 @@ function tests() {
   files.push('sales-app/test-lean-browser.cjs','sales-app/test-performance.cjs');
   files.push('sales-app/test-business.cjs','sales-app/test-business-browser.cjs');
   files.push('sales-app/test-communication.cjs','sales-app/test-communication-browser.cjs');
+  files.push('sales-app/test-auth.cjs','sales-app/test-auth-browser.cjs');
   for (const name of files) {
     console.log(`Prüfe ${name}`);
     const output = run(process.execPath, [path.join(root, name)], {env});

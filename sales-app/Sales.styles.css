@@ -15,6 +15,7 @@
 @media(max-width:440px){#magazin-vertrieb .m-summaries{grid-template-columns:1fr}#magazin-vertrieb .m-summary{padding:14px}#magazin-vertrieb .m-summary span{font-size:.86em}}
 
 /* Customer workspace: independent detail/history scrolling; capture stays visible. */
+#magazin-vertrieb [hidden]{display:none!important}
 body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb.m-customer-open{height:100dvh;min-height:0;display:flex;flex-direction:column}
 #magazin-vertrieb.m-customer-open .m-layout{flex:1;min-height:0;overflow:hidden}

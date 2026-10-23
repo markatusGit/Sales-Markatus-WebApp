@@ -38,6 +38,9 @@ function salesWorkerPause_(id){
 function salesSyncWorker_(event){
   const p=salesWorkerProps_(),owner=p.getProperty('SALES_SYNC_EXECUTOR'),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase(),allowed=String(p.getProperty('SALES_ALLOWED_EMAILS')||admin).split(',').map(x=>x.trim().toLowerCase());
   if(!event?.triggerUid||String(event.triggerUid)!==p.getProperty('SALES_SYNC_TRIGGER')||String(Session.getEffectiveUser().getEmail()||'').toLowerCase()!==owner||p.getProperty('SALES_SYNC_ADMIN')!==admin||!allowed.includes(admin))throw new Error('Hintergrundauftrag nicht autorisiert.');
+  // Only a validated installable trigger may establish this server-only context.
+  if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){const cfg=salesAuthConfig_();salesAuthRequest_={user:salesAuthPrincipal_({uid:cfg.ownerUid,email:cfg.ownerEmail}),worker:true};}
+  try{
   const until=Date.now()+180000;let checked=false;
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
@@ -62,6 +65,7 @@ function salesSyncWorker_(event){
       if(writeBoundary)return;
     }finally{lock.releaseLock();}
   }
+  }finally{if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
 function salesWorkerPrivate_(){
   const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}

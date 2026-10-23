@@ -1,0 +1,37 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=require('playwright'),{authFixture}=require('./test-auth.cjs');
+(async()=>{
+ const f=authFixture(),user=f.user(),idToken=f.token(),calls=[],errors=[];
+ const edition={id:'fixture-1',magazine:'Synthetic',issue:1,loadedAt:'2026-10-23',complete:true,settings:{targetCents:9999},documents:[]};
+ f.ctx.getSalesLeanState=()=>({release:'2026-10-23-r26',lean:true,user:f.ctx.salesUser_(),edition,editions:[edition],companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],preferences:{}});
+ f.ctx.getSalesLeanView=name=>name==='customers'?{companies:[{id:'101',name:'Synthetic customer'}]}:name==='admin'?{editions:[edition],access:null}:{};
+ f.ctx.getSalesLeanCompany=()=>({company:{id:'101',name:'Synthetic customer',companyTypes:[],responsibleUsers:[],customFields:[],defaultAddress:{city:'Synthetic city'}},contacts:[{id:'202',companyId:101,firstName:'Synthetic',lastName:'Contact'}],histories:[{id:1,content:'Allowed conversation',contactOn:'2026-10-23T10:00:00Z'},{documentDispatch:true,content:'HIDDEN INVOICE'}],projects:[{id:77,name:'HIDDEN PROJECT'}]});
+ const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
+ try{
+  const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+  const origin='https://fixture-script.googleusercontent.com';
+  let html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8').replace('"AUTH_RUNTIME_CONFIG"',JSON.stringify({enabled:true,origin:'https://sales-markatus.web.app',invitation:''}));
+  const sdk=`const user={emailVerified:true,refreshToken:'${'r'.repeat(50)}',reload:async()=>{},getIdToken:async()=>${JSON.stringify(idToken)}};const auth={currentUser:user};export const getAuth=()=>auth,setPersistence=async()=>{},inMemoryPersistence={},signInWithPopup=async()=>{},signInWithEmailAndPassword=async()=>{},createUserWithEmailAndPassword=async()=>{},sendEmailVerification=async()=>{},sendPasswordResetEmail=async()=>{},signOut=async()=>{};export class GoogleAuthProvider {}`;
+  await context.route('**/*',async route=>{const url=new URL(route.request().url());if(url.origin===origin)return route.fulfill({contentType:'text/html',body:html});if(url.hostname==='www.gstatic.com')return route.fulfill({contentType:'text/javascript',body:url.pathname.endsWith('firebase-app.js')?'export const initializeApp=x=>x;':sdk});if(url.origin==='https://sales-markatus.web.app'){
+   if(url.pathname==='/__/firebase/init.json')return route.fulfill({contentType:'application/json',body:'{"projectId":"sales-markatus","apiKey":"synthetic"}'});
+   const name=url.pathname.split('/').pop()||'index.html';if(['index.html','login.mjs','style.css','origins.json'].includes(name))return route.fulfill({contentType:name.endsWith('.mjs')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.json')?'application/json':'text/html',body:name==='origins.json'?JSON.stringify([origin]):fs.readFileSync(__dirname+'/../firebase-pilot/public/auth/'+name,'utf8')});
+  }return route.abort();});
+  await page.exposeFunction('fixtureRpc',(name,args)=>{calls.push({name,args:cloneSafe(args)});return JSON.parse(JSON.stringify(f.ctx[name](...args)));});
+  await page.addInitScript(()=>{const chain=(ok,fail)=>new Proxy({},{get(_,name){if(name==='withSuccessHandler')return f=>chain(f,fail);if(name==='withFailureHandler')return f=>chain(ok,f);return (...args)=>window.fixtureRpc(name,args).then(ok,fail);}});window.google={script:{run:chain(()=>{},()=>{})}};});
+  await page.goto(origin);await page.getByRole('button',{name:'Anmelden / Einladung aktivieren'}).waitFor();assert.equal(calls.length,0,'No business request before login');
+  const popupPromise=page.waitForEvent('popup');await page.getByRole('button',{name:'Anmelden / Einladung aktivieren'}).click();const popup=await popupPromise;await popup.getByRole('button',{name:'Mit Google anmelden'}).waitFor();
+  await page.evaluate(()=>window.dispatchEvent(new MessageEvent('message',{origin:'https://sales-markatus.web.app',source:window,data:{type:'sales-firebase-login',state:'forged',attempt:'forged',idToken:'forged'}})));assert.equal(calls.some(c=>c.name==='finishSalesLogin'),false);
+  await popup.getByRole('button',{name:'Mit Google anmelden'}).click();await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();
+  assert.equal(calls.filter(c=>c.name==='getSalesLeanState').length,0,'All business requests use gateway');assert.equal(calls.some(c=>c.name==='salesAuthenticatedRpc'),true);
+  for(const label of ['Magazinverkauf','Ansprechpartner','Buchungshistorie','Datenabgleich','Verwaltung'])assert.equal(await page.getByRole('button',{name:label,exact:true}).isVisible(),false,label);
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('button',{name:'Synthetic customer',exact:true}).click();await page.getByRole('heading',{name:'Synthetic customer',exact:true}).waitFor();
+  const text=await page.locator('main').innerText();assert.match(text,/Allowed conversation/);assert.ok(!/HIDDEN INVOICE|HIDDEN PROJECT/.test(text));assert.equal(await page.getByRole('button',{name:'Speichern',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Ansprechpartner bearbeiten',exact:true}).isVisible(),false);
+  await page.getByRole('button',{name:'Abmelden',exact:true}).click();await page.getByRole('button',{name:'Anmelden / Einladung aktivieren'}).waitFor();assert.ok(!(await page.locator('body').innerText()).includes('Synthetic customer'));assert.deepEqual(await page.evaluate(()=>Object.keys(localStorage)),[]);assert.deepEqual(errors,[]);
+  // Also render the real owner administration through a valid server session.
+  const ownerSession=f.session('owner');f.ctx.listSalesUsers=()=>{f.ctx.salesAuthOwner_();return {users:[{...f.ctx.salesAuthPublicUser_(user),status:"active"}],next:null};};
+  html=html.replace('if(salesUsesLogin())render();',`if(salesUsesLogin()){salesLoginSession={id:${JSON.stringify(ownerSession)},revision:1};act(async()=>{state=await rpc('getSalesLeanState');});}`);
+  await page.reload();await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();await page.getByRole('button',{name:'Verwaltung',exact:true}).click();await page.getByRole('heading',{name:'Benutzer und Rechte',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Benutzer laden',exact:true}).click();await page.getByText('reader@example.invalid · Aktiv',{exact:true}).waitFor();assert.equal(await page.locator('input[name="permission:customers.read"]').first().isDisabled(),true);assert.deepEqual(errors,[]);
+  console.log('PASS real helper handshake, zero pre-login reads, strict source, read-only customer, cleared logout and owner administration');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
+function cloneSafe(args){return JSON.parse(JSON.stringify(args,((k,v)=>['idToken','refreshToken'].includes(k)?'[synthetic token]':v)));}

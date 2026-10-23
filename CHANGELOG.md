@@ -4,6 +4,11 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.26.0]
+
+- In Vorbereitung: eingeladene Firebase-Benutzer, Google-/Passwortanmeldung und serverseitige Bereichs-/Schreibrechte auf Apps Script ohne Abrechnungskonto. Geschützte Administratorbindung, 48-Stunden-Einladungen, widerrufbare Sitzungen und Rechteprüfung vor HQ-Schreibvorgängen.
+- Neue Authentifizierungs-/Autorisierungs- und Browserprüfungen. Noch nicht aktiviert oder live abgenommen; Stand und Grenzen in `docs/BENUTZERZUGANG-R26.md`.
+
 Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L01–L14 anhand r21-Quellen sortiert, bestehende echte Lesefunktionen von Test-Schreibwegen und reinen Konzept-/Demofunktionen getrennt. Prioritäten und Abnahmekriterien für Teamzugang, echte Kundenarbeit und vollständigen Verkaufsablauf festgehalten; V1-Plan mit aktuellem Einstieg versehen. Kein Appumbau, keine Bereinigung oder Rechteänderung.
 
 Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Abschnitt dokumentiert. D17 und D21 bleiben erhalten; D22 umfasst weiterhin nur eine lesende Inventur.

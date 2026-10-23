@@ -1,5 +1,7 @@
 # Projektüberblick – Sales Markatus
 
+**In Arbeit am 23.10.2026: Benutzerlogin und Rechte (r26).** Nutzer beauftragt die Umsetzung ohne Abrechnungskonto: Firebase bleibt Spark, kein Cloud Run. Statisches Firebase-Anmeldefenster und serverseitige Identitäts-/Rechteprüfung auf Apps Script. Basis: Mein Tag/Kunden lesen, weitere Bereiche/Hinzufügen/Ändern einzeln; kein Löschen. Bisheriger Administrator wird im bestehenden privaten Zugang gebunden. Lokale Implementierung und neue Sicherheitstests vorhanden; vollständige Projektprüfung, Einrichtung, Veröffentlichung und Live-Abnahme offen. Aktive Google-Version weiterhin 36/r25. [Details](docs/BENUTZERZUGANG-R26.md).
+
 Stand: 23.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.
 
 ## Auftrag und Produktstand

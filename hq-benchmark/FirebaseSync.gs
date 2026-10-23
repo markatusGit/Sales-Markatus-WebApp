@@ -160,6 +160,10 @@ function pilotWriteDocument_(projectId,path,value,token) {
     const item=value[key];
     fields[key]=typeof item==='string' ? {stringValue:item} : typeof item==='boolean' ? {booleanValue:item} : typeof item==='number' ? {integerValue:String(item)} : {stringValue:JSON.stringify(item)};
   });
+  if(typeof salesAuthRequest_!=='undefined'&&salesAuthRequest_){
+    const writes=salesAuthProtectWrites_([{update:{name:'projects/'+projectId+'/databases/(default)/documents/'+path,fields}}]);
+    return pilotCall_(pilotUrl_(projectId,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+token},payload:JSON.stringify({writes})});
+  }
   return pilotCall_(pilotUrl_(projectId,path),{method:'patch',contentType:'application/json',headers:{Authorization:'Bearer '+token},payload:JSON.stringify({fields})});
 }
 function pilotDeleteSnapshot_(projectId,id,token) {

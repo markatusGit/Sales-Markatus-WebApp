@@ -17,6 +17,7 @@
 @media(max-width:440px){#magazin-vertrieb .m-summaries{grid-template-columns:1fr}#magazin-vertrieb .m-summary{padding:14px}#magazin-vertrieb .m-summary span{font-size:.86em}}
 
 /* Customer workspace: independent detail/history scrolling; capture stays visible. */
+#magazin-vertrieb [hidden]{display:none!important}
 body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb.m-customer-open{height:100dvh;min-height:0;display:flex;flex-direction:column}
 #magazin-vertrieb.m-customer-open .m-layout{flex:1;min-height:0;overflow:hidden}
@@ -92,7 +93,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-10-23-r25</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-10-23-r26</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -103,7 +104,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-10-23-r25</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-10-23-r26</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -117,11 +118,12 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-10-23-r25';
-  const UI_BUILD='2026-10-23-r25';
+  const APP_RELEASE='2026-10-23-r26';
+  const UI_BUILD='2026-10-23-r26';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function salesCan(key){if(typeof SALES_LOGIN_CONFIG==='undefined'||SALES_LOGIN_CONFIG?.enabled!==true)return true;return state?.user?.admin===true||state?.user?.permissions?.[key]===true;}
   const money=c=>c===null||c===undefined?'Noch nicht hinterlegt':new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(c/100);
   const dateLabel=v=>/^\d{4}-\d{2}-\d{2}/.test(v||'')?v.slice(0,10).split('-').reverse().join('.'):'Datum nicht geliefert';
   const amountLabel=(c,currency)=>c===null||c===undefined?'Betrag nicht geliefert':currency?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(c/100)+' '+currency+' netto':'Währung nicht geliefert';
@@ -196,7 +198,8 @@ window.__salesStarted=false;
     const body=`${title}${dates?`<ul>${dates}</ul>`:fallback}${explanation}`;
     return active?`<div class="m-plan">${body}</div>`:`<details class="m-plan"><summary>${esc(r.description||'Planumsatz')} · ${esc(r.status||'Status nicht geliefert')} (nicht als offen bestätigt)</summary>${body}</details>`;
   }
-  function projectRow(p){return `<div class="m-row"><h3>${esc(p.number)} · ${esc(p.name)}</h3><p>${esc(p.status)} · Fakturiert: ${money(p.revenueCents)} netto${p.complete?'':' · vorläufig'}</p>${p.completed||p.actualFinishDate?`<p>Abgeschlossen: ${esc(p.actualFinishDate?dateLabel(p.actualFinishDate):'Abschlussdatum von HQ nicht geliefert')}</p>`:`${p.plannedFinishDate?`<p>Geplanter Projektabschluss: ${esc(dateLabel(p.plannedFinishDate))}</p>`:''}<h4>Planumsätze</h4>${Array.isArray(p.plannedRevenues)?p.plannedRevenues.map(plannedRevenueRow).join('')||'<p>Keine Planumsätze von HQ geliefert.</p>':'<p>Bitte Firmendetails erneut importieren, um Abschlussdatum und Planumsätze zu laden.</p>'}`}</div>`;}
+  function projectRow(p){if(salesCan('finance.read'))return projectFinancialRow(p);return '<div class="m-row"><h3>'+esc(p.number)+' · '+esc(p.name)+'</h3><p>'+esc(p.status||'')+'</p>'+(p.actualFinishDate?'<p>Abgeschlossen: '+esc(dateLabel(p.actualFinishDate))+'</p>':'')+'</div>';}
+  function projectFinancialRow(p){return `<div class="m-row"><h3>${esc(p.number)} · ${esc(p.name)}</h3><p>${esc(p.status)} · Fakturiert: ${money(p.revenueCents)} netto${p.complete?'':' · vorläufig'}</p>${p.completed||p.actualFinishDate?`<p>Abgeschlossen: ${esc(p.actualFinishDate?dateLabel(p.actualFinishDate):'Abschlussdatum von HQ nicht geliefert')}</p>`:`${p.plannedFinishDate?`<p>Geplanter Projektabschluss: ${esc(dateLabel(p.plannedFinishDate))}</p>`:''}<h4>Planumsätze</h4>${Array.isArray(p.plannedRevenues)?p.plannedRevenues.map(plannedRevenueRow).join('')||'<p>Keine Planumsätze von HQ geliefert.</p>':'<p>Bitte Firmendetails erneut importieren, um Abschlussdatum und Planumsätze zu laden.</p>'}`}</div>`;}
   let state=null,view='home',selected=null,detail=null,preview=null,audit=null,auditId=null,busy=false,message='',error='',search='',theme='dark';
   try{theme=localStorage.getItem('sales-theme')==='light'?'light':'dark';}catch(_){}
   function rpc(name,...args){return new Promise((resolve,reject)=>{
@@ -211,6 +214,7 @@ window.__salesStarted=false;
         target='startSalesSync';args=[{mode:'editions'}];
       }
       if(leanMutations.has(name)){target='mutateSalesLean';args=[name,args];}
+      if(salesUsesLogin()){salesRpcWithLogin(target,args).then(value=>finish(true,value),e=>{if(/^AUTH_(REQUIRED|DENIED):/.test(e.message))salesForgetLogin(e.message.replace(/^AUTH_\w+: /,''));finish(false,e);});return;}
       const runner=google.script.run.withSuccessHandler(value=>finish(true,value)).withFailureHandler(e=>finish(false,new Error(e?.message||'Anfrage fehlgeschlagen.')));
       if(typeof runner[target]!=='function')throw new Error('Serverfunktion „'+target+'“ ist in dieser Google-Bereitstellung nicht verfügbar. Bitte beide App-Dateien vollständig ersetzen, eine neue Version bereitstellen und die Web-App neu öffnen. Oberfläche: '+APP_RELEASE+' · Server: '+(state?.release||'noch unbekannt')+'.');
       runner[target](...args);
@@ -250,19 +254,42 @@ window.__salesStarted=false;
   }
   let formDraft=null,historyFilter='all';
   function changeForm(){return head('Änderung testen',formDraft?.company.name||'')+`<div class="m-note">Erster Änderungstest: Branche und Homepage. HQ wird vor dem Schreiben mit dem zuletzt importierten Firebase-Stand verglichen. Weitere Stammdatenänderungen folgen nach Prüfung dieses Weges.</div><section class="m-panel m-section"><div class="m-panel-body"><form data-form="change" class="m-form">${select('Branche','industrialSector',[{id:'',name:'Bitte wählen'},...Array.from(new Set([...(state.catalog?.industries||[]),detail?.company.industrialSector].filter(Boolean))).map(v=>({id:v,name:v}))],detail?.company.industrialSector||'')}${field('Homepage','homepage',detail?.company.homepageDisplay||detail?.company.homepage||'','text')}<button class="m-button m-primary" ${busy?'disabled':''}>Änderung in Firebase speichern</button></form></div></section>`;}
-  function admin(){const e=state.edition,s=e?.settings;return head('Verwaltung','Ausgabeziele, Termine und Zugang')+`<section class="m-panel"><div class="m-panel-head"><h2>COBURGER #70 · Ziel und Termine</h2></div><div class="m-panel-body">${s?`<form data-form="edition" class="m-form">${field('Zielumsatz netto (€)','target',s.targetCents===null?'':s.targetCents/100,'number',true)}${field('Anzeigenschluss','adDeadline',s.adDeadline,'date')}${field('Drucktermin','printDate',s.printDate,'date')}${field('Veröffentlichungsdatum','releaseDate',s.releaseDate,'date')}<div class="m-full"><button class="m-button m-primary" ${busy?'disabled':''}>Für alle in Firebase speichern</button></div></form>`:'Zuerst die Ausgabe importieren.'}</div></section>${state.user.admin?`<section class="m-panel m-section"><div class="m-panel-head"><h2>Freigegebene E-Mail-Adressen</h2></div><div class="m-panel-body"><form data-form="access"><label class="m-field">Eine Adresse pro Zeile<textarea name="emails" required>${esc(state.access.emails.join('\n'))}</textarea></label><p class="m-muted">Nur diese Konten erhalten Zugriff. Deine Administratoradresse bleibt freigegeben. Die Freigabe sendet keine E-Mail.</p><button class="m-button m-primary" ${busy?'disabled':''}>Freigaben speichern</button></form></div></section>`:''}`;}
+  function admin(){const e=state.edition,s=e?.settings;return head('Verwaltung','Ausgabeziele, Termine und Zugang')+`<section class="m-panel"><div class="m-panel-head"><h2>COBURGER #70 · Ziel und Termine</h2></div><div class="m-panel-body">${s?`<form data-form="edition" class="m-form">${field('Zielumsatz netto (€)','target',s.targetCents===null?'':s.targetCents/100,'number',true)}${field('Anzeigenschluss','adDeadline',s.adDeadline,'date')}${field('Drucktermin','printDate',s.printDate,'date')}${field('Veröffentlichungsdatum','releaseDate',s.releaseDate,'date')}<div class="m-full"><button class="m-button m-primary" ${busy?'disabled':''}>Für alle in Firebase speichern</button></div></form>`:'Zuerst die Ausgabe importieren.'}</div></section>${state.user.admin&&!salesUsesLogin()?`<section class="m-panel m-section"><div class="m-panel-head"><h2>Freigegebene E-Mail-Adressen</h2></div><div class="m-panel-body"><form data-form="access"><label class="m-field">Eine Adresse pro Zeile<textarea name="emails" required>${esc(state.access.emails.join('\n'))}</textarea></label><p class="m-muted">Nur diese Konten erhalten Zugriff. Deine Administratoradresse bleibt freigegeben. Die Freigabe sendet keine E-Mail.</p><button class="m-button m-primary" ${busy?'disabled':''}>Freigaben speichern</button></form></div></section>`:''}`;}
   const nav=[['home','Mein Tag'],['magazine','Magazinverkauf'],['customers','Kunden'],['contacts','Ansprechpartner'],['invoices','Buchungshistorie'],['reminders','Wiedervorlagen'],['import','Datenabgleich'],['admin','Verwaltung']];
   function render(){
+    if(salesUsesLogin()&&!salesLoginSession){root.innerHTML=salesLoginPage();return;}
     communicationBeforeRender();root.dataset.theme=theme;if(state&&state.release!==APP_RELEASE){root.innerHTML=`<div class="m-login"><h1>Dateien haben unterschiedliche Stände</h1><p>Bitte SalesBackend.gs und Sales.html vollständig ersetzen und eine neue Version der bestehenden Web-App bereitstellen.</p><p>Oberfläche: ${esc(UI_BUILD)} · Server: ${esc(state.release||'alter Stand')}</p></div>`;return;}if(!state){root.innerHTML=`<div class="m-login"><h1>Sales Markatus</h1><p>${esc(error||'Lade Firebase-Daten …')}</p>${error?button('Erneut versuchen','reload'):''}</div>`;return;}
     const pages={home:v1Home,customers:v1Customers,company,business:businessPage,magazine:v1Magazine,invoices:v1Invoices,import:v1Import,test,preview:previewPage,new:newCompany,change:changeForm,admin:v1Admin,contacts:v1Contacts,unassigned:v1Unassigned,reminders:()=>head('Wiedervorlagen')+empty('Die gemeinsame Wiedervorlagenverwaltung folgt in einem späteren V1-Schritt.')};
-    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Magazinvertrieb<br>Lesedaten aus HQ<br>Manueller Datenabgleich</p></div></aside><main class="m-main">${(pages[view]||v1Home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?.loadedAt?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
-    communicationAfterRender();
+    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${salesUsesLogin()?button('Abmelden','auth-logout'):''}${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Magazinvertrieb<br>Lesedaten aus HQ<br>Manueller Datenabgleich</p></div></aside><main class="m-main">${(pages[view]||v1Home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?.loadedAt?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
+    communicationAfterRender();salesUiPermissions();
   }
   async function act(fn,{reload=false,preserve=false}={}){if(busy)return;busy=true;root.setAttribute('aria-busy','true');error='';let result;if(preserve){root.querySelectorAll('button').forEach(b=>b.disabled=true);}else render();try{result=await fn();if(result?.message)message=result.message;if(reload)state=await rpc('getSalesState');}catch(e){error=e.message;if(preserve){busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const status=root.querySelector('.m-status');if(status){status.textContent=error;status.classList.add('m-error');}return;}}finally{busy=false;root.setAttribute('aria-busy','false');}render();return result;}
   async function runCreateJob(id,step){
     return act(async()=>{const r=await rpc('runSalesJob',id,step);preview=await rpc('getSalesJobPreview',id);if(selected==='draft_'+id)detail=await loadCompany(selected);return r;},{});
   }
-    let selectedEditionId='',customerHistoryFilter='all',industryFilter='',cityFilter='',ownerFilter='',projectResults=null,companyResults=null,importLoop=false,stopImport=false;
+  // Shared by the browser, Apps Script and the authentication service.
+const SALES_PERMISSION_CATALOG = Object.freeze([
+  ['home.read','Mein Tag','Bereiche'],['customers.read','Kunden','Bereiche'],
+  ['magazine.read','Magazinverkauf','Bereiche'],['directory.read','Adressbuch aller Ansprechpartner','Bereiche'],
+  ['finance.read','Buchungen, Rechnungen und Umsätze','Bereiche'],['projects.read','Kundenprojekte','Bereiche'],
+  ['sync.read','Datenabgleich ansehen','Bereiche'],['sync.run','Datenabgleich ausführen und anhalten','Bereiche'],
+  ['settings.read','Fachliche Verwaltung ansehen','Bereiche'],['settings.edit','Ausgabeziele und Termine ändern','Bereiche'],
+  ['company.read','Firmendaten lesen','Firmen'],['company.create','Firma hinzufügen','Firmen'],['company.edit','Firmendaten und Adressen ändern','Firmen'],
+  ['contact.read','Ansprechpartner lesen','Ansprechpartner'],['contact.create','Ansprechpartner hinzufügen','Ansprechpartner'],['contact.edit','Ansprechpartner ändern','Ansprechpartner'],
+  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation']
+]);
+const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
+function salesPermissions_(input,owner=false){
+  if(input!==undefined&&(!input||typeof input!=='object'||Array.isArray(input)))throw Error('Ungültige Rechte.');
+  const known=new Set(SALES_PERMISSION_CATALOG.map(p=>p[0]));
+  for(const [key,value] of Object.entries(input||{}))if(!known.has(key)||typeof value!=='boolean')throw Error('Unbekanntes oder ungültiges Recht: '+key);
+  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
+  for(const [write,read] of [['sync.run','sync.read'],['settings.edit','settings.read'],['company.create','company.read'],['company.edit','company.read'],['contact.create','contact.read'],['contact.edit','contact.read'],['communication.create','communication.read']])if(out[write])out[read]=true;
+  return out;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,salesPermissions_};
+
+  let selectedEditionId='',customerHistoryFilter='all',industryFilter='',cityFilter='',ownerFilter='',projectResults=null,companyResults=null,importLoop=false,stopImport=false;
   function adoptSalesState(value){
     const editions=value.editions||[value.edition].filter(Boolean);value.editions=editions;
     value.edition=editions.find(e=>e.id===selectedEditionId)||editions.find(e=>e.id===value.preferences?.currentEditionId)||value.edition||editions[0]||null;
@@ -302,13 +329,14 @@ window.__salesStarted=false;
     return (selection.message?'<p class="m-note">'+esc(selection.message)+'</p>':'')+rows.map(c=>'<div class="m-listitem"><div><h3><button class="m-link" data-action="company" data-id="'+esc(c.id)+'">'+esc(c.name)+'</button></h3><p>'+esc([addr(c)?.city,c.industrialSector].filter(Boolean).join(' · '))+'</p><div class="m-tags">'+tag(c.localDraftId?localStatus(c):'HQ · nur lesen')+(c.companyTypes||[]).map(t=>tag(t.name)).join('')+'</div></div><div class="m-list-end"><strong>'+(state.edition?.loadedAt?money(revenue(String(c.hqId||c.id))):'Noch nicht importiert')+'</strong><small>'+esc(editionLabel(state.edition))+(state.edition?.complete?'':' · vorläufig')+'</small></div></div>').join('')+(rows.length?'':empty('Keine passenden Kunden im geladenen Datenbestand.'));
   }
   function v1Home(){
+    if(salesUsesLogin()&&!salesCan('finance.read'))return head('Mein Tag','Gemeinsamer Kundenbestand')+'<section class="m-panel"><div class="m-panel-head"><h2>Kunden und Kommunikation</h2></div><div class="m-panel-body"><p>Deine freigegebenen Kunden findest du unter Kunden.</p>'+button('Kunden öffnen','nav','customers')+(salesCan('sync.read')?button('Datenabgleich öffnen','nav','import'):'')+'</div></section>';
     const e=state.edition,run=state.syncRun;return head('Mein Tag','Gemeinsamer Datenstand aus Firebase',button('Frisch aus Firebase laden','reload'))+editionSelectors()+
       '<div class="m-summaries"><div class="m-summary"><span>Unternehmen im Bestand</span><b>'+(loadedViews.has('customers')||loadedViews.has('magazine')?v1Companies().length:'Bei Kunden anzeigen')+'</b><small>Ohne doppelte HQ-Firmen</small></div><div class="m-summary"><span>Fakturierter Netto-Umsatz</span><b>'+(e?.loadedAt?money(revenue()):'Noch nicht importiert')+'</b><small>'+esc(editionLabel(e))+(e?.complete?'':' · vorläufig')+'</small></div><div class="m-summary"><span>Offene Übertragungen</span><b>'+(loadedViews.has('import')||loadedViews.has('test')?state.jobs.filter(j=>!['synced','canceled'].includes(j.state)).length:'Im Datenabgleich')+'</b><small>Eigene Firmen</small></div></div>'+
       (e?.changes?.length?'<p class="m-note">Ausgabe aktualisiert: Ziel '+money(e.changes[0].before.targetCents)+' → '+money(e.settings.targetCents)+' · '+esc(new Date(e.changes[0].at).toLocaleString('de-DE'))+'</p>':'')+
       '<section class="m-panel m-section"><div class="m-panel-head"><h2>'+esc(editionLabel(e))+'</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Zielumsatz</dt><dd>'+money(e?.settings?.targetCents)+'</dd><dt>Anzeigenschluss</dt><dd>'+esc(e?.settings?.adDeadline||'Noch offen')+'</dd><dt>Drucktermin</dt><dd>'+esc(e?.settings?.printDate||'Noch offen')+'</dd><dt>Veröffentlichung</dt><dd>'+esc(e?.settings?.releaseDate||'Noch offen')+'</dd></dl><p>Letzter Ausgabeimport: '+esc(e?.loadedAt?new Date(e.loadedAt).toLocaleString('de-DE'):'Noch keiner')+'</p>'+button('Datenabgleich öffnen','nav','import')+(run?.errors?.length?'<p class="m-note">Der letzte Import enthält '+run.errors.length+' fehlgeschlagene Abschnitte. Details im Datenabgleich.</p>':'')+'</div></section>';
   }
   function v1SimpleCustomerRows(){const q=search.toLocaleLowerCase('de');const rows=v1Companies().filter(c=>String(c.name||'').toLocaleLowerCase('de').includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'de'));return rows.map(c=>'<div class="m-row">'+button(c.name,'company',c.id)+'</div>').join('')||empty('Keine passenden Kunden.');}
-  function v1Customers(){return head('Kunden','Unternehmen und Interessenten aus Firebase')+'<label class="m-field">Nach Namen suchen<input id="customer-name-search" value="'+esc(search)+'" placeholder="Unternehmensname"></label><section id="customer-rows" class="m-panel m-section">'+v1SimpleCustomerRows()+'</section>';}
+  function v1Customers(){return head('Kunden','Unternehmen und Interessenten aus Firebase',salesUsesLogin()&&salesCan('company.create')?button('Firma hinzufügen','nav','new'):'')+'<label class="m-field">Nach Namen suchen<input id="customer-name-search" value="'+esc(search)+'" placeholder="Unternehmensname"></label><section id="customer-rows" class="m-panel m-section">'+v1SimpleCustomerRows()+'</section>';}
   function v1Magazine(){return head('Magazinverkauf','Recherche aus HQ-Rechnungen; aktuelle Verkäufe werden hier noch nicht gebucht.')+editionSelectors()+v1FilterBar()+'<section id="customer-rows" class="m-panel m-section">'+v1CustomerRows(false)+'</section>';}
   function v1Contacts(){
     const contacts=new Map();(state.directory||[]).forEach(e=>(e.contacts||[]).forEach(c=>contacts.set(String(c.id),{...c,companyName:e.company.name,companyId:e.company.id})));
@@ -330,7 +358,7 @@ window.__salesStarted=false;
   function v1Import(){
     const run=state.syncRun,stats=run?.stats||{},open=state.jobs.filter(j=>!['synced','canceled'].includes(j.state)),background=run?.engine===2&&run.state==='running'&&!run.paused&&Date.now()-Date.parse(run.updatedAt)<600000;
     const rows=[['Unternehmen',stats.companies,stats.hqCompanies],['Ansprechpartner',stats.contacts===undefined?undefined:stats.contacts+(stats.totalsIncludeUnassigned?0:(stats.unassignedContacts||0)),stats.hqContacts],['Historieneinträge',stats.histories===undefined?undefined:stats.histories+(stats.totalsIncludeUnassigned?0:(stats.unassignedHistories||0)),stats.hqHistories]];
-    return head('HQ-Synchronisation','Firebase bleibt die Arbeitsdatenbank. Der Abgleich startet nur durch deinen Klick.',button('Fortschritt aktualisieren','sync-status'))+'<section class="m-panel"><div class="m-panel-body"><p>Zuerst offene App-Aufträge nach HQ: Firma bestätigen, danach Ansprechpartner. Anschließend HQ-Daten gesammelt nach Firebase laden und Kundenakten sowie ausgewählte Magazinausgaben daraus aktualisieren.</p><p>Offene App-Aufträge unter Aufträge und Konflikte ansehen. Firmen, Adressen, Ansprechpartner und Kommunikation können für den geladenen Kundenbestand bearbeitet werden. HQ-Projekte und Rechnungen bleiben nur lesbar.</p>'+ (state.user.admin?(importLoop||background?'<button class="m-button m-primary" disabled>HQ-Sync läuft</button><button class="m-button" data-action="pause-import" '+(stopImport||run?.pauseRequested?'disabled':'')+'>Nach diesem Abschnitt anhalten</button>':button(run?.state==='running'?'HQ-Sync fortsetzen':'HQ synchronisieren','v1-sync','',true)):'')+
+    return head('HQ-Synchronisation','Firebase bleibt die Arbeitsdatenbank. Der Abgleich startet nur durch deinen Klick.',button('Fortschritt aktualisieren','sync-status'))+'<section class="m-panel"><div class="m-panel-body"><p>Zuerst offene App-Aufträge nach HQ: Firma bestätigen, danach Ansprechpartner. Anschließend HQ-Daten gesammelt nach Firebase laden und Kundenakten sowie ausgewählte Magazinausgaben daraus aktualisieren.</p><p>Offene App-Aufträge unter Aufträge und Konflikte ansehen. Firmen, Adressen, Ansprechpartner und Kommunikation können für den geladenen Kundenbestand bearbeitet werden. HQ-Projekte und Rechnungen bleiben nur lesbar.</p>'+ ((state.user.admin||salesUsesLogin()&&salesCan('sync.run'))?(importLoop||background?'<button class="m-button m-primary" disabled>HQ-Sync läuft</button><button class="m-button" data-action="pause-import" '+(stopImport||run?.pauseRequested?'disabled':'')+'>Nach diesem Abschnitt anhalten</button>':button(run?.state==='running'?'HQ-Sync fortsetzen':'HQ synchronisieren','v1-sync','',true)):'')+
       (state.user.admin&&!importLoop&&!background&&run?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+
       (run?'<p>'+run.done+' von '+run.total+' bekannten Abschnitten erfolgreich · '+run.errors.length+' Hinweise/Fehler</p><p>'+esc(syncStatusLabel(run))+'</p><p>Aktueller Abschnitt: '+esc(run.current||'Keiner')+(run.stage?' · '+esc(run.stage):'')+'</p><p>Letzte Aktualisierung: '+esc(new Date(run.updatedAt).toLocaleString('de-DE'))+'</p>':'<p>Noch kein vollständiger HQ-Sync. Ein älterer Ausgabeimport bestätigt noch nicht den gesamten Firmenbestand.</p>')+
       (run?.discovery?'<p id="sync-discovery"><strong>'+run.discovery.count+' von '+(run.discovery.total??'noch unbekannt vielen')+' Firmen erfasst</strong> · '+run.discovery.pages+' Seiten gespeichert'+(run.discovery.complete?' · Firmenerfassung abgeschlossen':'')+'</p><p class="m-muted">Alle bekannten Firmen bleiben unabhängig von Magazinbuchungen gespeichert. Bei einem Änderungsabgleich werden nur betroffene Akten aktualisiert.</p>':'')+
@@ -341,6 +369,7 @@ window.__salesStarted=false;
   }
   function v1Admin(){
     let body=admin().replace('COBURGER #70 · Ziel und Termine',esc(editionLabel(state.edition))+' · Ziel und Termine');body=editionSelectors()+body;if(!state.user.admin)return body;
+    body=(salesUsesLogin()?salesUsersPanel():salesSetupPanel())+body;
     return body+storageInventoryPanel()+projectSearchPanel()+(state.syncRun?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+'<p class="m-note">Alle eingelesenen HQ-Unternehmen und Ansprechpartner bleiben verfügbar, auch ohne Magazinrechnung. Weitere Ausgaben können aus dem gespeicherten Bestand verknüpft werden.</p><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
   }
   async function continueV1Import(editionsOnly=false){
@@ -784,6 +813,88 @@ window.__salesStarted=false;
     });
   });
 
+  const SALES_LOGIN_CONFIG="AUTH_RUNTIME_CONFIG";
+  let salesLoginSession=null,salesLoginPending=null,salesUserRows=[],salesUserCursor=null,salesInvitationLink='';
+  let salesSetupConfig=null,salesSetupBound=false;
+  const salesUsesLogin=()=>SALES_LOGIN_CONFIG?.enabled===true;
+  const salesLoginOrigin=()=>salesUsesLogin()?SALES_LOGIN_CONFIG.origin:salesSetupConfig?.origin;
+  function salesSetupPanel(){return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzeranmeldung einrichten</h2></div><div class="m-panel-body"><p>Der bisherige Google-Zugang bleibt bis zur Aktivierung erhalten.</p>'+button('Einrichtung vorbereiten','auth-setup')+(salesSetupConfig?button('Administratorkonto bestätigen','auth-login'):'')+(salesSetupBound?button('Benutzeranmeldung aktivieren','auth-enable'):'')+'</div></section>';}
+  function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e?.message||'Anfrage fehlgeschlagen.')))[name](...args));}
+  function salesForgetLogin(text=''){
+    salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
+    state=null;detail=null;preview=null;audit=null;businessEditor=null;contactDialog=null;salesUserRows=[];salesInvitationLink='';
+    for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';
+    if(communicationClock){clearInterval(communicationClock);communicationClock=null;}root.classList.remove('m-customer-open');document.body.classList.remove('sales-customer-open');render();
+  }
+  function salesLoginPage(){return '<div class="m-login"><h1>Sales Markatus</h1><p>'+(SALES_LOGIN_CONFIG.invitation?'Du wurdest eingeladen. Bitte dein Konto bestätigen.':'Bitte mit deinem freigegebenen Konto anmelden.')+'</p><p role="alert">'+esc(error)+'</p>'+button('Anmelden / Einladung aktivieren','auth-login','','true')+'</div>';}
+  async function salesBeginLogin(){
+    if(salesLoginPending&&!salesLoginPending.popup.closed){salesLoginPending.popup.focus();return;}
+    const popup=window.open('about:blank','sales-auth','popup,width=520,height=760');if(!popup){error='Bitte das Anmeldefenster im Browser erlauben.';render();return;}
+    try{
+      const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join(''),stateKey=Array.from(crypto.getRandomValues(new Uint8Array(24)),n=>n.toString(16).padStart(2,'0')).join('');
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)),challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      const response=await salesDirectRpc('beginSalesLogin',{origin:location.origin,state:stateKey,challenge});
+      const origin=new URL(response.origin).origin;if(origin!==salesLoginOrigin())throw Error('Anmeldeursprung stimmt nicht überein.');
+      salesLoginPending={popup,verifier,state:stateKey,attempt:response.attempt,createdAt:Date.now()};
+      popup.location.href=origin+'/auth/#'+new URLSearchParams({origin:location.origin,state:stateKey,attempt:response.attempt,...(SALES_LOGIN_CONFIG.invitation?{invitation:SALES_LOGIN_CONFIG.invitation}:{})});
+    }catch(e){popup.close();salesLoginPending=null;error=e.message;render();}
+  }
+  if(typeof window!=='undefined')window.addEventListener('message',async event=>{
+    const pending=salesLoginPending;if(!pending||pending.finishing||Date.now()-pending.createdAt>5*60000||event.origin!==salesLoginOrigin()||event.source!==pending.popup||event.data?.type!=='sales-firebase-login'||event.data.state!==pending.state||event.data.attempt!==pending.attempt)return;
+    pending.finishing=true;
+    try{
+      const result=await salesDirectRpc('finishSalesLogin',{attempt:pending.attempt,verifier:pending.verifier,state:pending.state,idToken:event.data.idToken,refreshToken:event.data.refreshToken,invitation:SALES_LOGIN_CONFIG.invitation||''});
+      salesLoginSession={id:result.session,revision:result.user.revision};pending.popup.postMessage({type:'sales-login-complete',state:pending.state},salesLoginOrigin());salesLoginPending=null;
+      if(!salesUsesLogin()){salesSetupBound=true;message='Administratorkonto bestätigt. Die Benutzeranmeldung kann jetzt aktiviert werden.';render();return;}
+      error='';await act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});
+    }catch(e){pending.finishing=false;error=e.message;render();}
+  });
+  async function salesRpcWithLogin(target,args){
+    if(!salesLoginSession)throw Error('AUTH_REQUIRED: Bitte anmelden.');
+    const response=await salesDirectRpc('salesAuthenticatedRpc',salesLoginSession.id,target,args);
+    if(response.identity.revision!==salesLoginSession.revision){salesForgetLogin('Deine Rechte wurden geändert. Bitte erneut anmelden.');throw Error('AUTH_REQUIRED: Rechte geändert.');}
+    if(state)state.user=response.identity;return response.result;
+  }
+  function salesPermissionFields(values={},owner=false){return SALES_PERMISSION_CATALOG.map(([key,label,group],i)=>'<label class="m-check"><input type="checkbox" name="permission:'+key+'" '+(values[key]||SALES_PERMISSION_BASE.includes(key)?'checked':'')+' '+(owner||SALES_PERMISSION_BASE.includes(key)?'disabled':'')+'>'+esc(label)+'</label>').join('');}
+  function salesUsersPanel(){
+    const users=salesUserRows.map(u=>'<details class="m-row"><summary>'+esc(u.email)+' · '+(u.status==='active'?'Aktiv':'Gesperrt')+'</summary><form data-form="auth-user" data-uid="'+esc(u.uid)+'" data-revision="'+u.revision+'">'+salesPermissionFields(u.permissions,u.uid===state.user.uid)+'<label class="m-field">Zugang<select name="status" '+(u.uid===state.user.uid?'disabled':'')+'><option value="active" '+(u.status==='active'?'selected':'')+'>Aktiv</option><option value="disabled" '+(u.status==='disabled'?'selected':'')+'>Gesperrt</option></select></label><button class="m-button" '+(u.uid===state.user.uid?'disabled':'')+'>Rechte speichern</button></form></details>').join('');
+    return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzer und Rechte</h2>'+button('Benutzer laden','auth-users')+'</div><div class="m-panel-body"><form data-form="auth-invite"><h3>Benutzer freigeben</h3>'+field('E-Mail-Adresse','email','','email',true)+salesPermissionFields()+'<p class="m-muted">Neue Benutzer lesen zunächst nur Mein Tag und Kunden. Löschen sowie noch nicht vorhandene Funktionen bleiben gesperrt.</p><button class="m-button m-primary">Einladungslink erstellen</button></form>'+(salesInvitationLink?'<label class="m-field">Einladungslink · 48 Stunden gültig<input readonly data-invitation-link value="'+esc(salesInvitationLink)+'"></label>'+button('Einladungslink kopieren','auth-copy'):'')+'</div>'+users+(salesUserCursor?button('Weitere Benutzer','auth-more'):'')+'</section>';
+  }
+  function salesUiPermissions(){
+    if(!salesUsesLogin()||!state)return;
+    const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'unavailable',test:'owner',new:'company.create',change:'company.edit'};
+    for(const b of root.querySelectorAll('[data-action="nav"]')){const rule=navRules[b.dataset.id];if(rule&&!salesCan(rule)&&!(b.dataset.id==='admin'&&state.user.admin))b.hidden=true;}
+    const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read'};
+    for(const b of root.querySelectorAll('[data-action]')){
+      let rule=actionRules[b.dataset.action];if(b.dataset.action==='edit-business'&&b.dataset.id.startsWith('contact:'))rule='contact.edit';
+      if(rule&&(rule==='owner'?!state.user.admin:!salesCan(rule)))b.hidden=true;
+    }
+    const capture=root.querySelector('.m-capture');if(capture&&!salesCan('communication.create'))capture.innerHTML='<h2>Kommunikation</h2><p>Du hast Leserechte. Neue Einträge können von berechtigten Personen erfasst werden.</p>';
+    if(!salesCan('contact.create'))root.querySelector('[name="communicationContact"] option[value="__new"]')?.remove();
+    if(!salesCan('finance.read')){
+      for(const el of root.querySelectorAll('.m-list-end'))el.remove();
+      root.querySelector('[name="v1History"]')?.closest('label')?.remove();
+      for(const form of root.querySelectorAll('form[data-form="edition"]'))form.hidden=true;
+    }
+    if(!salesCan('projects.read'))root.querySelector('[data-customer-list="projects"]')?.remove();
+    if(!salesCan('settings.edit'))for(const form of root.querySelectorAll('form[data-form="edition"],form[data-form="edition-selection"],form[data-form="project-search"]'))form.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);
+  }
+  root.addEventListener('click',e=>{
+    const b=e.target.closest('[data-action]');if(!b||!b.dataset.action.startsWith('auth-'))return;e.stopImmediatePropagation();
+    if(b.dataset.action==='auth-login')salesBeginLogin();
+    if(b.dataset.action==='auth-setup')act(async()=>{await salesDirectRpc('saveSalesAuthSetup',{allowedOrigins:[location.origin]});salesSetupConfig=await salesDirectRpc('getSalesAuthSetup');return {message:'Vorbereitet. Bitte jetzt das bisherige Administratorkonto bestätigen.'};});
+    if(b.dataset.action==='auth-enable')act(async()=>{const r=await salesDirectRpc('enableSalesLogin',salesLoginSession?.id);salesSetupBound=false;return r;});
+    if(b.dataset.action==='auth-logout')act(async()=>{try{await rpc('logoutSalesUser');}finally{salesForgetLogin();}});
+    if(b.dataset.action==='auth-users'||b.dataset.action==='auth-more')act(async()=>{const r=await rpc('listSalesUsers',b.dataset.action==='auth-more'?salesUserCursor:null);salesUserRows=b.dataset.action==='auth-more'?[...salesUserRows,...r.users]:r.users;salesUserCursor=r.next;});
+    if(b.dataset.action==='auth-copy')navigator.clipboard.writeText(salesInvitationLink).catch(()=>root.querySelector('[data-invitation-link]')?.select());
+  });
+  root.addEventListener('submit',e=>{
+    const form=e.target;if(!['auth-user','auth-invite'].includes(form.dataset.form))return;e.preventDefault();e.stopImmediatePropagation();if(busy||!form.reportValidity())return;
+    const permissions=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,form.querySelector('[name="permission:'+key+'"]')?.checked===true]));
+    act(async()=>{if(form.dataset.form==='auth-invite'){const r=await rpc('createSalesUserInvitation',{email:form.elements.email.value,permissions});salesInvitationLink=r.url;return r;}
+      const r=await rpc('updateSalesUser',{uid:form.dataset.uid,revision:Number(form.dataset.revision),status:form.elements.status.value,permissions});const users=await rpc('listSalesUsers');salesUserRows=users.users;salesUserCursor=users.next;return r;});
+  });
+
   root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;if(a==='pause-import'){v1Click(a,id);return;}if(busy)return;if(v1Click(a,id))return;if(a==='theme'){theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;b.textContent=theme==='dark'?'Helle Ansicht':'Dunkle Ansicht';try{localStorage.setItem('sales-theme',theme);}catch(_){}return;}if(a==='nav')return act(async()=>{search='';message='';await openView(id);});
     if(a==='reload')return act(async()=>{await refreshCurrentView();return {message:'Diese Ansicht frisch aus Firebase geladen. Kein HQ-Aufruf.'};});
     if(a==='company')return act(async()=>{historyFilter='all';selected=id;detail=await loadCompany(id);if(detail?.company?.localDraftId)selected=detail.company.id;view='company';});
@@ -815,6 +926,8 @@ window.__salesStarted=false;
       if(kind==='access'){state.access=await rpc('saveSalesAccess',input.emails);const cached=viewCache.get('admin');if(cached)cached.access=state.access;r={message:'E-Mail-Freigaben gespeichert.'};}return r;},{preserve:true});
   });
   // No home timer, version poll, TTL refresh or other automatic working-data reads.
+  if(salesUsesLogin())render();
+  if(!salesUsesLogin())
   act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});
   window.__salesStarted=true;
 })();

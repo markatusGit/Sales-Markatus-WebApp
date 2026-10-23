@@ -13,7 +13,7 @@ const HQ_BENCH = Object.freeze({
 });
 
 function doGet(e) {
-  if (!e || !e.parameter || e.parameter.view !== 'benchmark') return salesPage_();
+  if (!e || !e.parameter || e.parameter.view !== 'benchmark') return salesPage_(e);
   requireBenchUser_();
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('Magazinvertrieb – HQ-Test');
 }
@@ -134,6 +134,7 @@ function runBenchmark(input) {
 }
 
 function requireBenchUser_() {
+  if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_())return salesAuthOwner_().email;
   const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
   const allowed = String(PropertiesService.getScriptProperties().getProperty('HQ_BENCH_ALLOWED_EMAILS') || '')
     .split(',').map(value => value.trim().toLowerCase()).filter(Boolean);

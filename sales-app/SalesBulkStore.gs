@@ -4,6 +4,7 @@ function salesBulkCollection_(entity){
   if(!names[entity])throw new Error('Unbekannte HQ-Datenart.');return 'sales_raw'+names[entity];
 }
 function salesBulkRest_(operation,body){
+  if(operation==='commit'&&typeof salesAuthProtectWrites_==='function')body={...body,writes:salesAuthProtectWrites_(body.writes)};
   const c=salesContext_();return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':'+operation,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify(body)});
 }
 function salesBulkName_(path){return 'projects/'+salesContext_().project+'/databases/(default)/documents/'+salesPath_(path);}
