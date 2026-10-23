@@ -6,20 +6,20 @@
   "dashboardConfirmedByUser": true,
   "observedAppsScriptVersion": 30,
   "observedOn": "2026-10-16",
-  "gitTag": "v0.26.0",
-  "appsScriptVersion": 37,
-  "sourceCommit": "30232b9a9e7be1007f4ca705fc0deba8d7fe745c",
+  "gitTag": "v0.26.1",
+  "appsScriptVersion": 38,
+  "sourceCommit": "235a220b8bb56aa3b04c767b6a12f7da44112fdf",
   "status": "google-version-verified",
   "files": {
     "Code.gs": "18f5dfabbf4c0fa5639f618b23ee95553783c0d7ee4f3f068574ea58f6481c62",
     "FirebaseSync.gs": "6201bda0fd4f6b5835a3cbaabb35e36e9633690ef5c0936bb76104846a5192db",
     "Index.html": "d19c1ab2c6e561a7ac406e2219dc937bd49e1a5d21f1161adf411baf7f50e7a3",
     "Revenue.gs": "b2ca0fab7b8b3f064eb6adb5d20f5d4e80b716bcffc4f88e2afdf2822ce6bc89",
-    "Sales.html": "36645b4741b77ac6b184b3a7d1a7f4d1940bac5a526d02f2a19047eb77db3772",
-    "SalesBackend.gs": "2ae326d30cdf7bad7c8574a16df2fc952da08c4fb4d32cae9b092858e4ed8d0e",
+    "Sales.html": "1eff115b058083bebe732b0fd60eed0cb88a4d2d576c41b0860c1c66198edc21",
+    "SalesBackend.gs": "6c331646c8aa6b67366908e69e66abcea18d8ec0e6c04913db2ffd3dc446d8fa",
     "appsscript.json": "f32a769288ac07419c5845add764219f474d03f00cf234d51b00b42d11419c9c"
   },
   "note": "Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.",
   "googleCodeVerifiedOn": "2026-10-16",
-  "googleCodeVerifiedAt": "2026-10-23T13:28:48.310Z"
+  "googleCodeVerifiedAt": "2026-10-23T13:54:32.486Z"
 }
