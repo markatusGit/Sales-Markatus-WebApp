@@ -6,9 +6,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [v0.27.1]
 
-- Ausschließlich Google-Anmeldung mit freigegebenem Google-Konto; Passwortfelder, Kontoanlage, Bestätigungsmails und Passwort-zurücksetzen aus dem Anmeldefenster entfernt. Server weist andere Anmeldeanbieter auch für verknüpfte Konten zurück; Firebase-Passwortanbieter wird deaktiviert. Einladungen und Rechte unverändert.
 - Ladeanzeige schon im initialen HTML und während Google-Rückkehr sowie Serverprüfung; kein kurz sichtbares Anmeldeformular. Bei Abbruch erneuter Versuch; bei Serverfehler schließt das Ladefenster und die App zeigt die Fehlermeldung. Reduzierte Bewegung und zugänglicher Ladestatus berücksichtigt.
-- Synthetischer Browser prüft verzögerte Rückkehr, Formularfreiheit, Server-Wartezeit, Abbruch/Wiederholung und Serverablehnung. Zusätzliche Backendprüfung für Google-only. Kein neuer Script-Property-Wert und keine Apps-Script-Zugriffs-/Ausführungsänderung. Veröffentlichung und Live-Abnahme separat dokumentieren.
+- Synthetischer Browser prüft verzögerte Rückkehr, verborgene Bedienelemente bis zur Serverantwort, Abbruch/Wiederholung und Serverablehnung. E-Mail-/Passwortanmeldung einschließlich Einladung/Verifizierung unverändert erhalten. Google-only-Umstellung wartet nach automatischer Ablehnung auf ausdrückliche Nutzerbestätigung. Keine Anbieter-, Rechte-, Script-Property- oder Apps-Script-Einstellungsänderung.
 
 ## [v0.27.0]
 

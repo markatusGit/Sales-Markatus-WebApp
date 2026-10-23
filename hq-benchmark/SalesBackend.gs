@@ -2570,7 +2570,6 @@ function salesAuthIdentity_(idToken){
   const users=JSON.parse(r.getContentText()).users;if(!Array.isArray(users)||users.length!==1)throw Error('AUTH_REQUIRED: Konto nicht eindeutig.');
   const u=users[0];let claims;try{claims=JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(idToken.split('.')[1])).getDataAsString());}catch{throw Error('AUTH_REQUIRED: Anmeldung ungültig.');}
   if(u.disabled||u.emailVerified!==true||claims.email_verified!==true||claims.sub!==u.localId||claims.aud!==cfg.project||claims.iss!=='https://securetoken.google.com/'+cfg.project||!Number.isFinite(claims.exp)||claims.exp<=Date.now()/1000||!Number.isFinite(claims.auth_time)||claims.auth_time<Number(u.validSince||0))throw Error('AUTH_REQUIRED: Konto unbestätigt, gesperrt oder Anmeldung widerrufen.');
-  if(claims.firebase?.sign_in_provider!=='google.com')throw Error('AUTH_REQUIRED: Bitte mit Google anmelden.');
   return {uid:u.localId,email:salesAuthEmail_(u.email),authTime:claims.auth_time,tokenExpiresAt:claims.exp*1000};
 }
 function salesAuthPrincipal_(identity){

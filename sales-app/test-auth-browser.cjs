@@ -20,7 +20,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   await page.addInitScript(()=>{const chain=(ok,fail)=>new Proxy({},{get(_,name){if(name==='withSuccessHandler')return f=>chain(f,fail);if(name==='withFailureHandler')return f=>chain(ok,f);return (...args)=>window.fixtureRpc(name,args).then(ok,fail);}});window.google={script:{run:chain(()=>{},()=>{})}};});
   await page.goto(origin);await page.getByRole('button',{name:'Anmelden / Einladung aktivieren'}).waitFor();assert.equal(calls.length,0,'No business request before login');
   const popupPromise=page.waitForEvent('popup');await page.getByRole('button',{name:'Anmelden / Einladung aktivieren'}).click();const popup=await popupPromise;await popup.getByRole('button',{name:'Mit Google anmelden'}).waitFor();
-  assert.equal(await popup.locator('input,form,#forgot,#verification').count(),0,'Only Google sign-in is offered');
+  assert.equal(await popup.locator('input').count(),2,'Existing email/password login remains available pending explicit Google-only decision');
   await page.evaluate(()=>window.dispatchEvent(new MessageEvent('message',{origin:'https://sales-markatus.firebaseapp.com',source:window,data:{type:'sales-firebase-login',state:'forged',attempt:'forged',idToken:'forged'}})));assert.equal(calls.some(c=>c.name==='finishSalesLogin'),false);
   await popup.evaluate(()=>sessionStorage.setItem('fixture-cancel','1'));
   await popup.getByRole('button',{name:'Mit Google anmelden'}).click();await popup.getByText('Anmeldung abgebrochen.',{exact:true}).waitFor();assert.equal(await popup.locator('#loading').isVisible(),false);assert.equal(await popup.locator('#google').isVisible(),true);
