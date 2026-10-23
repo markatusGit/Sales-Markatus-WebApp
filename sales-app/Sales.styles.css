@@ -73,3 +73,12 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
  #magazin-vertrieb.m-customer-open .m-nav{flex-wrap:nowrap;overflow-x:auto;gap:6px}
  #magazin-vertrieb.m-customer-open .m-nav button{white-space:nowrap;flex-shrink:0;min-height:38px;padding:6px}
 }
+
+/* Small customer lists grow naturally; longer lists show three cards and filter locally. */
+#magazin-vertrieb .m-customer-list-tools{padding:12px 18px;border-bottom:1px solid var(--m-line)}
+#magazin-vertrieb .m-customer-list-tools small{display:block;margin-top:6px}
+#magazin-vertrieb .m-customer-list-rows{overflow-y:auto;overscroll-behavior:contain}
+#magazin-vertrieb .m-customer-list[data-limit=true] .m-customer-list-rows{scrollbar-gutter:stable}
+#magazin-vertrieb .m-company-addresses{margin-top:20px;padding-top:16px;border-top:1px solid var(--m-line)}
+#magazin-vertrieb .m-company-addresses>.m-row{padding-left:0;padding-right:0}
+#magazin-vertrieb .m-company-addresses h4{margin:0;font-size:.94em;font-weight:500}

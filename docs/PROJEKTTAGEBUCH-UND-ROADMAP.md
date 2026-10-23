@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 22. Oktober 2026.
+Zuletzt aktualisiert: 23. Oktober 2026.
 
 ## Zweck und Pflege
 
@@ -1265,3 +1265,15 @@ Veröffentlichung v0.23.0: Apps-Script-Version 34, bestehende Bereitstellung bei
 **Abschluss r23:** Genau die 25 zugehörigen Quell-/Test-/Dokumentationsdateien im Quellcommit 04fcfb4 gesichert. Saubere Veröffentlichungskopie .release/publish-r23 mit separaten Git-Verwaltungsdateien im freigegebenen lokalen C-Arbeitsbereich; alle 20 Prüfsuiten vor Upload vollständig erfolgreich, keine fremden Arbeitsdateien übernommen. clasp push, feste Google-Version 34 und Aktualisierung derselben bestätigten Bereitstellungs-ID erfolgreich. Releasecommit 5386e22 und Git-Tag v0.23.0 erfolgreich nach GitHub übertragen; release:verify bestätigt Google-Version, Editor und GitHub-Tag/main mit identischem Code. Originalprojekt per Fetch/Fast-Forward auf denselben Nachweis gebracht. Bekannte packed-refs.lock-Warnung verhinderte Commit/Fetch/Merge nicht; keine Sperrdatei gelöscht. Abschlussdokumentation wird zusätzlich gezielt nach GitHub gesichert und der Vergleich im ursprünglichen Projekt abgeschlossen.
 
 **Live-Abnahme / Einrichtung:** Keine echten Kundendaten für Funktionsprüfungen geändert; fachliche Abnahme mit einem bewusst ausgewählten Kunden offen. Keine neuen/geänderten Script Properties, OAuth-Scopes, Ausführungsidentität, Zugriffsgruppe oder Firestore-Endnutzerregeln. Kein Nachtlauf, keine Wiedervorlagen, keine E-Mails oder Datenbereinigung. Bestehende Dashboard-Adresse neu öffnen und oben Stand 2026-10-22-r23 erwarten; bei Abweichung die Kennung melden. Einen Kunden öffnen; links vorhandene Angaben und rechts feste Erfassung mit eigener Historie erwarten. Detaillierte Bedienung/Fehlerfälle in docs/KUNDENKOMMUNIKATION-R23.md. Fremde START-HIER-Änderung und zwei unversionierte Zusatzdokumente bleiben erhalten.
+
+### 23.10.2026 – Ansprechpartner und Projekte kompakt durchsuchen, Adressen in Allgemein (r24)
+
+**Nutzerauftrag:** Links Ansprechpartner und Projekte bei höchstens drei Einträgen wie bisher anzeigen. Ab vier Einträgen jeweils drei Karten im eigenen Scrollbereich und darüber eine während der Eingabe filternde Suche. Firmenadressen unten in Allgemein aufnehmen. Die feste Kommunikation rechts aus r23 bleibt Grundlage; übrige Roadmap-Wünsche unverändert erhalten.
+
+**Lokal umgesetzt:** Ein gemeinsamer Listenbaustein für Kontakte und Projekte in HQ- und lokalen Kundenakten. Kartengrößen werden anhand der ersten drei sichtbaren Karten gemessen und bei Größenänderung angepasst. Suchleiste bleibt über dem Listen-Scrollbereich; Trefferzahl und Leermeldung ergänzt. Kontakte nach Name/Position/E-Mail/Telefon, Projekte nach Name/Nummer filterbar, ohne Groß-/Kleinschreibung oder Akzente. Nur DOM-/Sitzungszustand; keine zusätzlichen Datenabrufe. Suchtext, eigener Listen-Scrollstand und bisherige Kommunikationsentwürfe bleiben bei Neudarstellungen erhalten. Schrumpft die Gesamtliste auf höchstens drei, wird ein alter Filter zurückgesetzt. Firmenadressen in Allgemein integriert, bestehende Bearbeitung erhalten; lokale Adressen ohne HQ-ID lesbar.
+
+**Gezielt geprüft:** Build und 100 bestehende Logikprüfungen erfolgreich. Erweiterte Kommunikations-Browserprüfung bestätigt beide Listen mit 0–4 Einträgen, größere Projektlisten, Filterzeichen, Treffer/Leermeldung, Suchrücknahme beim Schrumpfen, keine RPCs durch Suche, unabhängiges Scrollen, Kontaktanlage, mobile Suche und erhaltene Notizentwürfe. Bestehende Kunden-/Adressbearbeitung erfolgreich. Desktop-, Handy- und helle Ansicht mit synthetischen Daten visuell geprüft. Vollständiger Projektprüflauf, gezielter Quellcommit und Veröffentlichung derselben Bereitstellung mit GitHub-Tag v0.24.0 folgen als eigene Nachweise.
+
+**Grenzen / Einrichtung:** Keine echten Kundendaten für Tests gelesen oder geändert. Keine neuen Script Properties, Scopes, Firebase-Regeln, Trigger oder Bereitstellungseinstellungen. Keine Migration, Datenbereinigung oder neue Hintergrundabfrage. Fachliche Live-Abnahme offen; Bedienung in docs/KUNDENANSICHT-R24.md. Fremde START-HIER-Änderung und zwei unversionierte Zusatzdokumente bleiben getrennt.
+
+**Vollständige lokale Prüfung vor Veröffentlichung:** npm test einschließlich Syntax, JSON, Buildgleichheit, Uploadliste, Zugangsdatenprüfung und aller 20 Logik-/Browser-Prüfsuiten erfolgreich. Abschließende Sichtprüfung bestätigt genau drei Karten im Kontakt-/Projektbereich und eingebettete Firmenadressen. Nur die zugehörigen Quell-, Test- und Dokumentationsdateien werden gesichert; veröffentlichen aus sauberer Kopie ohne fremde Änderungen.

@@ -4,6 +4,42 @@
   const contactKey=c=>String(c.localContactId||c.id);
   const localContactTime=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
   const communicationId=()=>Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
+  let customerListObserver=null;
+  const customerSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('de').trim();
+  function customerContactRow(p,editable=true){
+    return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p></div>';
+  }
+  function customerCardList(kind,title,rows,renderRow,emptyText,badge=''){
+    const d=communicationDraft();d.lists||={};const saved=d.lists[kind]||{query:'',scroll:0};d.lists[kind]=saved;
+    const searchable=rows.length>3;
+    if(!searchable){saved.query='';saved.scroll=0;}
+    const tools=searchable?'<div class="m-customer-list-tools"><label class="m-field">'+title+' suchen<input type="search" data-customer-list-search="'+kind+'" value="'+esc(saved.query)+'" placeholder="'+(kind==='contacts'?'Name, E-Mail oder Telefon':'Projektname oder Projektnummer')+'"></label><small data-list-count aria-live="polite"></small></div>':'';
+    const cards=rows.map(row=>{
+      const text=kind==='contacts'?[row.salutation,row.firstName,row.lastName,row.position,row.eMail,row.phoneMobile,row.phoneLandline].filter(Boolean).join(' '):[row.number,row.name].filter(Boolean).join(' ');
+      return renderRow(row).replace('<div class="m-row"','<div class="m-row" data-customer-list-row data-search="'+esc(customerSearchText(text))+'"');
+    }).join('');
+    return '<section class="m-panel m-section m-customer-list" data-customer-list="'+kind+'" data-limit="'+searchable+'"><div class="m-panel-head"><h2>'+title+'</h2>'+badge+'</div>'+tools+'<div class="m-customer-list-rows" role="region" aria-label="'+title+'-Liste" tabindex="0">'+cards+'<div class="m-empty" data-list-empty '+(rows.length?'hidden':'')+'>'+esc(rows.length?'Keine passenden '+title+'.':emptyText)+'</div></div></section>';
+  }
+  function sizeCustomerCardList(panel){
+    const list=panel.querySelector('.m-customer-list-rows'),rows=Array.from(list.querySelectorAll('[data-customer-list-row]')).filter(row=>!row.hidden);
+    const height=panel.dataset.limit==='true'&&rows.length>3?Math.ceil(rows.slice(0,3).reduce((n,row)=>n+row.getBoundingClientRect().height,0))+'px':'';
+    if(list.style.maxHeight!==height)list.style.maxHeight=height;
+  }
+  function filterCustomerCardList(panel,query){
+    const normalized=customerSearchText(query),rows=panel.querySelectorAll('[data-customer-list-row]');let matches=0;
+    for(const row of rows){row.hidden=!row.dataset.search.includes(normalized);if(!row.hidden)matches++;}
+    panel.querySelector('[data-list-empty]').hidden=matches>0;
+    const count=panel.querySelector('[data-list-count]');if(count)count.textContent=matches+' von '+rows.length+' '+(panel.dataset.customerList==='contacts'?'Ansprechpartnern':'Projekten');
+    sizeCustomerCardList(panel);
+  }
+  function customerListsAfterRender(){
+    const panels=root.querySelectorAll('[data-customer-list]'),saved=communicationDraft().lists||{};
+    for(const panel of panels){const state=saved[panel.dataset.customerList];filterCustomerCardList(panel,state?.query||'');panel.querySelector('.m-customer-list-rows').scrollTop=state?.scroll||0;}
+    if(typeof ResizeObserver==='function'){
+      customerListObserver=new ResizeObserver(()=>{for(const panel of panels)sizeCustomerCardList(panel);});
+      for(const panel of panels){customerListObserver.observe(panel);for(const row of panel.querySelectorAll('[data-customer-list-row]'))customerListObserver.observe(row);}
+    }
+  }
   function communicationDraft(){
     const key=communicationKey();let draft=communicationDrafts.get(key);
     if(!draft){draft={text:'',contact:'',manualTime:false,time:localContactTime(),tab:'details',leftScroll:0,historyScroll:0};communicationDrafts.set(key,draft);}
@@ -35,14 +71,16 @@
   function communicationBeforeRender(){
     if(!root.querySelector('.m-customer-workspace'))return;
     const d=communicationDrafts.get(root.querySelector('[data-communication-ref]')?.dataset.communicationRef||communicationKey());
-    if(d){d.leftScroll=root.querySelector('.m-customer-details')?.scrollTop||0;d.historyScroll=root.querySelector('.m-history-scroll')?.scrollTop||0;}
+    if(d){d.leftScroll=root.querySelector('.m-customer-details')?.scrollTop||0;d.historyScroll=root.querySelector('.m-history-scroll')?.scrollTop||0;for(const panel of root.querySelectorAll('[data-customer-list]'))if(d.lists?.[panel.dataset.customerList])d.lists[panel.dataset.customerList].scroll=panel.querySelector('.m-customer-list-rows').scrollTop;}
   }
   function communicationAfterRender(){
+    if(customerListObserver){customerListObserver.disconnect();customerListObserver=null;}
     if(communicationClock){clearInterval(communicationClock);communicationClock=null;}
     root.classList?.toggle('m-customer-open',view==='company');
     document.body?.classList.toggle('sales-customer-open',view==='company');
     const box=root.querySelector('.m-customer-workspace');if(!box)return;
     box.dataset.communicationRef=communicationKey();const d=communicationDraft();
+    customerListsAfterRender();
     if(d.scrollToTop){d.historyScroll=0;d.scrollToTop=false;}
     root.querySelector('.m-customer-details').scrollTop=d.leftScroll;
     root.querySelector('.m-history-scroll').scrollTop=d.historyScroll;
@@ -71,6 +109,10 @@
     companyCache.set(String(selected),detail);
   }
   root.addEventListener('input',e=>{
+    if(e.target.matches('[data-customer-list-search]')){
+      const panel=e.target.closest('[data-customer-list]'),saved=communicationDraft().lists[panel.dataset.customerList];saved.query=e.target.value;saved.scroll=0;
+      filterCustomerCardList(panel,saved.query);panel.querySelector('.m-customer-list-rows').scrollTop=0;return;
+    }
     const form=e.target.closest('form');if(!form)return;
     if(form.dataset.form==='communication'){
       const d=communicationDraft();

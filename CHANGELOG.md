@@ -8,6 +8,14 @@ Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L0
 
 Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Abschnitt dokumentiert. D17 und D21 bleiben erhalten; D22 umfasst weiterhin nur eine lesende Inventur.
 
+## [v0.24.0] – 2026-10-23
+
+- Ansprechpartner und Projekte in der Kundenakte bis zu drei Einträge wie bisher; ab vier Einträgen eigener Scrollbereich mit Platz für drei Karten und fest darüber angeordneter Suche.
+- Sofortiges Filtern während der Eingabe: Ansprechpartner nach Name, Position, E-Mail oder Telefon; Projekte nach Name oder Nummer. Treffermenge und leere Ergebnisse sichtbar. Keine zusätzlichen Server-/Datenbankzugriffe.
+- Firmenadressen an das Ende von Allgemein verschoben; vorhandene Adressbearbeitung erhalten. Such-/Scrollzustand und Kommunikation bleiben bei einer Neudarstellung in derselben Sitzung erhalten.
+- Gemeinsamer Listenbaustein für beide Bereiche und beide Kundentypen. Browserprüfung um Grenzfälle 0–4, Schrumpfen einer gefilterten Liste, getrenntes Scrollen, Kundenwechsel und Handy-Suche ergänzt; bestehende Kommunikations- und Kundenpflegeprüfungen erhalten.
+- Keine neuen Script Properties, OAuth-Scopes, Trigger oder Bereitstellungseinstellungen. Fachliche Live-Abnahme gesondert offen.
+
 ## [v0.23.0] – 2026-10-22
 
 - Feste Kommunikationserfassung rechts in jeder Kundenakte; Kundendaten links und Historie rechts scrollen unabhängig. Auf schmalen Bildschirmen Reiter, gleichwertige helle/dunkle Darstellung.
