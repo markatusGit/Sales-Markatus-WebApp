@@ -35,8 +35,8 @@ function salesAuthIdentity_(idToken){
   if(u.disabled||u.emailVerified!==true||claims.email_verified!==true||claims.sub!==u.localId||claims.aud!==cfg.project||claims.iss!=='https://securetoken.google.com/'+cfg.project||!Number.isFinite(claims.exp)||claims.exp<=Date.now()/1000||!Number.isFinite(claims.auth_time)||claims.auth_time<Number(u.validSince||0))throw Error('AUTH_REQUIRED: Konto unbestätigt, gesperrt oder Anmeldung widerrufen.');
   return {uid:u.localId,email:salesAuthEmail_(u.email),authTime:claims.auth_time,tokenExpiresAt:claims.exp*1000};
 }
-function salesAuthPrincipal_(identity){
-  const cfg=salesAuthConfig_(),record=salesAuthRead_('users',identity.uid);
+function salesAuthPrincipal_(identity,record=salesAuthRead_('users',identity.uid)){
+  const cfg=salesAuthConfig_();
   if(!record||record.status!=='active'||record.email!==identity.email)throw Error('AUTH_DENIED: Zugriff nicht freigegeben.');
   const admin=identity.uid===cfg.ownerUid&&identity.email===cfg.ownerEmail;
   return {uid:identity.uid,email:identity.email,admin,permissions:salesPermissions_(record.permissions,admin),revision:record.revision,record};
@@ -54,19 +54,21 @@ function salesAuthVerify_(session){
   const identity=salesAuthIdentity_(entry.idToken);if(identity.uid!==entry.uid||identity.email!==entry.email)throw Error('AUTH_REQUIRED: Konto wurde geändert.');
   const user=salesAuthPrincipal_(identity);if(user.record.sessionEpoch!==entry.sessionEpoch)throw Error('AUTH_REQUIRED: Sitzung wurde gesperrt.');return user;
 }
-function getSalesLoginConfig(){return {enabled:salesAuthEnabled_(),release:SALES_RELEASE,...(salesAuthEnabled_()?{origin:salesAuthConfig_().origin}:{})};}
+function getSalesLoginConfig(){return {enabled:salesAuthEnabled_(),release:SALES_RELEASE,appUrl:SALES_AUTH_APP_URL,...(salesAuthEnabled_()?{origin:salesAuthConfig_().origin}:{})};}
 function beginSalesLogin(input){
   if(!salesAuthEnabled_())salesUser_(true);
   const allowed=JSON.parse(PropertiesService.getScriptProperties().getProperty('SALES_AUTH_ALLOWED_ORIGINS')||'[]');
   if(!input||!allowed.includes(input.origin)||!/^[-\w]{43}$/.test(input.challenge||'')||!/^[-\w]{32,128}$/.test(input.state||''))throw Error('AUTH_REQUIRED: Anmeldeursprung nicht freigegeben.');
+  if(input.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
   // Bound anonymous writes and token-validation traffic; this is a quota guard, not an identity check.
   salesAuthThrottle_('begin',30);
-  const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin};
+  const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
 }
 function salesAuthThrottle_(key,limit){
   salesLock_(()=>{const cache=CacheService.getScriptCache(),slot='sales-auth-'+key+'-'+Math.floor(Date.now()/60000),count=Number(cache.get(slot)||0);if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');cache.put(slot,String(count+1),120);});
 }
 function finishSalesLogin(input){
+  if(input?.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
   salesAuthThrottle_('finish',30);
   const identity=salesAuthIdentity_(input?.idToken),hash=salesAuthHash_(salesAuthKey_(input?.attempt));
   return salesLock_(()=>{
@@ -78,8 +80,10 @@ function finishSalesLogin(input){
       if(!salesAuthRead_('users',identity.uid))salesAuthCommit_([{kind:'users',id:identity.uid,create:true,value:{uid:identity.uid,email:identity.email,status:'active',permissions:salesPermissions_({},true),revision:1,sessionEpoch:0,createdAt:salesNow_()}}]);
       PropertiesService.getScriptProperties().setProperty('SALES_AUTH_OWNER_UID',identity.uid);
     }
-    if(input.invitation)salesAuthActivate_(input.invitation,identity);
-    const user=salesAuthPrincipal_(identity),session=salesAuthRandom_();
+    let record=salesAuthRead_('users',identity.uid);
+    // A previously activated account signs in with its current ACL, not its old invitation.
+    if(!record&&input.invitation){salesAuthActivate_(input.invitation,identity);record=salesAuthRead_('users',identity.uid);}
+    const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_();
     salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt:Date.now()+8*3600000,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,user:salesAuthPublicUser_(user)};
   });
 }

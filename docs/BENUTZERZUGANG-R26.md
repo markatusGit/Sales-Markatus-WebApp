@@ -1,4 +1,6 @@
-# Benutzerzugang und Rechte – r27.1
+# Benutzerzugang und Rechte – r27.2
+
+**In Arbeit am 23.10.2026 – r27.2:** Erneute Anmeldung über bereits aktivierten Einladungslink nutzt die aktuelle serverseitige Benutzerfreigabe, keine zweite Einladungsaktivierung und kein Zurücksetzen geänderter Rechte. Gesperrte/andere Konten bleiben abgewiesen. Erfolgreiche Anmeldung entfernt Einladung aus dem aktuellen Tab über google.script.history. Veraltete Oberfläche wird beim Login ohne Datenbankzugriff erkannt; verständlicher Hinweis mit Link zur aktuellen Version derselben Bereitstellung statt manueller Code-Ersetzungsanleitung. Auch Versionswechsel während Google-Anmeldung abgesichert. 19 Backendfälle und erweiterter synthetischer Browser bestanden; vollständiger Releaseprüflauf/Veröffentlichung folgen. Keine geänderten Script Properties, Provider, Scopes, Bereitstellungseinstellungen oder Datenbankregeln. 24-Stunden-Wiederherstellung bleibt eigener offener Wunsch; bestehende acht Stunden Serverfrist und RAM-only unverändert.
 
 **Veröffentlicht am 23.10.2026 – r27.1/v0.27.1/Google-Version 40:** Nach der Rückkehr von Google erscheint durchgehend ein Ladekreis bis zur Serverbestätigung; kein erneutes sichtbares Formular. Abbruch mit Wiederholung und geschlossene Fehlerfenster geprüft. Nutzer entscheidet ausdrücklich: E-Mail/Passwort zusätzlich behalten, keine Google-only-Umstellung. Beide Anmeldeanbieter unverändert aktiv; Einladungen und Rechte erhalten. Alle 22 Projektsuiten einschließlich 16 Auth-Sicherheitsfällen und erweitertem synthetischem Browsertest auch in sauberer Veröffentlichungskopie erfolgreich. Hosting e45e9acf37e62aaa, veröffentlichte Auth-Dateien bytegenau geprüft; bisherige Geschäftsdateien/Schutzheader erhalten. Bestehende App-Adresse und Ausführung/Zugriffsgruppe unverändert. Keine neuen/geänderten Script Properties, OAuth-Scopes, Firebase-Anbieter, Regeln oder Trigger. Neue echte interaktive Google-Bedienprobe noch offen; bisherige r27-Administratorprüfung bleibt bestätigt.
 
@@ -75,3 +77,14 @@ Bestehende Freigabe ändern:
 - Auf „Rechte speichern“ klicken; eine Bestätigung erwarten. Bei Konflikt „Benutzer laden“ erneut verwenden und den aktuellen Stand prüfen.
 
 Rechteänderungen aktualisieren nur die betroffene Zeile und widerrufen vorhandene App-Sitzungen. Die betroffene Person muss sich erneut anmelden. Das Administratorkonto kann sich nicht selbst sperren. Vor dem Schließen der App kann über „Abmelden“ die Sitzung beendet werden.
+
+
+## Wiederanmeldung, Rechtewechsel und Sitzungsdauer ab r27.2
+
+Ein bereits aktivierter Benutzer kann auch den früheren Einladungslink wieder öffnen. Nach bestätigter Identität gelten ausschließlich die aktuellen aktiven Benutzerrechte. Die ursprünglichen Einladungshäkchen werden nicht erneut übernommen; eine Sperre bleibt wirksam. Neue, bisher nicht aktivierte Konten benötigen weiterhin eine passende, unbenutzte, gültige Einladung. Rechteänderungen widerrufen vorhandene Sitzungen absichtlich; erneute Anmeldung erfolgt mit demselben Konto, ohne neue Einladung.
+
+Bei alter Oberfläche den Link Aktuelle Version öffnen verwenden. Er führt zur bestehenden bestätigten Dashboard-Adresse mit Versionsparameter; noch benötigte Einladung bleibt erhalten. Nach erfolgreichem Login entfernt Apps Script den Einladungsparameter aus dem aktuellen Tab. Ein älteres Lesezeichen kann ihn weiterhin enthalten, ist für bereits aktivierte Benutzer aber kein Hindernis mehr.
+
+Bisherige Dauer: acht Stunden ab App-Anmeldung, ohne gleitende Verlängerung. Das ungefähr stündlich ablaufende Firebase-ID-Token wird serverseitig bei Bedarf erneuert, ohne die App-Frist zu verlängern. Die App-Sitzungskennung liegt nur im Arbeitsspeicher: Neuladen/Schließen der Seite verliert diese Kennung bereits vor Ablauf. Deshalb erklärt die einstündige Tokenfrist allein nicht die Neuanmeldung beim Seitenladen.
+
+Offener Nutzerwunsch: im selben Browser/Gerät ungefähr 24 Stunden angemeldet bleiben, einschließlich Seitenneuladen. Erfordert explizite sichere Wiederherstellung und gerätebezogenes Abmelden; bloße Verlängerung der Serverfrist löst das nicht. Keine eigenen Bearer-Sitzungskennungen oder ID-/Refresh-Tokens einfach in localStorage/sessionStorage ablegen. Bei Folgeschritt unterstützte Firebase-Persistenz sowie die Grenzen des Apps-Script-Iframes prüfen; serverseitige Rechte-/Sperr-/Widerrufsprüfung muss bei jedem Aufruf erhalten bleiben. In r27.2 keine persistente Anmeldung und keine Verlängerung umgesetzt.

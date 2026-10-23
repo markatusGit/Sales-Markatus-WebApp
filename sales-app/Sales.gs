@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-23-r27.1';
+const SALES_RELEASE = '2026-10-23-r27.2';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -18,7 +18,7 @@ function salesUser_(admin) {
 }
 function salesPage_(event) {
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){
-    try{const cfg=salesAuthConfig_(),invite=event?.parameter?.invite||'';if(invite)salesAuthKey_(invite);return HtmlService.createHtmlOutput(HtmlService.createHtmlOutputFromFile('Sales').getContent().replace('"AUTH_RUNTIME_CONFIG"',JSON.stringify({enabled:true,origin:cfg.origin,invitation:invite}).replace(/</g,'\\u003c'))).setTitle('Sales Markatus').addMetaTag('viewport','width=device-width, initial-scale=1');}
+    try{const cfg=salesAuthConfig_(),invite=event?.parameter?.invite||'';if(invite)salesAuthKey_(invite);return HtmlService.createHtmlOutput(HtmlService.createHtmlOutputFromFile('Sales').getContent().replace('"AUTH_RUNTIME_CONFIG"',JSON.stringify({enabled:true,origin:cfg.origin,invitation:invite,appUrl:SALES_AUTH_APP_URL,release:SALES_RELEASE}).replace(/</g,'\\u003c'))).setTitle('Sales Markatus').addMetaTag('viewport','width=device-width, initial-scale=1');}
     catch(_){return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><h1>Anmeldung wird eingerichtet</h1><p>Aktuell werden keine Kundendaten ausgeliefert.</p>');}
   }
   try {salesUser_();} catch (_) {return HtmlService.createHtmlOutput('<!doctype html><html lang="de"><meta charset="utf-8"><h1>Zugriff nicht freigegeben</h1><p>Bitte diese App mit deinem freigegebenen Google-Konto öffnen. Wenn Google deine Identität nicht übermittelt, muss die Bereitstellung geprüft werden.</p></html>');}

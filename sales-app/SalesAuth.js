@@ -1,8 +1,12 @@
   const SALES_LOGIN_CONFIG="AUTH_RUNTIME_CONFIG";
   let salesLoginSession=null,salesLoginPending=null,salesUserRows=[],salesUserCursor=null,salesInvitationLink='';
-  let salesSetupConfig=null,salesSetupBound=false;
+  let salesSetupConfig=null,salesSetupBound=false,salesNewRelease='';
   const salesUsesLogin=()=>SALES_LOGIN_CONFIG?.enabled===true;
   const salesLoginOrigin=()=>salesUsesLogin()?SALES_LOGIN_CONFIG.origin:salesSetupConfig?.origin;
+  function salesUpdatePage(release){
+    const url=new URL(SALES_LOGIN_CONFIG.appUrl);url.searchParams.set('v',release);if(SALES_LOGIN_CONFIG.invitation)url.searchParams.set('invite',SALES_LOGIN_CONFIG.invitation);
+    return '<div class="m-login"><h1>App wurde aktualisiert</h1><p>Bitte die aktuelle Version öffnen. Deine Benutzerfreigabe bleibt erhalten.</p><p><a class="m-button m-primary" href="'+esc(url.href)+'" target="_top">Aktuelle Version öffnen</a></p><p>Oberfläche: '+esc(UI_BUILD)+' · Server: '+esc(release)+'</p></div>';
+  }
   function salesSetupPanel(){return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzeranmeldung einrichten</h2></div><div class="m-panel-body"><p>Der bisherige Google-Zugang bleibt bis zur Aktivierung erhalten.</p>'+button('Einrichtung vorbereiten','auth-setup')+(salesSetupConfig?button('Administratorkonto bestätigen','auth-login'):'')+(salesSetupBound?button('Benutzeranmeldung aktivieren','auth-enable'):'')+'</div></section>';}
   function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e?.message||'Anfrage fehlgeschlagen.')))[name](...args));}
   function salesForgetLogin(text=''){
@@ -21,7 +25,8 @@
     try{
       const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join(''),stateKey=Array.from(crypto.getRandomValues(new Uint8Array(24)),n=>n.toString(16).padStart(2,'0')).join('');
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)),challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-      const response=await salesDirectRpc('beginSalesLogin',{origin:location.origin,state:stateKey,challenge});
+      const response=await salesDirectRpc('beginSalesLogin',{origin:location.origin,state:stateKey,challenge,release:APP_RELEASE});
+      if(response.reloadRequired){popup.close();salesNewRelease=response.release;render();return;}
       const origin=new URL(response.origin).origin;if(origin!==salesLoginOrigin())throw Error('Anmeldeursprung stimmt nicht überein.');
       salesLoginPending={popup,verifier,state:stateKey,attempt:response.attempt,createdAt:Date.now()};
       popup.location.href=origin+'/auth/#'+new URLSearchParams({origin:location.origin,state:stateKey,attempt:response.attempt,...(SALES_LOGIN_CONFIG.invitation?{invitation:SALES_LOGIN_CONFIG.invitation}:{})});
@@ -31,8 +36,10 @@
     const pending=salesLoginPending;if(!pending||pending.finishing||Date.now()-pending.createdAt>5*60000||event.origin!==salesLoginOrigin()||event.source!==pending.popup||event.data?.type!=='sales-firebase-login'||event.data.state!==pending.state||event.data.attempt!==pending.attempt)return;
     pending.finishing=true;
     try{
-      const result=await salesDirectRpc('finishSalesLogin',{attempt:pending.attempt,verifier:pending.verifier,state:pending.state,idToken:event.data.idToken,refreshToken:event.data.refreshToken,invitation:SALES_LOGIN_CONFIG.invitation||''});
+      const result=await salesDirectRpc('finishSalesLogin',{attempt:pending.attempt,verifier:pending.verifier,state:pending.state,idToken:event.data.idToken,refreshToken:event.data.refreshToken,invitation:SALES_LOGIN_CONFIG.invitation||'',release:APP_RELEASE});
+      if(result.reloadRequired){pending.popup.close();salesLoginPending=null;salesNewRelease=result.release;render();return;}
       salesLoginSession={id:result.session,revision:result.user.revision};pending.popup.postMessage({type:'sales-login-complete',state:pending.state},salesLoginOrigin());salesLoginPending=null;
+      SALES_LOGIN_CONFIG.invitation='';try{google.script.history?.replace({}, {}, '');}catch{} // Remove the consumed invitation from this tab's URL.
       if(!salesUsesLogin()){salesSetupBound=true;message='Administratorkonto bestätigt. Die Benutzeranmeldung kann jetzt aktiviert werden.';render();return;}
       error='';await act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});
     }catch(e){pending.popup.close();salesLoginPending=null;error=e.message;render();}
