@@ -90,3 +90,7 @@ Nach bestätigter Veröffentlichung ist keine manuelle Dateiersetzung nötig. F�
 - Für jede gewünschte Folgeseite einmal „Nächste Inventurseite lesen“ anklicken; die Mengen müssen fortgeschrieben werden, bis „Durchlauf vollständig“ erscheint. Bei Fehlern den Teilstand erhalten und den Fehlertext melden.
 
 Die Inventur ist optional zur späteren Bereinigungsplanung, verbraucht selbst Lesezugriffe und ist keine Löschfreigabe. Eine Aufbewahrungsdauer wurde noch nicht festgelegt. Skripteigenschaften, Bereitstellungseinstellungen und Nachttrigger müssen für r21 nicht geändert werden.
+
+## Kontrollierter Firebase-Zugangswechsel
+
+Für den ausdrücklich beauftragten Benutzerlogin gibt es einen eng begrenzten Übergang von MYSELF zu ANYONE_ANONYMOUS auf derselben Bereitstellung bei unverändertem USER_DEPLOYING. Er benötigt in deployment.json einen konkreten genehmigten Übergang mit bestehender Bereitstellungs-ID, Ausgangsversion und Zeitpunkt der echten Administratorbestätigung. Der öffentliche Quellstand muss SALES_AUTH_REQUIRE_FIREBASE=true erzwingen. Ohne diese Angaben bricht die Vorprüfung ab. Die bisherigen Regeln zu fremden Änderungen, Tests, Fingerabdrücken und fester Bereitstellung bleiben bestehen. Private Einrichtungsstände benötigen keine Zugriffsänderung.

@@ -39,9 +39,14 @@ function preflight(tag) {
   checkRemoteBaseline(config, active, backup.files);
   same(Object.fromEntries(Object.keys(backup.files).map(n => [n, true])), Object.fromEntries(appFiles.map(n => [n, true])), 'Google-Dateiliste vor Upload');
   const localManifest = JSON.parse(fs.readFileSync(path.join(app, 'appsscript.json'), 'utf8'));
-  checkSettings(localManifest, JSON.parse(fs.readFileSync(path.join(backup.dir, 'appsscript.json'), 'utf8')));
+  const transition=config.webappAccessTransition;
+  if(localManifest.webapp?.access==='ANYONE_ANONYMOUS'&&!fs.readFileSync(path.join(root,'sales-app/SalesAuth.gs'),'utf8').includes('const SALES_AUTH_REQUIRE_FIREBASE=true;'))throw Error('Öffentliche Bereitstellung darf niemals auf den alten Google-Freigabemodus zurückfallen.');
+  if(transition?.status==='approved'){
+    if(transition.deploymentId!==config.deploymentId||transition.fromVersion!==active.versionNumber||!transition.ownerLoginVerifiedAt||!fs.readFileSync(path.join(root,'sales-app/SalesAuth.gs'),'utf8').includes('const SALES_AUTH_REQUIRE_FIREBASE=true;'))throw Error('Öffentlicher Zugang benötigt dieselbe Bereitstellung, bestätigte Administratoranmeldung und zwingende Firebase-Authentifizierung.');
+  }
+  checkSettings(localManifest, JSON.parse(fs.readFileSync(path.join(backup.dir, 'appsscript.json'), 'utf8')),transition);
   const deployed = remoteSnapshot(config, active.versionNumber, 'before-version');
-  checkSettings(localManifest, JSON.parse(fs.readFileSync(path.join(deployed.dir, 'appsscript.json'), 'utf8')));
+  checkSettings(localManifest, JSON.parse(fs.readFileSync(path.join(deployed.dir, 'appsscript.json'), 'utf8')),transition);
   same(localHashes(), trackedHashes('HEAD'), 'Lokale Dateien/Git');
   clean();
   console.log(`PASS Vorprüfung; bestehende Google-Version ${active.versionNumber}; keine Veröffentlichung ausgeführt.`);
@@ -107,8 +112,10 @@ function publish(tag) {
   pending.step = 'deployment-updated'; save(pendingPath, pending);
   if (deployment(state.config).versionNumber !== pending.version) throw Error('Bestehende Bereitstellung verwendet die neue Version noch nicht.');
   const now = new Date().toISOString();
-  save(path.join(root, 'deployment.json'), {...state.config, gitTag: tag, appsScriptVersion: pending.version, sourceCommit: state.sourceCommit, status: 'google-version-verified', files: state.files, googleCodeVerifiedAt: now, note: 'Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.'});
-  const text = `Veröffentlichung ${tag}: Apps-Script-Version ${pending.version}, bestehende Bereitstellung beibehalten. Quellcommit ${state.sourceCommit}. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen verändert. Live-Funktionstest offen. Zeitpunkt: ${now}.`;
+  const changedAccess=state.config.webappAccessTransition?.status==='approved';
+  save(path.join(root, 'deployment.json'), {...state.config, ...(changedAccess?{webappAccessTransition:{...state.config.webappAccessTransition,status:'applied',toVersion:pending.version}}:{}),gitTag: tag, appsScriptVersion: pending.version, sourceCommit: state.sourceCommit, status: 'google-version-verified', files: state.files, googleCodeVerifiedAt: now, note: 'Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.'});
+  const settings=changedAccess?'Ausführung USER_DEPLOYING erhalten; ausdrücklich beauftragter Zugang ANYONE_ANONYMOUS für die Firebase-Loginseite. Script Properties separat eingerichtet; Upload ändert keine Eigenschaften.':'Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert.';
+  const text = `Veröffentlichung ${tag}: Apps-Script-Version ${pending.version}, bestehende Bereitstellung beibehalten. Quellcommit ${state.sourceCommit}. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. ${settings} Live-Funktionstest gesondert dokumentieren. Zeitpunkt: ${now}.`;
   append('PROJEKTUEBERBLICK.md', text);
   append('docs/PROJEKTTAGEBUCH-UND-ROADMAP.md', `### Veröffentlichung ${tag}\n\n${text}`);
   append('CHANGELOG.md', `Veröffentlichungsnachweis für ${tag}: Google-Version ${pending.version}; ${now}. Details in deployment.json.`);

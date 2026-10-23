@@ -91,14 +91,14 @@ function updateSalesUser(input){
 function logoutSalesUser(){const current=salesAuthRead_('sessions',salesAuthHash_(salesAuthRequest_.session));if(current)salesAuthCommit_([{kind:'sessions',id:salesAuthHash_(salesAuthRequest_.session),prior:current,value:{disabled:true,expiresAt:Date.now()}}]);return {message:'Abgemeldet.'};}
 function getSalesAuthSetup(){
   if(salesAuthEnabled_())salesAuthOwner_();else salesUser_(true);
-  const p=PropertiesService.getScriptProperties();return {configured:!!p.getProperty('SALES_AUTH_OWNER_UID'),origin:p.getProperty('SALES_AUTH_ORIGIN')||'https://sales-markatus.web.app',allowedOrigins:JSON.parse(p.getProperty('SALES_AUTH_ALLOWED_ORIGINS')||'[]'),enabled:salesAuthEnabled_()};
+  const p=PropertiesService.getScriptProperties();return {configured:!!p.getProperty('SALES_AUTH_OWNER_UID'),origin:p.getProperty('SALES_AUTH_ORIGIN')||'https://sales-markatus.firebaseapp.com',allowedOrigins:JSON.parse(p.getProperty('SALES_AUTH_ALLOWED_ORIGINS')||'[]'),enabled:salesAuthEnabled_()};
 }
 function saveSalesAuthSetup(input){
   if(salesAuthEnabled_())salesAuthOwner_();else salesUser_(true);
   if(!input||!Array.isArray(input.allowedOrigins)||!input.allowedOrigins.length||input.allowedOrigins.length>10||input.allowedOrigins.some(v=>!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(v)))throw Error('Exakte App-Ursprünge erforderlich.');
-  const config=pilotCall_('https://sales-markatus.web.app/__/firebase/init.json',{method:'get'});
+  const config=pilotCall_('https://sales-markatus.firebaseapp.com/__/firebase/init.json',{method:'get'});
   if(config.projectId!=='sales-markatus'||!/^AIza[\w-]{30,60}$/.test(config.apiKey||''))throw Error('Öffentliche Firebase-Konfiguration passt nicht zum Projekt.');
-  const p=PropertiesService.getScriptProperties();p.setProperty('SALES_FIREBASE_WEB_API_KEY',config.apiKey);p.setProperty('SALES_AUTH_ORIGIN','https://sales-markatus.web.app');p.setProperty('SALES_AUTH_ALLOWED_ORIGINS',JSON.stringify(input.allowedOrigins));p.setProperty('SALES_APP_URL',SALES_AUTH_APP_URL);
+  const p=PropertiesService.getScriptProperties();p.setProperty('SALES_FIREBASE_WEB_API_KEY',config.apiKey);p.setProperty('SALES_AUTH_ORIGIN','https://sales-markatus.firebaseapp.com');p.setProperty('SALES_AUTH_ALLOWED_ORIGINS',JSON.stringify(input.allowedOrigins));p.setProperty('SALES_APP_URL',SALES_AUTH_APP_URL);
   return {message:'Anmeldung vorbereitet. Bestehender Google-Zugang bleibt unverändert geschützt.'};
 }
 function enableSalesLogin(session){

@@ -64,8 +64,14 @@ function deployment(config) {
   if (!Number.isInteger(found?.versionNumber)) throw Error('Die festgelegte Bereitstellung fehlt oder verwendet keine feste Version.');
   return found;
 }
-function checkSettings(local, remote) {
-  if (canonical('settings.json', JSON.stringify(local.webapp || null)) !== canonical('settings.json', JSON.stringify(remote.webapp || null))) throw Error('Web-App-Zugriff/Ausführung unterscheiden sich. Bereitstellungseinstellungen zuerst ausdrücklich klären.');
+function checkSettings(local, remote, transition) {
+  const normalized=value=>canonical('settings.json',JSON.stringify(value||null));
+  if(normalized(local.webapp)===normalized(remote.webapp))return;
+  // One explicit migration for this app's invited Firebase login, never a general bypass.
+  if(transition?.status==='approved'&&transition.from==='MYSELF'&&transition.to==='ANYONE_ANONYMOUS'&&transition.executeAs==='USER_DEPLOYING'&&transition.authMode==='firebase'
+    &&normalized(remote.webapp)===normalized({access:transition.from,executeAs:transition.executeAs})
+    &&normalized(local.webapp)===normalized({access:transition.to,executeAs:transition.executeAs}))return;
+  throw Error('Web-App-Zugriff/Ausführung unterscheiden sich. Bereitstellungseinstellungen zuerst ausdrücklich klären.');
 }
 function checkRemoteBaseline(config, active, files) {
   if (config.appsScriptVersion && active.versionNumber !== config.appsScriptVersion) throw Error('Google-Bereitstellung wurde außerhalb des dokumentierten Ablaufs verändert. Zuerst zuordnen.');

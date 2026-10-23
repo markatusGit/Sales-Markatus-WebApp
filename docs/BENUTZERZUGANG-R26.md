@@ -2,6 +2,8 @@
 
 Stand: 23.10.2026, in Arbeit. Privater Einrichtungsstand r26/v0.26.0 als Google-Version 37 veröffentlicht und mit Editor/GitHub-Tag verglichen. Neuer Login noch nicht aktiviert.
 
+**Korrektur r26.1 in Vorbereitung:** Nutzer meldet „Anmeldung abgebrochen“ beim Google-Pop-up. Google wird jetzt im vorhandenen Anmeldefenster direkt weitergeleitet. Fenster unter `https://sales-markatus.firebaseapp.com/auth/`, identisch zur Firebase-Auth-Domain, ohne zusätzlichen Google-Popup und ohne Abhängigkeit von fremdem Browser-Speicher. Nur Anfragekontext wird höchstens fünf Minuten in Session Storage aufbewahrt und nach Rückkehr entfernt. Firebase nutzt weiterhin inMemoryPersistence; keine eigene Speicherung von Zugangstokens. Der lokale Browsertest durchläuft die Weiterleitung einschließlich Neuladen. Echte Google-Bestätigung weiterhin nötig. Die frühere web.app-Adresse ist historisch.
+
 ## Auftrag
 
 Einzelne E-Mail-Adressen einladen, einschließlich Gmail und anderer Domains. Google-Anmeldung oder persönliches Passwort; bestätigte E-Mail vor jedem Geschäftsdatenzugriff. Freigegebene Benutzer teilen denselben Kundenbestand. Basis: Mein Tag und Kunden einschließlich Ansprechpartner/Kommunikation lesen. Weitere Bereiche und Hinzufügen/Ändern einzeln per Häkchen; Löschen bleibt gesperrt. Benutzerverwaltung nur durch den bisherigen Administrator. Einladungslink manuell weitergeben, 48 Stunden gültig, einmalig und an die exakte bestätigte E-Mail gebunden. Neue Einladung ersetzt eine ältere offene Einladung derselben Adresse.

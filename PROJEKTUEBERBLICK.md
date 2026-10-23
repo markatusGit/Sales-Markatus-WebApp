@@ -1,5 +1,7 @@
 # Projektüberblick – Sales Markatus
 
+**Einrichtungsupdate 23.10.2026:** r26/v0.26.0 als private Google-Version 37 veröffentlicht, Quellcommit 30232b9, Releasecommit 6b193f4; Google/Editor/GitHub-Tag geprüft. Firebase-Hosting ergänzt, Passwortanmeldung mit zwölf Zeichen eingerichtet, alle direkten Firestore-Browserzugriffe einschließlich altem Pilot gesperrt (db5ee74). Öffentliche Auth-Konfiguration im privaten Zugang gesetzt; Owner-UID/Modus noch nicht gebunden/aktiviert. Nutzer meldet beim zusätzlichen Google-Pop-up „Anmeldung abgebrochen“; privater Korrekturstand r26.1 mit direkter Weiterleitung und gleicher Firebase-Auth-Domain in Prüfung. Google bleibt MYSELF/USER_DEPLOYING. Freischaltung und echte Benutzer-/Passwortprüfung offen.
+
 **In Arbeit am 23.10.2026: Benutzerlogin und Rechte (r26).** Nutzer beauftragt die Umsetzung ohne Abrechnungskonto: Firebase bleibt Spark, kein Cloud Run. Statisches Firebase-Anmeldefenster und serverseitige Identitäts-/Rechteprüfung auf Apps Script. Basis: Mein Tag/Kunden lesen, weitere Bereiche/Hinzufügen/Ändern einzeln; kein Löschen. Bisheriger Administrator wird im bestehenden privaten Zugang gebunden. Lokale Implementierung und neue Sicherheitstests vorhanden; vollständige Projektprüfung, Einrichtung, Veröffentlichung und Live-Abnahme offen. Aktive Google-Version weiterhin 36/r25. [Details](docs/BENUTZERZUGANG-R26.md).
 
 Stand: 23.10.2026. Einstieg für neue Chats; ausführliche Historie und alle bisherigen Wünsche bleiben im [Projekttagebuch und in der Roadmap](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) erhalten.

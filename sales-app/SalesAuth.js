@@ -7,12 +7,15 @@
   function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e?.message||'Anfrage fehlgeschlagen.')))[name](...args));}
   function salesForgetLogin(text=''){
     salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
-    state=null;detail=null;preview=null;audit=null;businessEditor=null;contactDialog=null;salesUserRows=[];salesInvitationLink='';
+    state=null;detail=null;preview=null;audit=null;businessEditor=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
+    projectResults=null;companyResults=null;unassignedData=null;storageInventory=null;projectChoices={};projectSearchTerm='';projectSearchError='';selected=null;selectedEditionId='';search='';message='';
+    customerListObserver?.disconnect();customerListObserver=null;
     for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';
     if(communicationClock){clearInterval(communicationClock);communicationClock=null;}root.classList.remove('m-customer-open');document.body.classList.remove('sales-customer-open');render();
   }
   function salesLoginPage(){return '<div class="m-login"><h1>Sales Markatus</h1><p>'+(SALES_LOGIN_CONFIG.invitation?'Du wurdest eingeladen. Bitte dein Konto bestätigen.':'Bitte mit deinem freigegebenen Konto anmelden.')+'</p><p role="alert">'+esc(error)+'</p>'+button('Anmelden / Einladung aktivieren','auth-login','','true')+'</div>';}
   async function salesBeginLogin(){
+    if(salesLoginPending&&Date.now()-salesLoginPending.createdAt>=5*60000){salesLoginPending.popup.close();salesLoginPending=null;}
     if(salesLoginPending&&!salesLoginPending.popup.closed){salesLoginPending.popup.focus();return;}
     const popup=window.open('about:blank','sales-auth','popup,width=520,height=760');if(!popup){error='Bitte das Anmeldefenster im Browser erlauben.';render();return;}
     try{

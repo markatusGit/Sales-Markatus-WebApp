@@ -1,10 +1,12 @@
 /** Spark: Google's REST endpoint validates tokens. Decoding alone NEVER authenticates. */
 let salesAuthRequest_=null;
+// Public releases must never fall back to the historical Google email list.
+const SALES_AUTH_REQUIRE_FIREBASE=false;
 const SALES_AUTH_APP_URL='https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec';
-function salesAuthEnabled_(){const mode=PropertiesService.getScriptProperties().getProperty('SALES_AUTH_MODE');if(mode&&mode!=='firebase')throw Error('AUTH_REQUIRED: Ungültige Anmeldekonfiguration.');return mode==='firebase';}
+function salesAuthEnabled_(){const mode=PropertiesService.getScriptProperties().getProperty('SALES_AUTH_MODE');if(mode&&mode!=='firebase')throw Error('AUTH_REQUIRED: Ungültige Anmeldekonfiguration.');return mode==='firebase'||SALES_AUTH_REQUIRE_FIREBASE;}
 function salesAuthConfig_(){
   const p=PropertiesService.getScriptProperties(),project=p.getProperty('FIREBASE_PROJECT_ID'),apiKey=p.getProperty('SALES_FIREBASE_WEB_API_KEY'),origin=p.getProperty('SALES_AUTH_ORIGIN');
-  if(project!=='sales-markatus'||!/^AIza[\w-]{30,60}$/.test(apiKey||'')||origin!=='https://sales-markatus.web.app')throw Error('AUTH_REQUIRED: Benutzeranmeldung noch nicht eingerichtet.');
+  if(project!=='sales-markatus'||!/^AIza[\w-]{30,60}$/.test(apiKey||'')||origin!=='https://sales-markatus.firebaseapp.com')throw Error('AUTH_REQUIRED: Benutzeranmeldung noch nicht eingerichtet.');
   return {project,apiKey,origin,ownerUid:p.getProperty('SALES_AUTH_OWNER_UID'),ownerEmail:String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).toLowerCase()};
 }
 function salesAuthHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value)).map(b=>('0'+(b&255).toString(16)).slice(-2)).join('');}

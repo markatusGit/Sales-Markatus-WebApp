@@ -4,9 +4,15 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.26.1]
+
+- Privater Korrekturstand: Google-Anmeldung als direkte Weiterleitung im vorhandenen Anmeldefenster auf `sales-markatus.firebaseapp.com`. Nutzer meldete beim zusätzlichen Google-Pop-up einen Abbruch. Nur kurzlebiger Anfragekontext in Session Storage, keine eigene Tokenpersistenz; Firebase im Arbeitsspeichermodus.
+- Logout leert zusätzliche Such-/Formular-/Verwaltungszustände; abgelaufene Anmeldeversuche neu startbar. Administratorbindung und Aktivierung zusätzlich geprüft.
+- Öffentlicher Zugang bleibt zurückgehalten. Veröffentlichungswerkzeug erlaubt künftig ausschließlich den dokumentierten Übergang auf derselben Bereitstellung nach bestätigtem Administrator und mit zwingendem Firebase-Modus.
+
 ## [v0.26.0]
 
-- In Vorbereitung: eingeladene Firebase-Benutzer, Google-/Passwortanmeldung und serverseitige Bereichs-/Schreibrechte auf Apps Script ohne Abrechnungskonto. Geschützte Administratorbindung, 48-Stunden-Einladungen, widerrufbare Sitzungen und Rechteprüfung vor HQ-Schreibvorgängen.
+- Privat als Google-Version 37 veröffentlicht: eingeladene Firebase-Benutzer und serverseitige Bereichs-/Schreibrechte auf Apps Script ohne Abrechnungskonto. Geschützte Administratorbindung, 48-Stunden-Einladungen, widerrufbare Sitzungen und Rechteprüfung vor HQ-Schreibvorgängen. Aktivierung/Live-Abnahme noch offen.
 - Neue Authentifizierungs-/Autorisierungs- und Browserprüfungen. Noch nicht aktiviert oder live abgenommen; Stand und Grenzen in `docs/BENUTZERZUGANG-R26.md`.
 
 Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L01–L14 anhand r21-Quellen sortiert, bestehende echte Lesefunktionen von Test-Schreibwegen und reinen Konzept-/Demofunktionen getrennt. Prioritäten und Abnahmekriterien für Teamzugang, echte Kundenarbeit und vollständigen Verkaufsablauf festgehalten; V1-Plan mit aktuellem Einstieg versehen. Kein Appumbau, keine Bereinigung oder Rechteänderung.
