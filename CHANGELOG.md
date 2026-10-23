@@ -6,6 +6,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [v0.27.2]
 
+- Veröffentlicht als Google-Version 41; alle 22 Suiten, 19 Auth-/Rechtefälle und erweiterter Browser bestanden. Google/Editor/GitHub abgeglichen. Fachliche Live-Abnahme offen.
+
 - Erneuter Login mit altem Einladungslink nutzt bei aktivierten Konten ausschließlich aktuelle Rechte. Keine zweite Aktivierung, kein Zurücksetzen geänderter Rechte und kein Entsperren gesperrter Konten. Einladung nach Erfolg aus der aktuellen Tab-Adresse entfernen.
 - Versionsprüfung im vorhandenen Anmeldedialog, ohne zusätzliche Geschäftsdaten- oder Datenbankabrufe. Veraltete Oberfläche erhält einen Link zur aktuellen Version derselben Bereitstellung. Wechsel während der Google-Anmeldung ebenfalls abgefangen; manuelle Ersetzungsanleitung im normalen Benutzerzugang entfällt.
 - 19 Auth-/Rechtefälle einschließlich Wiederanmeldung nach Rechteänderung, Sperre, Versionswechsel und Token-Erneuerung nach einer Stunde; Browser prüft alten Einladungslink, URL-Bereinigung und Wechsel vor/während Login. Tagesanmeldung mit Wiederherstellung nach Reload noch nicht umgesetzt; Serverfrist acht Stunden/RAM-only unverändert. Keine neuen Einstellungen.
