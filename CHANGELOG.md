@@ -142,3 +142,5 @@ Veröffentlichungsnachweis für v0.26.0: Google-Version 37; 2026-10-23T13:28:48.
 Veröffentlichungsnachweis für v0.26.1: Google-Version 38; 2026-10-23T13:54:32.486Z. Details in deployment.json.
 
 Veröffentlichungsnachweis für v0.27.0: Google-Version 39; 2026-10-23T14:13:03.162Z. Details in deployment.json.
+
+Veröffentlichungsnachweis für v0.27.1: Google-Version 40; 2026-10-23T14:57:36.280Z. Details in deployment.json.
