@@ -7,7 +7,7 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 ## [v0.27.1]
 
 - Ladeanzeige schon im initialen HTML und während Google-Rückkehr sowie Serverprüfung; kein kurz sichtbares Anmeldeformular. Bei Abbruch erneuter Versuch; bei Serverfehler schließt das Ladefenster und die App zeigt die Fehlermeldung. Reduzierte Bewegung und zugänglicher Ladestatus berücksichtigt.
-- Synthetischer Browser prüft verzögerte Rückkehr, verborgene Bedienelemente bis zur Serverantwort, Abbruch/Wiederholung und Serverablehnung. E-Mail-/Passwortanmeldung einschließlich Einladung/Verifizierung unverändert erhalten. Google-only-Umstellung wartet nach automatischer Ablehnung auf ausdrückliche Nutzerbestätigung. Keine Anbieter-, Rechte-, Script-Property- oder Apps-Script-Einstellungsänderung.
+- Synthetischer Browser prüft verzögerte Rückkehr, verborgene Bedienelemente bis zur Serverantwort, Abbruch/Wiederholung und Serverablehnung. E-Mail-/Passwortanmeldung einschließlich Einladung/Verifizierung unverändert erhalten. Nutzer bestätigt ausdrücklich, E-Mail/Passwort zusätzlich zu behalten; keine Google-only-Umstellung. Keine Anbieter-, Rechte-, Script-Property- oder Apps-Script-Einstellungsänderung.
 
 ## [v0.27.0]
 
