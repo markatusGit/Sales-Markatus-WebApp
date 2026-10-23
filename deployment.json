@@ -6,24 +6,24 @@
   "dashboardConfirmedByUser": true,
   "observedAppsScriptVersion": 30,
   "observedOn": "2026-10-16",
-  "gitTag": "v0.26.1",
-  "appsScriptVersion": 38,
-  "sourceCommit": "235a220b8bb56aa3b04c767b6a12f7da44112fdf",
+  "gitTag": "v0.27.0",
+  "appsScriptVersion": 39,
+  "sourceCommit": "060586c4c461bc82add10910b7ee4532bd901c6b",
   "status": "google-version-verified",
   "files": {
     "Code.gs": "18f5dfabbf4c0fa5639f618b23ee95553783c0d7ee4f3f068574ea58f6481c62",
     "FirebaseSync.gs": "6201bda0fd4f6b5835a3cbaabb35e36e9633690ef5c0936bb76104846a5192db",
     "Index.html": "d19c1ab2c6e561a7ac406e2219dc937bd49e1a5d21f1161adf411baf7f50e7a3",
     "Revenue.gs": "b2ca0fab7b8b3f064eb6adb5d20f5d4e80b716bcffc4f88e2afdf2822ce6bc89",
-    "Sales.html": "1eff115b058083bebe732b0fd60eed0cb88a4d2d576c41b0860c1c66198edc21",
-    "SalesBackend.gs": "6c331646c8aa6b67366908e69e66abcea18d8ec0e6c04913db2ffd3dc446d8fa",
-    "appsscript.json": "f32a769288ac07419c5845add764219f474d03f00cf234d51b00b42d11419c9c"
+    "Sales.html": "531c8c4d99818eda246428e48eb0aa888fca2b1be3f0ac2b8ff11806dc96af32",
+    "SalesBackend.gs": "cf094b06e2fc7b3b58dd6e814d0b19152e1bc9867a0a122a0764e1cbecfc3bba",
+    "appsscript.json": "5d269a359a81cab0524871201e67027dd98052f7bcece5771f1c9f1a419d2e12"
   },
   "note": "Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.",
   "googleCodeVerifiedOn": "2026-10-16",
-  "googleCodeVerifiedAt": "2026-10-23T13:54:32.486Z",
+  "googleCodeVerifiedAt": "2026-10-23T14:13:03.162Z",
   "webappAccessTransition": {
-    "status": "approved",
+    "status": "applied",
     "from": "MYSELF",
     "to": "ANYONE_ANONYMOUS",
     "executeAs": "USER_DEPLOYING",
@@ -31,7 +31,8 @@
     "deploymentId": "AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw",
     "fromVersion": 38,
     "ownerLoginVerifiedAt": "2026-10-23T14:03:37.580Z",
-    "authorizedOn": "2026-10-23"
+    "authorizedOn": "2026-10-23",
+    "toVersion": 39
   },
   "firebaseHosting": {
     "siteId": "sales-markatus",
