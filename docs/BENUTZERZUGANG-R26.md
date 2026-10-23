@@ -1,6 +1,6 @@
 # Benutzerzugang und Rechte – r26
 
-Stand: 23.10.2026, in Arbeit. Aktive Bereitstellung weiterhin r25, Google-Version 36. Neuer Login noch nicht aktiviert.
+Stand: 23.10.2026, in Arbeit. Privater Einrichtungsstand r26/v0.26.0 als Google-Version 37 veröffentlicht und mit Editor/GitHub-Tag verglichen. Neuer Login noch nicht aktiviert.
 
 ## Auftrag
 
@@ -20,7 +20,7 @@ Der Nutzer beauftragt ausdrücklich die Einrichtung ohne Abrechnungskonto. Proje
 - Finanz-/Projektinformationen werden auch aus Kundenakten und anderen Serverantworten entfernt, wenn die Bereichsfreigabe fehlt. Leserechte erlauben keine Schreibaktion, Hinzufügen keine Änderung vorhandener Daten.
 - Vor jedem HQ-Schreibzugriff werden aktuelle Rechte des ursprünglichen Autors geprüft. Nicht eindeutig zuordenbare alte Aufträge bleiben für die Administratorprüfung gesperrt. Bestehende Trigger-/Ausführungskontoprüfung schützt private Hintergrundfortsetzungen.
 
-Sammlungen: `sales_authusers`, `sales_authsessions`, `sales_authattempts`, `sales_authinvites`, `sales_authemails`, `sales_authaudit`. Die bestehende abschließende Firestore-Regel verweigert Browserzugriffe. Dienstkontozugang bleibt serverseitig. Abgelaufene Dokumente sind wirkungslos; begrenzte Aufbewahrungs-/Bereinigungsroutine noch offen. Keine automatische Löschung oder Nachtplanung.
+Sammlungen: `sales_authusers`, `sales_authsessions`, `sales_authattempts`, `sales_authinvites`, `sales_authemails`, `sales_authaudit`. Die neue Firestore-Regel verweigert alle direkten Browserzugriffe, einschließlich früherer pilot_access-Freigaben. Der alte Firebase-Browserpilot erhält damit keine Lesedaten mehr; die aktuelle Apps-Script-App nutzt ihren geschützten Serverzugang. Dienstkontozugang bleibt serverseitig. Abgelaufene Dokumente sind wirkungslos; begrenzte Aufbewahrungs-/Bereinigungsroutine noch offen. Keine automatische Löschung oder Nachtplanung.
 
 ## Rechte und Grenzen
 

@@ -1318,3 +1318,9 @@ Prüfupdate r26: Alle 22 Projektsuiten erfolgreich, einschließlich Auth-Sicherh
 ### Veröffentlichung v0.26.0
 
 Veröffentlichung v0.26.0: Apps-Script-Version 37, bestehende Bereitstellung beibehalten. Quellcommit 30232b9a9e7be1007f4ca705fc0deba8d7fe745c. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen verändert. Live-Funktionstest offen. Zeitpunkt: 2026-10-23T13:28:48.310Z.
+
+### r26 privat veröffentlicht; alte Pilot-Leseabkürzung schließen
+
+Quellcommit 30232b9, Releasecommit 6b193f4, Tag v0.26.0, Google-Version 37. Alle 22 Suiten erneut in sauberer Veröffentlichungskopie bestanden, Google-Editor/feste Version/GitHub-Tag verglichen. Bestehende private Bereitstellung/USER_DEPLOYING erhalten. Firebase-Hosting-Version d1dc6af4e193a965 ergänzt ausschließlich vier auth-Dateien; sämtliche bisherigen Datei-Hashes erhalten. Schutzheader no-store/CSP/DENY bestätigt, anonyme Benutzer-/Sitzungs-/Kundendatenproben HTTP403, Abrechnung deaktiviert. Geschützte Vorbereitung der neuen Script Properties im privaten Browser begonnen.
+
+Zusätzlicher Sicherheitsbefund: Aktive ältere pilot_access-Regel könnte neue Bereichsrechte umgehen. Neue Regel verweigert alle direkten Browserzugriffe; der alte Firebase-Browserpilot wird damit stillgelegt, aktuelle Apps-Script-App liest weiterhin serverseitig über IAM. Kein Löschen von Daten oder Pilotfreigabe-Dokumenten. Regeländerung wird gesondert geprüft/veröffentlicht. Neuer Login weiterhin nicht aktiviert.
