@@ -1,5 +1,7 @@
 # Benutzerzugang und Rechte – r26
 
+**Fortführung r27, 23.10.2026:** Administrator hat die Google-Anmeldung nach der Weiterleitung bestätigt. Aktive App-Freigabe und verifizierte eindeutige Firebase-Identität wurden zusätzlich serverseitig geprüft. r26.1 ist als private Google-Version 38 veröffentlicht und mit Google-Editor/GitHub-Tag verglichen. Öffentlicher Freischaltungsstand r27 vorbereitet; vollständige Releaseprüfung und öffentliche Erreichbarkeitsprüfung folgen. Die Browsersteuerung ist aktuell in Work deaktiviert, daher keine vollständige Live-Bedienabnahme behauptet.
+
 Stand: 23.10.2026, in Arbeit. Privater Einrichtungsstand r26/v0.26.0 als Google-Version 37 veröffentlicht und mit Editor/GitHub-Tag verglichen. Neuer Login noch nicht aktiviert.
 
 **Korrektur r26.1 in Vorbereitung:** Nutzer meldet „Anmeldung abgebrochen“ beim Google-Pop-up. Google wird jetzt im vorhandenen Anmeldefenster direkt weitergeleitet. Fenster unter `https://sales-markatus.firebaseapp.com/auth/`, identisch zur Firebase-Auth-Domain, ohne zusätzlichen Google-Popup und ohne Abhängigkeit von fremdem Browser-Speicher. Nur Anfragekontext wird höchstens fünf Minuten in Session Storage aufbewahrt und nach Rückkehr entfernt. Firebase nutzt weiterhin inMemoryPersistence; keine eigene Speicherung von Zugangstokens. Der lokale Browsertest durchläuft die Weiterleitung einschließlich Neuladen. Echte Google-Bestätigung weiterhin nötig. Die frühere web.app-Adresse ist historisch.
@@ -41,3 +43,31 @@ Neue Script Properties: `SALES_FIREBASE_WEB_API_KEY` (öffentliche Web-Konfigura
 13 neue Backendprüfungen bestanden: manipulierte Identitäten, fehlende E-Mail-Bestätigung, Widerruf/Sperre, direkte Altaufrufe, Methoden/Rechte, verschachtelte Finanzfelder, Antwortfilter, PKCE/Zustand/Wiederholung, Einladungen, geschützter Administrator, Revisionsschutz und HQ-Autorenrechte. Neuer synthetischer Browsertest mit tatsächlichem Anmeldefenstercode und künstlichen Firebase-Antworten bestätigt null Geschäftsdatenabrufe vor Login, Nachrichtenprüfung, lesende Kundenansicht und leere Ansicht nach Logout. Alle 22 Projektsuiten erfolgreich; zusätzlich Benutzerverwaltungsansicht im synthetischen Browser geprüft. Echte Google-/Passwort-/Einladungsprüfung noch offen. Firebase-E-Mail/Passwort aktiviert, Mindestlänge zwölf Zeichen serverseitig erzwungen, E-Mail-Ausforschungsschutz eingeschaltet. Kein Abrechnungskonto.
 
 Referenzen: [Firebase-Tarife](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [Auth REST](https://firebase.google.com/docs/reference/rest/auth), [Passwortauthentifizierung](https://firebase.google.com/docs/auth/web/password-auth).
+
+## Aktivierung und Bedienung ab r27
+
+Die bestehende Google-Bereitstellung wird auf `ANYONE_ANONYMOUS` geändert, damit Passwortbenutzer ohne Google-Konto die Loginseite erreichen. Ausführung bleibt `USER_DEPLOYING`. Geschäftsdaten werden weiterhin erst nach gültiger Firebase-Anmeldung und expliziter Freigabe ausgeliefert. Der öffentliche Code erzwingt Firebase unabhängig von der optionalen Eigenschaft `SALES_AUTH_MODE`; diese Eigenschaft muss nicht manuell gesetzt werden und öffnet bei Fehlen keinen alten Zugang. `SALES_ALLOWED_EMAILS` ist keine Freigabeliste für die neue Benutzeranmeldung mehr. Sie bleibt nur für bestehende technische Triggerprüfungen erhalten.
+
+Im bisherigen privaten Zugang eingerichtet: `SALES_FIREBASE_WEB_API_KEY`, `SALES_AUTH_ORIGIN=https://sales-markatus.firebaseapp.com`, `SALES_AUTH_ALLOWED_ORIGINS`, `SALES_APP_URL`. Die bestätigte Administratoranmeldung bindet `SALES_AUTH_OWNER_UID`. Keine neuen OAuth-Scopes oder Dienstkonto-/HQ-Zugangsdaten; Code-Upload ändert diese Eigenschaften nicht. Hosting-Weiterleitungsstand `c2005f8664bc98ca` geprüft, bisherige öffentliche Dateien unverändert. Alle direkten Firestore-Browserzugriffe sind gesperrt; die App arbeitet über ihren geschützten Serverzugang. Firebase bleibt ohne Abrechnungskonto.
+
+Nach Veröffentlichung einen Benutzer freigeben:
+
+- Die bestehende Sales-App-Adresse neu öffnen; die Loginseite erwarten. Bei Kundendaten ohne Anmeldung die Nutzung beenden und den Fehler melden.
+- Auf „Anmelden / Einladung aktivieren“ klicken; das Firebase-Anmeldefenster erwarten. Bei blockiertem Fenster die Browsermeldung für diese App prüfen.
+- Auf „Mit Google anmelden“ klicken und das gebundene Administratorkonto wählen; nach Rückkehr die angemeldete App erwarten. Bei Fehlermeldung deren Text ohne Zugangsdaten melden.
+- „Verwaltung“ öffnen; „Benutzer und Rechte“ erwarten. Falls der Bereich fehlt, die angezeigte Konto-Adresse prüfen.
+- In „E-Mail-Adresse“ die freizugebende Adresse eintragen.
+- Die zusätzlichen Bereiche und Schreibaktionen anhaken; die festen Leserechte bleiben gesetzt.
+- Auf „Einladungslink erstellen“ klicken; einen Link mit 48 Stunden Gültigkeit erwarten. Bei Fehler nichts weitergeben und die Meldung prüfen.
+- Auf „Einladungslink kopieren“ klicken; der Link kann persönlich an die eingetragene Person weitergegeben werden. Falls Kopieren blockiert wird, den markierten Link mit Strg+C kopieren.
+
+Der Empfänger öffnet seinen Einladungslink, meldet sich mit exakt dieser Google-Adresse an oder legt ein persönliches Passwort mit mindestens zwölf Zeichen an. Bei Passwortanmeldung ist die E-Mail-Bestätigung erforderlich. Erst danach aktiviert die App die Einladung. Andere Adressen, ersetzte, abgelaufene oder bereits verwendete Einladungen werden abgewiesen.
+
+Bestehende Freigabe ändern:
+
+- Unter „Verwaltung“ auf „Benutzer laden“ klicken; bis zu 50 Konten erwarten. Bei weiteren Konten „Weitere Benutzer“ benutzen.
+- Die gewünschte E-Mail-Adresse aufklappen.
+- Die gewünschten Häkchen ändern oder „Zugang“ auf „Gesperrt“ stellen.
+- Auf „Rechte speichern“ klicken; eine Bestätigung erwarten. Bei Konflikt „Benutzer laden“ erneut verwenden und den aktuellen Stand prüfen.
+
+Rechteänderungen aktualisieren nur die betroffene Zeile und widerrufen vorhandene App-Sitzungen. Die betroffene Person muss sich erneut anmelden. Das Administratorkonto kann sich nicht selbst sperren. Vor dem Schließen der App kann über „Abmelden“ die Sitzung beendet werden.

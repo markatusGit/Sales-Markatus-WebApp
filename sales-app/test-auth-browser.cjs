@@ -2,7 +2,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
 (async()=>{
  const f=authFixture(),user=f.user(),idToken=f.token(),calls=[],errors=[];
  const edition={id:'fixture-1',magazine:'Synthetic',issue:1,loadedAt:'2026-10-23',complete:true,settings:{targetCents:9999},documents:[]};
- f.ctx.getSalesLeanState=()=>({release:'2026-10-23-r26.1',lean:true,user:f.ctx.salesUser_(),edition,editions:[edition],companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],preferences:{}});
+ f.ctx.getSalesLeanState=()=>({release:'2026-10-23-r27',lean:true,user:f.ctx.salesUser_(),edition,editions:[edition],companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],preferences:{}});
  f.ctx.getSalesLeanView=name=>name==='customers'?{companies:[{id:'101',name:'Synthetic customer'}]}:name==='admin'?{editions:[edition],access:null}:{};
  f.ctx.getSalesLeanCompany=()=>({company:{id:'101',name:'Synthetic customer',companyTypes:[],responsibleUsers:[],customFields:[],defaultAddress:{city:'Synthetic city'}},contacts:[{id:'202',companyId:101,firstName:'Synthetic',lastName:'Contact'}],histories:[{id:1,content:'Allowed conversation',contactOn:'2026-10-23T10:00:00Z'},{documentDispatch:true,content:'HIDDEN INVOICE'}],projects:[{id:77,name:'HIDDEN PROJECT'}]});
  const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
@@ -31,6 +31,9 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{chromium}=requ
   html=html.replace('if(salesUsesLogin())render();',`if(salesUsesLogin()){salesLoginSession={id:${JSON.stringify(ownerSession)},revision:1};act(async()=>{state=await rpc('getSalesLeanState');});}`);
   await page.reload();await page.getByRole('heading',{name:'Mein Tag',exact:true}).waitFor();await page.getByRole('button',{name:'Verwaltung',exact:true}).click();await page.getByRole('heading',{name:'Benutzer und Rechte',exact:true}).waitFor();
   await page.getByRole('button',{name:'Benutzer laden',exact:true}).click();await page.getByText('reader@example.invalid · Aktiv',{exact:true}).waitFor();assert.equal(await page.locator('input[name="permission:customers.read"]').first().isDisabled(),true);assert.deepEqual(errors,[]);
+  const row=page.locator('details').filter({hasText:'reader@example.invalid · Aktiv'});await row.locator('summary').click();const userForm=row.locator('form[data-form="auth-user"]'),lists=calls.filter(c=>c.name==='salesAuthenticatedRpc'&&c.args[1]==='listSalesUsers').length;
+  await userForm.locator('input[name="permission:contact.create"]').check();await userForm.getByRole('button',{name:'Rechte speichern',exact:true}).click();await page.getByText('Rechte gespeichert. Bestehende Sitzungen müssen sich erneut anmelden.',{exact:true}).waitFor();
+  assert.equal(calls.filter(c=>c.name==='salesAuthenticatedRpc'&&c.args[1]==='listSalesUsers').length,lists,'Permission change returns one user delta instead of reloading users');assert.deepEqual(errors,[]);
   console.log('PASS real helper handshake, zero pre-login reads, strict source, read-only customer, cleared logout and owner administration');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

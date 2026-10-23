@@ -4,7 +4,7 @@
   "exceptionLogging": "NONE",
   "webapp": {
     "executeAs": "USER_DEPLOYING",
-    "access": "MYSELF"
+    "access": "ANYONE_ANONYMOUS"
   },
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.external_request",

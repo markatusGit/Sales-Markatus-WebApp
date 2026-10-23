@@ -4,6 +4,12 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.27.0]
+
+- Freischaltungsstand für eingeladene Benutzer nach erfolgreicher Bestätigung des bisherigen Administrators. Bestehende Bereitstellung erhält eine öffentlich erreichbare Loginseite; Geschäftsdaten ausschließlich über Firebase und den serverseitigen Rechte-Gateway. Ausführung bleibt USER_DEPLOYING.
+- Firebase-Modus im öffentlichen Code zwingend, auch ohne optionale Modus-Eigenschaft. Alte E-Mail-Liste eröffnet keinen alternativen Zugang. Serverseitige Finanz-/Projektfilter und getrennte Lese-/Hinzufügen-/Ändern-Rechte.
+- Rechteänderungen liefern nur den geänderten Benutzer zurück, ohne erneuten Listenabruf. Bestehende technische Administratoraktionen im Gateway erhalten. 16 Sicherheitsprüfungen und erweiterte Browserprüfung erfolgreich; vollständige Releaseprüfung folgt vor Upload.
+
 ## [v0.26.1]
 
 - Privater Korrekturstand: Google-Anmeldung als direkte Weiterleitung im vorhandenen Anmeldefenster auf `sales-markatus.firebaseapp.com`. Nutzer meldete beim zusätzlichen Google-Pop-up einen Abbruch. Nur kurzlebiger Anfragekontext in Session Storage, keine eigene Tokenpersistenz; Firebase im Arbeitsspeichermodus.

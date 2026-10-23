@@ -1334,3 +1334,11 @@ Zusätzliche Härtung: Logout leert Such-/Formular-/Projekt-/Verwaltungszuständ
 ### Veröffentlichung v0.26.1
 
 Veröffentlichung v0.26.1: Apps-Script-Version 38, bestehende Bereitstellung beibehalten. Quellcommit 235a220b8bb56aa3b04c767b6a12f7da44112fdf. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-10-23T13:54:32.486Z.
+
+### r27 – Administrator bestätigt, öffentliche Freischaltung vorbereitet
+
+Nutzer bestätigt die erfolgreiche Anmeldung und beauftragt Fortsetzung. Serverseitig genau eine aktive Administratorfreigabe und die passende bestätigte Firebase-Identität mit Google-Anbieter geprüft, ohne Token-/Kontokonfiguration auszugeben. Privates r26.1 erfolgreich als Google-Version 38, Releasecommit af4b07e, GitHub-Tag v0.26.1 veröffentlicht; Originalprojekt auf Nachweis übernommen. Firebase-Hosting c2005f8664bc98ca, ursprüngliche Dateien unverändert.
+
+Browsersteuerung ist nun in Work deaktiviert. Keine Umgehung über andere Browsertechnik. Freischaltung erfolgt über den geprüften Veröffentlichungsablauf: zwingender Firebase-Modus im öffentlichen Code, daher keine Abhängigkeit vom optionalen Modus-Schalter. Konkreter Übergang von MYSELF zu ANYONE_ANONYMOUS auf derselben bestätigten Bereitstellung mit erhaltener Ausführung USER_DEPLOYING dokumentiert; tatsächliche Veröffentlichung/Erreichbarkeitsprüfung folgen. Nutzer hat diese Einladungslösung und die Fortsetzung ausdrücklich autorisiert.
+
+16 Sicherheitsprüfungen einschließlich datenfreier anonymer Loginseite bestanden. Erweiterter synthetischer Browser prüft jetzt auch eine Rechteänderung ohne erneuten Benutzerlistenabruf. Bestehende technische Administratoraktionen im Gateway erhalten. Neue/gebundene Script Properties und kleinschrittige Bedienung in docs/BENUTZERZUGANG-R26.md. Eigene App-MFA, begrenzte Auth-Dokumentaufbewahrung und vollständige Live-Prüfung von Passwort-Einladung/Teamrechten bleiben offen. Abrechnung nicht aktiviert. Fremde Dokumentänderungen erhalten.

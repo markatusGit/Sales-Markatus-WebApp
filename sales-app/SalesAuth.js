@@ -80,5 +80,5 @@
     const form=e.target;if(!['auth-user','auth-invite'].includes(form.dataset.form))return;e.preventDefault();e.stopImmediatePropagation();if(busy||!form.reportValidity())return;
     const permissions=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,form.querySelector('[name="permission:'+key+'"]')?.checked===true]));
     act(async()=>{if(form.dataset.form==='auth-invite'){const r=await rpc('createSalesUserInvitation',{email:form.elements.email.value,permissions});salesInvitationLink=r.url;return r;}
-      const r=await rpc('updateSalesUser',{uid:form.dataset.uid,revision:Number(form.dataset.revision),status:form.elements.status.value,permissions});const users=await rpc('listSalesUsers');salesUserRows=users.users;salesUserCursor=users.next;return r;});
+      const r=await rpc('updateSalesUser',{uid:form.dataset.uid,revision:Number(form.dataset.revision),status:form.elements.status.value,permissions});salesUserRows=salesUserRows.map(u=>u.uid===r.user.uid?r.user:u);return r;});
   });

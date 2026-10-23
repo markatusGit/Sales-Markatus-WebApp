@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-10-23-r26.1';
+const SALES_RELEASE = '2026-10-23-r27';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -2538,7 +2538,7 @@ function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind=
 /** Spark: Google's REST endpoint validates tokens. Decoding alone NEVER authenticates. */
 let salesAuthRequest_=null;
 // Public releases must never fall back to the historical Google email list.
-const SALES_AUTH_REQUIRE_FIREBASE=false;
+const SALES_AUTH_REQUIRE_FIREBASE=true;
 const SALES_AUTH_APP_URL='https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec';
 function salesAuthEnabled_(){const mode=PropertiesService.getScriptProperties().getProperty('SALES_AUTH_MODE');if(mode&&mode!=='firebase')throw Error('AUTH_REQUIRED: Ungültige Anmeldekonfiguration.');return mode==='firebase'||SALES_AUTH_REQUIRE_FIREBASE;}
 function salesAuthConfig_(){
@@ -2639,7 +2639,7 @@ function salesAuthRule_(method,args){
   const rules={getSalesLeanState:'home.read',getSalesLeanCompany:'customers.read',getSalesLeanEdition:'magazine.read',saveSalesCompany:'company.create',saveSalesTestCompany:'company.create',saveSalesCompanyChange:'company.edit',saveSalesCommunication:'communication.create',saveSalesHistory:'communication.create',createSalesCustomerContact:'contact.create',getSalesSyncStatus:'sync.read',startSalesSync:'sync.run',pauseSalesSync:'sync.run',runSalesSyncStep:'sync.run',syncSalesLeanCompany:'sync.run',syncSalesLeanHistory:'sync.run',saveSalesLeanEditionSettings:'settings.edit',searchSalesProjects:'settings.edit',searchSalesCompanies:'sync.run',addSalesCompany:'sync.run',saveSalesEditionConfig:'settings.edit',setSalesEditionEnabled:'settings.edit',getSalesUnassigned:'sync.read',getSalesJobPreview:'sync.read'};
   if(method==='getSalesLeanView')return ({home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',admin:'settings.read',import:'sync.read',new:'company.create',change:'company.edit',test:'owner'})[args[0]]||'deny';
   if(method==='getSalesEditor'||method==='saveSalesEntityChange')return args[0]?.entity==='contact'?'contact.edit':['company','address','types'].includes(args[0]?.entity)?'company.edit':'deny';
-  if(['getSalesStorageInventoryPage','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding','queueSalesContactEmail','queueSalesMarkerCleanup','bindSalesCompanyResult','bindSalesCustomerContact','listSalesUsers','createSalesUserInvitation','updateSalesUser','getSalesAuthSetup','saveSalesAuthSetup','setSalesDocumentExcluded','startSalesEditionRefresh'].includes(method))return 'owner';
+  if(['getSalesStorageInventoryPage','getSalesTestAudit','setupSalesSyncWorker','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding','queueSalesContactEmail','queueSalesMarkerCleanup','bindSalesCompanyResult','bindSalesCustomerContact','listSalesUsers','createSalesUserInvitation','updateSalesUser','getSalesAuthSetup','saveSalesAuthSetup','setSalesDocumentExcluded','startSalesEditionRefresh'].includes(method))return 'owner';
   if(method==='logoutSalesUser')return 'home.read';
   return rules[method]||'deny';
 }
@@ -2655,7 +2655,7 @@ function salesAuthDispatch_(method,args){
   if(method==='getSalesLeanView'&&args[0]==='admin'&&salesAuthRequest_.user.admin)rule='owner';
   if(rule==='owner')salesAuthOwner_();else salesAuthRequire_(rule);
   salesAuthRequest_.requiredPermission=rule;
-  const methods={getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh};
+  const methods={getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,getSalesTestAudit,setupSalesSyncWorker,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh};
   if(!Object.prototype.hasOwnProperty.call(methods,method))throw Error('AUTH_DENIED: Aktion nicht freigegeben.');
   salesAuthValidateWrite_(method,args);
   return methods[method](...args);
@@ -2721,7 +2721,7 @@ function updateSalesUser(input){
   return salesLock_(()=>{
     const prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
     salesAuthCommit_([{kind:'users',id:uid,prior,value:{...prior,status:input.status,permissions,revision:prior.revision+1,sessionEpoch:(prior.sessionEpoch||0)+1}},{kind:'audit',id:salesAuthRandom_(),create:true,value:{action:'access-'+input.status,actor:actor.uid,target:uid,at:salesNow_()}}],[actor.record]);
-    return {message:input.status==='disabled'?'Zugang und laufende Sitzungen gesperrt.':'Rechte gespeichert. Bestehende Sitzungen müssen sich erneut anmelden.'};
+    return {user:{uid,email:prior.email,status:input.status,permissions,revision:prior.revision+1,createdAt:prior.createdAt},message:input.status==='disabled'?'Zugang und laufende Sitzungen gesperrt.':'Rechte gespeichert. Bestehende Sitzungen müssen sich erneut anmelden.'};
   });
 }
 function logoutSalesUser(){const current=salesAuthRead_('sessions',salesAuthHash_(salesAuthRequest_.session));if(current)salesAuthCommit_([{kind:'sessions',id:salesAuthHash_(salesAuthRequest_.session),prior:current,value:{disabled:true,expiresAt:Date.now()}}]);return {message:'Abgemeldet.'};}

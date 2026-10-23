@@ -1,7 +1,7 @@
 /** Spark: Google's REST endpoint validates tokens. Decoding alone NEVER authenticates. */
 let salesAuthRequest_=null;
 // Public releases must never fall back to the historical Google email list.
-const SALES_AUTH_REQUIRE_FIREBASE=false;
+const SALES_AUTH_REQUIRE_FIREBASE=true;
 const SALES_AUTH_APP_URL='https://script.google.com/a/macros/markatus.de/s/AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw/exec';
 function salesAuthEnabled_(){const mode=PropertiesService.getScriptProperties().getProperty('SALES_AUTH_MODE');if(mode&&mode!=='firebase')throw Error('AUTH_REQUIRED: Ungültige Anmeldekonfiguration.');return mode==='firebase'||SALES_AUTH_REQUIRE_FIREBASE;}
 function salesAuthConfig_(){

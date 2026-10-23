@@ -21,5 +21,22 @@
   },
   "note": "Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.",
   "googleCodeVerifiedOn": "2026-10-16",
-  "googleCodeVerifiedAt": "2026-10-23T13:54:32.486Z"
+  "googleCodeVerifiedAt": "2026-10-23T13:54:32.486Z",
+  "webappAccessTransition": {
+    "status": "approved",
+    "from": "MYSELF",
+    "to": "ANYONE_ANONYMOUS",
+    "executeAs": "USER_DEPLOYING",
+    "authMode": "firebase",
+    "deploymentId": "AKfycbxlNLBoZvy6SgSHHEFviByTN9bL07nb7kLzlUWaAcCs0Jmrc96lIrAyGNxUrwtevDWrFw",
+    "fromVersion": 38,
+    "ownerLoginVerifiedAt": "2026-10-23T14:03:37.580Z",
+    "authorizedOn": "2026-10-23"
+  },
+  "firebaseHosting": {
+    "siteId": "sales-markatus",
+    "authOrigin": "https://sales-markatus.firebaseapp.com",
+    "version": "c2005f8664bc98ca",
+    "businessFilesUnchanged": true
+  }
 }
