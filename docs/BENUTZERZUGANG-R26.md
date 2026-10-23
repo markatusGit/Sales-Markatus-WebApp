@@ -1,4 +1,8 @@
-# Benutzerzugang und Rechte – r27
+# Benutzerzugang und Rechte – r27.1
+
+**In Arbeit am 23.10.2026 – r27.1:** Anmeldung auf Google vereinfacht: keine E-Mail-/Passwortfelder, Registrierung, Bestätigungsmails oder Passwort-zurücksetzen in der App. Einladungen weiterhin exakt an die freigegebene E-Mail gebunden; jeder eingeladene Benutzer benötigt dafür ein Google-Konto, auch mit eigener Firmenadresse möglich. Ladekreis ab dem ersten HTML bis zum Abschluss der Google-Rückkehr und Serverprüfung, Formular währenddessen verborgen. Abbruch erlaubt erneuten Versuch, Serverablehnung schließt das Ladefenster und zeigt die Meldung in der App. Server akzeptiert nur google.com-Anmeldungen. Keine Änderung an Rollen/Freigaben, Datenbankregeln, Script Properties oder Apps-Script-Zugriffseinstellungen. Firebase-Passwortanbieter wird gesondert deaktiviert. Prüfung und Veröffentlichung folgen; keine echte neue Google-Liveanmeldung behauptet.
+
+Die folgenden r26/r27-Einrichtungsangaben beschreiben den vorherigen Stand mit zusätzlichem Passwortanbieter. Für den aktuellen Einstieg gilt ausschließlich Google.
 
 **Veröffentlicht am 23.10.2026:** r27/v0.27.0 als Google-Version 39 unter derselben App-Adresse. Quellcommit 060586c, Releasecommit d926dba. Alle 22 Suiten einschließlich 16 Sicherheitsfällen und erweitertem Browserablauf bestanden; Google-Version, Editor und GitHub-Tag verglichen. Bisheriger Administrator durch Nutzer und serverseitig bestätigt. Anonymer HTTP-Abruf liefert r27 mit aktiviertem Login und exakt freigegebener App-Herkunft; keine Google-Anmeldung für die Loginseite nötig. Datenbankproben für Benutzer/Sitzungen/Kunden/alten Pilot ergeben HTTP403, aktive Regeln entsprechen exakt dem server-only-Stand. Firebase-Abrechnung weiterhin deaktiviert. Öffentliche Google-Administratoranmeldung und Ansicht Benutzer und Rechte anschließend vom Nutzer mit funktioniert live bestätigt. Echte Passwort-Einladung/Teamrechte noch nicht live abgenommen; Browsersteuerung in Work deaktiviert.
 
@@ -8,7 +12,7 @@ Einrichtungshistorie: Zunächst privates r26/v0.26.0, Google-Version 37; anschli
 
 ## Auftrag
 
-Einzelne E-Mail-Adressen einladen, einschließlich Gmail und anderer Domains. Google-Anmeldung oder persönliches Passwort; bestätigte E-Mail vor jedem Geschäftsdatenzugriff. Freigegebene Benutzer teilen denselben Kundenbestand. Basis: Mein Tag und Kunden einschließlich Ansprechpartner/Kommunikation lesen. Weitere Bereiche und Hinzufügen/Ändern einzeln per Häkchen; Löschen bleibt gesperrt. Benutzerverwaltung nur durch den bisherigen Administrator. Einladungslink manuell weitergeben, 48 Stunden gültig, einmalig und an die exakte bestätigte E-Mail gebunden. Neue Einladung ersetzt eine ältere offene Einladung derselben Adresse.
+Einzelne E-Mail-Adressen einladen, einschließlich Gmail und anderer Domains. Seit r27.1 ausschließlich Google-Anmeldung; bestätigte E-Mail vor jedem Geschäftsdatenzugriff. Freigegebene Benutzer teilen denselben Kundenbestand. Basis: Mein Tag und Kunden einschließlich Ansprechpartner/Kommunikation lesen. Weitere Bereiche und Hinzufügen/Ändern einzeln per Häkchen; Löschen bleibt gesperrt. Benutzerverwaltung nur durch den bisherigen Administrator. Einladungslink manuell weitergeben, 48 Stunden gültig, einmalig und an die exakte bestätigte E-Mail gebunden. Neue Einladung ersetzt eine ältere offene Einladung derselben Adresse.
 
 ## Kostenloser Betrieb
 
@@ -61,7 +65,7 @@ Nach Veröffentlichung einen Benutzer freigeben:
 - Auf „Einladungslink erstellen“ klicken; einen Link mit 48 Stunden Gültigkeit erwarten. Bei Fehler nichts weitergeben und die Meldung prüfen.
 - Auf „Einladungslink kopieren“ klicken; der Link kann persönlich an die eingetragene Person weitergegeben werden. Falls Kopieren blockiert wird, den markierten Link mit Strg+C kopieren.
 
-Der Empfänger öffnet seinen Einladungslink, meldet sich mit exakt dieser Google-Adresse an oder legt ein persönliches Passwort mit mindestens zwölf Zeichen an. Bei Passwortanmeldung ist die E-Mail-Bestätigung erforderlich. Erst danach aktiviert die App die Einladung. Andere Adressen, ersetzte, abgelaufene oder bereits verwendete Einladungen werden abgewiesen.
+Der Empfänger öffnet seinen Einladungslink und meldet sich mit dem Google-Konto für exakt die eingeladene E-Mail-Adresse an. Ein eigenes App-Passwort gibt es seit r27.1 nicht mehr. Erst danach aktiviert die App die Einladung. Andere Adressen, ersetzte, abgelaufene oder bereits verwendete Einladungen werden abgewiesen.
 
 Bestehende Freigabe ändern:
 

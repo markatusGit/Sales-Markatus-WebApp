@@ -35,7 +35,7 @@
       salesLoginSession={id:result.session,revision:result.user.revision};pending.popup.postMessage({type:'sales-login-complete',state:pending.state},salesLoginOrigin());salesLoginPending=null;
       if(!salesUsesLogin()){salesSetupBound=true;message='Administratorkonto bestätigt. Die Benutzeranmeldung kann jetzt aktiviert werden.';render();return;}
       error='';await act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});
-    }catch(e){pending.finishing=false;error=e.message;render();}
+    }catch(e){pending.popup.close();salesLoginPending=null;error=e.message;render();}
   });
   async function salesRpcWithLogin(target,args){
     if(!salesLoginSession)throw Error('AUTH_REQUIRED: Bitte anmelden.');
