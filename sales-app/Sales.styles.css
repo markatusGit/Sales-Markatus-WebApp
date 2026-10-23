@@ -38,6 +38,10 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb .m-history-scroll .m-panel-body{padding:8px 18px 12px}
 #magazin-vertrieb .m-history-scroll .m-test-actions{margin:0}
 #magazin-vertrieb .m-history-scroll .m-panel-body>.m-muted{margin-top:8px;font-size:.76em}
+#magazin-vertrieb .m-history-toolbar{position:sticky;top:0;z-index:1;background:var(--m-surface);border-bottom:1px solid var(--m-line)}
+#magazin-vertrieb .m-history-filters{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:8px}
+#magazin-vertrieb .m-history-filters select{min-width:0;width:100%}
+#magazin-vertrieb .m-history-toolbar .m-test-actions:not(:empty){margin-top:8px}
 #magazin-vertrieb .m-customer-tabs{display:none}
 #magazin-vertrieb .m-contact-dialog{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:10px;padding:24px;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
 #magazin-vertrieb .m-contact-dialog::backdrop{background:#0009}

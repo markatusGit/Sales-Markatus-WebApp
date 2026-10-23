@@ -5,6 +5,7 @@
   const localContactTime=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
   const communicationId=()=>Array.from(crypto.getRandomValues(new Uint32Array(4)),n=>n.toString(16).padStart(8,'0')).join('');
   let customerListObserver=null;
+  const historySearchTexts=new WeakMap();
   const customerSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('de').trim();
   function customerContactRow(p,editable=true){
     return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p></div>';
@@ -13,7 +14,7 @@
     const d=communicationDraft();d.lists||={};const saved=d.lists[kind]||{query:'',scroll:0};d.lists[kind]=saved;
     const searchable=rows.length>3;
     if(!searchable){saved.query='';saved.scroll=0;}
-    const tools=searchable?'<div class="m-customer-list-tools"><label class="m-field">'+title+' suchen<input type="search" data-customer-list-search="'+kind+'" value="'+esc(saved.query)+'" placeholder="'+(kind==='contacts'?'Name, E-Mail oder Telefon':'Projektname oder Projektnummer')+'"></label><small data-list-count aria-live="polite"></small></div>':'';
+    const tools=searchable?'<div class="m-customer-list-tools"><input type="search" aria-label="'+title+' suchen" data-customer-list-search="'+kind+'" value="'+esc(saved.query)+'" placeholder="'+(kind==='contacts'?'Name, E-Mail oder Telefon':'Projektname oder Projektnummer')+'"><small data-list-count aria-live="polite"></small></div>':'';
     const cards=rows.map(row=>{
       const text=kind==='contacts'?[row.salutation,row.firstName,row.lastName,row.position,row.eMail,row.phoneMobile,row.phoneLandline].filter(Boolean).join(' '):[row.number,row.name].filter(Boolean).join(' ');
       return renderRow(row).replace('<div class="m-row"','<div class="m-row" data-customer-list-row data-search="'+esc(customerSearchText(text))+'"');
@@ -39,6 +40,17 @@
       customerListObserver=new ResizeObserver(()=>{for(const panel of panels)sizeCustomerCardList(panel);});
       for(const panel of panels){customerListObserver.observe(panel);for(const row of panel.querySelectorAll('[data-customer-list-row]'))customerListObserver.observe(row);}
     }
+  }
+  function filterCommunicationHistory(){
+    const list=root.querySelector('.m-history-rows');if(!list)return;
+    const query=customerSearchText(communicationDraft().historyQuery),rows=list.querySelectorAll('[data-history-row]');let matches=0;
+    for(const row of rows){
+      if(!historySearchTexts.has(row))historySearchTexts.set(row,customerSearchText(row.textContent));
+      const typeMatches=historyFilter==='all'||(historyFilter==='documents'?row.dataset.document==='true':row.dataset.document!=='true');
+      row.hidden=!typeMatches||!historySearchTexts.get(row).includes(query);if(!row.hidden)matches++;
+    }
+    list.querySelector('[data-history-empty]').hidden=matches>0;
+    root.querySelector('[data-history-count]').textContent=matches===rows.length?rows.length+' Einträge in Firebase':matches+' von '+rows.length+' Einträgen';
   }
   function communicationDraft(){
     const key=communicationKey();let draft=communicationDrafts.get(key);
@@ -81,6 +93,7 @@
     const box=root.querySelector('.m-customer-workspace');if(!box)return;
     box.dataset.communicationRef=communicationKey();const d=communicationDraft();
     customerListsAfterRender();
+    filterCommunicationHistory();
     if(d.scrollToTop){d.historyScroll=0;d.scrollToTop=false;}
     root.querySelector('.m-customer-details').scrollTop=d.leftScroll;
     root.querySelector('.m-history-scroll').scrollTop=d.historyScroll;
@@ -109,6 +122,10 @@
     companyCache.set(String(selected),detail);
   }
   root.addEventListener('input',e=>{
+    if(e.target.matches('[data-history-search]')){
+      const d=communicationDraft();d.historyQuery=e.target.value;d.historyScroll=0;
+      filterCommunicationHistory();root.querySelector('.m-history-scroll').scrollTop=0;return;
+    }
     if(e.target.matches('[data-customer-list-search]')){
       const panel=e.target.closest('[data-customer-list]'),saved=communicationDraft().lists[panel.dataset.customerList];saved.query=e.target.value;saved.scroll=0;
       filterCustomerCardList(panel,saved.query);panel.querySelector('.m-customer-list-rows').scrollTop=0;return;
@@ -123,6 +140,10 @@
     if(form.dataset.form==='communication-contact'&&contactDialog)contactDialog.values=Object.fromEntries(new FormData(form));
   });
   root.addEventListener('change',e=>{
+    if(e.target.name==='historyFilter'){
+      e.stopImmediatePropagation();historyFilter=e.target.value;communicationDraft().historyScroll=0;
+      filterCommunicationHistory();root.querySelector('.m-history-scroll').scrollTop=0;return;
+    }
     if(e.target.name!=='communicationContact')return;e.stopImmediatePropagation();const d=communicationDraft();
     if(e.target.value==='__new'){
       e.target.value=d.contact;const key=communicationKey();contactDialog=contactDialogDrafts.get(key)||{companyRef:key,requestId:communicationId(),values:{}};contactDialogDrafts.set(key,contactDialog);render();

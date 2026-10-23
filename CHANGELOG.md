@@ -8,6 +8,13 @@ Dokumentation vom 18.10.2026: Testbestandteile T01–T09 und Produktivlücken L0
 
 Die anschließende Freigabe für T01/T02/T03/T04/T06/T09 ist im folgenden r22-Abschnitt dokumentiert. D17 und D21 bleiben erhalten; D22 umfasst weiterhin nur eine lesende Inventur.
 
+## [v0.25.0] – 2026-10-23
+
+- Suchfeld oberhalb der rechten Kontakthistorie; filtert bei jeder Eingabe im geladenen Bestand, einschließlich vollständiger eingeklappter Inhalte, Ansprechpartner und Dokumentangaben. Mit bestehendem Typfilter kombinierbar, Trefferzahl und Leermeldung sichtbar.
+- Historienkopf und Suche bleiben beim Scrollen stehen. Suchtext bleibt je Kunde während der Sitzung erhalten, auch bei Neudarstellung und neuen Einträgen. Tippen und Typfilterwechsel ohne Serverzugriff und ohne erneutes Rendern der gesamten Kundenakte.
+- Zusätzliche sichtbare Beschriftungen über Ansprechpartner-, Projekt- und Historiensuche entfernt. Platzhalter und zugängliche Feldnamen bleiben erhalten; Historienfilter kompakt neben der Suche.
+- Synthetische Browserprüfungen für volle eingeklappte Inhalte, Akzente/Großschreibung, kombinierte Filter, keine Treffer, Suchrücknahme, Kundenwechsel, neue Notizen, Notizentwürfe und Handybedienung ergänzt. Keine neuen Script Properties, Scopes oder Bereitstellungseinstellungen; echte Live-Abnahme gesondert offen.
+
 ## [v0.24.0] – 2026-10-23
 
 - Ansprechpartner und Projekte in der Kundenakte bis zu drei Einträge wie bisher; ab vier Einträgen eigener Scrollbereich mit Platz für drei Karten und fest darüber angeordneter Suche.

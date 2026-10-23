@@ -513,7 +513,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-10-23-r24',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-10-23-r25',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -538,16 +538,16 @@ test('email preview shows the target person, address and action in readable esca
   assert.ok(sandbox.output.includes('Status: Bestätigt'));assert.ok(sandbox.output.includes('E-Mail und erhaltene Kontaktdaten in HQ bestätigt.'));assert.ok(!sandbox.output.includes('data-action="run-job"'));
 });
 test('UI script compiles and has no demo storage or customer fixtures',()=>{const html=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');for(const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);for(const forbidden of ['sales-markatus-demo-v1','Atelier am Markt','Mara Beispiel','seedBookings'])assert.ok(!html.includes(forbidden));});
-test('customer history offers separated filters, pending sync actions and collapsed safe long content',()=>{
+test('customer history keeps full content for local type/search filters, pending sync actions and collapsed safe long content',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const sandbox={document:{getElementById:()=>({dataset:{},addEventListener(){}})},localStorage:{getItem:()=>null},setInterval(){}};
   const rows=[{reason:'Call only',content:'A'.repeat(300)+'End & text',contactHistoryChannel:'Call',contactOn:'2026-09-26T10:15:00Z',jobId:'job-1',syncState:'pending'},{projectName:'Project only',content:'Automated full message',documentDispatch:true,contactOn:'2026-09-25',invoice:{netCents:10000,currency:'EUR'}}];
   vm.runInNewContext(preboot+`state={user:{admin:true},jobs:[{id:'test-1',state:'synced'}]};detail={histories:${JSON.stringify(rows)}};const c={id:'draft_test-1',hqId:'101',localDraftId:'test-1'};globalThis.all=historyPanel(c);historyFilter='documents';globalThis.documents=historyPanel(c);historyFilter='communication';globalThis.communication=historyPanel(c);})();`,sandbox);
   assert.ok(!sandbox.all.includes('data-action="history-form"'));assert.ok(!sandbox.all.includes('data-action="sync-history"'));assert.ok(sandbox.all.includes('2 Einträge in Firebase'));
-  assert.ok(sandbox.communication.includes('In Firebase · HQ offen'));assert.ok(sandbox.communication.includes('Übertragung ansehen'));assert.ok(!sandbox.communication.includes('Project only'));
+  assert.ok(sandbox.communication.includes('In Firebase · HQ offen'));assert.ok(sandbox.communication.includes('Übertragung ansehen'));assert.ok(sandbox.communication.includes('Project only'));assert.ok(sandbox.communication.includes('<option value="communication" selected>'));assert.ok(sandbox.communication.includes('data-document="false"'));
   assert.ok(sandbox.communication.indexOf('End &amp; text')>sandbox.communication.indexOf('<details>'));assert.ok(!sandbox.communication.includes('<img'));
-  assert.ok(!sandbox.documents.includes('Call only'));assert.ok(sandbox.documents.includes('100,00 EUR netto'));assert.ok(sandbox.documents.indexOf('Automated full message')>sandbox.documents.indexOf('<details>'));
+  assert.ok(sandbox.documents.includes('Call only'));assert.ok(sandbox.documents.includes('<option value="documents" selected>'));assert.ok(sandbox.documents.includes('data-document="true"'));assert.ok(sandbox.documents.includes('100,00 EUR netto'));assert.ok(sandbox.documents.indexOf('Automated full message')>sandbox.documents.indexOf('<details>'));
 });
 test('ordinary email about an invoice stays communication unless HQ evidence identifies document dispatch',()=>{
   const {ctx}=fixture(),doc={id:1,companyId:1,number:'RE-1',documentType:'Invoice',netValue:100,currency:'EUR'};
@@ -574,7 +574,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-10-23-r24'));
+  assert.ok(root.innerHTML.includes('2026-10-23-r25'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });
