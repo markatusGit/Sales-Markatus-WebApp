@@ -8,7 +8,7 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 - Freischaltungsstand für eingeladene Benutzer nach erfolgreicher Bestätigung des bisherigen Administrators. Bestehende Bereitstellung erhält eine öffentlich erreichbare Loginseite; Geschäftsdaten ausschließlich über Firebase und den serverseitigen Rechte-Gateway. Ausführung bleibt USER_DEPLOYING.
 - Firebase-Modus im öffentlichen Code zwingend, auch ohne optionale Modus-Eigenschaft. Alte E-Mail-Liste eröffnet keinen alternativen Zugang. Serverseitige Finanz-/Projektfilter und getrennte Lese-/Hinzufügen-/Ändern-Rechte.
-- Rechteänderungen liefern nur den geänderten Benutzer zurück, ohne erneuten Listenabruf. Bestehende technische Administratoraktionen im Gateway erhalten. 16 Sicherheitsprüfungen und erweiterte Browserprüfung sowie alle 22 Release-Suiten erfolgreich. Als Google-Version 39 veröffentlicht und mit GitHub-Tag verglichen; anonymer Loginseiten-Abruf und geschlossene Datenbankregeln bestätigt. Öffentliche Bedien-/Passwort-Einladungsprüfung noch offen.
+- Rechteänderungen liefern nur den geänderten Benutzer zurück, ohne erneuten Listenabruf. Bestehende technische Administratoraktionen im Gateway erhalten. 16 Sicherheitsprüfungen und erweiterte Browserprüfung sowie alle 22 Release-Suiten erfolgreich. Als Google-Version 39 veröffentlicht und mit GitHub-Tag verglichen; anonymer Loginseiten-Abruf und geschlossene Datenbankregeln bestätigt. Öffentliche Google-Administratoranmeldung und Benutzerverwaltung vom Nutzer live bestätigt; echte Passwort-Einladung/Teamrechte noch nicht live abgenommen.
 
 ## [v0.26.1]
 
