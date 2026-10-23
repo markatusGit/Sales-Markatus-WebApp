@@ -1297,3 +1297,7 @@ Veröffentlichung v0.24.0: Apps-Script-Version 35, bestehende Bereitstellung bei
 **Grenzen / Einrichtung:** Ausschließlich synthetische Testdaten. Keine neuen Script Properties, Scopes, Bereitstellungseinstellungen, Firebase-Regeln oder Trigger. Keine Migration, keine echten Kundendaten für Funktionsprüfungen verändert. Fachliche Live-Abnahme offen. Bedienung in docs/KUNDENANSICHT-R24.md um r25 ergänzt; übrige Roadmap und fremde Dokumentänderungen erhalten.
 
 **Vollständige lokale Prüfung:** Build, Syntax-/JSON-/Uploadlisten-/Zugangsdatenprüfungen und alle 20 Prüfsuiten erfolgreich. Browser bestätigt zusätzlich leere Historie ohne Suchübernahme vom anderen Kunden und neu gespeicherte passende Notiz bei aktivem Filter. Genau die zugehörigen Dateien werden gezielt committet; Veröffentlichung als v0.25.0 aus sauberer Kopie folgt.
+
+### Veröffentlichung v0.25.0
+
+Veröffentlichung v0.25.0: Apps-Script-Version 36, bestehende Bereitstellung beibehalten. Quellcommit 5d5b0c60e22104bc3c68644a6f889d6a83fbf1a1. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen verändert. Live-Funktionstest offen. Zeitpunkt: 2026-10-23T08:14:48.233Z.
