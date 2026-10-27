@@ -83,8 +83,8 @@ function finishSalesLogin(input){
     let record=salesAuthRead_('users',identity.uid);
     // A previously activated account signs in with its current ACL, not its old invitation.
     if(!record&&input.invitation){salesAuthActivate_(input.invitation,identity);record=salesAuthRead_('users',identity.uid);}
-    const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_();
-    salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt:Date.now()+8*3600000,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,user:salesAuthPublicUser_(user)};
+    const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_(),expiresAt=Date.now()+8*3600000;
+    salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,expiresAt,user:salesAuthPublicUser_(user)};
   });
 }
 function salesAuthPublicUser_(user){return {uid:user.uid,email:user.email,admin:user.admin,permissions:user.permissions,revision:user.revision};}

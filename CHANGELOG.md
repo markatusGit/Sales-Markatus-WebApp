@@ -4,6 +4,12 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.27.3]
+
+- Abgelaufene Sitzung öffnet beim nächsten Zugriff die Anmeldung. Google-Fehlerhüllen werden für AUTH_REQUIRED/AUTH_DENIED normalisiert; angemeldete Datenansicht und Sitzungscaches werden verlassen. Automatisches Pop-up mit direkt bedienbarer Schaltfläche Erneut anmelden als Rückfall.
+- Acht-Stunden-Serverfrist in der bestehenden Loginantwort mitgegeben; lokale Prüfung vor dem nächsten Geschäfts-RPC, ohne Timer, Hintergrundabfragen oder Browserpersistenz. Keine automatische Wiederholung fehlgeschlagener Lese-/Schreibaktionen.
+- Parallele Fehler erzeugen nur eine Anmeldung; verspätete Antworten alter Sitzungen werden verworfen. Manuelles Abmelden bleibt ohne automatische Wiederanmeldung. Browser prüft tatsächliche Fehlerhülle, lokalen/serverseitigen Ablauf, erneuten Login, Pop-up-Blockierung, parallele Fehler und späte Antworten. Keine neuen Einstellungen; Tagesanmeldung weiterhin separat offen.
+
 ## [v0.27.2]
 
 - Veröffentlicht als Google-Version 41; alle 22 Suiten, 19 Auth-/Rechtefälle und erweiterter Browser bestanden. Google/Editor/GitHub abgeglichen. Fachliche Live-Abnahme offen.

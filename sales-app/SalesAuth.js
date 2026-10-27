@@ -1,6 +1,6 @@
   const SALES_LOGIN_CONFIG="AUTH_RUNTIME_CONFIG";
   let salesLoginSession=null,salesLoginPending=null,salesUserRows=[],salesUserCursor=null,salesInvitationLink='';
-  let salesSetupConfig=null,salesSetupBound=false,salesNewRelease='';
+  let salesSetupConfig=null,salesSetupBound=false,salesNewRelease='',salesReauthentication=false;
   const salesUsesLogin=()=>SALES_LOGIN_CONFIG?.enabled===true;
   const salesLoginOrigin=()=>salesUsesLogin()?SALES_LOGIN_CONFIG.origin:salesSetupConfig?.origin;
   function salesUpdatePage(release){
@@ -8,8 +8,22 @@
     return '<div class="m-login"><h1>App wurde aktualisiert</h1><p>Bitte die aktuelle Version öffnen. Deine Benutzerfreigabe bleibt erhalten.</p><p><a class="m-button m-primary" href="'+esc(url.href)+'" target="_top">Aktuelle Version öffnen</a></p><p>Oberfläche: '+esc(UI_BUILD)+' · Server: '+esc(release)+'</p></div>';
   }
   function salesSetupPanel(){return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzeranmeldung einrichten</h2></div><div class="m-panel-body"><p>Der bisherige Google-Zugang bleibt bis zur Aktivierung erhalten.</p>'+button('Einrichtung vorbereiten','auth-setup')+(salesSetupConfig?button('Administratorkonto bestätigen','auth-login'):'')+(salesSetupBound?button('Benutzeranmeldung aktivieren','auth-enable'):'')+'</div></section>';}
-  function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e?.message||'Anfrage fehlgeschlagen.')))[name](...args));}
-  function salesForgetLogin(text=''){
+  function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(String(e?.message||'Anfrage fehlgeschlagen.').replace(/^(?:(?:Error|Exception):\s*)+(?=AUTH_(?:REQUIRED|DENIED):)/,''))))[name](...args));}
+  const salesHandledAuthError=()=>Object.assign(Error('Bitte erneut anmelden.'),{salesAuthHandled:true});
+  function salesRequireLogin(session,text,automatic=true){
+    if(session!==salesLoginSession)return salesHandledAuthError();
+    busy=false;root.setAttribute('aria-busy','false');salesForgetLogin(text,true);
+    if(automatic)salesBeginLogin(true);
+    return salesHandledAuthError();
+  }
+  function salesCheckSessionAction(event){
+    const session=salesLoginSession;if(!salesUsesLogin()||!session||!(session.expiresAt<=Date.now())||event.target.closest?.('[data-action="auth-logout"]'))return;
+    event.preventDefault();event.stopImmediatePropagation();salesRequireLogin(session,'Deine Sitzung ist beendet. Bitte melde dich erneut an.');
+  }
+  root.addEventListener('click',salesCheckSessionAction,true);
+  root.addEventListener('submit',salesCheckSessionAction,true);
+  function salesForgetLogin(text='',reauthenticate=false){
+    salesReauthentication=reauthenticate;
     salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
     state=null;detail=null;preview=null;audit=null;businessEditor=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
     projectResults=null;companyResults=null;unassignedData=null;storageInventory=null;projectChoices={};projectSearchTerm='';projectSearchError='';selected=null;selectedEditionId='';search='';message='';
@@ -17,37 +31,49 @@
     for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';
     if(communicationClock){clearInterval(communicationClock);communicationClock=null;}root.classList.remove('m-customer-open');document.body.classList.remove('sales-customer-open');render();
   }
-  function salesLoginPage(){return '<div class="m-login"><h1>Sales Markatus</h1><p>'+(SALES_LOGIN_CONFIG.invitation?'Du wurdest eingeladen. Bitte dein Konto bestätigen.':'Bitte mit deinem freigegebenen Konto anmelden.')+'</p><p role="alert">'+esc(error)+'</p>'+button('Anmelden / Einladung aktivieren','auth-login','','true')+'</div>';}
-  async function salesBeginLogin(){
+  function salesLoginPage(){return '<div class="m-login"><h1>Sales Markatus</h1><p>'+(SALES_LOGIN_CONFIG.invitation?'Du wurdest eingeladen. Bitte dein Konto bestätigen.':'Bitte mit deinem freigegebenen Konto anmelden.')+'</p><p role="alert">'+esc(error)+'</p>'+button(salesReauthentication?'Erneut anmelden':'Anmelden / Einladung aktivieren','auth-login','','true')+'</div>';}
+  async function salesBeginLogin(automatic=false){
     if(salesLoginPending&&Date.now()-salesLoginPending.createdAt>=5*60000){salesLoginPending.popup.close();salesLoginPending=null;}
     if(salesLoginPending&&!salesLoginPending.popup.closed){salesLoginPending.popup.focus();return;}
-    const popup=window.open('about:blank','sales-auth','popup,width=520,height=760');if(!popup){error='Bitte das Anmeldefenster im Browser erlauben.';render();return;}
+    const popup=window.open('about:blank','sales-auth','popup,width=520,height=760');if(!popup){if(!automatic)error='Bitte das Anmeldefenster im Browser erlauben.';render();return;}
+    const pending={popup,createdAt:Date.now()};salesLoginPending=pending;
     try{
       const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join(''),stateKey=Array.from(crypto.getRandomValues(new Uint8Array(24)),n=>n.toString(16).padStart(2,'0')).join('');
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)),challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
       const response=await salesDirectRpc('beginSalesLogin',{origin:location.origin,state:stateKey,challenge,release:APP_RELEASE});
-      if(response.reloadRequired){popup.close();salesNewRelease=response.release;render();return;}
+      if(salesLoginPending!==pending)return;
+      if(response.reloadRequired){popup.close();salesLoginPending=null;salesNewRelease=response.release;render();return;}
       const origin=new URL(response.origin).origin;if(origin!==salesLoginOrigin())throw Error('Anmeldeursprung stimmt nicht überein.');
-      salesLoginPending={popup,verifier,state:stateKey,attempt:response.attempt,createdAt:Date.now()};
+      Object.assign(pending,{verifier,state:stateKey,attempt:response.attempt});
       popup.location.href=origin+'/auth/#'+new URLSearchParams({origin:location.origin,state:stateKey,attempt:response.attempt,...(SALES_LOGIN_CONFIG.invitation?{invitation:SALES_LOGIN_CONFIG.invitation}:{})});
-    }catch(e){popup.close();salesLoginPending=null;error=e.message;render();}
+    }catch(e){popup.close();if(salesLoginPending===pending){salesLoginPending=null;error=e.message;render();}}
   }
   if(typeof window!=='undefined')window.addEventListener('message',async event=>{
-    const pending=salesLoginPending;if(!pending||pending.finishing||Date.now()-pending.createdAt>5*60000||event.origin!==salesLoginOrigin()||event.source!==pending.popup||event.data?.type!=='sales-firebase-login'||event.data.state!==pending.state||event.data.attempt!==pending.attempt)return;
+    const pending=salesLoginPending;if(!pending?.attempt||pending.finishing||Date.now()-pending.createdAt>5*60000||event.origin!==salesLoginOrigin()||event.source!==pending.popup||event.data?.type!=='sales-firebase-login'||event.data.state!==pending.state||event.data.attempt!==pending.attempt)return;
     pending.finishing=true;
     try{
       const result=await salesDirectRpc('finishSalesLogin',{attempt:pending.attempt,verifier:pending.verifier,state:pending.state,idToken:event.data.idToken,refreshToken:event.data.refreshToken,invitation:SALES_LOGIN_CONFIG.invitation||'',release:APP_RELEASE});
+      if(salesLoginPending!==pending)return;
       if(result.reloadRequired){pending.popup.close();salesLoginPending=null;salesNewRelease=result.release;render();return;}
-      salesLoginSession={id:result.session,revision:result.user.revision};pending.popup.postMessage({type:'sales-login-complete',state:pending.state},salesLoginOrigin());salesLoginPending=null;
+      salesLoginSession={id:result.session,revision:result.user.revision,expiresAt:result.expiresAt};salesReauthentication=false;pending.popup.postMessage({type:'sales-login-complete',state:pending.state},salesLoginOrigin());salesLoginPending=null;
       SALES_LOGIN_CONFIG.invitation='';try{google.script.history?.replace({}, {}, '');}catch{} // Remove the consumed invitation from this tab's URL.
       if(!salesUsesLogin()){salesSetupBound=true;message='Administratorkonto bestätigt. Die Benutzeranmeldung kann jetzt aktiviert werden.';render();return;}
       error='';await act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});
-    }catch(e){pending.popup.close();salesLoginPending=null;error=e.message;render();}
+    }catch(e){pending.popup.close();if(salesLoginPending===pending){salesLoginPending=null;error=e.message;render();}}
   });
   async function salesRpcWithLogin(target,args){
-    if(!salesLoginSession)throw Error('AUTH_REQUIRED: Bitte anmelden.');
-    const response=await salesDirectRpc('salesAuthenticatedRpc',salesLoginSession.id,target,args);
-    if(response.identity.revision!==salesLoginSession.revision){salesForgetLogin('Deine Rechte wurden geändert. Bitte erneut anmelden.');throw Error('AUTH_REQUIRED: Rechte geändert.');}
+    const session=salesLoginSession;if(!session)throw salesHandledAuthError();
+    if(target!=='logoutSalesUser'&&session.expiresAt<=Date.now())throw salesRequireLogin(session,'Deine Sitzung ist beendet. Bitte melde dich erneut an.');
+    let response;
+    try{response=await salesDirectRpc('salesAuthenticatedRpc',session.id,target,args);}
+    catch(e){
+      if(session!==salesLoginSession)throw salesHandledAuthError();
+      if(/^AUTH_REQUIRED:/.test(e.message))throw salesRequireLogin(session,'Deine Sitzung ist beendet. Bitte melde dich erneut an.',target!=='logoutSalesUser');
+      if(/^AUTH_DENIED:/.test(e.message))throw salesRequireLogin(session,e.message.replace(/^AUTH_DENIED:\s*/,''),false);
+      throw e;
+    }
+    if(session!==salesLoginSession)throw salesHandledAuthError();
+    if(response.identity.revision!==session.revision)throw salesRequireLogin(session,'Deine Rechte wurden geändert. Bitte erneut anmelden.');
     if(state)state.user=response.identity;return response.result;
   }
   function salesPermissionFields(values={},owner=false){return SALES_PERMISSION_CATALOG.map(([key,label,group],i)=>'<label class="m-check"><input type="checkbox" name="permission:'+key+'" '+(values[key]||SALES_PERMISSION_BASE.includes(key)?'checked':'')+' '+(owner||SALES_PERMISSION_BASE.includes(key)?'disabled':'')+'>'+esc(label)+'</label>').join('');}
