@@ -1426,3 +1426,7 @@ Gezielte Prüfung bestanden: 19 Auth-/Rechtefälle mit zusätzlichem Vergleich v
 Technische Grenzen: Browser können automatische Pop-ups nach einer asynchronen Serverantwort blockieren; deshalb funktionaler Rückfall direkt im Tab, keine Pflicht zur Browsereinstellung. Kein Idle-Timer, keine automatische Passwort-/Google-Anmeldung und kein Wiederholen eines alten Schreibvorgangs. Die Wiederanmeldung erteilt ausschließlich die aktuellen serverseitigen Rechte. Die sichere Tageswiederherstellung bleibt separat offen. Fremde START-HIER-Änderung und beide Zusatzdokumente erhalten; alle bisherigen Roadmap-Wünsche unverändert. Vollständige Projekt-/Releaseprüfung und tatsächliche Live-Bedienabnahme separat ausweisen.
 
 Ergänzende Prüfung vor Release: Auch rein lokale Klicks mit geladenem Bestand (getestet am Ansichtswechsel hell/dunkel) erkennen die bekannte abgelaufene Serverfrist, ohne erst einen Datenabruf abzuwarten. Click-/Submit-Prüfung vor den bestehenden Aktionen; keine automatische Wiederholung.
+
+### Veröffentlichung v0.27.3
+
+Veröffentlichung v0.27.3: Apps-Script-Version 42, bestehende Bereitstellung beibehalten. Quellcommit 9eb4b2890f912935f23cad01773283c17462a12c. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-10-27T09:10:54.273Z.
