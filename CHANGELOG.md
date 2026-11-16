@@ -4,6 +4,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+- Dokumentation 16.11.2026: Meldung HQ-Abgleich 0/32 eingeordnet; manuelle Fortschrittsaktualisierung als ersten Diagnoseschritt festgehalten. Tatsächlicher Laufzustand noch offen; kein Code-/Trigger-/Konfigurationswechsel.
+
 ## [v0.27.3]
 
 - Als Google-Version 42 unter derselben Adresse veröffentlicht. Alle 22 Suiten und erweiterte Ablauf-/Wiederanmeldungsfälle bestanden, Google/Editor/GitHub verglichen. Echte Langzeit-Bedienprobe noch offen.
