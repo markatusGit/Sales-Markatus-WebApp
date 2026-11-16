@@ -4,7 +4,7 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
-- Dokumentation 16.11.2026: Meldung HQ-Abgleich 0/32 eingeordnet; manuelle Fortschrittsaktualisierung als ersten Diagnoseschritt festgehalten. Tatsächlicher Laufzustand noch offen; kein Code-/Trigger-/Konfigurationswechsel.
+- Dokumentation 16.11.2026: HQ-Abgleich zunächst 0/32, danach laut Nutzer 19/32 mit 18 Meldungen und Filterpause. Blockierender abgelehnter Änderungsfilter und getrennte unsichere Schreibaufträge eingeordnet. Missverständliche Erfolgszählung als offener Punkt erfasst. Konkrete Filterursache/Korrektur noch offen; kein Code-/Trigger-/Konfigurationswechsel.
 
 ## [v0.27.3]
 
