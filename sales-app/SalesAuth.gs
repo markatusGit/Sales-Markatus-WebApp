@@ -16,7 +16,7 @@ function salesAuthEmail_(value){value=String(value||'').trim().toLowerCase();if(
 function salesAuthDocument_(kind,id){if(!['users','sessions','attempts','invites','emails','audit'].includes(kind)||!/^[-\w]{1,128}$/.test(id))throw Error('Ungültiger Auth-Datenpfad.');return 'sales_auth'+kind+'/'+id;}
 function salesAuthRead_(kind,id){
   const c=salesContext_(),path=salesAuthDocument_(kind,id),r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',headers:{Authorization:'Bearer '+c.token},muteHttpExceptions:true});
-  if(r.getResponseCode()===404)return null;if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
+  if(r.getResponseCode()===404)return null;if(r.getResponseCode()===429){const e=Error('Der Firebase-Datenspeicher hat sein Kontingent erreicht. Bitte später erneut versuchen. Erneutes Anmelden behebt dies nicht.');e.salesQuota=true;throw e;}if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
   const doc=JSON.parse(r.getContentText());return {...JSON.parse(doc.fields.payload.stringValue),_path:path,_updateTime:doc.updateTime};
 }
 function salesAuthCommit_(entries,checks=[]){

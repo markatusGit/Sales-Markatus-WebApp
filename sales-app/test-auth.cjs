@@ -99,6 +99,10 @@ if(require.main===module){
    if(status==='FAILED_PRECONDITION'){f.ctx.salesAuthThrottle_('begin',30);assert.equal(commits,2);}else {assert.throws(()=>f.ctx.salesAuthThrottle_('begin',30),/Auth-Speicher HTTP 400/);assert.equal(commits,1);}
   }
  });
+ test('exhausted Firestore quota never bypasses ACL checks or creates a login session',()=>{
+  const f=authFixture();f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>429,getContentText:()=>'{"error":{"status":"RESOURCE_EXHAUSTED"}}'});
+  assert.throws(()=>f.ctx.salesAuthRead_('users','owner'),e=>e.salesQuota===true&&/Kontingent/.test(e.message));assert.throws(()=>f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge:'c'.repeat(43),state:'s'.repeat(40)}),/Kontingent/);assert.ok(![...f.db.keys()].some(k=>k.startsWith('sales_authsessions/')));
+ });
  test('private bootstrap binds only the existing Google owner and activation requires that verified session',()=>{
   const f=authFixture({legacy:true});delete f.props.SALES_AUTH_OWNER_UID;f.db.delete('sales_authusers/owner');
   const verifier='v'.repeat(64),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),state='s'.repeat(40),begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state}),input={attempt:begin.attempt,verifier,state,refreshToken:'r'.repeat(50)};

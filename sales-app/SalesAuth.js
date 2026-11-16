@@ -8,7 +8,7 @@
     return '<div class="m-login"><h1>App wurde aktualisiert</h1><p>Bitte die aktuelle Version öffnen. Deine Benutzerfreigabe bleibt erhalten.</p><p><a class="m-button m-primary" href="'+esc(url.href)+'" target="_top">Aktuelle Version öffnen</a></p><p>Oberfläche: '+esc(UI_BUILD)+' · Server: '+esc(release)+'</p></div>';
   }
   function salesSetupPanel(){return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzeranmeldung einrichten</h2></div><div class="m-panel-body"><p>Der bisherige Google-Zugang bleibt bis zur Aktivierung erhalten.</p>'+button('Einrichtung vorbereiten','auth-setup')+(salesSetupConfig?button('Administratorkonto bestätigen','auth-login'):'')+(salesSetupBound?button('Benutzeranmeldung aktivieren','auth-enable'):'')+'</div></section>';}
-  function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(String(e?.message||'Anfrage fehlgeschlagen.').replace(/^(?:(?:Error|Exception):\s*)+(?=AUTH_(?:REQUIRED|DENIED):)/,''))))[name](...args));}
+  function salesDirectRpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(String(e?.message||'Anfrage fehlgeschlagen.').replace(/^(?:(?:Error|Exception):\s*)+(?=AUTH_(?:REQUIRED|DENIED):|Der Firebase-Datenspeicher)/,''))))[name](...args));}
   const salesHandledAuthError=()=>Object.assign(Error('Bitte erneut anmelden.'),{salesAuthHandled:true});
   function salesRequireLogin(session,text,automatic=true){
     if(session!==salesLoginSession)return salesHandledAuthError();

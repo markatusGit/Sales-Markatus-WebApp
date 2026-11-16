@@ -4,6 +4,13 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.28.3]
+
+- Live nachgewiesenes ausgeschöpftes Firestore-Lesekontingent: Login zeigt verständliche Speicher-/Kontingentmeldung und bleibt bei nicht prüfbarer Freigabe gesperrt.
+- HQ-Trigger bei tatsächlichem HTTP429 oder lokalem Tagesbudget unabhängig von Firestore stoppen. Auch Kontingentfehler während anfänglicher Authentifizierung und Statuslesung abfangen. Checkpoint/Wasserzeichen unangetastet.
+- Autorisierter HQ-Worker erhält ein Pacific-Tagesbudget von 20.000 dokumentbezogenen Lese- und 12.000 Schreibvorgängen. Transport reserviert vor Abruf, verrechnet tatsächliche Query-Ergebnisse und zählt fehlende Lookups sowie Commit-Verifikationen. Kein neuer Idle-Abruf.
+- Neue interne Script Properties SALES_SYNC_BUDGET und SALES_SYNC_HOLD werden automatisch gepflegt; keine manuelle Einrichtung oder zusätzlichen Scopes/Anbieter/Zugriffsrechte. Kontingentpause in Status sichtbar, Fortsetzung nach Tageswechsel ausschließlich manuell.
+
 ## [v0.28.2]
 
 - Als Google45 veröffentlicht; alle 22 Suiten, 25 Auth-/Rechtefälle und Browserlogin bei belegter Geschäftssperre bestanden. Google/Editor/GitHub bestätigt. Echte Wiederanmeldung noch offen.

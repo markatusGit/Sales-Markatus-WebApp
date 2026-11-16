@@ -109,5 +109,27 @@ test('fresh HQ imports preserve pending local changes and projected names',()=>{
  const f=bulkFixture();f.ctx.salesWrite_('sales_companies/102',{company:{id:'102',name:'Synthetic old'},contacts:[],pendingChanges:[{jobId:'synthetic-pending',entity:'company',targetId:102,change:{name:'Synthetic pending name'}}]});
  f.finishBulk();const saved=f.ctx.salesRead_('sales_companies/102');assert.equal(saved.company.name,'Synthetic prospect');assert.equal(saved.pendingChanges.length,1);assert.equal(f.ctx.getSalesLeanCompany(102).company.name,'Synthetic pending name');assert.equal(f.ctx.salesRead_('sales_directory/102').company.name,'Synthetic pending name');
 });
-if(require.main===module){let count=0;for(const c of cases){c.fn();console.log('PASS',c.name);count++;}console.log(count+' bulk/worker checks passed.');}
+if(require.main===module){let count=0;test('quota on initial worker read stops triggers without touching the durable checkpoint',()=>{
+ const f=bulkFixture();f.ctx.startSalesSync();const before=JSON.stringify(f.db);f.ctx.salesRead_=()=>{throw Error('Firestore-Lesezugriff HTTP 429.');};f.worker();assert.equal(f.triggers.length,0);assert.equal(JSON.stringify(f.db),before);assert.equal(JSON.parse(f.props.SALES_SYNC_HOLD).reason,'quota');
+});
+test('quota during worker principal verification is also stopped before any business read',()=>{
+ const f=bulkFixture();f.ctx.startSalesSync();f.ctx.salesAuthEnabled_=()=>true;f.ctx.salesAuthConfig_=()=>({ownerUid:'owner',ownerEmail:'owner@example.invalid'});f.ctx.salesAuthPrincipal_=()=>{const e=Error('Quota');e.salesQuota=true;throw e;};const before=JSON.stringify(f.db);f.worker();assert.equal(f.triggers.length,0);assert.equal(JSON.stringify(f.db),before);
+});
+test('import budget is enforced before reads, stops durably outside Firestore and resumes only manually next day',()=>{
+ const f=bulkFixture(),run=f.ctx.startSalesSync(),read=f.ctx.salesRead_;f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:20000,writes:0});let reached=false;
+ f.ctx.salesRead_=p=>{f.ctx.salesWorkerBudget_(1,0);reached=true;return read(p);};f.worker();assert.equal(reached,false);assert.equal(f.triggers.length,0);assert.equal(JSON.parse(f.props.SALES_SYNC_HOLD).reason,'budget');
+ f.ctx.salesRead_=read;const before=JSON.stringify(f.db),summary=f.ctx.getSalesSyncStatus();assert.equal(summary.paused,true);assert.equal(summary.background,false);assert.equal(JSON.stringify(f.db),before);assert.throws(()=>f.ctx.startSalesSync(),/Tagesbudget/);
+ f.ctx.salesWorkerDay_=()=> 'synthetic-next-day';assert.equal(f.ctx.startSalesSync().id,run.id);assert.equal(f.props.SALES_SYNC_HOLD,'');assert.equal(f.triggers.length,1);
+});
+test('real Firestore transports meter actual query documents, missing lookups and commit verification without metering idle UI',()=>{
+ const f=bulkFixture(),core=fs.readFileSync(__dirname+'/../hq-benchmark/FirebaseSync.gs','utf8');vm.runInContext(core.slice(core.indexOf('function pilotCall_('),core.indexOf('function pilotWriteDocument_(')),f.ctx);
+ const base='https://firestore.googleapis.com/v1/projects/synthetic-project/databases/(default)/documents',reply={getResponseCode:()=>200,getContentText:()=>JSON.stringify([{document:{name:'synthetic-a'}},{document:{name:'synthetic-b'}}])};let requests=0;f.ctx.UrlFetchApp.fetch=()=>{requests++;return reply;};
+ const query={method:'post',payload:JSON.stringify({structuredQuery:{limit:250}})};f.ctx.pilotCall_(base+':runQuery',query);assert.equal(f.props.SALES_SYNC_BUDGET,undefined);
+ vm.runInContext('salesWorkerBudgetActive_=true;',f.ctx);f.ctx.pilotCall_(base+':runQuery',query);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,2);
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>404,getContentText:()=>''});assert.equal(f.ctx.pilotReadDocument_('synthetic-project','sales_test/missing','synthetic'),null);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,3);
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({writeResults:[]})});f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{verify:'synthetic'},{update:{name:'synthetic'}}]})});assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,4);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).writes,1);
+ f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:4,writes:12000});assert.throws(()=>f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{update:{name:'synthetic'}}]})}),/Tagesbudget/);
+});
+
+for(const c of cases){c.fn();console.log('PASS',c.name);count++;}console.log(count+' bulk/worker checks passed.');}
 module.exports={bulkFixture};

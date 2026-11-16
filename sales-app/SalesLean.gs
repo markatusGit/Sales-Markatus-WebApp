@@ -15,8 +15,8 @@ function salesLeanProjection_(path,build){
 function salesLeanFilters_(){return salesLeanProjection_('sales_meta/lean_filters',()=>salesV1Index_().entries.map(e=>salesLeanFilterRow_(e.company)));}
 function salesLeanBookings_(){return salesLeanProjection_('sales_meta/lean_bookings',()=>salesV1Editions_().map(salesLeanBookingRow_));}
 function salesLeanSyncStatus_(){
-  const cached=salesRead_('sales_meta/lean_sync');if(cached)return {...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};
-  return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return summary;});
+  const cached=salesRead_('sales_meta/lean_sync');if(cached){const value={...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(value):value;}
+  return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(summary):summary;});
 }
 function salesLeanFiltersUpdate_(entries){
   const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>salesLeanFilterRow_(e.value.company));

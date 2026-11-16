@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-16-r28.2';
+const SALES_RELEASE = '2026-11-16-r28.3';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -1598,6 +1598,37 @@ function salesDeltaAudit_(run){
 }
 
 /** Temporary Apps Script continuation trigger. Never starts a new/nightly business sync. */
+let salesWorkerBudgetActive_=false;
+function salesWorkerDay_(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function salesWorkerHoldState_(){try{return JSON.parse(salesWorkerProps_().getProperty('SALES_SYNC_HOLD')||'null');}catch{throw Error('Gespeicherte Kontingentpause ungültig. Bitte administrativ prüfen.');}}
+function salesWorkerBudget_(reads,writes){
+  if(!salesWorkerBudgetActive_)return;
+  const p=salesWorkerProps_(),day=salesWorkerDay_();let meter;try{meter=JSON.parse(p.getProperty('SALES_SYNC_BUDGET')||'null');}catch{throw Error('Gespeichertes Importbudget ungültig.');}
+  if(!meter||meter.day!==day)meter={day,reads:0,writes:0};
+  if(!Number.isSafeInteger(meter.reads)||meter.reads<0||!Number.isSafeInteger(meter.writes)||meter.writes<0||!Number.isSafeInteger(reads)||!Number.isSafeInteger(writes))throw Error('Gespeichertes Importbudget ungültig.');
+  const next={day,reads:Math.max(0,meter.reads+reads),writes:Math.max(0,meter.writes+writes)};
+  if(next.reads>20000||next.writes>12000){const e=Error('Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
+  p.setProperty('SALES_SYNC_BUDGET',JSON.stringify(next));
+}
+function salesWorkerRequestBudget_(url,options){
+  if(!salesWorkerBudgetActive_||!/^https:\/\/firestore\.googleapis\.com\//.test(url))return null;
+  const method=String(options?.method||'get').toLowerCase();let body;try{body=JSON.parse(options?.payload||'{}');}catch{throw Error('Importanfrage ohne prüfbares Budget.');}
+  let reads=0,writes=0,query=false;
+  if(url.endsWith(':batchGet'))reads=body.documents.length;
+  else if(url.endsWith(':runQuery')){reads=body.structuredQuery.limit;query=true;}
+  else if(url.endsWith(':commit')){reads=body.writes.filter(w=>w.verify).length;writes=body.writes.filter(w=>w.update||w.delete||w.transform).length;}
+  else if(method==='get'){reads=Number(/[?&]pageSize=(\d+)/.exec(url)?.[1]||1);query=/[?&]pageSize=/.test(url);}
+  else if(['patch','delete'].includes(method))writes=1;
+  else throw Error('Importanfrage ohne prüfbares Budget.');
+  if(!Number.isSafeInteger(reads)||reads<0)throw Error('Import-Lesemenge nicht begrenzt.');
+  salesWorkerBudget_(reads,writes);return {reads,query};
+}
+function salesWorkerLimited_(e){return e.salesQuota||e.salesBudget||/Firestore[^\n]*HTTP 429/.test(e.message||'');}
+function salesWorkerHold_(e){
+  const message=e.salesBudget?'Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.':'Firebase-Kontingent ausgeschöpft. Hintergrundlauf gestoppt; nach Erneuerung des Kontingents manuell fortsetzen.';
+  salesWorkerProps_().setProperty('SALES_SYNC_HOLD',JSON.stringify({day:salesWorkerDay_(),at:salesNow_(),reason:e.salesBudget?'budget':'quota',message}));salesWorkerStop_();
+}
+function salesWorkerStatus_(summary){const hold=salesWorkerHoldState_();return summary?.state==='running'&&hold?{...summary,paused:true,background:false,errors:summary.errors.concat({label:'HQ-Abgleich angehalten · Kontingentschutz',message:hold.message})}:summary;}
 function salesWorkerProps_(){return PropertiesService.getScriptProperties();}
 function setupSalesSyncWorker(){
   const user=salesUser_(true),email=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
@@ -1607,8 +1638,10 @@ function setupSalesSyncWorker(){
   return {message:'Hintergrundfortsetzung freigegeben. Der nächste manuelle HQ-Sync darf ohne offenen Browser weiterlaufen. Kein Nachtlauf eingerichtet.'};
 }
 function salesWorkerEnsure_(){
+  const hold=salesWorkerHoldState_();if(hold?.day===salesWorkerDay_())throw Error(hold.message);
   const p=salesWorkerProps_(),email=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase(),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase();
   if(!email||p.getProperty('SALES_SYNC_EXECUTOR')!==email||p.getProperty('SALES_SYNC_ADMIN')!==admin)throw new Error('Hintergrundlauf noch nicht freigegeben. In Apps Script einmal setupSalesSyncWorker ausführen und Google-Berechtigung bestätigen.');
+  if(hold)p.setProperty('SALES_SYNC_HOLD','');
   const existing=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='salesSyncWorker_'),saved=p.getProperty('SALES_SYNC_TRIGGER');
   const keep=existing.find(t=>t.getUniqueId()===saved);existing.filter(t=>t!==keep).forEach(t=>ScriptApp.deleteTrigger(t));
   if(!keep){const trigger=ScriptApp.newTrigger('salesSyncWorker_').timeBased().everyMinutes(1).create();p.setProperty('SALES_SYNC_TRIGGER',trigger.getUniqueId());}
@@ -1637,13 +1670,15 @@ function salesWorkerPause_(id){
 function salesSyncWorker_(event){
   const p=salesWorkerProps_(),owner=p.getProperty('SALES_SYNC_EXECUTOR'),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase(),allowed=String(p.getProperty('SALES_ALLOWED_EMAILS')||admin).split(',').map(x=>x.trim().toLowerCase());
   if(!event?.triggerUid||String(event.triggerUid)!==p.getProperty('SALES_SYNC_TRIGGER')||String(Session.getEffectiveUser().getEmail()||'').toLowerCase()!==owner||p.getProperty('SALES_SYNC_ADMIN')!==admin||!allowed.includes(admin))throw new Error('Hintergrundauftrag nicht autorisiert.');
+  try{
+  if(salesWorkerHoldState_()){salesWorkerStop_();return;}
   // Only a validated installable trigger may establish this server-only context.
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){const cfg=salesAuthConfig_();salesAuthRequest_={user:salesAuthPrincipal_({uid:cfg.ownerUid,email:cfg.ownerEmail}),worker:true};}
-  try{
   const until=Date.now()+180000;let checked=false;
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
     try{
+      salesWorkerBudgetActive_=true;
       let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){if(run?.engine===2)salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
       if(p.getProperty('SALES_SYNC_PAUSE')===run.id){run.paused=true;run.revision++;run.updatedAt=salesNow_();salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;}
       let writeBoundary=false;try{
@@ -1654,6 +1689,7 @@ function salesSyncWorker_(event){
         if(!checked){salesAssertPrivate_();salesWorkerPrivate_();checked=true;}
         writeBoundary=salesBulkStep_(run);
       }catch(e){
+        if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}
         // Reload the durable checkpoint: an interrupted page may already have an immutable replay journal.
         run=salesRead_('sales_meta/sync');
         if(run&&run.state!=='running'){salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
@@ -1664,7 +1700,7 @@ function salesSyncWorker_(event){
       if(writeBoundary)return;
     }finally{lock.releaseLock();}
   }
-  }finally{if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
+  }catch(e){if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}throw e;}finally{salesWorkerBudgetActive_=false;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
 function salesWorkerPrivate_(){
   const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}
@@ -1687,8 +1723,8 @@ function salesLeanProjection_(path,build){
 function salesLeanFilters_(){return salesLeanProjection_('sales_meta/lean_filters',()=>salesV1Index_().entries.map(e=>salesLeanFilterRow_(e.company)));}
 function salesLeanBookings_(){return salesLeanProjection_('sales_meta/lean_bookings',()=>salesV1Editions_().map(salesLeanBookingRow_));}
 function salesLeanSyncStatus_(){
-  const cached=salesRead_('sales_meta/lean_sync');if(cached)return {...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};
-  return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return summary;});
+  const cached=salesRead_('sales_meta/lean_sync');if(cached){const value={...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(value):value;}
+  return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(summary):summary;});
 }
 function salesLeanFiltersUpdate_(entries){
   const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>salesLeanFilterRow_(e.value.company));
@@ -2630,7 +2666,7 @@ function salesAuthEmail_(value){value=String(value||'').trim().toLowerCase();if(
 function salesAuthDocument_(kind,id){if(!['users','sessions','attempts','invites','emails','audit'].includes(kind)||!/^[-\w]{1,128}$/.test(id))throw Error('Ungültiger Auth-Datenpfad.');return 'sales_auth'+kind+'/'+id;}
 function salesAuthRead_(kind,id){
   const c=salesContext_(),path=salesAuthDocument_(kind,id),r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',headers:{Authorization:'Bearer '+c.token},muteHttpExceptions:true});
-  if(r.getResponseCode()===404)return null;if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
+  if(r.getResponseCode()===404)return null;if(r.getResponseCode()===429){const e=Error('Der Firebase-Datenspeicher hat sein Kontingent erreicht. Bitte später erneut versuchen. Erneutes Anmelden behebt dies nicht.');e.salesQuota=true;throw e;}if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
   const doc=JSON.parse(r.getContentText());return {...JSON.parse(doc.fields.payload.stringValue),_path:path,_updateTime:doc.updateTime};
 }
 function salesAuthCommit_(entries,checks=[]){
