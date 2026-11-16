@@ -6,6 +6,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [v0.28.1]
 
+- Google44 und GitHub-Tag/main bestätigt; alle 22 Suiten bestanden. Vorhandenen Lauf live fortgesetzt; tatsächlicher Abschluss noch offen.
+
 - HQ-Filterzeit auf volle UTC-Sekunden begrenzt: echter Gegenversuch bestätigt die Ursache des HTTP400. Grenzsekunde sicher überlappend lesen und validieren; pausierten Lauf ohne Vollimport oder erneute alte Schreibaufträge fortsetzen.
 - HQ-Firmenarten aus GET-id in Rückprüfung, Projektion und Typeneditor normalisieren; ungültige/widersprüchliche IDs abweisen.
 - Auftragsübersicht mit gespeicherten HQ-Firmen repariert; neuer Administrator-Lesetest verändert weder Aufträge noch Sperren. Gezielte Regressionen ergänzt.

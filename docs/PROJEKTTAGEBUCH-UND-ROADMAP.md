@@ -1485,3 +1485,10 @@ Reine Auftragsprüfung liest höchstens gespeicherte HQ-Ziele; fehlende ID bleib
 ### Veröffentlichung v0.28.1
 
 Veröffentlichung v0.28.1: Apps-Script-Version 44, bestehende Bereitstellung beibehalten. Quellcommit 6b40869481c638b3497271c3893d1d8816ced36a. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-16T14:47:08.109Z.
+
+
+### Veröffentlichungsnachweis und Wiederaufnahme r28.1
+
+**Veröffentlicht am 16.11.2026 – r28.1/v0.28.1/Google44:** HQ-Datumsfilter mit vollen UTC-Sekunden korrigiert, Adressänderungen weiterhin enthalten. Alle 22 Suiten einschließlich 20 Delta-, 15 Firmen-, 20 Auth-/Rechtefälle und erweitertem Browser bestanden. Feste Google-Version, Editor und GitHub-Tag/main auch im Originalprojekt verglichen. Bestehender Live-Lauf um 15:47 Uhr bei gespeichertem Stand 19/32 fortgesetzt; Google-Start bestätigt, keine Wiederholung der vorherigen Schreibabschnitte. Tatsächlicher Abschluss und nur lesende Legacy-Auftragsprüfung noch in Arbeit. Neue Oberfläche nach Reload noch ohne Benutzeranmeldung; Hintergrundlauf davon unabhängig. Keine neuen Script Properties, Scopes, Provider oder Zugriffs-/Ausführungseinstellungen.
+
+Quellcommit 6b40869, Releasecommit/Tag 1c67044. Arbeitsschritt ohne fremde START-HIER-/Zusatzdokumente veröffentlicht. Status vor Fortsetzung unverändert 19/32, danach gespeicherte Pause entfernt und Läuft bei Google angezeigt. 17 frühere Schreibmeldungen bleiben ausdrücklich offen; technische Filterpausenmeldung entfällt nach Fortsetzen. Keine unsichere Anlage entsperrt, kein HQ-Auftrag durch die Prüfung neu angelegt.
