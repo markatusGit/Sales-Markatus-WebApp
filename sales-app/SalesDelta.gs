@@ -46,6 +46,38 @@ function salesDeltaRecent_(entity,row,since){
   const values=[row.updatedOn,row.createdOn];if(entity==='Companies')values.push(row.defaultAddress?.updatedOn,...(row.addresses||[]).map(a=>a.updatedOn));
   return values.some(x=>Number.isFinite(Date.parse(x))&&Date.parse(x)>=Date.parse(since));
 }
+/** Owner-only, bounded GET probes for an already paused filter failure. Never changes the run. */
+function salesDeltaDiagnosticStatus_(summary,admin){
+  if(!admin||!summary?.paused||!summary.errors?.some(e=>/Unternehmen: HQ hat den Änderungsfilter abgelehnt/.test(e.message||'')))return summary;
+  const cache=CacheService.getScriptCache(),key='sales-filter-diagnostic-'+summary.id+'-'+summary.revision;
+  let result;try{result=JSON.parse(cache.get(key)||'null');}catch{}
+  if(!Array.isArray(result)){
+    const run=salesRead_('sales_meta/sync'),task=run?.tasks?.[run.cursor],since=run?.entities?.Companies?.since;
+    if(run?.id!==summary.id||!run.paused||task?.kind!=='bulkRead'||task.id!=='Companies'||!Number.isFinite(Date.parse(since)))return summary;
+    result=salesDeltaFilterProbes_(since,run.entities.Companies.lastId||0);try{cache.put(key,JSON.stringify(result),1800);}catch{}
+  }
+  return {...summary,errors:summary.errors.concat({label:'HQ-Filterdiagnose · nur lesend',message:result.join(' · ')})};
+}
+function salesDeltaFilterProbes_(since,lastId){
+  const date="datetime'"+new Date(since).toISOString()+"'",floor=new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const probes=[['Gesamtfilter',salesDeltaFilter_('Companies',since)],['Nur Datumsfelder','(updatedOn ge '+date+' or createdOn ge '+date+')'],['Nur updatedOn','updatedOn ge '+date],['Nur createdOn','createdOn ge '+date],['Standardadresse','defaultAddress/updatedOn ge '+date],['Adressliste','addresses/any(a: a/updatedOn ge '+date+')'],['Ohne Millisekunden',salesDeltaFilter_('Companies',floor)]];
+  const token=revenueToken_(),out=[],until=Date.now()+20000;
+  for(const [label,filter] of probes){
+    if(Date.now()>=until){out.push('Weitere Prüfungen wegen Zeitgrenze ausgelassen');break;}
+    const query=(lastId?'id gt '+salesId_(lastId)+' and ':'')+filter;
+    try{
+      const response=UrlFetchApp.fetch('https://api.hellohq.io/v2/Companies?$top=1&$skip=0&orderby=id&$filter='+encodeURIComponent(query)+'&expand='+encodeURIComponent(SALES_BULK_EXPAND.Companies),{method:'get',headers:{Authorization:'Bearer '+token,Accept:'application/json'},muteHttpExceptions:true,followRedirects:false});
+      const code=response.getResponseCode();let text='';
+      if(code!==200){let body;try{body=JSON.parse(response.getContentText());}catch{}text=salesDeltaSafeDiagnostic_(body?.message||body?.Message||body?.error?.message||body?.title||'Kein auswertbarer HQ-Fehlerhinweis',token);}
+      out.push(label+': HTTP '+code+(text?' – '+text:''));
+      if(code!==200&&code!==400)break;
+    }catch(e){out.push(label+': '+salesDeltaSafeDiagnostic_(e.message,token));break;}
+  }
+  return out;
+}
+function salesDeltaSafeDiagnostic_(value,token){
+  return String(value).split(token).join('[Zugangsdaten entfernt]').replace(/https?:\/\/\S+/g,'[URL entfernt]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g,'[E-Mail entfernt]').replace(/[\x00-\x1F\x7F]/g,' ').slice(0,450);
+}
 function salesDeltaRecord_(run,entity,row,prior,entries){
   const m=run.entities[entity],path=salesBulkCollection_(entity)+'/'+row.id;
   const exists=prior&&prior.generation===m.generation,changed=!exists||JSON.stringify(prior.row)!==JSON.stringify(row);

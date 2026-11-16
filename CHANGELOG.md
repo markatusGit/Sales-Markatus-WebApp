@@ -4,6 +4,12 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.28.0]
+
+- Diagnosestufe für den ausdrücklich beauftragten HQ-Sync-Fix: Nur bei manuell abgefragter Unternehmens-Filterpause und nur für Administratoren maximal sieben gefilterte GET-Probes mit je top=1. Fehlertext begrenzt und Zugangsdaten entfernt, Ergebnis 30 Minuten im Script Cache. Keine HQ-/Firebase-Schreibvorgänge, keine Cursor-/Triggeränderung oder unfiltrierter Ersatzabruf. Normale Statusabfrage bleibt unverändert schlank.
+- Abschnittszähler nennt bearbeitete statt vermeintlich erfolgreiche Abschnitte. Diagnose wird nur der angezeigten Antwort angefügt, nicht als neuer Lauf-/Auftragsfehler gespeichert. Filterkorrektur folgt nach echter Diagnose.
+- 19 Delta-/Wiederaufnahmefälle, 20 Auth-/Rechtefälle und elf Performancefälle erfolgreich; neue Diagnosefälle bestätigen GET-only, Begrenzung, Caching, Redaktion und unveränderten Datenbestand. Vollständige Releaseprüfung folgt. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 - Dokumentation 16.11.2026: HQ-Abgleich zunächst 0/32, danach laut Nutzer 19/32 mit 18 Meldungen und Filterpause. Blockierender abgelehnter Änderungsfilter und getrennte unsichere Schreibaufträge eingeordnet. Missverständliche Erfolgszählung als offener Punkt erfasst. Konkrete Filterursache/Korrektur noch offen; kein Code-/Trigger-/Konfigurationswechsel.
 
 ## [v0.27.3]

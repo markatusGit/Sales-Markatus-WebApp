@@ -27,7 +27,7 @@ function salesBulkStart_(){
   });
 }
 function getSalesSyncStatus(){
-  salesUser_();return salesLeanSyncStatus_();
+  const user=salesUser_();return salesDeltaDiagnosticStatus_(salesLeanSyncStatus_(),user.admin);
 }
 function salesWorkerPause_(id){
   const run=salesRead_('sales_meta/sync');if(!run||run.id!==id)throw new Error('HQ-Sync nicht gefunden.');

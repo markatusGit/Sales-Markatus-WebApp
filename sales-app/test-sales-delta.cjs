@@ -24,6 +24,20 @@ test('nested company address update and silent contact address update are preser
 test('failed nested filter never retries with an unfiltered query or advances metadata',()=>{
  const f=bulkFixture();f.finishBulk();const metadata=JSON.stringify(f.db['sales_meta/bulk']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(decodeURIComponent(p).includes('addresses/any'))throw Error('HQ-Lesetest: HTTP 400');return get(p);};f.ctx.startSalesSync();f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.match(f.db['sales_meta/sync'].blockedMessage,/Kein Gesamtimport/);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),metadata);
 });
+test('paused company filter diagnosis is bounded, read-only, cached and removes credentials',()=>{
+ const f=bulkFixture();f.finishBulk();const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(decodeURIComponent(p).includes('addresses/any'))throw Error('HQ-Lesetest: HTTP 400');return get(p);};f.ctx.startSalesSync();f.worker();
+ const before=JSON.stringify(f.db),cache=new Map(),requests=[];f.ctx.CacheService={getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})};f.ctx.revenueToken_=()=> 'synthetic-private-token';
+ f.ctx.UrlFetchApp.fetch=(url,opt)=>{requests.push({url,opt});assert.equal(opt.method,'get');assert.equal(opt.followRedirects,false);const query=new URL(url).searchParams;assert.equal(query.get('$top'),'1');assert.ok(query.get('$filter').includes('datetime'));return {getResponseCode:()=>400,getContentText:()=>JSON.stringify({message:'Cannot filter addresses; synthetic-private-token test@example.invalid https://private.invalid/token'})};};
+ const status=f.ctx.getSalesSyncStatus();assert.equal(requests.length,7);assert.equal(status.errors.length,f.db['sales_meta/lean_sync'].errors.length+1);assert.ok(!JSON.stringify(status).includes('synthetic-private-token'));assert.ok(!JSON.stringify(status).includes('test@example.invalid'));assert.equal(JSON.stringify(f.db),before);
+ f.ctx.getSalesSyncStatus();assert.equal(requests.length,7,'Repeated manual status uses the cached diagnostic');assert.equal(JSON.stringify(f.db),before);
+});
+test('normal status and nonadministrator status never issue filter probes',()=>{
+ const f=bulkFixture();f.finishBulk();f.ctx.UrlFetchApp.fetch=()=>{throw Error('Diagnostic not allowed');};f.ctx.getSalesSyncStatus();
+ const summary={paused:true,id:'synthetic',revision:1,errors:[{message:'Unternehmen: HQ hat den Änderungsfilter abgelehnt'}]};assert.equal(f.ctx.salesDeltaDiagnosticStatus_(summary,false),summary);
+});
+test('filter diagnosis stops after authentication or server failure instead of retrying',()=>{
+ const f=bulkFixture();let requests=0;f.ctx.revenueToken_=()=> 'synthetic-private-token';f.ctx.UrlFetchApp.fetch=(_,opt)=>{requests++;assert.equal(opt.method,'get');return {getResponseCode:()=>401,getContentText:()=>'{"message":"Not authorized"}'};};const out=f.ctx.salesDeltaFilterProbes_('2026-01-01T00:00:00.123Z',0);assert.equal(requests,1);assert.equal(out.length,1);assert.match(out[0],/HTTP 401/);
+});
 test('edition-only run uses cached invoices and neither executes jobs nor changes cursors',()=>{
  const f=bulkFixture();f.remote.Projects[570]={id:570,companyId:102,number:'P70',name:'Synthetic magazine #70',updatedOn:'2026-01-01'};f.doc(70,1);f.remote.Documents[1].updatedOn='2026-01-01';f.finishBulk();
  const e=f.ctx.saveSalesEditionConfig({magazine:'Synthetic magazine',issue:70,projectId:570}).id;
