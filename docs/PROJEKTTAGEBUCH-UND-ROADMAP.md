@@ -1502,3 +1502,10 @@ Der r28.1-Lauf war live als gestartet bestätigt, sein tatsächlicher Abschluss 
 
 
 Veröffentlichung v0.28.2: Apps-Script-Version 45, bestehende Bereitstellung beibehalten. Quellcommit bfede8abf29d01a7c37b8b6212d45d1b8b7c9b44. Alle 22 Prüfsuiten einschließlich 25 Auth-/Rechtefällen und Browserlogin mit blockiertem Geschäftslock bestanden. Nach verzögerter Google-Versionsanzeige feste Version45 und Editor lesend mit denselben Quelldateien verglichen; kein erneuter Upload und keine weitere Version erzeugt. Keine neuen Script Properties oder Zugriffs-/Ausführungseinstellungen. Echte erneute Benutzeranmeldung und HQ-Laufabschluss weiterhin offen. Zeitpunkt: 2026-11-16T15:09:51.599Z.
+
+
+### Veröffentlichungsabschluss r28.2
+
+**Veröffentlicht am 16.11.2026 – r28.2/v0.28.2/Google45:** Anmeldung und Tokenverlängerung beanspruchen keine globale Geschäftssperre mehr. Alle 22 Suiten einschließlich 25 Auth-/Rechtefällen und echtem Browserablauf mit blockiertem Geschäftslock bestanden. Nach verzögerter Google-Versionsanzeige Version45/Editor bytegenau verglichen; bestehende Bereitstellung und Zugangseinstellungen erhalten. GitHub-Tag/main bestätigt. Quellcommit bfede8a, Releasecommit c6a6c59. Keine neuen Script Properties oder einzurichtenden Dienste. Erneuter Benutzerlogin nach veröffentlichter Korrektur angefordert; echte Anmeldung, HQ-Abschluss und Legacy-Auftragsprüfung bleiben offen.
+
+Anfangsprüfung unmittelbar nach Deploy zeigte noch Version44, pending.json hielt deployment-updated/45 fest. Danach bestehende Bereitstellung lesend als Version45 erkannt. Feste Version45 und Editor gegen die bereits geprüften Fingerabdrücke verglichen; fehlenden Veröffentlichungsnachweis anhand dieses gesicherten Zwischenstands ergänzt und release:recover ohne weiteren Google-Upload ausgeführt. GitHub-Tag und main durch release:verify bestätigt. Kein Downgrade, keine zusätzliche Ersatzbereitstellung und keine erneute Version erzeugt. Neue Oberfläche im IAB geladen; Nutzer zum erneuten Login eingeladen. Kein erneuter Anmeldefehler oder Erfolg bisher live festgestellt. Fremde Dokumentdateien erhalten.
