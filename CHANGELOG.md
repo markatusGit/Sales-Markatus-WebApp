@@ -203,3 +203,5 @@ Veröffentlichungsnachweis für v0.28.1: Google-Version 44; 2026-11-16T14:47:08.
 
 
 Veröffentlichung v0.28.2: Apps-Script-Version 45, bestehende Bereitstellung beibehalten. Quellcommit bfede8abf29d01a7c37b8b6212d45d1b8b7c9b44. Alle 22 Prüfsuiten einschließlich 25 Auth-/Rechtefällen und Browserlogin mit blockiertem Geschäftslock bestanden. Nach verzögerter Google-Versionsanzeige feste Version45 und Editor lesend mit denselben Quelldateien verglichen; kein erneuter Upload und keine weitere Version erzeugt. Keine neuen Script Properties oder Zugriffs-/Ausführungseinstellungen. Echte erneute Benutzeranmeldung und HQ-Laufabschluss weiterhin offen. Zeitpunkt: 2026-11-16T15:09:51.599Z.
+
+Veröffentlichungsnachweis für v0.28.3: Google-Version 46; 2026-11-16T15:27:06.964Z. Details in deployment.json.
