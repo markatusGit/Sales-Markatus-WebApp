@@ -4,6 +4,12 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.28.2]
+
+- Anmeldung und Tokenverlängerung vom langen HQ-Script-Lock getrennt; Schutz über atomare Firestore-Versionsbedingungen erhalten. Globale Anmeldequote bleibt 30/min und wird ohne Geschäftssperre atomar gespeichert.
+- Nebenläufige Verlängerung übernimmt nur bestätigte aktive Sitzungen; verbrauchte Anmeldeanfragen, geänderte Rechte und Logout können nicht überschrieben werden. Browser prüft Login/Wiederanmeldung bei dauerhaft blockiertem Geschäftslock.
+- Keine neuen Script Properties oder Bereitstellungseinstellungen. Veröffentlichung und echter Login noch offen.
+
 ## [v0.28.1]
 
 - Google44 und GitHub-Tag/main bestätigt; alle 22 Suiten bestanden. Vorhandenen Lauf live fortgesetzt; tatsächlicher Abschluss noch offen.

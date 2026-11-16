@@ -64,9 +64,40 @@ if(require.main===module){
  });
  test('outdated client receives update notice without auth database accesses or business reads',()=>{const f=authFixture(),response=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge:'c'.repeat(43),state:'s'.repeat(40),release:'old'});assert.equal(response.reloadRequired,true);assert.equal(f.ctx.finishSalesLogin({release:'old'}).reloadRequired,true);assert.equal(f.calls.length,0);});
  test('token refresh after one hour preserves the original server session deadline',()=>{
-  const f=authFixture();f.user();const authTime=Math.floor(Date.now()/1000)-3601,refreshed=f.token('reader',{auth_time:authTime}),expired=f.token('reader',{auth_time:authTime,exp:Math.floor(Date.now()/1000)-1}),deadline=Date.now()+7*3600000,session=f.session('reader',{idToken:expired,tokenExpiresAt:Date.now()-1,expiresAt:deadline}),fetch=f.ctx.UrlFetchApp.fetch;
+  const f=authFixture();f.ctx.LockService.getScriptLock=()=>{throw Error('HQ owns the script lock');};f.user();const authTime=Math.floor(Date.now()/1000)-3601,refreshed=f.token('reader',{auth_time:authTime}),expired=f.token('reader',{auth_time:authTime,exp:Math.floor(Date.now()/1000)-1}),deadline=Date.now()+7*3600000,session=f.session('reader',{idToken:expired,tokenExpiresAt:Date.now()-1,expiresAt:deadline}),fetch=f.ctx.UrlFetchApp.fetch;
   f.ctx.UrlFetchApp.fetch=(url,opt)=>url.startsWith('https://securetoken.googleapis.com/')?{getResponseCode:()=>200,getContentText:()=>JSON.stringify({user_id:'reader',project_id:'539269099884',id_token:refreshed,refresh_token:'n'.repeat(50),expires_in:'3600'})}:fetch(url,opt);
   assert.equal(f.ctx.salesAuthVerify_(session).uid,'reader');assert.equal(f.ctx.salesAuthRead_('sessions',f.ctx.salesAuthHash_(session)).expiresAt,deadline);
+ });
+ test('login succeeds while HQ owns the global lock and still consumes each attempt once',()=>{
+  const f=authFixture();f.user();f.ctx.LockService.getScriptLock=()=>{throw Error('HQ owns the script lock');};const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url');
+  const begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state}),input={attempt:begin.attempt,verifier,state,idToken:f.token(),refreshToken:'r'.repeat(50)};
+  const result=f.ctx.finishSalesLogin(input);assert.equal(result.user.uid,'reader');assert.equal(f.ctx.salesAuthVerify_(result.session).uid,'reader');assert.throws(()=>f.ctx.finishSalesLogin(input),/ungültig|abgelaufen/);
+ });
+ test('global login quota uses compare-and-set and retries only bounded storage conflicts',()=>{
+  const f=authFixture(),commit=f.ctx.salesAuthCommit_;let clash=true;f.ctx.salesAuthCommit_=(entries,...rest)=>{if(clash){clash=false;f.put('attempts',entries[0].id,{count:1});throw Error('Firestore HTTP 409');}return commit(entries,...rest);};
+  f.ctx.salesAuthThrottle_('begin',2);const path=[...f.db.keys()].find(k=>k.includes('/rate-begin-'));assert.equal(JSON.parse(f.db.get(path).fields.payload.stringValue).count,2);assert.throws(()=>f.ctx.salesAuthThrottle_('begin',2),/Zu viele/);
+  let tries=0;f.ctx.salesAuthCommit_=()=>{tries++;throw Error('Firestore HTTP 412');};assert.throws(()=>f.ctx.salesAuthThrottle_('finish',30),/gleichzeitige/);assert.equal(tries,3);
+ });
+ test('concurrent session refresh adopts the committed winner and never revives logout',()=>{
+  for(const disabled of [false,true]){
+   const f=authFixture();f.user();const session=f.session('reader',{tokenExpiresAt:0}),id=f.ctx.salesAuthHash_(session),deadline=f.ctx.salesAuthRead_('sessions',id).expiresAt,refreshed=f.token(),fetch=f.ctx.UrlFetchApp.fetch,commit=f.ctx.salesAuthCommit_;
+   f.ctx.UrlFetchApp.fetch=(url,opt)=>url.startsWith('https://securetoken.googleapis.com/')?{getResponseCode:()=>200,getContentText:()=>JSON.stringify({user_id:'reader',project_id:'sales-markatus',id_token:refreshed,refresh_token:'n'.repeat(50),expires_in:3600})}:fetch(url,opt);
+   f.ctx.salesAuthCommit_=(entries,...rest)=>{if(entries[0].kind==='sessions'){const current=f.ctx.salesAuthRead_('sessions',id);f.put('sessions',id,{...current,idToken:refreshed,disabled,tokenExpiresAt:Date.now()+3600000});throw Error('Firestore HTTP 409');}return commit(entries,...rest);};
+   if(disabled)assert.throws(()=>f.ctx.salesAuthVerify_(session),/AUTH_REQUIRED/);else assert.equal(f.ctx.salesAuthVerify_(session).uid,'reader');assert.equal(f.ctx.salesAuthRead_('sessions',id).expiresAt,deadline);
+  }
+ });
+ test('concurrent login cannot reuse a consumed attempt or bypass an ACL change',()=>{
+  for(const changed of ['attempt','acl']){
+   const f=authFixture();f.user();const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state}),commit=f.ctx.salesAuthCommit_;
+   f.ctx.salesAuthCommit_=(entries,...rest)=>{if(entries.some(e=>e.kind==='sessions')){if(changed==='attempt')f.put('attempts',f.ctx.salesAuthHash_(begin.attempt),{used:true});else f.user('reader',{},'disabled');}return commit(entries,...rest);};
+   assert.throws(()=>f.ctx.finishSalesLogin({attempt:begin.attempt,verifier,state,idToken:f.token(),refreshToken:'r'.repeat(50)}),/Precondition/);assert.ok(![...f.db.keys()].some(k=>k.startsWith('sales_authsessions/')));
+  }
+ });
+ test('quota retries structured Firestore precondition errors but never unrelated bad requests',()=>{
+  for(const status of ['FAILED_PRECONDITION','INVALID_ARGUMENT']){
+   const f=authFixture(),fetch=f.ctx.UrlFetchApp.fetch;let commits=0;f.ctx.UrlFetchApp.fetch=(url,opt)=>{if(url.endsWith(':commit')&&commits++===0)return {getResponseCode:()=>400,getContentText:()=>JSON.stringify({error:{status,message:'private diagnostic'}})};return fetch(url,opt);};
+   if(status==='FAILED_PRECONDITION'){f.ctx.salesAuthThrottle_('begin',30);assert.equal(commits,2);}else {assert.throws(()=>f.ctx.salesAuthThrottle_('begin',30),/Auth-Speicher HTTP 400/);assert.equal(commits,1);}
+  }
  });
  test('private bootstrap binds only the existing Google owner and activation requires that verified session',()=>{
   const f=authFixture({legacy:true});delete f.props.SALES_AUTH_OWNER_UID;f.db.delete('sales_authusers/owner');

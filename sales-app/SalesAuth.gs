@@ -23,7 +23,9 @@ function salesAuthCommit_(entries,checks=[]){
   const c=salesContext_(),base='projects/'+c.project+'/databases/(default)/documents/';
   const writes=checks.map(d=>({verify:base+d._path,currentDocument:{updateTime:d._updateTime}}));
   for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)}}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
-  return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes})});
+  const response=UrlFetchApp.fetch(pilotUrl_(c.project,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes}),muteHttpExceptions:true,followRedirects:false});
+  const code=response.getResponseCode();if(code<200||code>=300){let body;try{body=JSON.parse(response.getContentText());}catch{}const error=Error('Auth-Speicher HTTP '+code+'. Bitte erneut versuchen.');error.firestoreStatus=body?.error?.status;throw error;}
+  return response.getContentText()?JSON.parse(response.getContentText()):null;
 }
 function salesAuthIdentity_(idToken){
   const cfg=salesAuthConfig_();if(typeof idToken!=='string'||idToken.length>10000)throw Error('AUTH_REQUIRED: Ungültige Anmeldung.');
@@ -44,13 +46,15 @@ function salesAuthPrincipal_(identity,record=salesAuthRead_('users',identity.uid
 function salesAuthVerify_(session){
   const id=salesAuthHash_(salesAuthKey_(session));let entry=salesAuthRead_('sessions',id);
   if(!entry||entry.expiresAt<=Date.now()||entry.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');
-  if(entry.tokenExpiresAt<Date.now()+60000)entry=salesLock_(()=>{
+  if(entry.tokenExpiresAt<Date.now()+60000)entry=(()=>{
     const current=salesAuthRead_('sessions',id);if(!current||current.expiresAt<=Date.now()||current.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet.');if(current.tokenExpiresAt>=Date.now()+60000)return current;
     const r=UrlFetchApp.fetch('https://securetoken.googleapis.com/v1/token?key='+salesAuthConfig_().apiKey,{method:'post',contentType:'application/x-www-form-urlencoded',payload:'grant_type=refresh_token&refresh_token='+encodeURIComponent(current.refreshToken),muteHttpExceptions:true});
     if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Bitte erneut anmelden.');const refreshed=JSON.parse(r.getContentText());
     if(refreshed.user_id!==current.uid||![salesAuthConfig_().project,'539269099884'].includes(refreshed.project_id))throw Error('AUTH_REQUIRED: Anmeldung passt nicht zum Projekt.');
-    const updated={...current,idToken:refreshed.id_token,refreshToken:refreshed.refresh_token,tokenExpiresAt:Date.now()+Number(refreshed.expires_in)*1000};salesAuthCommit_([{kind:'sessions',id,value:updated,prior:current}]);return updated;
-  });
+    const updated={...current,idToken:refreshed.id_token,refreshToken:refreshed.refresh_token,tokenExpiresAt:Date.now()+Number(refreshed.expires_in)*1000};
+    try{salesAuthCommit_([{kind:'sessions',id,value:updated,prior:current}]);return updated;}
+    catch(e){if(!salesAuthConflict_(e))throw e;const winner=salesAuthRead_('sessions',id);if(!winner||winner.disabled||winner.expiresAt<=Date.now()||!(winner.tokenExpiresAt>=Date.now()+60000))throw Error('AUTH_REQUIRED: Sitzung wurde gleichzeitig geändert. Bitte erneut anmelden.');return winner;}
+  })();
   const identity=salesAuthIdentity_(entry.idToken);if(identity.uid!==entry.uid||identity.email!==entry.email)throw Error('AUTH_REQUIRED: Konto wurde geändert.');
   const user=salesAuthPrincipal_(identity);if(user.record.sessionEpoch!==entry.sessionEpoch)throw Error('AUTH_REQUIRED: Sitzung wurde gesperrt.');return user;
 }
@@ -64,28 +68,35 @@ function beginSalesLogin(input){
   salesAuthThrottle_('begin',30);
   const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
 }
+function salesAuthConflict_(error){return ['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(error.firestoreStatus)||/\bHTTP (?:409|412)\b/.test(error.message||'');}
 function salesAuthThrottle_(key,limit){
-  salesLock_(()=>{const cache=CacheService.getScriptCache(),slot='sales-auth-'+key+'-'+Math.floor(Date.now()/60000),count=Number(cache.get(slot)||0);if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');cache.put(slot,String(count+1),120);});
+  // Atomic global quota guard is independent of the long business/worker script lock.
+  const minute=Math.floor(Date.now()/60000),id='rate-'+key+'-'+minute;
+  for(let retry=0;retry<3;retry++){
+    const prior=salesAuthRead_('attempts',id),count=prior?.count||0;
+    if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');
+    try{salesAuthCommit_([{kind:'attempts',id,prior,create:!prior,value:{count:count+1,expiresAt:(minute+2)*60000}}]);return;}
+    catch(e){if(!salesAuthConflict_(e))throw e;}
+  }
+  throw Error('AUTH_REQUIRED: Viele gleichzeitige Anmeldungen. Bitte gleich erneut versuchen.');
 }
 function finishSalesLogin(input){
   if(input?.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
   salesAuthThrottle_('finish',30);
   const identity=salesAuthIdentity_(input?.idToken),hash=salesAuthHash_(salesAuthKey_(input?.attempt));
-  return salesLock_(()=>{
-    const attempt=salesAuthRead_('attempts',hash),verifier=salesAuthKey_(input?.verifier),challenge=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,verifier)).replace(/=+$/,'');
-    if(!attempt||attempt.used||attempt.expiresAt<=Date.now()||attempt.state!==input.state||attempt.challenge!==challenge||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||Date.now()/1000-identity.authTime>300||identity.authTime>Date.now()/1000+60)throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
-    if(!salesAuthEnabled_()){
-      const legacy=salesUser_(true);if(identity.email!==legacy.email)throw Error('AUTH_DENIED: Bitte mit dem bisherigen Administratorkonto anmelden.');
-      if(salesAuthConfig_().ownerUid&&salesAuthConfig_().ownerUid!==identity.uid)throw Error('AUTH_DENIED: Administrator bereits gebunden.');
-      if(!salesAuthRead_('users',identity.uid))salesAuthCommit_([{kind:'users',id:identity.uid,create:true,value:{uid:identity.uid,email:identity.email,status:'active',permissions:salesPermissions_({},true),revision:1,sessionEpoch:0,createdAt:salesNow_()}}]);
-      PropertiesService.getScriptProperties().setProperty('SALES_AUTH_OWNER_UID',identity.uid);
-    }
-    let record=salesAuthRead_('users',identity.uid);
-    // A previously activated account signs in with its current ACL, not its old invitation.
-    if(!record&&input.invitation){salesAuthActivate_(input.invitation,identity);record=salesAuthRead_('users',identity.uid);}
-    const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_(),expiresAt=Date.now()+8*3600000;
-    salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,expiresAt,user:salesAuthPublicUser_(user)};
-  });
+  const attempt=salesAuthRead_('attempts',hash),verifier=salesAuthKey_(input?.verifier),challenge=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,verifier)).replace(/=+$/,'');
+  if(!attempt||attempt.used||attempt.expiresAt<=Date.now()||attempt.state!==input.state||attempt.challenge!==challenge||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||Date.now()/1000-identity.authTime>300||identity.authTime>Date.now()/1000+60)throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
+  if(!salesAuthEnabled_()){
+    const legacy=salesUser_(true);if(identity.email!==legacy.email)throw Error('AUTH_DENIED: Bitte mit dem bisherigen Administratorkonto anmelden.');
+    if(salesAuthConfig_().ownerUid&&salesAuthConfig_().ownerUid!==identity.uid)throw Error('AUTH_DENIED: Administrator bereits gebunden.');
+    if(!salesAuthRead_('users',identity.uid))salesAuthCommit_([{kind:'users',id:identity.uid,create:true,value:{uid:identity.uid,email:identity.email,status:'active',permissions:salesPermissions_({},true),revision:1,sessionEpoch:0,createdAt:salesNow_()}}]);
+    PropertiesService.getScriptProperties().setProperty('SALES_AUTH_OWNER_UID',identity.uid);
+  }
+  let record=salesAuthRead_('users',identity.uid);
+  // A previously activated account signs in with its current ACL, not its old invitation.
+  if(!record&&input.invitation){salesAuthActivate_(input.invitation,identity);record=salesAuthRead_('users',identity.uid);}
+  const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_(),expiresAt=Date.now()+8*3600000;
+  salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,expiresAt,user:salesAuthPublicUser_(user)};
 }
 function salesAuthPublicUser_(user){return {uid:user.uid,email:user.email,admin:user.admin,permissions:user.permissions,revision:user.revision};}
 function salesAuthActivate_(token,identity){
