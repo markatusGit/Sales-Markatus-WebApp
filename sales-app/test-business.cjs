@@ -16,7 +16,7 @@ function edit(f,entity,change,targetId=entity==='contact'?202:entity==='address'
 if(require.main===module){
 test('all production RPCs authenticate before accessing customer or HQ data',()=>{
  const f=productionFixture();f.setEmail('outsider@example.invalid');const n=f.calls.length;
- for(const name of ['saveSalesCompany','getSalesEditor','saveSalesEntityChange','bindSalesCompanyResult'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+ for(const name of ['saveSalesCompany','getSalesEditor','saveSalesEntityChange','bindSalesCompanyResult','getSalesJobInspection'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
  assert.equal(f.calls.length,n);
 });
 test('ordinary imported customer captures each communication type without creation jobs or immediate HQ writes',()=>{
@@ -86,6 +86,25 @@ test('new ordinary company sends no marker and a lost POST cannot auto-adopt a n
  assert.equal(f.calls.filter(c=>c.path==='/v2/Companies'&&c.method==='post').at(-1).body.description,'Synthetic ordinary description');assert.equal(f.db['sales_drafts/'+r.id].testOnly,undefined);
  assert.throws(()=>f.ctx.reconcileSalesJob(r.id),/gesperrt/);f.remote.Companies[999]={...f.remote.Companies[101],id:999,name:'Synthetic different'};assert.throws(()=>f.ctx.bindSalesCompanyResult(r.id,999),/stimmt/);
  const before=f.calls.filter(c=>c.path==='/v2/Companies'&&c.method==='post').length;f.ctx.bindSalesCompanyResult(r.id,101);f.ctx.runSalesJob(r.id,'company');assert.equal(f.calls.filter(c=>c.path==='/v2/Companies'&&c.method==='post').length,before);
+});
+test('HQ id-shaped company types normalize at read boundary and ambiguous types stay blocked',()=>{
+ const f=productionFixture();f.remote.Companies[101].companyTypes=[{id:2,name:'Interessent',number:'S-2'}];
+ const model=f.ctx.getSalesEditor({companyId:101,entity:'types',targetId:101});assert.equal(model.base.companyTypes[0].companyTypeId,2);assert.equal(model.base.companyTypes[0].number,'S-2');assert.ok(!('id' in model.base.companyTypes[0]));assert.equal(f.ctx.salesCompany_(f.remote.Companies[101]).companyTypes[0].companyTypeId,2);
+ const n=f.calls.filter(c=>c.method!=='get').length;
+ for(const row of [{id:2,companyTypeId:3},{id:0},{id:'invalid'}]){f.remote.Companies[101].companyTypes=[row];assert.throws(()=>f.ctx.getSalesEditor({companyId:101,entity:'types',targetId:101}),/nicht eindeutig/);}
+ assert.equal(f.calls.filter(c=>c.method!=='get').length,n);
+});
+test('new company verifies documented id-shaped HQ types without a second company POST',()=>{
+ const f=productionFixture(),before=f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,r=f.ctx.saveSalesCompany({...f.input,name:'Synthetic id type company'}),one=f.ctx.salesOne_;
+ f.ctx.salesOne_=(entity,id)=>{const row=one(entity,id);if(entity==='Companies')row.companyTypes=row.companyTypes.map(t=>({id:t.companyTypeId}));return row;};
+ assert.equal(f.ctx.runSalesJob(r.id,'company').state,'companyConfirmed');assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'synced');assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,before+1);
+});
+test('job inspection is GET-only and leaves matching, missing and unknown outcomes locked',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany({...f.input,name:'Synthetic inspect company'});f.ctx.runSalesJob(r.id,'company');f.ctx.runSalesJob(r.id,'contact');f.db['sales_jobs/'+r.id].state='uncertain';
+ let before=JSON.stringify(f.db),n=f.calls.length;const result=f.ctx.getSalesJobInspection(r.id);assert.equal(result.state,'uncertain');assert.ok(result.checks.some(x=>x.includes('Anlagefelder stimmen')));assert.ok(result.checks.some(x=>x.includes('Kontaktfelder stimmen')));assert.equal(JSON.stringify(f.db),before);assert.ok(f.calls.slice(n).every(c=>c.method==='get'));assert.equal(f.calls.length-n,2);
+ f.ctx.salesOne_=()=>{throw Error('HQ-Lesetest: HTTP 404.');};before=JSON.stringify(f.db);const missing=f.ctx.getSalesJobInspection(r.id);assert.match(missing.checks[0],/HTTP 404/);assert.equal(JSON.stringify(f.db),before);
+ delete f.db['sales_jobs/'+r.id].hqId;delete f.db['sales_drafts/'+r.id].hqId;f.ctx.salesOne_=()=>{throw Error('Must not search HQ');};assert.match(f.ctx.getSalesJobInspection(r.id).checks[0],/Keine gespeicherte HQ-ID/);
+ f.setEmail('test@example.invalid');assert.throws(()=>f.ctx.getSalesJobInspection(r.id),/Zugriff|Administrator/);
 });
 console.log(count+' production checks passed.');
 }

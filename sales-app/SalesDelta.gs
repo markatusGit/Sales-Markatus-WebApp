@@ -36,15 +36,17 @@ function salesDeltaPrepare_(old){
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
 }
+// HQ accepts whole UTC seconds. Floor the request boundary; keep durable watermarks unchanged.
+function salesDeltaSince_(since){return new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');}
 function salesDeltaFilter_(entity,since){
-  const date="datetime'"+since+"'",parts=['updatedOn ge '+date,'createdOn ge '+date];
+  const date="datetime'"+salesDeltaSince_(since)+"'",parts=['updatedOn ge '+date,'createdOn ge '+date];
   // Company addresses expose their own timestamp. Contact-address DTOs and estimations do not.
   if(entity==='Companies')parts.push('defaultAddress/updatedOn ge '+date,'addresses/any(a: a/updatedOn ge '+date+')');
   return '('+parts.join(' or ')+')';
 }
 function salesDeltaRecent_(entity,row,since){
   const values=[row.updatedOn,row.createdOn];if(entity==='Companies')values.push(row.defaultAddress?.updatedOn,...(row.addresses||[]).map(a=>a.updatedOn));
-  return values.some(x=>Number.isFinite(Date.parse(x))&&Date.parse(x)>=Date.parse(since));
+  return values.some(x=>Number.isFinite(Date.parse(x))&&Date.parse(x)>=Date.parse(salesDeltaSince_(since)));
 }
 /** Owner-only, bounded GET probes for an already paused filter failure. Never changes the run. */
 function salesDeltaDiagnosticStatus_(summary,admin){

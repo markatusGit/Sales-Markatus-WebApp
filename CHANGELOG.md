@@ -4,6 +4,13 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.28.1]
+
+- HQ-Filterzeit auf volle UTC-Sekunden begrenzt: echter Gegenversuch bestätigt die Ursache des HTTP400. Grenzsekunde sicher überlappend lesen und validieren; pausierten Lauf ohne Vollimport oder erneute alte Schreibaufträge fortsetzen.
+- HQ-Firmenarten aus GET-id in Rückprüfung, Projektion und Typeneditor normalisieren; ungültige/widersprüchliche IDs abweisen.
+- Auftragsübersicht mit gespeicherten HQ-Firmen repariert; neuer Administrator-Lesetest verändert weder Aufträge noch Sperren. Gezielte Regressionen ergänzt.
+- Keine neuen Script Properties oder Bereitstellungseinstellungen. Vollständige Veröffentlichung/Live-Prüfung noch offen.
+
 ## [v0.28.0]
 
 - Diagnosestufe für den ausdrücklich beauftragten HQ-Sync-Fix: Nur bei manuell abgefragter Unternehmens-Filterpause und nur für Administratoren maximal sieben gefilterte GET-Probes mit je top=1. Fehlertext begrenzt und Zugangsdaten entfernt, Ergebnis 30 Minuten im Script Cache. Keine HQ-/Firebase-Schreibvorgänge, keine Cursor-/Triggeränderung oder unfiltrierter Ersatzabruf. Normale Statusabfrage bleibt unverändert schlank.

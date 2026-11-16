@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-16-r28';
+const SALES_RELEASE = '2026-11-16-r28.1';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -125,12 +125,20 @@ function salesWebsiteInput_(value) {
   if(!/^https?:\/\/[^\s@/:?#]+\.[^\s@/:?#]{2,}(?::\d{1,5})?(?:[/?#][^\s]*)?$/i.test(result)) throw new Error('Homepage bitte als Domain wie test.de oder vollständige https-Adresse eingeben.');
   return result;
 }
+function salesCompanyTypeId_(row) {
+  const id=Number(row?.companyTypeId??row?.id);
+  if(!Number.isSafeInteger(id)||id<=0||(row?.id!=null&&row?.companyTypeId!=null&&Number(row.id)!==Number(row.companyTypeId)))throw new Error('HQ-Firmenart ist nicht eindeutig.');
+  return id;
+}
+function salesCompanyTypes_(rows) {
+  return (rows||[]).map(row=>({...salesPick_(row,['name','number']),companyTypeId:salesCompanyTypeId_(row)}));
+}
 function salesCompany_(raw) {
   const pickAddress=a=>a?salesPick_(a,['id','street','houseNumber','zipCode','city','country','description','standardForDocumentType','website']):null;
   const website=salesWebsite_(raw);
   return {id:String(salesId_(raw.id)),name:raw.name||'',industrialSector:raw.industrialSector||'',description:raw.description||'',homepage:raw.homepage||'',
     homepageDisplay:website.value,homepageSource:website.source,
-    companyTypes:(raw.companyTypes||[]).map(x=>salesPick_(x,['companyTypeId','name','number'])),responsibleUsers:(raw.responsibleUsers||[]).map(x=>salesPick_(x,['id','userId','firstName','lastName'])),
+    companyTypes:salesCompanyTypes_(raw.companyTypes),responsibleUsers:(raw.responsibleUsers||[]).map(x=>salesPick_(x,['id','userId','firstName','lastName'])),
     defaultAddress:pickAddress(raw.defaultAddress),addresses:(raw.addresses||[]).map(pickAddress),customFields:(raw.customFields||[]).filter(x=>['Kundenklassifizierung','Kundenherkunft','Adressherkunft'].includes(x.name)).map(x=>salesPick_(x,['name','type','value'])),updatedOn:raw.updatedOn||null};
 }
 function salesWebsite_(raw) {
@@ -631,7 +639,7 @@ function salesRunCreate_(job,draft,step) {
   if(!salesEqualFields_(actual,salesPick_(draft.company,['industrialSector']))) throw new Error('Branche der Firma wurde in HQ noch nicht bestätigt.');
   if(!salesHomepageConfirmed_(actual,draft.company.homepage)) throw new Error('Homepage der Firma wurde in HQ noch nicht bestätigt.');
   if(!salesEqualFields_(actual.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Standardadresse der Firma wurde in HQ noch nicht vollständig bestätigt.');
-  if(!(actual.companyTypes||[]).some(t=>Number(t.companyTypeId)===Number(draft.company.companyTypes[0].companyTypeId))) throw new Error('Firmenart wurde in HQ noch nicht bestätigt.');
+  if(!(actual.companyTypes||[]).some(t=>salesCompanyTypeId_(t)===Number(draft.company.companyTypes[0].companyTypeId))) throw new Error('Firmenart wurde in HQ noch nicht bestätigt.');
   if(!(actual.responsibleUsers||[]).some(u=>Number(u.userId||u.id)===Number(draft.company.responsibleUserIds[0]))) throw new Error('Verantwortlicher HQ-Benutzer wurde noch nicht bestätigt.');
   if(!(actual.subsystems||[]).some(s=>Number(s.id)===Number(draft.company.subsystemIds[0]))) throw new Error('HQ-Unternehmensbereich wurde noch nicht bestätigt.');
   if((draft.company.customFields||[]).some(f=>!(actual.customFields||[]).some(a=>a.name===f.name&&String(a.value)===String(f.value)))) throw new Error('Eigene Felder stimmen nicht überein.');

@@ -2,6 +2,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const {chromium}=require('playwright'),{productionFixture}=require('./test-business.cjs');
 (async()=>{
  const f=productionFixture();f.ctx.saveSalesHistory({companyId:101,channel:'Note',reason:'Synthetic pending history',content:'Preserve while editing',contactOn:'2026-10-18T09:00:00Z'});
+ const created=f.ctx.saveSalesCompany({...f.input,name:'Synthetic saved draft'});f.db['sales_drafts/'+created.id].hqId=999;
  const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
  try{
   const page=await browser.newPage(),calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
@@ -26,6 +27,12 @@ const {chromium}=require('playwright'),{productionFixture}=require('./test-busin
   await page.getByRole('button',{name:'Änderungen in Firebase speichern',exact:true}).click();await page.getByRole('heading',{name:'Synthetic browser customer',exact:true}).waitFor();const types=Object.values(f.db).find(j=>j.entity==='types');assert.equal(types.change.companyTypes[0].companyTypeId,3);assert.equal(types.change.companyTypes[0].number,'synthetic-number');
   await page.getByLabel('Gespräch / Notiz',{exact:true}).fill('Synthetic customer note');
   const lastWrite=f.calls.filter(c=>c.method!=='get').length;await page.getByRole('button',{name:'Speichern',exact:true}).click();await page.getByText('Synthetic customer note',{exact:true}).waitFor();assert.equal(f.calls.filter(c=>c.method!=='get').length,lastWrite);
+  // Real overview must render existing app-created firms with a stored HQ ID.
+  await page.getByRole('button',{name:'Datenabgleich',exact:true}).click();
+  await page.getByRole('button',{name:'Aufträge und Konflikte ansehen',exact:true}).click();await page.getByRole('heading',{name:'Aufträge und Firmen',exact:true}).waitFor();await page.getByRole('heading',{name:'Synthetic saved draft',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Auftrag ansehen',exact:true}).first().click();await page.getByRole('button',{name:'HQ-Stand nur lesen',exact:true}).click();await page.getByText('Nur gelesen. Auftrag und Sperre bleiben unverändert; keine erneute Anlage freigegeben.',{exact:true}).first().waitFor();
+  assert.equal(calls.filter(c=>c.name==='getSalesJobInspection').length,1);
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('heading',{name:'Kunden',exact:true}).waitFor();
   assert.deepEqual(errors,[]);assert.ok(!calls.some(c=>c.name==='getSalesV1State'));console.log('PASS ordinary customer: targeted editor, changed fields only, pending display, contact/address edits and Firebase-only activity');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

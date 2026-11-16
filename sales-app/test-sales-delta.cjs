@@ -21,6 +21,18 @@ test('nested company address update and silent contact address update are preser
  const f=bulkFixture();f.remote.ContactPersons[300]={id:300,companyId:102,firstName:'Synthetic',defaultAddress:{email:'one@example.invalid'},updatedOn:'2026-01-01'};f.finishBulk();f.remote.Companies[102].defaultAddress={id:400,website:'https://synthetic.invalid',updatedOn:new Date().toISOString()};f.remote.ContactPersons[300].defaultAddress.email='two@example.invalid';
  const run=f.finishBulk();assert.equal(run.entities.Companies.seen,1);assert.equal(f.db['sales_companies/102'].contacts.find(c=>String(c.id)==='300').eMail,'two@example.invalid');assert.equal(f.db['sales_rawcompanies/102'].row.defaultAddress.website,'https://synthetic.invalid');
 });
+test('whole-second HQ filters safely include fractional boundary rows and resume the same paused run',()=>{
+ const f=bulkFixture();f.finishBulk();const watermark='2026-10-01T10:00:00.987Z';for(const m of Object.values(f.db['sales_meta/bulk'].entities))m.watermark=watermark;
+ const filter=f.ctx.salesDeltaFilter_,get=f.ctx.salesHqGet_,meta=JSON.stringify(f.db['sales_meta/bulk']);
+ f.ctx.salesDeltaFilter_=(entity,since)=>filter(entity,since).replaceAll(f.ctx.salesDeltaSince_(since),since);
+ f.ctx.salesHqGet_=p=>{if(/datetime'[^']*\.\d+Z'/.test(decodeURIComponent(p)))throw Error('HQ-Lesetest: HTTP 400');return get(p);};
+ f.ctx.startSalesSync();f.worker();const paused=f.db['sales_meta/sync'];assert.ok(paused.paused);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),meta);
+ f.remote.Companies[102].updatedOn='2026-10-01T09:58:00.100Z';f.remote.Companies[102].name='Synthetic second boundary';
+ f.ctx.salesDeltaFilter_=filter;const calls=f.calls.length;f.ctx.startSalesSync();const run=finish(f);assert.equal(run.id,paused.id);assert.equal(run.full,false);assert.equal(run.entities.Companies.since,'2026-10-01T09:58:00.987Z');assert.equal(f.db['sales_companies/102'].company.name,'Synthetic second boundary');assert.ok(!f.calls.slice(calls).some(c=>c.method!=='get'));
+ for(const entity of ['Companies','ContactPersons','Projects','Documents','PlannedRevenues','ContactHistories']){const query=f.ctx.salesDeltaFilter_(entity,'2026-10-01T09:58:00.987Z');assert.ok(query.includes("datetime'2026-10-01T09:58:00Z'"));assert.ok(!query.includes('.987'));}
+ assert.equal(f.ctx.salesDeltaRecent_('Companies',{updatedOn:'2026-10-01T09:58:00.001Z'},'2026-10-01T09:58:00.987Z'),true);assert.equal(f.ctx.salesDeltaRecent_('Companies',{updatedOn:'2026-10-01T09:57:59.999Z'},'2026-10-01T09:58:00.987Z'),false);
+});
+
 test('failed nested filter never retries with an unfiltered query or advances metadata',()=>{
  const f=bulkFixture();f.finishBulk();const metadata=JSON.stringify(f.db['sales_meta/bulk']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(decodeURIComponent(p).includes('addresses/any'))throw Error('HQ-Lesetest: HTTP 400');return get(p);};f.ctx.startSalesSync();f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.match(f.db['sales_meta/sync'].blockedMessage,/Kein Gesamtimport/);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),metadata);
 });
