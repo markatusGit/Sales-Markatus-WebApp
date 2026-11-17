@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-Zuletzt aktualisiert: 23. Oktober 2026.
+Zuletzt aktualisiert: 17. November 2026.
 
 ## Zweck und Pflege
 
@@ -1597,3 +1597,11 @@ Nutzerentscheidung: Weil Firestore-TTL-Richtlinien im Spark-Tarif eine Abrechnun
 ### Veröffentlichung v0.29.1
 
 Veröffentlichung v0.29.1: Apps-Script-Version 49, bestehende Bereitstellung beibehalten. Quellcommit c9bedb8f6ea94c0e2742a5c49050a28df5eea73e. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-17T12:47:15.779Z.
+
+### 17.11.2026 – r30: Vorhandene Kundenfelder ändern und ergänzen
+
+Auftrag: Kunden aus eigener Anlage oder HQ direkt in der App bearbeiten, ausschließlich mit entsprechender Kontofreigabe. Nutzer präzisiert ausdrücklich: vorhandene Felder ändern und ergänzen; keine frei benennbaren neuen Felder. Der vorhandene HQ-Stammdateneditor bleibt der gemeinsame Weg. Ergänzt: Bearbeitung ungesendeter App-Entwürfe für Firma, Firmenart, Standardadresse und ersten Ansprechpartner; bereits definierte unbelegte HQ-Firmenfelder werden angeboten.
+
+Entwurf und bestehender Anlageauftrag werden unter Geschäftssperre atomar gespeichert; keine zweite Firma oder unnötiger Folgeauftrag. Revisionskonflikte und fremde Ziele werden abgewiesen. Wiederverwendbare Anfragekennung übernimmt bereits bestätigte Speicherung nach verlorener Antwort. Begonnene HQ-Schreibversuche, Teilanlagen und unklare Ausgänge bleiben gesperrt; nach vollständig bestätigter Anlage gilt der HQ-Editor. Zusätzliche Kontaktanschrift wird beim ersten POST erhalten; alle editierten Felder werden zurückgelesen, bevor Erfolg bestätigt wird. company.edit/contact.edit und zusätzlich finance.read werden im bestehenden Gateway geprüft; reine Lese-/Anlagerechte reichen nicht. Änderungen behalten ursprünglichen Ersteller plus Bearbeiterprovenienz; vor HQ-Schreiben werden aktuelle Bearbeiterrechte erneut geprüft. Keine automatische Hintergrundaktualisierung. Listen-/Detailcache erhalten gezielte Änderungen, Historie und Kommunikationsentwürfe bleiben erhalten.
+
+Prüfung: vier neue Fachfälle (lokale Speicherung ohne HQ, erste Übertragung mit geänderten Feldern, Wiederholung/Revision/Zielschutz/atomarer Fehler, definierte leere Felder und eigene Kontaktadresse, fehlende HQ-Bestätigung), drei neue Rechtefälle und erweiterter echter Browserablauf einschließlich verlorener Antwort und erhaltener Eingaben. Erstlauf aller 23 Prüfdateien erfolgreich, nach abschließenden Verbesserungen vor Veröffentlichung erneut vollständig prüfen. Keine echten Kundendaten verändert. Keine neuen Script Properties, Scopes, Provider, Firebase-Regeln oder Zugriffs-/Ausführungseinstellungen. Veröffentlichung und Live-Bedienabnahme noch gesondert nachweisen. Unabhängige lokale Dokumentationsänderungen bleiben außerhalb dieses Releases, alte Warnungen/Jobs und alle Roadmap-Wünsche unverändert.

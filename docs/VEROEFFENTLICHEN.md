@@ -94,3 +94,18 @@ Die Inventur ist optional zur späteren Bereinigungsplanung, verbraucht selbst L
 ## Kontrollierter Firebase-Zugangswechsel
 
 Für den ausdrücklich beauftragten Benutzerlogin gibt es einen eng begrenzten Übergang von MYSELF zu ANYONE_ANONYMOUS auf derselben Bereitstellung bei unverändertem USER_DEPLOYING. Er benötigt in deployment.json einen konkreten genehmigten Übergang mit bestehender Bereitstellungs-ID, Ausgangsversion und Zeitpunkt der echten Administratorbestätigung. Der öffentliche Quellstand muss SALES_AUTH_REQUIRE_FIREBASE=true erzwingen. Ohne diese Angaben bricht die Vorprüfung ab. Die bisherigen Regeln zu fremden Änderungen, Tests, Fingerabdrücken und fester Bereitstellung bleiben bestehen. Private Einrichtungsstände benötigen keine Zugriffsänderung.
+
+## r30: Kundenbearbeitung prüfen
+
+Für diese Version sind keine Skripteigenschaften oder Bereitstellungseinstellungen zu ändern. Speicherung erfolgt zunächst in Firebase, HQ-Übertragung weiterhin über den vorhandenen Datenabgleich. Konten benötigen „Firmendaten und Adressen ändern“ bzw. „Ansprechpartner ändern“; Finanzfelder zusätzlich die Finanzfreigabe. Begonnene oder unklare Anlagen zuerst im vorhandenen Abgleich klären.
+
+- Die bisherige App-Adresse neu laden; oben „Stand 2026-11-17-r30“ erwarten. Bei anderer Kennung diese im Chat melden.
+- „Kunden“ öffnen.
+- Den gewünschten Kunden öffnen.
+- Unter „Allgemein“ auf „Firmendaten bearbeiten“ klicken; vorhandene und leere bearbeitbare Felder erwarten. Bei fehlender Schaltfläche die Kontofreigabe durch den Administrator prüfen lassen.
+- Einen gewünschten bestehenden Wert ändern oder ein leeres Feld ausfüllen.
+- „Änderungen in Firebase speichern“ anklicken; gespeicherte Kundendaten erwarten. Bei Fehler bleibt die Eingabe erhalten; die Meldung ohne Kundeninhalte mitteilen.
+- Für eine Adresskorrektur auf „Adresse bearbeiten“ klicken.
+- Für eine Kontaktkorrektur auf „Ansprechpartner bearbeiten“ klicken.
+
+Ein reines Lese- oder Hinzufügen-Konto darf diese Bearbeitungsschaltflächen nicht sehen und serverseitig nichts ändern. Die Übertragung echter Änderungen nach HQ erfolgt erst über den bestehenden kontrollierten Abgleich; dafür keinen zusätzlichen Testkunden in HQ anlegen.

@@ -45,6 +45,25 @@ function authFixture({legacy=false}={}){
 }
 let count=0;function test(name,fn){fn();console.log('PASS '+name);count++;}
 if(require.main===module){
+ test('customer edit permissions apply equally to unsent drafts, imported records and blank fields',()=>{
+  const f=authFixture();let reads=0;f.ctx.salesRead_=()=>{reads++;return null;};
+  for(const id of [101,'draft_synthetic'])for(const permissions of [{},{'company.create':true},{'contact.create':true}]){f.request(f.user('limited',permissions));for(const entity of ['company','address','types','contact'])for(const method of ['getSalesEditor','saveSalesEntityChange'])assert.throws(()=>f.ctx.salesAuthDispatch_(method,[{companyId:id,targetId:id,entity,change:{homepage:'https://synthetic.invalid'}}]),/AUTH_DENIED/);}
+  assert.equal(reads,0);f.request(f.user('editor',{'company.edit':true}));assert.throws(()=>f.ctx.salesAuthDispatch_('saveSalesEntityChange',[{companyId:'draft_synthetic',entity:'company',change:{vatId:'synthetic'}}]),/Finanzfelder/);assert.equal(reads,0);
+ });
+ test('draft editors are reauthorized before HQ creation, including withdrawn financial permission',()=>{
+  const f=authFixture(),job={kind:'createCompany',actorUid:'owner',actor:'owner@example.invalid',editAuthors:[{uid:'editor',email:'editor@example.invalid',permissions:['company.edit'],financial:true}]};
+  f.user('editor',{'company.edit':true,'finance.read':true});f.ctx.salesAuthSource_(job);f.user('editor',{'company.edit':true});assert.throws(()=>f.ctx.salesAuthSource_(job),/Bearbeiter/);
+  job.editAuthors[0].financial=false;f.ctx.salesAuthSource_(job);f.user('editor',{});assert.throws(()=>f.ctx.salesAuthSource_(job),/Bearbeiter/);f.user('editor',{'company.edit':true},'disabled');assert.throws(()=>f.ctx.salesAuthSource_(job),/Bearbeiter/);
+ });
+ test('a permitted editor saves a draft atomically with ACL verification and current editor provenance',()=>{
+  const f=authFixture(),u=f.user('editor',{'company.edit':true}),id='synthetic-draft',ref='draft_'+id;
+  const draft={id,company:{name:'Synthetic',companyTypes:[{companyTypeId:2}],defaultAddress:{street:'Synthetic',city:'Synthetic',zipCode:'00000',country:'DE',description:'Standardadresse'}},contact:{firstName:'Synthetic',lastName:'Contact'},kind:'Kunde',hqId:null};
+  for(const [path,value] of [['sales_drafts/'+id,draft],['sales_jobs/'+id,{id,draftId:id,kind:'createCompany',state:'pending',actorUid:'owner',actor:'owner@example.invalid',steps:{}}],['sales_meta/catalog',{types:[{id:2,name:'Kunde'}],fields:[]}]])f.db.set(path,{fields:{payload:{stringValue:JSON.stringify(value)}},updateTime:'synthetic'});
+  f.ctx.salesAssertPrivate_=()=>{};f.ctx.salesRead_=p=>JSON.parse(f.db.get(p)?.fields.payload.stringValue||'null');f.request(u);const result=f.ctx.salesAuthDispatch_('saveSalesEntityChange',[{companyId:ref,targetId:ref,entity:'company',revision:0,requestId:'synthetic-edit-request',change:{homepage:'https://synthetic.invalid'}}]);
+  const job=JSON.parse(f.db.get('sales_jobs/'+id).fields.payload.stringValue);assert.equal(job.actorUid,'owner');assert.equal(job.editAuthors[0].uid,'editor');assert.deepEqual([...job.editAuthors[0].permissions],['company.edit']);
+  const filtered=f.ctx.salesAuthFilter_(result,u,'saveSalesEntityChange');assert.equal(filtered.patch.draft.revision,1);assert.ok(!filtered.patch.job);assert.equal(filtered.entityPatch.localCompany.homepage,'https://synthetic.invalid');
+  f.ctx.salesAuthSource_(job);f.user('editor',{});assert.throws(()=>f.ctx.salesAuthSource_(job),/Bearbeiter/);
+ });
  test('public build never falls back to legacy email access when mode is missing or invalid',()=>{const f=authFixture();delete f.props.SALES_AUTH_MODE;assert.equal(f.ctx.salesAuthEnabled_(),true);assert.throws(()=>f.ctx.getSalesLeanState(),/AUTH_REQUIRED/);f.props.SALES_AUTH_MODE='legacy';assert.throws(()=>f.ctx.getSalesLeanState(),/AUTH_REQUIRED/);});
  test('anonymous page renders only login configuration and never reads business data',()=>{
   const f=authFixture();let reads=0;f.ctx.Session.getActiveUser=()=>{throw Error('No Google session');};f.ctx.salesRead_=()=>{reads++;throw Error('Business data forbidden');};

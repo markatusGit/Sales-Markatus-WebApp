@@ -14,6 +14,41 @@ function edit(f,entity,change,targetId=entity==='contact'?202:entity==='address'
   const model=f.ctx.getSalesEditor({companyId:101,entity,targetId});return f.ctx.saveSalesEntityChange({companyId:101,entity,targetId,base:model.base,change});
 }
 if(require.main===module){
+test('unsent app customer edits update one creation intent, survive reload and reach HQ once',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany({...f.input,name:'Synthetic editable draft'}),ref='draft_'+r.id,n=f.calls.length;
+ f.ctx.getSalesLeanView('customers');
+ const save=(entity,change)=>{const targetId=['company','types'].includes(entity)?ref:ref+'_'+entity,model=f.ctx.getSalesEditor({companyId:ref,entity,targetId});return f.ctx.saveSalesEntityChange({...model,change,requestId:'edit-request-'+entity});};
+ save('company',{name:'Synthetic updated draft',homepage:'https://synthetic.invalid',vatId:'synthetic-vat'});
+  save('address',{city:'Synthetic updated city',phone:'synthetic-phone'});save('contact',{phoneMobile:'synthetic-mobile',note:'Synthetic note'});save('types',{companyTypes:[{companyTypeId:3,number:'synthetic-number'},{companyTypeId:2}]});
+ assert.equal(f.calls.length,n,'edit and reload use no HQ');assert.equal(Object.values(f.db).filter(j=>j.kind==='createCompany').length,1);assert.equal(Object.values(f.db).filter(j=>j.kind==='entityChange').length,0);
+  assert.equal(f.ctx.getSalesLeanCompany(ref).company.name,'Synthetic updated draft');assert.equal(f.ctx.getSalesLeanCompany(ref).company.companyTypes[0].name,'Kunde');assert.equal(f.ctx.getSalesLeanView('customers').companies.find(c=>c.id===ref).name,'Synthetic updated draft');
+ for(let i=0;i<4&&f.db['sales_jobs/'+r.id].state!=='synced';i++)f.ctx.runSalesJob(r.id,f.db['sales_jobs/'+r.id].companyConfirmedAt?'contact':'company');
+  assert.equal(f.db['sales_jobs/'+r.id].state,'synced',f.db['sales_jobs/'+r.id].message);assert.equal(f.calls.slice(n).filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,1);
+  assert.equal(f.remote.Companies[101].vatId,'synthetic-vat');assert.equal(f.remote.Companies[101].defaultAddress.phone,'synthetic-phone');assert.equal(f.remote.ContactPersons[202].note,'Synthetic note');assert.equal(f.remote.Companies[101].companyTypes.length,2);assert.equal(f.remote.Companies[101].companyTypes[0].number,'synthetic-number');
+});
+test('draft revision, foreign target, first-write guard and atomic failure protect original intent',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany(f.input),ref='draft_'+r.id,model=f.ctx.getSalesEditor({companyId:ref,entity:'company',targetId:ref}),input={...model,requestId:'edit-request-atomic',change:{name:'Synthetic changed'}};
+ const original=JSON.stringify(f.db['sales_drafts/'+r.id]),commit=f.ctx.salesBulkRest_;f.ctx.salesBulkRest_=()=>{throw Error('Synthetic commit failed');};assert.throws(()=>f.ctx.saveSalesEntityChange(input),/commit failed/);assert.equal(JSON.stringify(f.db['sales_drafts/'+r.id]),original);f.ctx.salesBulkRest_=commit;
+ f.ctx.saveSalesEntityChange(input);f.ctx.saveSalesEntityChange(input);assert.equal(f.db['sales_drafts/'+r.id].revision,1);
+ assert.throws(()=>f.ctx.saveSalesEntityChange({...input,requestId:'different-request',change:{name:'Stale'}}),/inzwischen/);
+ assert.throws(()=>f.ctx.getSalesEditor({companyId:ref,entity:'contact',targetId:'draft_foreign_contact'}),/gehört/);
+ for(const state of ['running','uncertain','companyCreated','synced']){f.db['sales_jobs/'+r.id].state=state;assert.throws(()=>f.ctx.getSalesEditor(model),/bereits begonnen/);}
+ f.db['sales_jobs/'+r.id].state='pending';f.db['sales_jobs/'+r.id].writeAttempted=true;assert.throws(()=>f.ctx.saveSalesEntityChange({...input,revision:1,requestId:'new-request'}),/bereits begonnen/);
+});
+test('new contact address and empty defined HQ fields retain their target and type',()=>{
+ const f=productionFixture();f.db['sales_meta/catalog'].fields=[{name:'Kundenherkunft',type:'Text'}];
+ const m=f.ctx.getSalesEditor({companyId:101,entity:'company',targetId:101});assert.equal(m.customFieldDefinitions[0].name,'Kundenherkunft');
+ const change={customFields:[...(m.base.customFields||[]),{name:'Kundenherkunft',type:'Text',value:'Synthetic source'}]},r=f.ctx.saveSalesEntityChange({...m,change});f.ctx.salesSyncWrite_({id:r.id});assert.equal(f.remote.Companies[101].customFields.find(x=>x.name==='Kundenherkunft').value,'Synthetic source');
+ assert.throws(()=>edit(f,'company',{customFields:[{name:'Invented field',type:'Text',value:'x'}]}),/nicht bestätigt/);
+ const draft=f.ctx.saveSalesCompany(f.input),ref='draft_'+draft.id,contact=f.ctx.getSalesEditor({companyId:ref,entity:'contact',targetId:ref+'_contact'});
+ f.ctx.saveSalesEntityChange({...contact,requestId:'contact-address-edit',change:{defaultAddress:{...contact.base.defaultAddress,city:'Separate city',email:'synthetic@example.invalid'}}});
+ for(let i=0;i<4&&f.db['sales_jobs/'+draft.id].state!=='synced';i++)f.ctx.runSalesJob(draft.id,f.db['sales_jobs/'+draft.id].companyConfirmedAt?'contact':'company');
+ assert.equal(f.db['sales_jobs/'+draft.id].state,'synced',f.db['sales_jobs/'+draft.id].message);assert.equal(f.remote.ContactPersons[202].defaultAddress.city,'Separate city');assert.equal(f.remote.ContactPersons[202].eMail,'synthetic@example.invalid');
+});
+test('ignored newly edited creation fields fail readback without a repeated company POST',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany(f.input),ref='draft_'+r.id,m=f.ctx.getSalesEditor({companyId:ref,entity:'company',targetId:ref}),n=f.calls.length;f.ctx.saveSalesEntityChange({...m,requestId:'ignored-field-edit',change:{vatId:'synthetic-vat'}});
+  f.ctx.runSalesJob(r.id,'company');delete f.remote.Companies[101].vatId;f.ctx.runSalesJob(r.id,'contact');assert.notEqual(f.db['sales_jobs/'+r.id].state,'synced');assert.match(f.db['sales_jobs/'+r.id].message,/company.vatId/);assert.equal(f.calls.slice(n).filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,1);
+});
 test('all production RPCs authenticate before accessing customer or HQ data',()=>{
  const f=productionFixture();f.setEmail('outsider@example.invalid');const n=f.calls.length;
  for(const name of ['saveSalesCompany','getSalesEditor','saveSalesEntityChange','bindSalesCompanyResult','getSalesJobInspection'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);

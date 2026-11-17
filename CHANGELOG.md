@@ -4,6 +4,14 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.30.0]
+
+- Kunden aus der App sind vor dem ersten HQ-Schreibversuch über dieselben Schaltflächen wie importierte Kunden bearbeitbar: Firmendaten, Firmenart, Standardadresse und erster Ansprechpartner. Vorhandene Felder können geändert und leere ergänzt werden; keine freien neuen Feldnamen.
+- Unbelegte, bereits bestätigte HQ-Firmenfelder werden im Editor angeboten. Bestehende Werte und Feldtypen bleiben erhalten; nur Änderungen werden gespeichert.
+- Entwurf und ursprünglicher Anlageauftrag werden atomar mit Revision und wiederverwendbarer Anfragekennung aktualisiert. Abgebrochene Speicherantworten lassen Eingaben erhalten; Wiederholung legt keine zweite Firma an. Namenliste, Kundendetails und Ansprechpartner werden ohne vollständiges Nachladen aktualisiert, Kommunikationsentwürfe bleiben erhalten.
+- Begonnene/unklare HQ-Anlagen bleiben gegen Änderung gesperrt. Die ursprüngliche Anlage verwendet die geänderten Felder und prüft sie anschließend in HQ zurück. Bearbeiter und benötigte Änderungs-/Finanzrechte werden vor dem HQ-Schreiben erneut geprüft. Bestehende Kontorechte gelten serverseitig auch für neue App-Kunden; Hinzufügen erlaubt kein Bearbeiten.
+- Appkennung `2026-11-17-r30`. Erweiterte Fach-, Rechte- und Browserprüfungen mit synthetischen Daten. Keine neuen Skripteigenschaften, Scopes oder Bereitstellungseinstellungen; Live-Bedienabnahme gesondert.
+
 ## [v0.29.1]
 
 - **F-15 Bereinigung ohne TTL-Richtlinie (Spark):** Nach einer erfolgreichen Anmeldung löscht der Server höchstens alle 10 Minuten bis zu je 20 Anmeldeversuche und Sitzungen, deren Feld `ttl` (Ablauf plus 1 bzw. 7 Tage Karenz) überschritten ist. Löschung nur mit unveränderter `updateTime`; Fehler beeinträchtigen die Anmeldung nie. Dokumente aus der Zeit vor r29 ohne `ttl` werden nicht erfasst. Appkennung `2026-11-17-r29.1`; 1 neuer Test, alle 23 Prüfdateien bestanden. Keine neuen Script Properties oder Bereitstellungseinstellungen.

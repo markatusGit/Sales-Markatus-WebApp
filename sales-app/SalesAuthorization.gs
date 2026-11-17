@@ -44,7 +44,7 @@ function salesAuthFilter_(result,user,method){
       if(!user.permissions['projects.read']&&(k==='projects'||k==='plannedRevenues')){out[k]=[];continue;}
       if(!user.permissions['projects.read']&&/^project/i.test(k))continue;
       if(!user.permissions['sync.read']&&['jobs','syncRun','importRun','unassignedSummary','pendingChanges'].includes(k))continue;
-      if(k==='patch'&&!user.permissions['sync.read']){out.patch={};if(v?.localCompany)out.patch.localCompany=project(v.localCompany,'company');if(v?.draft&&method==='saveSalesCompany')out.patch.draft=project(v.draft,'draft');continue;}
+      if(k==='patch'&&!user.permissions['sync.read']){out.patch={};if(v?.localCompany)out.patch.localCompany=project(v.localCompany,'company');if(v?.draft&&['saveSalesCompany','saveSalesEntityChange'].includes(method))out.patch.draft=project(v.draft,'draft');continue;}
       out[k]=project(v,k);
     }return out;
   }
@@ -57,7 +57,12 @@ function salesAuthProtectWrites_(writes){
 }
 function salesAuthSource_(job){
   if(!salesAuthEnabled_())return;
-  const cfg=salesAuthConfig_();if(!job.actorUid){if(job.actor===cfg.ownerEmail||job.createdBy===cfg.ownerEmail)return;throw Error('Bisheriger Auftrag benötigt Administratorprüfung der Autorenzuordnung.');}
+  const cfg=salesAuthConfig_();
+  for(const a of job.editAuthors||[]){
+    const editor=salesAuthRead_('users',a.uid);
+    if(!editor||editor.status!=='active'||editor.email!==a.email||a.uid!==cfg.ownerUid&&((a.permissions||[]).some(p=>!salesPermissions_(editor.permissions)[p])||a.financial&&!editor.permissions['finance.read']))throw Error('Bearbeiter oder Änderungsrecht inzwischen gesperrt. Anlageauftrag angehalten.');
+  }
+  if(!job.actorUid){if(job.actor===cfg.ownerEmail||job.createdBy===cfg.ownerEmail)return;throw Error('Bisheriger Auftrag benötigt Administratorprüfung der Autorenzuordnung.');}
   const u=salesAuthRead_('users',job.actorUid),key=({createCompany:'company.create',createContact:'contact.create',history:'communication.create',communication:'communication.create',companyChange:'company.edit',entityChange:job.entity==='contact'?'contact.edit':'company.edit'})[job.kind];
   if(!u||u.status!=='active'||u.email!==job.actor||job.actorUid!==cfg.ownerUid&&(!key||!salesPermissions_(u.permissions)[key]))throw Error('Autor oder Schreibrecht inzwischen gesperrt. Auftrag angehalten.');
   if(job.actorUid!==cfg.ownerUid&&!u.permissions['finance.read']&&job.change&&JSON.stringify(job.change)!==JSON.stringify(salesAuthFilter_(job.change,{...u,admin:false},'job')))throw Error('Finanzrecht für diesen Auftrag inzwischen gesperrt.');

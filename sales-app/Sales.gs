@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-17-r29.1';
+const SALES_RELEASE = '2026-11-17-r30';
 let salesContextCache_;
 // User actions wait for the current background section (the worker yields between sections) instead of failing after 1 s.
 const SALES_LOCK_WAIT_MS=30000;
@@ -296,7 +296,7 @@ function syncSalesHistory(id) {
 function salesLocalCompany_(draft,catalog,job) {
   const company=draft.company,user=(catalog?.users||[]).find(u=>Number(u.id)===Number(company.responsibleUserIds?.[0]));
   const addressOrigin=draft.addressOrigin==='Sonstige'?draft.addressOriginOther:draft.addressOrigin;
-  return {id:'draft_'+draft.id,localDraftId:draft.id,hqId:draft.hqId?String(draft.hqId):null,name:company.name,industrialSector:company.industrialSector||'',description:company.description||'',homepage:company.homepage||'',homepageDisplay:company.homepage||'',homepageSource:'App',defaultAddress:company.defaultAddress,addresses:[],companyTypes:[{name:draft.kind,companyTypeId:company.companyTypes?.[0]?.companyTypeId}],responsibleUsers:[{userId:company.responsibleUserIds?.[0],firstName:user?.name||'',lastName:''}],customFields:[...(company.customFields||[]),{name:'Adressherkunft',value:addressOrigin||''}],syncState:job?.state||'pending'};
+  return {id:'draft_'+draft.id,localDraftId:draft.id,hqId:draft.hqId?String(draft.hqId):null,name:company.name,industrialSector:company.industrialSector||'',description:company.description||'',homepage:company.homepage||'',homepageDisplay:company.homepage||'',homepageSource:'App',defaultAddress:company.defaultAddress,addresses:[],companyTypes:(company.companyTypes||[]).map(t=>({...t,name:(catalog?.types||[]).find(x=>Number(x.id)===Number(t.companyTypeId))?.name||draft.kind})),responsibleUsers:[{userId:company.responsibleUserIds?.[0],firstName:user?.name||'',lastName:''}],customFields:[...(company.customFields||[]),...((company.customFields||[]).some(f=>f.name==='Adressherkunft')?[]:[{name:'Adressherkunft',value:addressOrigin||''}])],syncState:job?.state||'pending'};
 }
 function syncSalesCompany(id) {
   salesUser_(true);id=String(salesId_(id));return salesLock_(()=>{
@@ -663,7 +663,7 @@ function salesRunCreate_(job,draft,step) {
     // Optional strings are nullable in ContactPersonPost. Omit empty values instead of
     // asking HQ to validate an empty e-mail address or salutation.
     Object.keys(draft.contact).forEach(k=>{if(draft.contact[k]!=='')payload[k]=draft.contact[k];});
-    if(draft.contact.eMail)payload.defaultAddress=Object.assign({},salesContactAddressFields_(draft.company.defaultAddress),{email:draft.contact.eMail});
+    if(draft.contact.eMail)payload.defaultAddress=Object.assign({},salesContactAddressFields_(draft.company.defaultAddress),draft.contact.defaultAddress||{},{email:draft.contact.eMail});
     const result=salesWriteHq_(job,'/v2/ContactPersons','post',payload);job.contactId=salesId_(result&&result.id);salesWrite_('sales_jobs/'+job.id,job);
     job.safeStage='contactCreated';job.phaseWriteAttempted=false;salesWrite_('sales_jobs/'+job.id,job);
   }
@@ -683,6 +683,7 @@ function salesRunCreate_(job,draft,step) {
   if((draft.company.customFields||[]).some(f=>!(actual.customFields||[]).some(a=>a.name===f.name&&String(a.value)===String(f.value)))) throw new Error('Eigene Felder stimmen nicht überein.');
   if(job.markerMode!=='none'){salesCleanMarker_(job,draft);job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);}
   const cleanCompany=salesOne_('Companies',job.hqId);
+  if(job.editedFields)salesBusinessVerifyDraft_(job,draft,cleanCompany,job.contactId?salesContactWithAddress_(job.contactId):null);
   if(!salesHomepageConfirmed_(cleanCompany,draft.company.homepage)||!salesEqualFields_(cleanCompany.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Homepage oder Adresse nach Bereinigung in HQ nicht mehr bestätigt.');
   const stored=salesRead_('sales_companies/'+job.hqId)||{histories:[],projects:[]};
   const contacts=(stored.contacts||[]).filter(c=>String(c.id)!==String(job.contactId));
