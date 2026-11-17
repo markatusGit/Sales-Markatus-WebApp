@@ -6,6 +6,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [v0.28.3]
 
+- Als Google46 veröffentlicht, alle 22 Suiten und Google/Editor/GitHub-Abgleich erfolgreich. Am 17.11. Kontingenterneuerung und 14 gesperrte anonyme Datenpfade live bestätigt; alter Lauf 154/173 weiterhin angehalten. Echte Wiederanmeldung/Abschluss offen.
+
 - Live nachgewiesenes ausgeschöpftes Firestore-Lesekontingent: Login zeigt verständliche Speicher-/Kontingentmeldung und bleibt bei nicht prüfbarer Freigabe gesperrt.
 - HQ-Trigger bei tatsächlichem HTTP429 oder lokalem Tagesbudget unabhängig von Firestore stoppen. Auch Kontingentfehler während anfänglicher Authentifizierung und Statuslesung abfangen. Checkpoint/Wasserzeichen unangetastet.
 - Autorisierter HQ-Worker erhält ein Pacific-Tagesbudget von 20.000 dokumentbezogenen Lese- und 12.000 Schreibvorgängen. Transport reserviert vor Abruf, verrechnet tatsächliche Query-Ergebnisse und zählt fehlende Lookups sowie Commit-Verifikationen. Kein neuer Idle-Abruf.
