@@ -9,10 +9,17 @@ function authFixture({legacy=false}={}){
   if(url.startsWith('https://identitytoolkit.googleapis.com/')){const token=JSON.parse(opt.payload).idToken;return tokens.has(token)?response(200,{users:[tokens.get(token)]}):response(400,{error:{message:'INVALID_ID_TOKEN'}});}
   if(url.startsWith('https://securetoken.googleapis.com/'))return response(400,{});
   const path=url.split('/documents/')[1];
+  if(url.endsWith(':runQuery')){
+   const q=JSON.parse(opt.payload).structuredQuery,col=q.from[0].collectionId,limit=Number(q.limit),before=Date.parse(q.where.fieldFilter.value.timestampValue);
+   const rows=[...db.entries()].filter(([p,d])=>p.startsWith(col+'/')&&!p.slice(col.length+1).includes('/')&&d.fields?.ttl&&Date.parse(d.fields.ttl.timestampValue)<before).slice(0,limit)
+    .map(([p,d])=>({document:{name:'projects/sales-markatus/databases/(default)/documents/'+p,fields:clone(d.fields),updateTime:d.updateTime}}));
+   return response(200,rows.length?rows:[{readTime:'synthetic'}]);
+  }
   if(url.endsWith(':commit')){
    const writes=JSON.parse(opt.payload).writes;
-   for(const w of writes){const p=(w.verify||w.update?.name).split('/documents/')[1],prior=db.get(p),condition=w.currentDocument;
+   for(const w of writes){const p=(w.verify||w.update?.name||w.delete).split('/documents/')[1],prior=db.get(p),condition=w.currentDocument;
     if(condition&&(condition.exists===false&&prior||condition.updateTime&&condition.updateTime!==prior?.updateTime))throw Error('Precondition failed');}
+   for(const w of writes)if(w.delete)db.delete(w.delete.split('/documents/')[1]);
    for(const w of writes)if(w.update){const p=w.update.name.split('/documents/')[1];db.set(p,{...clone(w.update),updateTime:'v'+(++tick)});}
    return response(200,{writeResults:writes.map(()=>({}))});
   }
@@ -145,6 +152,19 @@ if(require.main===module){
   const session=f.db.get('sales_authsessions/'+f.ctx.salesAuthHash_(result.session)),attempt=f.db.get('sales_authattempts/'+f.ctx.salesAuthHash_(begin.attempt));
   assert.equal(Date.parse(session.fields.ttl.timestampValue),result.expiresAt+7*86400000);assert.ok(Date.parse(attempt.fields.ttl.timestampValue)>Date.now()+86400000);
   assert.equal(f.db.get('sales_authusers/reader').fields.ttl,undefined);
+ });
+ test('F-15 a successful login removes a bounded set of expired auth documents, at most every 10 minutes, never live ones',()=>{
+  const f=authFixture();f.user();const past=new Date(Date.now()-60000).toISOString(),future=new Date(Date.now()+86400000).toISOString();
+  const put=(kind,id,ttl)=>f.db.set('sales_auth'+kind+'/'+id,{fields:{payload:{stringValue:'{}'},ttl:{timestampValue:ttl}},updateTime:'old-'+id});
+  for(let i=0;i<25;i++)put('attempts','expired'+i,past);put('sessions','expiredsession',past);put('sessions','livesession',future);put('attempts','liveattempt',future);
+  const login=()=>{const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state});return f.ctx.finishSalesLogin({attempt:begin.attempt,verifier,state,idToken:f.token(),refreshToken:'r'.repeat(50)});};
+  assert.equal(login().user.uid,'reader');
+  const left=k=>[...f.db.keys()].filter(p=>p.includes(k)).length;
+  assert.equal(left('/expired'),5);assert.equal(left('/expiredsession'),0);assert.equal(left('/livesession'),1);assert.equal(left('/liveattempt'),1);assert.equal(left('sales_authusers/reader'),1);
+  assert.equal(login().user.uid,'reader');assert.equal(left('/expired'),5,'second login inside 10 minutes does not query again');
+  const g=authFixture();g.user();g.ctx.UrlFetchApp.fetch=((fetch)=>(url,opt)=>url.endsWith(':runQuery')?{getResponseCode:()=>500,getContentText:()=>'{}'}:fetch(url,opt))(g.ctx.UrlFetchApp.fetch);
+  const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),begin=g.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state});
+  assert.equal(g.ctx.finishSalesLogin({attempt:begin.attempt,verifier,state,idToken:g.token(),refreshToken:'r'.repeat(50)}).user.uid,'reader','cleanup failure never blocks the login');
  });
  console.log(count+' authentication and authorization tests passed');
 }

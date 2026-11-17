@@ -4,6 +4,10 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.29.1]
+
+- **F-15 Bereinigung ohne TTL-Richtlinie (Spark):** Nach einer erfolgreichen Anmeldung löscht der Server höchstens alle 10 Minuten bis zu je 20 Anmeldeversuche und Sitzungen, deren Feld `ttl` (Ablauf plus 1 bzw. 7 Tage Karenz) überschritten ist. Löschung nur mit unveränderter `updateTime`; Fehler beeinträchtigen die Anmeldung nie. Dokumente aus der Zeit vor r29 ohne `ttl` werden nicht erfasst. Appkennung `2026-11-17-r29.1`; 1 neuer Test, alle 23 Prüfdateien bestanden. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 - Nach v0.29.0 (ohne neue Google-Version): F-11 Firebase-Hosting liefert nur noch `/auth/` (Anmeldedateien byte-gleich, alte Pilotseite HTTP 404). F-14 `localhost` aus den autorisierten Domains entfernt. F-15 TTL-Richtlinien im Spark-Tarif nicht verfügbar (Firestore verlangt Abrechnung); keine Abrechnung aktiviert, TTL-Konfiguration per Revert zurückgenommen, Feld `ttl` bleibt vorbereitet.
 
 ## [v0.29.0]

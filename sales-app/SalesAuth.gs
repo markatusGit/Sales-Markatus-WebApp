@@ -26,6 +26,27 @@ function salesAuthTtlField_(kind,value){
   if(grace===null||!Number.isFinite(value?.expiresAt))return {};
   return {ttl:{timestampValue:new Date(value.expiresAt+grace).toISOString()}};
 }
+// Spark has no TTL policies (they require billing). After a successful login, at most every 10 minutes,
+// delete a bounded number of auth attempts/sessions whose 'ttl' (expiry plus grace) has passed.
+// Best effort: each delete is conditional on the read updateTime; failures never affect the login.
+const SALES_AUTH_CLEANUP_LIMIT=20;
+function salesAuthCleanup_(){
+  if(salesAuthCacheCount_('sales-auth-cleanup'))return 0;salesAuthCachePut_('sales-auth-cleanup',1,600);
+  const c=salesContext_(),root=pilotUrl_(c.project,'').replace(/\/$/,''),now=Date.now(),writes=[];
+  for(const kind of ['attempts','sessions']){
+    const query={structuredQuery:{from:[{collectionId:'sales_auth'+kind}],where:{fieldFilter:{field:{fieldPath:'ttl'},op:'LESS_THAN',value:{timestampValue:new Date(now).toISOString()}}},limit:SALES_AUTH_CLEANUP_LIMIT}};
+    const r=UrlFetchApp.fetch(root+':runQuery',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify(query),muteHttpExceptions:true});
+    if(r.getResponseCode()!==200)return 0;
+    for(const row of JSON.parse(r.getContentText())||[]){
+      const d=row?.document,rel=String(d?.name||'').split('/documents/')[1]||'',ttl=Date.parse(d?.fields?.ttl?.timestampValue||'');
+      if(!new RegExp('^sales_auth'+kind+'/[-\\w]{1,128}$').test(rel)||!Number.isFinite(ttl)||ttl>=now||!d.updateTime)continue;
+      writes.push({delete:d.name,currentDocument:{updateTime:d.updateTime}});
+    }
+  }
+  if(!writes.length)return 0;
+  const r=UrlFetchApp.fetch(root+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes}),muteHttpExceptions:true});
+  return r.getResponseCode()===200?writes.length:0;
+}
 function salesAuthCommit_(entries,checks=[]){
   const c=salesContext_(),base='projects/'+c.project+'/databases/(default)/documents/';
   const writes=checks.map(d=>({verify:base+d._path,currentDocument:{updateTime:d._updateTime}}));
@@ -119,7 +140,7 @@ function finishSalesLogin(input){
   // A previously activated account signs in with its current ACL, not its old invitation.
   if(!record&&input.invitation){salesAuthActivate_(input.invitation,identity);record=salesAuthRead_('users',identity.uid);}
   const user=salesAuthPrincipal_(identity,record),session=salesAuthRandom_(),expiresAt=Date.now()+8*3600000;
-  salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt,sessionEpoch:user.record.sessionEpoch}}],[user.record]);return {session,expiresAt,user:salesAuthPublicUser_(user)};
+  salesAuthCommit_([{kind:'attempts',id:hash,prior:attempt,value:{used:true,expiresAt:attempt.expiresAt}},{kind:'sessions',id:salesAuthHash_(session),create:true,value:{uid:identity.uid,email:identity.email,idToken:input.idToken,refreshToken:input.refreshToken,tokenExpiresAt:identity.tokenExpiresAt,expiresAt,sessionEpoch:user.record.sessionEpoch}}],[user.record]);try{salesAuthCleanup_();}catch(_){}return {session,expiresAt,user:salesAuthPublicUser_(user)};
 }
 function salesAuthPublicUser_(user){return {uid:user.uid,email:user.email,admin:user.admin,permissions:user.permissions,revision:user.revision};}
 function salesAuthActivate_(token,identity){
