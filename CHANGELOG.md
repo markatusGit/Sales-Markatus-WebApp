@@ -6,6 +6,9 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [v0.28.4]
 
+- Google47 veröffentlicht und mit Editor/GitHub verglichen; alle22 Suiten bestanden. Bestehender Abgleich am17.11. live von162/173 bis173/173 abgeschlossen.21 offene Hinweise ausdrücklich erhalten, keine fehlerfreie Datenabnahme behauptet.
+- Echte lesende Prüfungen bestätigen die korrigierte Unternehmensbereich-Zuordnung;13 Altaufträge unverändert. Sechs Historienaufträge weiterhin wegen syncId unbestätigt, drei Firmen-IDs HTTP404, ein E-Mail-Zielzustand offen.
+
 - Unternehmensbereiche entsprechend HQ-SubsystemBase ohne eingebettete ID bestätigen: begrenzte frische Metadatenliste, nur vollständige und eindeutige Zuordnung. Doppelte Namen/abweichende Attribute bleiben gesperrt. Kein erneuter Firmen-POST.
 - Bei gleicher Projekt-ID, Projektnummer, Magazin und Ausgabe nur führende Nullen im abschließenden Ausgabe-Titel tolerieren; wirkliche Zuordnungsänderungen weiterhin blockieren. Aktualisierten Titel nach erfolgreicher Verknüpfung speichern.
 - Reine Altauftragsprüfung nennt nicht bestätigte Historienfelder und prüft auch den gespeicherten E-Mail-Zielzustand. Keine Entsperrung/Statusänderung. HTTP429 bei anonymer Schutzprüfung als Kontingentfehler behandeln; öffentliche Daten bleiben abgewiesen.
