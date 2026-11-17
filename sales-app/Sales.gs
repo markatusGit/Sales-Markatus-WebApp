@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-16-r28.3';
+const SALES_RELEASE = '2026-11-17-r28.4';
 let salesContextCache_;
 
 function salesUser_(admin) {
@@ -90,6 +90,7 @@ function salesAssertPrivate_() {
   const c=salesContext_();
   for(const path of ['sales_editions/'+SALES.edition,'sales_jobs/security-probe','sales_companies/security-probe','sales_directory/security-probe','sales_chunks/security-probe','sales_meta/security-probe','sales_imports/security-probe']) {
     const r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',muteHttpExceptions:true,followRedirects:false});
+    if(r.getResponseCode()===429)throw Error('Firestore HTTP 429 bei Schutzprüfung.');
     if(![401,403].includes(r.getResponseCode())) throw new Error('Firestore-Schutz für die App-Daten fehlt. Import angehalten.');
   }
 }
@@ -124,6 +125,16 @@ function salesWebsiteInput_(value) {
   const result=/^https?:\/\//i.test(raw)?raw:'https://'+raw;
   if(!/^https?:\/\/[^\s@/:?#]+\.[^\s@/:?#]{2,}(?::\d{1,5})?(?:[/?#][^\s]*)?$/i.test(result)) throw new Error('Homepage bitte als Domain wie test.de oder vollständige https-Adresse eingeben.');
   return result;
+}
+function salesSubsystemConfirmed_(company,expectedId){
+  const id=salesId_(expectedId),linked=company.subsystems||[];if(!Array.isArray(linked)||!linked.length)return false;
+  if(linked.some(row=>row.id!=null))return linked.every(row=>row.id!=null)&&linked.filter(row=>Number(row.id)===id).length===1;
+  // CompanyGetRelated embeds SubsystemBase without an ID. Resolve only a unique fresh name.
+  const response=salesHqGet_('/v2/Subsystems?$top=200&$skip=0&orderby=id'),data=response.data,rows=Array.isArray(data)?data:data?.data||data?.value;
+  if(!Array.isArray(rows)||rows.length>=200)throw Error('HQ-Unternehmensbereiche nicht vollständig prüfbar.');
+  const key=Object.keys(response.headers).find(k=>k.toLowerCase()==='hellohq-count');if(key&&Number(response.headers[key])!==rows.length)throw Error('HQ-Unternehmensbereiche nicht vollständig prüfbar.');
+  const targets=rows.filter(row=>Number(row.id)===id);if(targets.length!==1||!targets[0].name||rows.filter(row=>row.name===targets[0].name).length!==1)return false;
+  const target=targets[0],matches=linked.filter(row=>row.name===target.name);return matches.length===1&&['isMaster','currency'].every(k=>matches[0][k]===undefined||String(matches[0][k]??'')===String(target[k]??''));
 }
 function salesCompanyTypeId_(row) {
   const id=Number(row?.companyTypeId??row?.id);
@@ -641,7 +652,7 @@ function salesRunCreate_(job,draft,step) {
   if(!salesEqualFields_(actual.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website']))) throw new Error('Standardadresse der Firma wurde in HQ noch nicht vollständig bestätigt.');
   if(!(actual.companyTypes||[]).some(t=>salesCompanyTypeId_(t)===Number(draft.company.companyTypes[0].companyTypeId))) throw new Error('Firmenart wurde in HQ noch nicht bestätigt.');
   if(!(actual.responsibleUsers||[]).some(u=>Number(u.userId||u.id)===Number(draft.company.responsibleUserIds[0]))) throw new Error('Verantwortlicher HQ-Benutzer wurde noch nicht bestätigt.');
-  if(!(actual.subsystems||[]).some(s=>Number(s.id)===Number(draft.company.subsystemIds[0]))) throw new Error('HQ-Unternehmensbereich wurde noch nicht bestätigt.');
+  if(!salesSubsystemConfirmed_(actual,draft.company.subsystemIds[0])) throw new Error('HQ-Unternehmensbereich wurde noch nicht bestätigt.');
   if((draft.company.customFields||[]).some(f=>!(actual.customFields||[]).some(a=>a.name===f.name&&String(a.value)===String(f.value)))) throw new Error('Eigene Felder stimmen nicht überein.');
   if(job.markerMode!=='none'){salesCleanMarker_(job,draft);job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);}
   const cleanCompany=salesOne_('Companies',job.hqId);

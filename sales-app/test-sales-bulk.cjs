@@ -131,5 +131,14 @@ test('real Firestore transports meter actual query documents, missing lookups an
  f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:4,writes:12000});assert.throws(()=>f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{update:{name:'synthetic'}}]})}),/Tagesbudget/);
 });
 
+test('edition linking permits only zero-padding of the same immutable project and issue',()=>{
+ const f=bulkFixture(),edition={id:'synthetic-4',magazine:'KRONACHER',issue:4,projectId:'42',projectNumber:'S4',projectName:'KRONACHER Ausgabe #04',settings:{targetCents:123},excludedDocumentIds:[]},project={generation:'synthetic',row:{id:42,number:'S4',name:'KRONACHER Ausgabe #4'}},run={entities:{Projects:{generation:'synthetic'}},stats:{editions:0}};
+ f.ctx.salesBulkEdition_(run,{id:edition.id},{edition,project,docs:[]});const saved=f.db['sales_editions/'+edition.id];assert.equal(saved.projectName,project.row.name);assert.equal(saved.projectId,'42');assert.equal(saved.settings.targetCents,123);const before=JSON.stringify(f.db);
+ for(const patch of [{name:'KRONACHER Ausgabe #5'},{name:'OTHER Ausgabe #4'},{name:'KRONACHER Ausgabe #4 EXTRA'},{number:'OTHER'},{id:43}])assert.throws(()=>f.ctx.salesBulkEdition_(run,{id:edition.id},{edition,project:{...project,row:{...project.row,...patch}},docs:[]}),/Projektzuordnung/);assert.equal(JSON.stringify(f.db),before);
+});
+test('quota during anonymous protection probe is recognized without accepting public data',()=>{
+ const f=bulkFixture(),source=fs.readFileSync(__dirname+'/Sales.gs','utf8');vm.runInContext(source.slice(source.indexOf('function salesAssertPrivate_('),source.indexOf('function getSalesState(')),f.ctx);f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>429});assert.throws(()=>f.ctx.salesAssertPrivate_(),e=>f.ctx.salesWorkerLimited_(e));f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200});assert.throws(()=>f.ctx.salesAssertPrivate_(),/Schutz/);
+});
+
 for(const c of cases){c.fn();console.log('PASS',c.name);count++;}console.log(count+' bulk/worker checks passed.');}
 module.exports={bulkFixture};

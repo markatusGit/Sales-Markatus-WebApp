@@ -100,13 +100,18 @@ function salesBulkCompany_(run,task){
   }
   salesBulkPut_(entries);run.stats.companies+=companies.length;run.stats.contacts+=contacts.filter(c=>companies.some(p=>Number(p.id)===Number(c.companyId))).length;run.stats.histories+=histories.filter(h=>companies.some(p=>Number(p.id)===Number(h.companyId))).length;return true;
 }
+function salesEditionProjectName_(edition,name){
+  if(name===edition.projectName)return true;
+  const parse=value=>/^(.*) Ausgabe #(\d+)$/.exec(String(value||'')),before=parse(edition.projectName),after=parse(name);
+  return !!before&&!!after&&before[1]===edition.magazine&&after[1]===edition.magazine&&Number(before[2])===Number(edition.issue)&&Number(after[2])===Number(edition.issue);
+}
 function salesBulkEdition_(run,task,cached){
   const e=cached?.edition||salesRead_('sales_editions/'+salesKey_(task.id)),p=cached?cached.project:salesBulkGet_([salesBulkCollection_('Projects')+'/'+e.projectId])[salesBulkCollection_('Projects')+'/'+e.projectId];
-  if(!p||p.generation!==run.entities.Projects.generation||p.row.name!==e.projectName||String(p.row.number)!==String(e.projectNumber))throw new Error('HQ-Projektzuordnung der Ausgabe wurde geändert oder nicht geliefert. In der Verwaltung prüfen.');
+  if(!p||p.generation!==run.entities.Projects.generation||Number(p.row.id)!==Number(e.projectId)||!salesEditionProjectName_(e,p.row.name)||String(p.row.number)!==String(e.projectNumber))throw new Error('HQ-Projektzuordnung der Ausgabe wurde geändert oder nicht geliefert. In der Verwaltung prüfen.');
   const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId))).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
   const excludedDocuments=docs.filter(d=>excluded.has(String(d.id))).map(d=>({id:String(d.id),number:d.number||''}));excludedDocuments.forEach(d=>b.issues.push({id:d.id,reason:'Mehrere Ausgaben / Zuordnung ungeklärt: aus Summe ausgeschlossen'}));
   const companyIds=Array.from(new Set(docs.filter(d=>['Invoice','CreditNote'].includes(d.documentType)&&d.companyId).map(d=>String(d.companyId))));
-  salesWrite_('sales_editions/'+e.id,{...e,cacheLinkPending:false,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
+  salesWrite_('sales_editions/'+e.id,{...e,projectName:p.row.name,cacheLinkPending:false,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
 }
 function salesBulkUnassigned_(run,task){
   const entity=task.id==='contacts'?'ContactPersons':'ContactHistories',known=new Set(run.companyIds),rows=[];

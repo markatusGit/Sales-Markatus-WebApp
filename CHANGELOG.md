@@ -4,6 +4,13 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.28.4]
+
+- Unternehmensbereiche entsprechend HQ-SubsystemBase ohne eingebettete ID bestätigen: begrenzte frische Metadatenliste, nur vollständige und eindeutige Zuordnung. Doppelte Namen/abweichende Attribute bleiben gesperrt. Kein erneuter Firmen-POST.
+- Bei gleicher Projekt-ID, Projektnummer, Magazin und Ausgabe nur führende Nullen im abschließenden Ausgabe-Titel tolerieren; wirkliche Zuordnungsänderungen weiterhin blockieren. Aktualisierten Titel nach erfolgreicher Verknüpfung speichern.
+- Reine Altauftragsprüfung nennt nicht bestätigte Historienfelder und prüft auch den gespeicherten E-Mail-Zielzustand. Keine Entsperrung/Statusänderung. HTTP429 bei anonymer Schutzprüfung als Kontingentfehler behandeln; öffentliche Daten bleiben abgewiesen.
+- Keine neuen Script Properties oder Bereitstellungseinstellungen; bestehender Tagesbudgetschutz bleibt erhalten.
+
 ## [v0.28.3]
 
 - Als Google46 veröffentlicht, alle 22 Suiten und Google/Editor/GitHub-Abgleich erfolgreich. Am 17.11. Kontingenterneuerung und 14 gesperrte anonyme Datenpfade live bestätigt; alter Lauf 154/173 weiterhin angehalten. Echte Wiederanmeldung/Abschluss offen.

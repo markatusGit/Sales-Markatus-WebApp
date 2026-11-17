@@ -106,6 +106,20 @@ test('job inspection is GET-only and leaves matching, missing and unknown outcom
  delete f.db['sales_jobs/'+r.id].hqId;delete f.db['sales_drafts/'+r.id].hqId;f.ctx.salesOne_=()=>{throw Error('Must not search HQ');};assert.match(f.ctx.getSalesJobInspection(r.id).checks[0],/Keine gespeicherte HQ-ID/);
  f.setEmail('test@example.invalid');assert.throws(()=>f.ctx.getSalesJobInspection(r.id),/Zugriff|Administrator/);
 });
+test('ID-less embedded subsystem requires a unique fresh bounded HQ mapping',()=>{
+ const f=productionFixture();f.remote.Subsystems={10:{id:10,name:'Synthetic main',isMaster:true,currency:'EUR'}};const company={subsystems:[{name:'Synthetic main',isMaster:true,currency:'EUR'}]},n=f.calls.length;assert.equal(f.ctx.salesSubsystemConfirmed_(company,10),true);assert.equal(f.calls.length,n+1);assert.match(f.calls.at(-1).path,/\$top=200/);
+ f.remote.Subsystems[11]={id:11,name:'Synthetic main',isMaster:true,currency:'EUR'};assert.equal(f.ctx.salesSubsystemConfirmed_(company,10),false);delete f.remote.Subsystems[11];assert.equal(f.ctx.salesSubsystemConfirmed_(company,11),false);assert.equal(f.ctx.salesSubsystemConfirmed_({subsystems:[{name:'Synthetic main',currency:'USD'}]},10),false);
+ const before=f.calls.filter(c=>c.method!=='get').length;for(let id=20;id<220;id++)f.remote.Subsystems[id]={id,name:'Synthetic '+id};assert.throws(()=>f.ctx.salesSubsystemConfirmed_(company,10),/nicht vollständig/);assert.equal(f.calls.filter(c=>c.method!=='get').length,before);
+});
+test('documented ID-less subsystem shape completes the original company without duplicate POST',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany({...f.input,name:'Synthetic subsystem contract'}),one=f.ctx.salesOne_;f.remote.Subsystems={4:{id:4,name:'Synthetic main',isMaster:true,currency:'EUR'}};
+ f.ctx.salesOne_=(entity,id)=>{const row=one(entity,id);if(entity==='Companies')row.subsystems=[{name:'Synthetic main',isMaster:true,currency:'EUR'}];return row;};const before=f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length;assert.equal(f.ctx.runSalesJob(r.id,'company').state,'companyConfirmed');assert.equal(f.ctx.runSalesJob(r.id,'contact').state,'synced');assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,before+1);
+});
+test('legacy email and history inspections report exact field status without reconciliation writes',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany({...f.input,name:'Synthetic inspection fields'});f.ctx.runSalesJob(r.id,'company');f.ctx.runSalesJob(r.id,'contact');const draft=f.db['sales_drafts/'+r.id],target=f.ctx.salesContactEmailState_(draft,202);
+ f.db['sales_jobs/inspect-email']={id:'inspect-email',kind:'contactEmail',draftId:r.id,hqId:101,contactId:202,state:'uncertain',targetContact:target};let before=JSON.stringify(f.db);assert.match(f.ctx.getSalesJobInspection('inspect-email').checks.join(' '),/Zielzustand stimmt/);assert.equal(JSON.stringify(f.db),before);f.remote.ContactPersons[202].eMail='different@example.invalid';assert.match(f.ctx.getSalesJobInspection('inspect-email').checks.join(' '),/noch nicht bestätigt/);
+ const history={companyId:101,syncId:'sales-inspect-history',reason:'Synthetic history',content:'Synthetic note',contactOn:'2026-11-17T09:00:00Z',contactHistoryChannel:'Note'};f.remote.ContactHistories[999]={...history,id:999,reason:'Synthetic changed'};f.db['sales_jobs/inspect-history']={id:'inspect-history',kind:'history',draftId:r.id,hqId:101,historyId:999,state:'uncertain',history};before=JSON.stringify(f.db);const n=f.calls.length,result=f.ctx.getSalesJobInspection('inspect-history');assert.match(result.checks.join(' '),/Nicht bestätigte Felder: reason/);assert.equal(JSON.stringify(f.db),before);assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
+});
 console.log(count+' production checks passed.');
 }
 module.exports={productionFixture};
