@@ -1,7 +1,9 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-17-r28.4';
+const SALES_RELEASE = '2026-11-17-r29';
 let salesContextCache_;
+// User actions wait for the current background section (the worker yields between sections) instead of failing after 1 s.
+const SALES_LOCK_WAIT_MS=30000;
 
 function salesUser_(admin) {
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){
@@ -30,9 +32,14 @@ function salesContext_() {
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project || '')) throw new Error('Firebase-Projekt fehlt.');
   let account; try {account=JSON.parse(p.getProperty('FIREBASE_SERVICE_ACCOUNT_JSON') || '{}');} catch (_) {throw new Error('Firebase-Dienstkonto ungültig.');}
   if (account.project_id!==project || account.type!=='service_account' || !account.private_key) throw new Error('Firebase-Dienstkonto passt nicht zum Projekt.');
-  salesContextCache_={project,token:pilotGoogleToken_(account)};
+  // Reuse the one-hour service-account token across executions (script-private cache) instead of signing a new JWT per call.
+  const cache=salesCache_(),key='sales-fs-token-'+project+'-'+String(account.client_email||'').replace(/[^a-z0-9]/gi,'').slice(0,60);
+  let token=null;try{token=cache?.get(key)||null;}catch(_){token=null;}
+  if(!token){token=pilotGoogleToken_(account);try{cache?.put(key,token,3000);}catch(_){}}
+  salesContextCache_={project,token};
   return salesContextCache_;
 }
+function salesCache_() {try{return typeof CacheService!=='undefined'?CacheService.getScriptCache():null;}catch(_){return null;}}
 function salesPath_(path) {if (!/^sales_[a-z]+\/[a-zA-Z0-9_-]+$/.test(path)) throw new Error('Ungültiger Datenpfad.'); return path;}
 function salesRead_(path) {
   const c=salesContext_(), raw=pilotReadDocument_(c.project,salesPath_(path),c.token);
@@ -54,7 +61,7 @@ function salesList_(collection) {
   }
   throw new Error('Zu viele Datensätze für diesen Pilotabruf.');
 }
-function salesLock_(fn) {const l=LockService.getScriptLock();if (!l.tryLock(1000)) throw new Error('Ein Speichervorgang läuft. Bitte gleich erneut versuchen.');try{return fn();}finally{l.releaseLock();}}
+function salesLock_(fn) {const l=LockService.getScriptLock();if (!l.tryLock(SALES_LOCK_WAIT_MS)) throw new Error('Ein Speichervorgang läuft. Bitte gleich erneut versuchen.');try{return fn();}finally{l.releaseLock();}}
 function salesNow_() {return new Date().toISOString();}
 function salesId_(value) {const id=Number(value);if (!Number.isSafeInteger(id)||id<=0) throw new Error('Ungültige HQ-ID.');return id;}
 function salesText_(value,max,required) {if (typeof value!=='string') value='';value=value.trim();if (value.length>max || (required&&!value)) throw new Error('Pflichtfeld fehlt oder Eingabe ist zu lang.');return value;}
@@ -362,7 +369,12 @@ function salesSalutationForm_(value) {
 }
 function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
-    const value=salesDraftInput_(input,cat),id=Utilities.getUuid(),draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
+    const requestId=input?.requestId===undefined||input.requestId===''?'':salesKey_(String(input.requestId)),value=salesDraftInput_(input,cat),id=requestId?'req_'+requestId:Utilities.getUuid();
+    // A repeated request after a lost response returns the stored draft instead of creating a second HQ company.
+    if(requestId){const old=salesRead_('sales_jobs/'+id);if(old){const prior=salesRead_('sales_drafts/'+id);
+      if(old.kind!=='createCompany'||old.actor!==user.email||!prior||Object.keys(value).some(k=>JSON.stringify(prior[k])!==JSON.stringify(value[k])))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');
+      return {id,replay:true,message:'Diese Firma wurde bereits gespeichert. Es wurde keine zweite Anlage erzeugt.'};}}
+    const draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
     salesWrite_('sales_drafts/'+id,draft);
     const job={id,kind:'createCompany',markerMode:'none',draftId:id,name:value.company.name,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid}:{}),createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
@@ -546,9 +558,11 @@ function salesWriteHq_(job,path,method,body) {
   if(!allowed) throw new Error('Dieser HQ-Schreibpfad ist gesperrt.');
   const draft=salesRead_('sales_drafts/'+job.draftId);
   if(!draft||!draft.company||job.hqId&&Number(draft.hqId)!==Number(job.hqId)) throw new Error('HQ-Schreibziel ist keine selbst angelegte Firma.');
+  const priorMarker={writeAttempted:job.writeAttempted,phaseWriteAttempted:job.phaseWriteAttempted,lastWrite:job.lastWrite};
   job.writeAttempted=true;job.phaseWriteAttempted=true;
   job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};
-  salesWrite_('sales_jobs/'+job.id,job);
+  // The marker only counts once it is durable; if it cannot be stored, HQ is not contacted.
+  try{salesWrite_('sales_jobs/'+job.id,job);}catch(e){Object.assign(job,priorMarker);throw e;}
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
   job.lastWrite.status=r.getResponseCode();
   if(r.getResponseCode()<200||r.getResponseCode()>=300) {
@@ -571,8 +585,23 @@ function salesEqualFields_(actual,expected) {
 function runSalesJob(id,step) {
   salesUser_(true);return salesLock_(()=>salesRunJobLocked_(id,step));
 }
+function salesJobFailState_(job,e) {
+  const reason=e?.message||'Unbekannter Fehler';
+  if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e?.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+  // Without a persisted write marker for this phase, HQ was not contacted: return to the stored stage instead of locking the job.
+  else if(job.kind==='createCompany'&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message=(job.safeStage==='pending'?'Noch nicht an HQ gesendet: ':'HQ-Rückprüfung noch offen: ')+reason;}
+  else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+reason+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
+  return job;
+}
+// Callers hold the global script lock, so a stored 'running' job belongs to an interrupted execution
+// (quota/budget stop or runtime limit) and is classified with the same rules as a caught error.
+function salesJobRecoverInterrupted_(job) {
+  if(job?.state!=='running')return job;
+  salesJobFailState_(job,{message:'Vorherige Übertragung wurde unterbrochen (Kontingent, Tagesbudget oder Laufzeitgrenze)'});
+  job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);return job;
+}
 function salesRunJobLocked_(id,step) {
-  salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
+  salesAssertPrivate_();const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(id)));if(!job) throw new Error('Auftrag fehlt.');
     if(job.state==='synced') {if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return {message:'Bereits synchronisiert. Keine erneute Anlage.'};}
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
     const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
@@ -593,9 +622,7 @@ function salesRunJobLocked_(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
-      else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
-      else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
+      salesJobFailState_(job,e);
     }
     job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);
 }
@@ -855,7 +882,8 @@ function salesRunChange_(job) {
   if(address){const payload=salesPick_(address,['alternativeCompanyName','additionalInformation','street','houseNumber','zipCode','city','country','description','phone','email','fax','website','addressLine2','standardForDocumentType']);payload.website=job.change.homepage;salesWriteHq_(job,'/v2/Companies/'+job.hqId+'/Addresses/'+job.addressId,'put',payload);}
   const after=salesOne_('Companies',job.hqId);
   if(after.industrialSector!==job.change.industrialSector||!salesHomepageConfirmed_(after,job.change.homepage)||String(after.defaultAddress?.website||'')!==job.change.homepage) throw new Error('Homepage oder Branche nicht vollständig in HQ bestätigt.');
-  const data=salesRead_('sales_companies/'+job.hqId);data.company=salesCompany_(after);data.loadedAt=salesNow_();salesWrite_('sales_companies/'+job.hqId,data);
+  // HQ is confirmed at this point; a missing local file must not turn a confirmed change into 'uncertain'.
+  const data=salesRead_('sales_companies/'+job.hqId);if(data){data.company=salesCompany_(after);data.loadedAt=salesNow_();salesWrite_('sales_companies/'+job.hqId,data);}
 }
 function salesHomepageConfirmed_(actual,expected) {return String(actual.homepage||'')===expected||!!expected&&!actual.homepage&&String(actual.defaultAddress?.website||'')===expected;}
 function resolveSalesConflict(id,choice) {

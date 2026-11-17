@@ -11,6 +11,13 @@ function salesWorkerBudget_(reads,writes){
   if(next.reads>20000||next.writes>12000){const e=Error('Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
   p.setProperty('SALES_SYNC_BUDGET',JSON.stringify(next));
 }
+// Before an HQ write task: stop cleanly unless enough budget remains to finish the job and store its state.
+function salesWorkerReserve_(reads,writes){
+  if(!salesWorkerBudgetActive_)return;
+  const day=salesWorkerDay_();let meter;try{meter=JSON.parse(salesWorkerProps_().getProperty('SALES_SYNC_BUDGET')||'null');}catch{throw Error('Gespeichertes Importbudget ungültig.');}
+  if(!meter||meter.day!==day)return;
+  if(meter.reads+reads>20000||meter.writes+writes>12000){const e=Error('Tagesbudget des HQ-Imports reicht nicht mehr sicher für einen Schreibauftrag. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
+}
 function salesWorkerRequestBudget_(url,options){
   if(!salesWorkerBudgetActive_||!/^https:\/\/firestore\.googleapis\.com\//.test(url))return null;
   const method=String(options?.method||'get').toLowerCase();let body;try{body=JSON.parse(options?.payload||'{}');}catch{throw Error('Importanfrage ohne prüfbares Budget.');}
@@ -100,6 +107,8 @@ function salesSyncWorker_(event){
       // Each company/contact write is followed by a separate trigger execution, not just another function call.
       if(writeBoundary)return;
     }finally{lock.releaseLock();}
+    // Give waiting user saves a chance to take the lock before the next section; if one does, the next trigger continues.
+    if(typeof Utilities!=='undefined'&&Utilities.sleep)Utilities.sleep(1500);
   }
   }catch(e){if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}throw e;}finally{salesWorkerBudgetActive_=false;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }

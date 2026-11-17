@@ -179,7 +179,7 @@ function main(){
  measure('Kundenliste: einmaliger Aufbau des Namensindex',()=>f.ctx.getSalesLeanView('customers'));
  assert.equal(measure('Kundenliste: regulärer Aufruf',()=>f.ctx.getSalesLeanView('customers')).readDocumentsModel,1);
  measure('Kundenakte: einmaliger Aufbau kleiner Zuordnungsindizes',()=>f.ctx.getSalesLeanCompany('10001'));
- assert.equal(measure('Kundenakte: reguläre erste Öffnung je Browsersitzung',()=>f.ctx.getSalesLeanCompany('10001')).readDocumentsModel,4);
+ assert.equal(measure('Kundenakte: reguläre erste Öffnung je Browsersitzung',()=>f.ctx.getSalesLeanCompany('10001')).readDocumentsModel,5); // r23: +1 Kommunikationsdokument (sales_communication) je Akte
  measure('Ausgabeeinstellungen: nur betroffene Ausgabe und Übersicht',()=>f.ctx.saveSalesLeanEditionSettings({editionId:'project-501',revision:0,target:100}));
  measure('Magazinfilter: einmaliger Aufbau',()=>f.ctx.getSalesLeanView('magazine'));
  assert.equal(measure('Magazinfilter: regulaerer Aufruf',()=>f.ctx.getSalesLeanView('magazine')).readDocumentsModel,2);

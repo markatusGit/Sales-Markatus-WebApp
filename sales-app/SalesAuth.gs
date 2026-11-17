@@ -19,10 +19,17 @@ function salesAuthRead_(kind,id){
   if(r.getResponseCode()===404)return null;if(r.getResponseCode()===429){const e=Error('Der Firebase-Datenspeicher hat sein Kontingent erreicht. Bitte später erneut versuchen. Erneutes Anmelden behebt dies nicht.');e.salesQuota=true;throw e;}if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
   const doc=JSON.parse(r.getContentText());return {...JSON.parse(doc.fields.payload.stringValue),_path:path,_updateTime:doc.updateTime};
 }
+// Firestore TTL field for short-lived auth documents (policy on field 'ttl' in sales_authattempts/sales_authsessions).
+// Grace periods keep expired sessions briefly traceable; the app itself already rejects them via expiresAt.
+function salesAuthTtlField_(kind,value){
+  const grace=kind==='attempts'?86400000:kind==='sessions'?7*86400000:null;
+  if(grace===null||!Number.isFinite(value?.expiresAt))return {};
+  return {ttl:{timestampValue:new Date(value.expiresAt+grace).toISOString()}};
+}
 function salesAuthCommit_(entries,checks=[]){
   const c=salesContext_(),base='projects/'+c.project+'/databases/(default)/documents/';
   const writes=checks.map(d=>({verify:base+d._path,currentDocument:{updateTime:d._updateTime}}));
-  for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)}}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
+  for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)},...salesAuthTtlField_(kind,clean)}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
   const response=UrlFetchApp.fetch(pilotUrl_(c.project,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes}),muteHttpExceptions:true,followRedirects:false});
   const code=response.getResponseCode();if(code<200||code>=300){let body;try{body=JSON.parse(response.getContentText());}catch{}const error=Error('Auth-Speicher HTTP '+code+'. Bitte erneut versuchen.');error.firestoreStatus=body?.error?.status;throw error;}
   return response.getContentText()?JSON.parse(response.getContentText()):null;
@@ -43,9 +50,17 @@ function salesAuthPrincipal_(identity,record=salesAuthRead_('users',identity.uid
   const admin=identity.uid===cfg.ownerUid&&identity.email===cfg.ownerEmail;
   return {uid:identity.uid,email:identity.email,admin,permissions:salesPermissions_(record.permissions,admin),revision:record.revision,record};
 }
+// Script-cache guard against anonymous quota exhaustion: unknown session keys are counted per minute and,
+// above the limit, rejected without any Firestore read. Recently verified sessions are never blocked by it.
+const SALES_AUTH_UNKNOWN_LIMIT=40;
+function salesAuthCacheCount_(key){const cache=salesCache_();try{return Number(cache?.get(key)||0)||0;}catch(_){return 0;}}
+function salesAuthCachePut_(key,value,seconds){const cache=salesCache_();try{cache?.put(key,String(value),seconds);}catch(_){}}
 function salesAuthVerify_(session){
-  const id=salesAuthHash_(salesAuthKey_(session));let entry=salesAuthRead_('sessions',id);
-  if(!entry||entry.expiresAt<=Date.now()||entry.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');
+  const id=salesAuthHash_(salesAuthKey_(session)),minute=Math.floor(Date.now()/60000),unknownKey='sales-auth-unknown-'+minute,knownKey='sales-auth-known-'+id;
+  if(!salesAuthCacheCount_(knownKey)&&salesAuthCacheCount_(unknownKey)>=SALES_AUTH_UNKNOWN_LIMIT)throw Error('AUTH_REQUIRED: Viele ungültige Anfragen. Bitte in einer Minute erneut anmelden.');
+  let entry=salesAuthRead_('sessions',id);
+  if(!entry||entry.expiresAt<=Date.now()||entry.disabled){salesAuthCachePut_(unknownKey,salesAuthCacheCount_(unknownKey)+1,120);throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');}
+  salesAuthCachePut_(knownKey,1,600);
   if(entry.tokenExpiresAt<Date.now()+60000)entry=(()=>{
     const current=salesAuthRead_('sessions',id);if(!current||current.expiresAt<=Date.now()||current.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet.');if(current.tokenExpiresAt>=Date.now()+60000)return current;
     const r=UrlFetchApp.fetch('https://securetoken.googleapis.com/v1/token?key='+salesAuthConfig_().apiKey,{method:'post',contentType:'application/x-www-form-urlencoded',payload:'grant_type=refresh_token&refresh_token='+encodeURIComponent(current.refreshToken),muteHttpExceptions:true});
@@ -66,24 +81,32 @@ function beginSalesLogin(input){
   if(input.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
   // Bound anonymous writes and token-validation traffic; this is a quota guard, not an identity check.
   salesAuthThrottle_('begin',30);
-  const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
+  const attempt=salesAuthRandom_(),attemptId=salesAuthHash_(attempt);salesAuthCommit_([{kind:'attempts',id:attemptId,create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);
+  salesAuthCachePut_('sales-auth-attempt-'+attemptId,1,360);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
 }
 function salesAuthConflict_(error){return ['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(error.firestoreStatus)||/\bHTTP (?:409|412)\b/.test(error.message||'');}
 function salesAuthThrottle_(key,limit){
   // Atomic global quota guard is independent of the long business/worker script lock.
-  const minute=Math.floor(Date.now()/60000),id='rate-'+key+'-'+minute;
+  const minute=Math.floor(Date.now()/60000),id='rate-'+key+'-'+minute,cacheKey='sales-auth-'+id;
+  // Once the limit is known to be reached, reject from the script cache without another Firestore read.
+  if(salesAuthCacheCount_(cacheKey)>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');
   for(let retry=0;retry<3;retry++){
     const prior=salesAuthRead_('attempts',id),count=prior?.count||0;
-    if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');
-    try{salesAuthCommit_([{kind:'attempts',id,prior,create:!prior,value:{count:count+1,expiresAt:(minute+2)*60000}}]);return;}
+    if(count>=limit){salesAuthCachePut_(cacheKey,count,120);throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');}
+    try{salesAuthCommit_([{kind:'attempts',id,prior,create:!prior,value:{count:count+1,expiresAt:(minute+2)*60000}}]);salesAuthCachePut_(cacheKey,count+1,120);return;}
     catch(e){if(!salesAuthConflict_(e))throw e;}
   }
   throw Error('AUTH_REQUIRED: Viele gleichzeitige Anmeldungen. Bitte gleich erneut versuchen.');
 }
 function finishSalesLogin(input){
   if(input?.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
+  // Cheap checks first: malformed input or an attempt this server never issued does not count against
+  // the shared login limit and causes no Firestore or token traffic.
+  if(typeof input?.idToken!=='string'||input.idToken.length>10000||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||!/^[-\w]{32,128}$/.test(input.state||''))throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
+  const hash=salesAuthHash_(salesAuthKey_(input.attempt));salesAuthKey_(input.verifier);
+  if(salesCache_()&&!salesAuthCacheCount_('sales-auth-attempt-'+hash))throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen. Bitte erneut anmelden.');
   salesAuthThrottle_('finish',30);
-  const identity=salesAuthIdentity_(input?.idToken),hash=salesAuthHash_(salesAuthKey_(input?.attempt));
+  const identity=salesAuthIdentity_(input.idToken);
   const attempt=salesAuthRead_('attempts',hash),verifier=salesAuthKey_(input?.verifier),challenge=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,verifier)).replace(/=+$/,'');
   if(!attempt||attempt.used||attempt.expiresAt<=Date.now()||attempt.state!==input.state||attempt.challenge!==challenge||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||Date.now()/1000-identity.authTime>300||identity.authTime>Date.now()/1000+60)throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
   if(!salesAuthEnabled_()){

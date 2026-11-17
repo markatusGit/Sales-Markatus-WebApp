@@ -56,6 +56,11 @@ test('names index retains pending drafts across a new session and deduplicates c
  const draft=f.ctx.salesRead_('sales_drafts/'+added.id);draft.hqId=999;f.ctx.salesWrite_('sales_drafts/'+added.id,draft);f.ctx.salesWrite_('sales_directory/999',{company:{id:'999',name:'TEST synthetic pending'}});
  const rows=f.ctx.getSalesLeanView('customers').companies;assert.equal(rows.filter(c=>String(c.hqId||c.id)==='999').length,1);
 });
+test('F-5 targeted HQ refresh keeps open app changes of the customer file',()=>{
+  const f=setup();f.ctx.syncSalesLeanCompany('101');const doc=f.ctx.salesRead_('sales_companies/101'),pending=[{jobId:'synthetic-job',entity:'company',targetId:101,change:{industrialSector:'New'}}];
+  doc.pendingChanges=pending;f.ctx.salesWrite_('sales_companies/101',doc);f.ctx.syncSalesLeanCompany('101');
+  assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.salesRead_('sales_companies/101').pendingChanges)),pending);
+});
 test('targeted HQ refresh keeps own TEST-company scope without widening write permissions',()=>{
  const f=setup(),before=f.calls.length,result=f.ctx.syncSalesLeanCompany('101');assert.equal(result.detail.company.id,'101');assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
  f.setEmail('ordinary@example.invalid');assert.throws(()=>f.ctx.syncSalesLeanCompany('101'),/Zugriff/);

@@ -49,6 +49,8 @@ function tests() {
   files.push('sales-app/test-business.cjs','sales-app/test-business-browser.cjs');
   files.push('sales-app/test-communication.cjs','sales-app/test-communication-browser.cjs');
   files.push('sales-app/test-auth.cjs','sales-app/test-auth-browser.cjs');
+  // Synthetic Firestore read/write model: keeps the documented consumption figures under regression test.
+  files.push('scripts/audit-firestore.cjs');
   for (const name of files) {
     console.log(`Prüfe ${name}`);
     const output = run(process.execPath, [path.join(root, name)], {env});

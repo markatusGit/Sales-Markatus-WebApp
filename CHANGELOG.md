@@ -4,6 +4,25 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.29.0]
+
+Korrekturen aus dem unabhängigen Claude-Code-Prüfbericht vom 17.11.2026 (Befunde F-1 bis F-15; Bericht liegt nur lokal in der Auditkopie). Appkennung `2026-11-17-r29`. Alle 23 Prüfdateien bestanden, darunter 12 neue Regressionstests (synthetische Daten).
+
+- **F-1 Auftrag bleibt nicht mehr auf `running` hängen:** Ein durch Kontingent, Tagesbudget oder Laufzeitgrenze unterbrochener Auftrag wird beim nächsten Zugriff unter der globalen Sperre nach denselben Regeln wie ein abgefangener Fehler eingeordnet (ohne gespeicherte Schreibmarke zurück in den letzten sicheren Schritt, sonst `uncertain` mit Zuordnungsmöglichkeit). Vor jeder HQ-Schreibaufgabe prüft der Worker eine Budgetreserve (400 Lese-/80 Schreibvorgänge); Budget- und Kontingentfehler einer Schreibaufgabe halten den Lauf an, statt die Aufgabe als erledigt zu verbuchen.
+- **F-4 Kein `uncertain` ohne Schreibversuch:** Firmenanlage aus `pending` kehrt bei Fehlern vor dem POST nach `pending` zurück. Die Schreibmarke gilt erst, wenn sie gespeichert ist; scheitert das Speichern, wird HQ nicht kontaktiert.
+- **F-5:** „Kundendetails aktualisieren“ behält offene App-Stammdatenänderungen (`pendingChanges`) wie der Sammelabgleich.
+- **F-6:** Firmenanlage mit Anfragekennung: Wiederholung nach verlorener Antwort liefert den gespeicherten Entwurf statt einer zweiten Anlage.
+- **F-12:** Bestätigte Stammdatenänderung bleibt `synced`, auch wenn die lokale Akte fehlt.
+- **F-2/F-3 Kontingentschutz gegen anonyme Aufrufe:** Dienstkonto-Token wird ca. 50 Minuten im Script-Cache gehalten. Unbekannte Sitzungen werden je Minute gezählt und über dem Grenzwert ohne Firestore-Lesevorgang abgewiesen; bestätigte Sitzungen bleiben unberührt. Login-Drossel prüft zuerst den Cache; unvollständige oder nicht ausgestellte Anmeldeabschlüsse verbrauchen weder Firestore noch das gemeinsame Anmeldelimit.
+- **F-7:** Speicheraktionen warten bis zu 30 s auf die globale Sperre; der Worker gibt sie zwischen Abschnitten kurz frei.
+- **F-8:** Recht „Datenabgleich ausführen“ startet den Ausgabenabgleich nicht mehr (nur Administrator).
+- **F-9:** Einzelne Geschäftsschreibvorgänge angemeldeter Nutzer prüfen die aktuelle Freigaberevision (Worker unverändert).
+- **F-10:** Synthetischer Firestore-Verbrauchsaudit auf den seit r23 gültigen Wert (5 Lesevorgänge je Akte) korrigiert und in `npm test` aufgenommen.
+- **F-11 (vorbereitet):** `firebase.json` liefert die alte Pilotseite nicht mehr aus; wirksam erst nach gesondertem Hosting-Deploy.
+- **F-13:** `exceptionLogging` auf `STACKDRIVER`, damit Fehler im Hintergrund unter Ausführungen nachvollziehbar sind.
+- **F-15 (Code):** Anmeldeversuche und Sitzungen erhalten ein Firestore-Feld `ttl`; automatische Löschung erst nach Einrichtung der TTL-Richtlinie in der Konsole.
+- Keine neuen Script Properties, keine Änderung an Zugriff/Ausführungsidentität der Bereitstellung. F-14 (`localhost` als autorisierte Domain) ist eine Konsoleneinstellung und nicht Teil dieses Codes.
+
 ## [v0.28.4]
 
 - Google47 veröffentlicht und mit Editor/GitHub verglichen; alle22 Suiten bestanden. Bestehender Abgleich am17.11. live von162/173 bis173/173 abgeschlossen.21 offene Hinweise ausdrücklich erhalten, keine fehlerfreie Datenabnahme behauptet.

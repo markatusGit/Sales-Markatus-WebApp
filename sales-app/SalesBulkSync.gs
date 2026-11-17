@@ -132,7 +132,7 @@ function salesBulkStep_(run){
 }
 function salesBulkStepWork_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
-  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task);run.stats.writes++;}catch(e){run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
+  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
   else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}

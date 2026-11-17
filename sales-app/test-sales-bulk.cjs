@@ -121,6 +121,15 @@ test('import budget is enforced before reads, stops durably outside Firestore an
  f.ctx.salesRead_=read;const before=JSON.stringify(f.db),summary=f.ctx.getSalesSyncStatus();assert.equal(summary.paused,true);assert.equal(summary.background,false);assert.equal(JSON.stringify(f.db),before);assert.throws(()=>f.ctx.startSalesSync(),/Tagesbudget/);
  f.ctx.salesWorkerDay_=()=> 'synthetic-next-day';assert.equal(f.ctx.startSalesSync().id,run.id);assert.equal(f.props.SALES_SYNC_HOLD,'');assert.equal(f.triggers.length,1);
 });
+test('F-1 a write task without enough remaining budget holds the run before touching the job or HQ',()=>{
+  const f=bulkFixture();f.db['sales_meta/sync']={id:'legacy',state:'running',paused:true,revision:10,cursor:0,tasks:[{kind:'write',id:'old',step:'company'}],errors:[]};
+  vm.runInContext('salesWorkerBudgetActive_=true;',f.ctx);f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:19900,writes:0});
+  assert.throws(()=>f.ctx.salesWorkerReserve_(400,80),e=>e.salesBudget===true);
+  f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:100,writes:100});f.ctx.salesWorkerReserve_(400,80);
+  f.props.SALES_SYNC_BUDGET=JSON.stringify({day:'other-day',reads:20000,writes:12000});f.ctx.salesWorkerReserve_(400,80);vm.runInContext('salesWorkerBudgetActive_=false;',f.ctx);
+  const run={tasks:[{kind:'write',id:'missing',label:'Synthetic'}],cursor:0,done:0,errors:[],stats:{writes:0},revision:0};
+  f.ctx.salesWorkerReserve_=()=>{const e=Error('Tagesbudget');e.salesBudget=true;throw e;};assert.throws(()=>f.ctx.salesBulkStep_(run),/Tagesbudget/);assert.equal(run.errors.length,0);assert.equal(run.cursor,0);
+});
 test('real Firestore transports meter actual query documents, missing lookups and commit verification without metering idle UI',()=>{
  const f=bulkFixture(),core=fs.readFileSync(__dirname+'/../hq-benchmark/FirebaseSync.gs','utf8');vm.runInContext(core.slice(core.indexOf('function pilotCall_('),core.indexOf('function pilotWriteDocument_(')),f.ctx);
  const base='https://firestore.googleapis.com/v1/projects/synthetic-project/databases/(default)/documents',reply={getResponseCode:()=>200,getContentText:()=>JSON.stringify([{document:{name:'synthetic-a'}},{document:{name:'synthetic-b'}}])};let requests=0;f.ctx.UrlFetchApp.fetch=()=>{requests++;return reply;};

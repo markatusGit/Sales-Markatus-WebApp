@@ -10,6 +10,8 @@ function startSalesSync(request){
     salesUser_(true);
     if(!request||typeof request!=='object'||Array.isArray(request)||request.mode!=='editions'||Object.keys(request).some(k=>k!=='mode'))throw new Error('Unbekannter Abgleichmodus. Kein HQ-Abgleich gestartet.');
     if(typeof startSalesEditionRefresh!=='function')throw new Error('Ausgabenverknüpfung fehlt im Serverstand. SalesBackend.gs vollständig ersetzen und eine neue Version bereitstellen. Kein HQ-Abgleich gestartet.');
+    // The edition refresh is an owner action (SalesAuthorization rule); 'sync.run' must not reach it through this mode.
+    if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_())salesAuthOwner_();
     return startSalesEditionRefresh();
   }
   if(typeof salesBulkStart_==='function')return salesBulkStart_();
@@ -40,7 +42,7 @@ function pauseSalesSync(id){
   });
 }
 function salesSyncWrite_(task){
-  const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
+  const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(task.id)));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));

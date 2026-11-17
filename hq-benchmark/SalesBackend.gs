@@ -1,7 +1,9 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-17-r28.4';
+const SALES_RELEASE = '2026-11-17-r29';
 let salesContextCache_;
+// User actions wait for the current background section (the worker yields between sections) instead of failing after 1 s.
+const SALES_LOCK_WAIT_MS=30000;
 
 function salesUser_(admin) {
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){
@@ -30,9 +32,14 @@ function salesContext_() {
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project || '')) throw new Error('Firebase-Projekt fehlt.');
   let account; try {account=JSON.parse(p.getProperty('FIREBASE_SERVICE_ACCOUNT_JSON') || '{}');} catch (_) {throw new Error('Firebase-Dienstkonto ungültig.');}
   if (account.project_id!==project || account.type!=='service_account' || !account.private_key) throw new Error('Firebase-Dienstkonto passt nicht zum Projekt.');
-  salesContextCache_={project,token:pilotGoogleToken_(account)};
+  // Reuse the one-hour service-account token across executions (script-private cache) instead of signing a new JWT per call.
+  const cache=salesCache_(),key='sales-fs-token-'+project+'-'+String(account.client_email||'').replace(/[^a-z0-9]/gi,'').slice(0,60);
+  let token=null;try{token=cache?.get(key)||null;}catch(_){token=null;}
+  if(!token){token=pilotGoogleToken_(account);try{cache?.put(key,token,3000);}catch(_){}}
+  salesContextCache_={project,token};
   return salesContextCache_;
 }
+function salesCache_() {try{return typeof CacheService!=='undefined'?CacheService.getScriptCache():null;}catch(_){return null;}}
 function salesPath_(path) {if (!/^sales_[a-z]+\/[a-zA-Z0-9_-]+$/.test(path)) throw new Error('Ungültiger Datenpfad.'); return path;}
 function salesRead_(path) {
   const c=salesContext_(), raw=pilotReadDocument_(c.project,salesPath_(path),c.token);
@@ -54,7 +61,7 @@ function salesList_(collection) {
   }
   throw new Error('Zu viele Datensätze für diesen Pilotabruf.');
 }
-function salesLock_(fn) {const l=LockService.getScriptLock();if (!l.tryLock(1000)) throw new Error('Ein Speichervorgang läuft. Bitte gleich erneut versuchen.');try{return fn();}finally{l.releaseLock();}}
+function salesLock_(fn) {const l=LockService.getScriptLock();if (!l.tryLock(SALES_LOCK_WAIT_MS)) throw new Error('Ein Speichervorgang läuft. Bitte gleich erneut versuchen.');try{return fn();}finally{l.releaseLock();}}
 function salesNow_() {return new Date().toISOString();}
 function salesId_(value) {const id=Number(value);if (!Number.isSafeInteger(id)||id<=0) throw new Error('Ungültige HQ-ID.');return id;}
 function salesText_(value,max,required) {if (typeof value!=='string') value='';value=value.trim();if (value.length>max || (required&&!value)) throw new Error('Pflichtfeld fehlt oder Eingabe ist zu lang.');return value;}
@@ -362,7 +369,12 @@ function salesSalutationForm_(value) {
 }
 function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
-    const value=salesDraftInput_(input,cat),id=Utilities.getUuid(),draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
+    const requestId=input?.requestId===undefined||input.requestId===''?'':salesKey_(String(input.requestId)),value=salesDraftInput_(input,cat),id=requestId?'req_'+requestId:Utilities.getUuid();
+    // A repeated request after a lost response returns the stored draft instead of creating a second HQ company.
+    if(requestId){const old=salesRead_('sales_jobs/'+id);if(old){const prior=salesRead_('sales_drafts/'+id);
+      if(old.kind!=='createCompany'||old.actor!==user.email||!prior||Object.keys(value).some(k=>JSON.stringify(prior[k])!==JSON.stringify(value[k])))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');
+      return {id,replay:true,message:'Diese Firma wurde bereits gespeichert. Es wurde keine zweite Anlage erzeugt.'};}}
+    const draft={id,createdBy:user.email,createdAt:salesNow_(),...value,hqId:null};
     salesWrite_('sales_drafts/'+id,draft);
     const job={id,kind:'createCompany',markerMode:'none',draftId:id,name:value.company.name,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid}:{}),createdAt:salesNow_(),updatedAt:salesNow_(),steps:{},message:'In Firebase gespeichert. HQ wurde noch nicht verändert.'};
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
@@ -546,9 +558,11 @@ function salesWriteHq_(job,path,method,body) {
   if(!allowed) throw new Error('Dieser HQ-Schreibpfad ist gesperrt.');
   const draft=salesRead_('sales_drafts/'+job.draftId);
   if(!draft||!draft.company||job.hqId&&Number(draft.hqId)!==Number(job.hqId)) throw new Error('HQ-Schreibziel ist keine selbst angelegte Firma.');
+  const priorMarker={writeAttempted:job.writeAttempted,phaseWriteAttempted:job.phaseWriteAttempted,lastWrite:job.lastWrite};
   job.writeAttempted=true;job.phaseWriteAttempted=true;
   job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};
-  salesWrite_('sales_jobs/'+job.id,job);
+  // The marker only counts once it is durable; if it cannot be stored, HQ is not contacted.
+  try{salesWrite_('sales_jobs/'+job.id,job);}catch(e){Object.assign(job,priorMarker);throw e;}
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
   job.lastWrite.status=r.getResponseCode();
   if(r.getResponseCode()<200||r.getResponseCode()>=300) {
@@ -571,8 +585,23 @@ function salesEqualFields_(actual,expected) {
 function runSalesJob(id,step) {
   salesUser_(true);return salesLock_(()=>salesRunJobLocked_(id,step));
 }
+function salesJobFailState_(job,e) {
+  const reason=e?.message||'Unbekannter Fehler';
+  if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e?.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
+  // Without a persisted write marker for this phase, HQ was not contacted: return to the stored stage instead of locking the job.
+  else if(job.kind==='createCompany'&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message=(job.safeStage==='pending'?'Noch nicht an HQ gesendet: ':'HQ-Rückprüfung noch offen: ')+reason;}
+  else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+reason+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
+  return job;
+}
+// Callers hold the global script lock, so a stored 'running' job belongs to an interrupted execution
+// (quota/budget stop or runtime limit) and is classified with the same rules as a caught error.
+function salesJobRecoverInterrupted_(job) {
+  if(job?.state!=='running')return job;
+  salesJobFailState_(job,{message:'Vorherige Übertragung wurde unterbrochen (Kontingent, Tagesbudget oder Laufzeitgrenze)'});
+  job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+job.id,job);return job;
+}
 function salesRunJobLocked_(id,step) {
-  salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
+  salesAssertPrivate_();const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(id)));if(!job) throw new Error('Auftrag fehlt.');
     if(job.state==='synced') {if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return {message:'Bereits synchronisiert. Keine erneute Anlage.'};}
     if(!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)) throw new Error('Auftrag ist gesperrt. Unklaren Ausgang oder Konflikt zuerst prüfen.');
     const draft=job.business===1?null:salesRead_('sales_drafts/'+job.draftId);if(job.business!==1&&!draft?.company) throw new Error('Firma fehlt.');
@@ -593,9 +622,7 @@ function salesRunJobLocked_(id,step) {
       else throw new Error('Unbekannter Auftrag.');
       if(job.state==='running') {job.state='synced';if(job.kind!=='contactEmail')job.message='HQ zurückgelesen; Übertragung bestätigt.';}
     }catch(e) {
-      if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
-      else if(job.kind==='createCompany'&&['ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message='HQ-Rückprüfung noch offen: '+(e.message||'Bitte später erneut prüfen.');}
-      else {job.state='uncertain';job.message='Übertragung oder Rückprüfung nicht vollständig bestätigt: '+(e.message||'Unbekannter Fehler')+'. Nicht erneut anlegen; zuerst HQ-Ergebnis prüfen.';}
+      salesJobFailState_(job,e);
     }
     job.updatedAt=salesNow_();salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);return salesJobSummary_(job);
 }
@@ -855,7 +882,8 @@ function salesRunChange_(job) {
   if(address){const payload=salesPick_(address,['alternativeCompanyName','additionalInformation','street','houseNumber','zipCode','city','country','description','phone','email','fax','website','addressLine2','standardForDocumentType']);payload.website=job.change.homepage;salesWriteHq_(job,'/v2/Companies/'+job.hqId+'/Addresses/'+job.addressId,'put',payload);}
   const after=salesOne_('Companies',job.hqId);
   if(after.industrialSector!==job.change.industrialSector||!salesHomepageConfirmed_(after,job.change.homepage)||String(after.defaultAddress?.website||'')!==job.change.homepage) throw new Error('Homepage oder Branche nicht vollständig in HQ bestätigt.');
-  const data=salesRead_('sales_companies/'+job.hqId);data.company=salesCompany_(after);data.loadedAt=salesNow_();salesWrite_('sales_companies/'+job.hqId,data);
+  // HQ is confirmed at this point; a missing local file must not turn a confirmed change into 'uncertain'.
+  const data=salesRead_('sales_companies/'+job.hqId);if(data){data.company=salesCompany_(after);data.loadedAt=salesNow_();salesWrite_('sales_companies/'+job.hqId,data);}
 }
 function salesHomepageConfirmed_(actual,expected) {return String(actual.homepage||'')===expected||!!expected&&!actual.homepage&&String(actual.defaultAddress?.website||'')===expected;}
 function resolveSalesConflict(id,choice) {
@@ -885,9 +913,17 @@ function salesDecodeStored_(path,payload,c){
   const text=parts.join('');if(text.length!==value.length)throw new Error('Firebase-Datensatz unvollständig: '+path);
   return JSON.parse(text);
 }
+// Root documents written for a signed-in user go through a commit that verifies the user's ACL revision,
+// so a write started just before a rights change or lock-out is rejected. Worker writes keep the plain path.
+function salesStoreRoot_(path,payload,c){
+  if(typeof salesAuthRequest_!=='undefined'&&salesAuthRequest_?.user&&!salesAuthRequest_.worker&&typeof salesBulkRest_==='function'){
+    salesBulkRest_('commit',{writes:[{update:{name:salesBulkName_(path),fields:{payload:{stringValue:payload}}}}]});return;
+  }
+  pilotWriteDocument_(c.project,path,{payload},c.token);
+}
 function salesStorePayload_(path,value){
   path=salesPath_(path);const c=salesContext_(),payload=JSON.stringify(value);
-  if(Utilities.newBlob(payload).getBytes().length<=650000){pilotWriteDocument_(c.project,path,{payload},c.token);return;}
+  if(Utilities.newBlob(payload).getBytes().length<=650000){salesStoreRoot_(path,payload,c);return;}
   const generation=Utilities.getUuid(),parts=Math.ceil(payload.length/100000);
   if(parts>2000)throw new Error('Datensatz überschreitet das Gesamtlimit: '+path+'. Bisheriger Stand bleibt erhalten.');
   for(let i=0;i<parts;i++){
@@ -895,7 +931,7 @@ function salesStorePayload_(path,value){
     if(Utilities.newBlob(fragment).getBytes().length>750000)throw new Error('Teilpaket überschreitet das Größenlimit: '+path);
     pilotWriteDocument_(c.project,'sales_chunks/'+generation+'-'+i,{payload:fragment},c.token);
   }
-  pilotWriteDocument_(c.project,path,{payload:JSON.stringify({storageFormat:'sales-parts-v1',generation,parts,length:payload.length})},c.token);
+  salesStoreRoot_(path,JSON.stringify({storageFormat:'sales-parts-v1',generation,parts,length:payload.length}),c);
 }
 
 /** Explicitly authorized V1 read workflows. No HQ POST/PUT is called here. */
@@ -989,7 +1025,9 @@ function salesV1LoadCompany_(id,alreadyChecked){
     const plans=completed?[]:salesCollect_('PlannedRevenues','projectId eq '+salesId_(p.id),started,'Estimations');if(plans.some(r=>Number(r.projectId)!==Number(p.id)))throw new Error('HQ-Planumsatz gehört zu anderem Projekt.');
     return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
   });
-  const value={company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
+  // Pending app changes are an overlay owned by their jobs; a refresh from HQ must keep them (same rule as the bulk sync).
+  const pendingChanges=salesRead_('sales_companies/'+id)?.pendingChanges;
+  const value={...(pendingChanges?{pendingChanges}:{}),company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
   salesWrite_('sales_companies/'+id,value);salesV1IndexCompany_(value,false);return {detail:value,message:'Kundendetails einschließlich aller Kontakte, Historie und Projekte aktualisiert.'};
 }
 function syncSalesV1Company(id){salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();return salesV1LoadCompany_(id);});}
@@ -1075,6 +1113,8 @@ function startSalesSync(request){
     salesUser_(true);
     if(!request||typeof request!=='object'||Array.isArray(request)||request.mode!=='editions'||Object.keys(request).some(k=>k!=='mode'))throw new Error('Unbekannter Abgleichmodus. Kein HQ-Abgleich gestartet.');
     if(typeof startSalesEditionRefresh!=='function')throw new Error('Ausgabenverknüpfung fehlt im Serverstand. SalesBackend.gs vollständig ersetzen und eine neue Version bereitstellen. Kein HQ-Abgleich gestartet.');
+    // The edition refresh is an owner action (SalesAuthorization rule); 'sync.run' must not reach it through this mode.
+    if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_())salesAuthOwner_();
     return startSalesEditionRefresh();
   }
   if(typeof salesBulkStart_==='function')return salesBulkStart_();
@@ -1105,7 +1145,7 @@ function pauseSalesSync(id){
   });
 }
 function salesSyncWrite_(task){
-  const job=salesRead_('sales_jobs/'+salesKey_(task.id));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
+  const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(task.id)));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
@@ -1428,7 +1468,7 @@ function salesBulkStep_(run){
 }
 function salesBulkStepWork_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
-  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task);run.stats.writes++;}catch(e){run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
+  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
   else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}
@@ -1626,6 +1666,13 @@ function salesWorkerBudget_(reads,writes){
   if(next.reads>20000||next.writes>12000){const e=Error('Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
   p.setProperty('SALES_SYNC_BUDGET',JSON.stringify(next));
 }
+// Before an HQ write task: stop cleanly unless enough budget remains to finish the job and store its state.
+function salesWorkerReserve_(reads,writes){
+  if(!salesWorkerBudgetActive_)return;
+  const day=salesWorkerDay_();let meter;try{meter=JSON.parse(salesWorkerProps_().getProperty('SALES_SYNC_BUDGET')||'null');}catch{throw Error('Gespeichertes Importbudget ungültig.');}
+  if(!meter||meter.day!==day)return;
+  if(meter.reads+reads>20000||meter.writes+writes>12000){const e=Error('Tagesbudget des HQ-Imports reicht nicht mehr sicher für einen Schreibauftrag. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
+}
 function salesWorkerRequestBudget_(url,options){
   if(!salesWorkerBudgetActive_||!/^https:\/\/firestore\.googleapis\.com\//.test(url))return null;
   const method=String(options?.method||'get').toLowerCase();let body;try{body=JSON.parse(options?.payload||'{}');}catch{throw Error('Importanfrage ohne prüfbares Budget.');}
@@ -1715,6 +1762,8 @@ function salesSyncWorker_(event){
       // Each company/contact write is followed by a separate trigger execution, not just another function call.
       if(writeBoundary)return;
     }finally{lock.releaseLock();}
+    // Give waiting user saves a chance to take the lock before the next section; if one does, the next trigger continues.
+    if(typeof Utilities!=='undefined'&&Utilities.sleep)Utilities.sleep(1500);
   }
   }catch(e){if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}throw e;}finally{salesWorkerBudgetActive_=false;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
@@ -2343,7 +2392,7 @@ function salesBusinessEqual_(actual,expected){
 function saveSalesCompany(input){return saveSalesTestCompany(input);}
 function bindSalesCompanyResult(id,hqId){
   salesUser_(true);return salesLock_(()=>{
-    salesAssertPrivate_();const job=salesRead_('sales_jobs/'+salesKey_(id));
+    salesAssertPrivate_();const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(id)));
     if(job?.kind!=='createCompany'||job.markerMode!=='none'||job.state!=='uncertain'||job.hqId||!job.writeAttempted)throw new Error('Keine offene Firmenzuordnung.');
     const draft=salesRead_('sales_drafts/'+job.draftId),actual=salesOne_('Companies',salesId_(hqId));
     if(!draft?.company||!salesBusinessEqual_(actual,salesPick_(draft.company,['name','description','industrialSector']))||!salesHomepageConfirmed_(actual,draft.company.homepage)||!salesBusinessEqual_(actual.defaultAddress||{},salesPick_(draft.company.defaultAddress,['street','houseNumber','zipCode','city','country','website'])))throw new Error('Die ausgewählte HQ-Firma stimmt nicht vollständig mit der gespeicherten Anlage überein. Auftrag bleibt gesperrt.');
@@ -2480,7 +2529,9 @@ function salesBusinessTransport_(job,path,method,body){
   const expected=['history','communication'].includes(job.kind)?'/v2/ContactHistories':job.kind==='createContact'?'/v2/ContactPersons':job.entity==='types'?'/v2/Companies/'+salesId_(job.hqId)+'/UpdateCompanyTypes':job.entity==='company'?'/v2/Companies/'+salesId_(job.hqId):job.entity==='contact'?'/v2/ContactPersons/'+salesId_(job.targetId):job.entity==='address'?'/v2/Companies/'+salesId_(job.hqId)+'/Addresses/'+salesId_(job.targetId):null;
   if(job.business!==1||job.state!=='running'||path!==expected||method!==(['history','communication','createContact'].includes(job.kind)||job.entity==='types'?'post':'put'))throw new Error('HQ-Schreibziel nicht freigegeben.');
   if(['communication','createContact'].includes(job.kind)&&Number(body.companyId)!==Number(job.hqId))throw new Error('Abweichendes Firmenziel.');
-  job.writeAttempted=true;job.phaseWriteAttempted=true;job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};salesWrite_('sales_jobs/'+job.id,job);
+  const priorMarker={writeAttempted:job.writeAttempted,phaseWriteAttempted:job.phaseWriteAttempted,lastWrite:job.lastWrite};
+  job.writeAttempted=true;job.phaseWriteAttempted=true;job.lastWrite={method:method.toUpperCase(),resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:null,fields:[]};
+  try{salesWrite_('sales_jobs/'+job.id,job);}catch(e){Object.assign(job,priorMarker);throw e;}
   const result=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method,contentType:'application/json',headers:{Authorization:'Bearer '+revenueToken_()},payload:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false});
   job.lastWrite.status=result.getResponseCode();salesWrite_('sales_jobs/'+job.id,job);
   if(job.lastWrite.status<200||job.lastWrite.status>=300)throw new Error('HQ-Schreiben: HTTP '+job.lastWrite.status+'. Ausgang vor Wiederholung prüfen.');
@@ -2687,10 +2738,17 @@ function salesAuthRead_(kind,id){
   if(r.getResponseCode()===404)return null;if(r.getResponseCode()===429){const e=Error('Der Firebase-Datenspeicher hat sein Kontingent erreicht. Bitte später erneut versuchen. Erneutes Anmelden behebt dies nicht.');e.salesQuota=true;throw e;}if(r.getResponseCode()!==200)throw Error('AUTH_REQUIRED: Freigabe momentan nicht prüfbar.');
   const doc=JSON.parse(r.getContentText());return {...JSON.parse(doc.fields.payload.stringValue),_path:path,_updateTime:doc.updateTime};
 }
+// Firestore TTL field for short-lived auth documents (policy on field 'ttl' in sales_authattempts/sales_authsessions).
+// Grace periods keep expired sessions briefly traceable; the app itself already rejects them via expiresAt.
+function salesAuthTtlField_(kind,value){
+  const grace=kind==='attempts'?86400000:kind==='sessions'?7*86400000:null;
+  if(grace===null||!Number.isFinite(value?.expiresAt))return {};
+  return {ttl:{timestampValue:new Date(value.expiresAt+grace).toISOString()}};
+}
 function salesAuthCommit_(entries,checks=[]){
   const c=salesContext_(),base='projects/'+c.project+'/databases/(default)/documents/';
   const writes=checks.map(d=>({verify:base+d._path,currentDocument:{updateTime:d._updateTime}}));
-  for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)}}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
+  for(const {kind,id,value,prior,create} of entries){const clean=Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('_')));writes.push({update:{name:base+salesAuthDocument_(kind,id),fields:{payload:{stringValue:JSON.stringify(clean)},...salesAuthTtlField_(kind,clean)}},...(prior?{currentDocument:{updateTime:prior._updateTime}}:create?{currentDocument:{exists:false}}:{})});}
   const response=UrlFetchApp.fetch(pilotUrl_(c.project,'').replace(/\/$/,'')+':commit',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify({writes}),muteHttpExceptions:true,followRedirects:false});
   const code=response.getResponseCode();if(code<200||code>=300){let body;try{body=JSON.parse(response.getContentText());}catch{}const error=Error('Auth-Speicher HTTP '+code+'. Bitte erneut versuchen.');error.firestoreStatus=body?.error?.status;throw error;}
   return response.getContentText()?JSON.parse(response.getContentText()):null;
@@ -2711,9 +2769,17 @@ function salesAuthPrincipal_(identity,record=salesAuthRead_('users',identity.uid
   const admin=identity.uid===cfg.ownerUid&&identity.email===cfg.ownerEmail;
   return {uid:identity.uid,email:identity.email,admin,permissions:salesPermissions_(record.permissions,admin),revision:record.revision,record};
 }
+// Script-cache guard against anonymous quota exhaustion: unknown session keys are counted per minute and,
+// above the limit, rejected without any Firestore read. Recently verified sessions are never blocked by it.
+const SALES_AUTH_UNKNOWN_LIMIT=40;
+function salesAuthCacheCount_(key){const cache=salesCache_();try{return Number(cache?.get(key)||0)||0;}catch(_){return 0;}}
+function salesAuthCachePut_(key,value,seconds){const cache=salesCache_();try{cache?.put(key,String(value),seconds);}catch(_){}}
 function salesAuthVerify_(session){
-  const id=salesAuthHash_(salesAuthKey_(session));let entry=salesAuthRead_('sessions',id);
-  if(!entry||entry.expiresAt<=Date.now()||entry.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');
+  const id=salesAuthHash_(salesAuthKey_(session)),minute=Math.floor(Date.now()/60000),unknownKey='sales-auth-unknown-'+minute,knownKey='sales-auth-known-'+id;
+  if(!salesAuthCacheCount_(knownKey)&&salesAuthCacheCount_(unknownKey)>=SALES_AUTH_UNKNOWN_LIMIT)throw Error('AUTH_REQUIRED: Viele ungültige Anfragen. Bitte in einer Minute erneut anmelden.');
+  let entry=salesAuthRead_('sessions',id);
+  if(!entry||entry.expiresAt<=Date.now()||entry.disabled){salesAuthCachePut_(unknownKey,salesAuthCacheCount_(unknownKey)+1,120);throw Error('AUTH_REQUIRED: Sitzung beendet. Bitte erneut anmelden.');}
+  salesAuthCachePut_(knownKey,1,600);
   if(entry.tokenExpiresAt<Date.now()+60000)entry=(()=>{
     const current=salesAuthRead_('sessions',id);if(!current||current.expiresAt<=Date.now()||current.disabled)throw Error('AUTH_REQUIRED: Sitzung beendet.');if(current.tokenExpiresAt>=Date.now()+60000)return current;
     const r=UrlFetchApp.fetch('https://securetoken.googleapis.com/v1/token?key='+salesAuthConfig_().apiKey,{method:'post',contentType:'application/x-www-form-urlencoded',payload:'grant_type=refresh_token&refresh_token='+encodeURIComponent(current.refreshToken),muteHttpExceptions:true});
@@ -2734,24 +2800,32 @@ function beginSalesLogin(input){
   if(input.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
   // Bound anonymous writes and token-validation traffic; this is a quota guard, not an identity check.
   salesAuthThrottle_('begin',30);
-  const attempt=salesAuthRandom_();salesAuthCommit_([{kind:'attempts',id:salesAuthHash_(attempt),create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
+  const attempt=salesAuthRandom_(),attemptId=salesAuthHash_(attempt);salesAuthCommit_([{kind:'attempts',id:attemptId,create:true,value:{origin:input.origin,challenge:input.challenge,state:input.state,expiresAt:Date.now()+5*60000}}]);
+  salesAuthCachePut_('sales-auth-attempt-'+attemptId,1,360);return {attempt,origin:salesAuthConfig_().origin,release:SALES_RELEASE};
 }
 function salesAuthConflict_(error){return ['ABORTED','ALREADY_EXISTS','FAILED_PRECONDITION'].includes(error.firestoreStatus)||/\bHTTP (?:409|412)\b/.test(error.message||'');}
 function salesAuthThrottle_(key,limit){
   // Atomic global quota guard is independent of the long business/worker script lock.
-  const minute=Math.floor(Date.now()/60000),id='rate-'+key+'-'+minute;
+  const minute=Math.floor(Date.now()/60000),id='rate-'+key+'-'+minute,cacheKey='sales-auth-'+id;
+  // Once the limit is known to be reached, reject from the script cache without another Firestore read.
+  if(salesAuthCacheCount_(cacheKey)>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');
   for(let retry=0;retry<3;retry++){
     const prior=salesAuthRead_('attempts',id),count=prior?.count||0;
-    if(count>=limit)throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');
-    try{salesAuthCommit_([{kind:'attempts',id,prior,create:!prior,value:{count:count+1,expiresAt:(minute+2)*60000}}]);return;}
+    if(count>=limit){salesAuthCachePut_(cacheKey,count,120);throw Error('AUTH_REQUIRED: Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.');}
+    try{salesAuthCommit_([{kind:'attempts',id,prior,create:!prior,value:{count:count+1,expiresAt:(minute+2)*60000}}]);salesAuthCachePut_(cacheKey,count+1,120);return;}
     catch(e){if(!salesAuthConflict_(e))throw e;}
   }
   throw Error('AUTH_REQUIRED: Viele gleichzeitige Anmeldungen. Bitte gleich erneut versuchen.');
 }
 function finishSalesLogin(input){
   if(input?.release&&input.release!==SALES_RELEASE)return {reloadRequired:true,release:SALES_RELEASE};
+  // Cheap checks first: malformed input or an attempt this server never issued does not count against
+  // the shared login limit and causes no Firestore or token traffic.
+  if(typeof input?.idToken!=='string'||input.idToken.length>10000||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||!/^[-\w]{32,128}$/.test(input.state||''))throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
+  const hash=salesAuthHash_(salesAuthKey_(input.attempt));salesAuthKey_(input.verifier);
+  if(salesCache_()&&!salesAuthCacheCount_('sales-auth-attempt-'+hash))throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen. Bitte erneut anmelden.');
   salesAuthThrottle_('finish',30);
-  const identity=salesAuthIdentity_(input?.idToken),hash=salesAuthHash_(salesAuthKey_(input?.attempt));
+  const identity=salesAuthIdentity_(input.idToken);
   const attempt=salesAuthRead_('attempts',hash),verifier=salesAuthKey_(input?.verifier),challenge=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,verifier)).replace(/=+$/,'');
   if(!attempt||attempt.used||attempt.expiresAt<=Date.now()||attempt.state!==input.state||attempt.challenge!==challenge||typeof input.refreshToken!=='string'||input.refreshToken.length<20||input.refreshToken.length>10000||Date.now()/1000-identity.authTime>300||identity.authTime>Date.now()/1000+60)throw Error('AUTH_REQUIRED: Anmeldeanfrage ungültig oder abgelaufen.');
   if(!salesAuthEnabled_()){

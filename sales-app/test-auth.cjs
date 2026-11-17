@@ -114,6 +114,38 @@ if(require.main===module){
  test('atomic business writes verify the current ACL revision',()=>{const f=authFixture(),u=f.user();f.request(u);const writes=f.ctx.salesAuthProtectWrites_([{update:{name:'business'}}]);assert.equal(writes[0].verify.endsWith('/sales_authusers/reader'),true);assert.equal(writes[0].currentDocument.updateTime,u.record._updateTime);f.user('reader',{},'disabled');assert.throws(()=>f.ctx.salesAuthCommit_([{kind:'audit',id:'x',value:{}}],[u.record]),/Precondition/);assert.equal(f.db.has('sales_authaudit/x'),false);});
  test('HQ writes reject revoked authors and unrecognized legacy jobs',()=>{const f=authFixture();f.user('reader',{'contact.create':true});f.ctx.salesAuthSource_({kind:'createContact',actorUid:'reader',actor:'reader@example.invalid'});f.user('reader',{},'disabled');assert.throws(()=>f.ctx.salesAuthSource_({kind:'createContact',actorUid:'reader',actor:'reader@example.invalid'}),/gesperrt/);assert.throws(()=>f.ctx.salesAuthSource_({kind:'createContact',actor:'unknown@example.invalid'}),/Administratorprüfung/);});
  test('gateway always clears its trusted context after errors',()=>{const f=authFixture();f.user();const s=f.session();assert.throws(()=>f.ctx.salesAuthenticatedRpc(s,'saveSalesCompany',[{}]),/AUTH_DENIED/);assert.throws(()=>f.ctx.salesUser_(),/AUTH_REQUIRED/);});
+ // --- Audit 17.11.2026 (F-2, F-3, F-8, F-9, F-15) ---
+ test('F-2 unknown session keys above the per-minute limit are rejected without Firestore reads; verified sessions continue',()=>{
+  const f=authFixture();f.user();const good=f.session();assert.equal(f.ctx.salesAuthVerify_(good).uid,'reader');
+  for(let i=0;i<40;i++)assert.throws(()=>f.ctx.salesAuthVerify_(crypto.randomBytes(32).toString('hex')),/Sitzung beendet/);
+  f.calls.length=0;assert.throws(()=>f.ctx.salesAuthVerify_(crypto.randomBytes(32).toString('hex')),/Viele ungültige/);assert.equal(f.calls.length,0);
+  assert.equal(f.ctx.salesAuthVerify_(good).uid,'reader');
+ });
+ test('F-3 malformed or never-issued login completions neither touch Firestore nor consume the shared login limit',()=>{
+  const f=authFixture();f.user();f.calls.length=0;
+  for(let i=0;i<40;i++)assert.throws(()=>f.ctx.finishSalesLogin({attempt:'a'.repeat(40)+String(i).padStart(3,'0'),verifier:'v'.repeat(64),state:'s'.repeat(40),idToken:'x',refreshToken:'r'.repeat(50)}),/AUTH_REQUIRED/);
+  for(const bad of [{},{idToken:5},{idToken:'x',refreshToken:'short'}])assert.throws(()=>f.ctx.finishSalesLogin(bad),/AUTH_REQUIRED/);
+  assert.equal(f.calls.length,0);
+  const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state});
+  assert.equal(f.ctx.finishSalesLogin({attempt:begin.attempt,verifier,state,idToken:f.token(),refreshToken:'r'.repeat(50)}).user.uid,'reader');
+ });
+ test('F-8 the sync.run permission cannot start the owner-only edition refresh',()=>{
+  const f=authFixture();f.request(f.user('reader',{'sync.run':true}));f.calls.length=0;
+  assert.throws(()=>f.ctx.salesAuthDispatch_('startSalesSync',[{mode:'editions'}]),/AUTH_DENIED/);assert.equal(f.calls.length,0);
+ });
+ test('F-9 single business writes of a signed-in user verify the current ACL revision',()=>{
+  const f=authFixture();f.request(f.user('reader'));f.ctx.salesStorePayload_('sales_jobs/synthetic',{value:1});
+  assert.equal(JSON.parse(f.db.get('sales_jobs/synthetic').fields.payload.stringValue).value,1);
+  f.user('reader',{'contact.create':true});assert.throws(()=>f.ctx.salesStorePayload_('sales_jobs/synthetic',{value:2}),/Precondition/);
+  assert.equal(JSON.parse(f.db.get('sales_jobs/synthetic').fields.payload.stringValue).value,1);
+ });
+ test('F-15 login attempts and sessions carry a TTL timestamp after their expiry',()=>{
+  const f=authFixture();f.user();const verifier='v'.repeat(64),state='s'.repeat(40),challenge=crypto.createHash('sha256').update(verifier).digest('base64url'),begin=f.ctx.beginSalesLogin({origin:'https://fixture-script.googleusercontent.com',challenge,state});
+  const result=f.ctx.finishSalesLogin({attempt:begin.attempt,verifier,state,idToken:f.token(),refreshToken:'r'.repeat(50)});
+  const session=f.db.get('sales_authsessions/'+f.ctx.salesAuthHash_(result.session)),attempt=f.db.get('sales_authattempts/'+f.ctx.salesAuthHash_(begin.attempt));
+  assert.equal(Date.parse(session.fields.ttl.timestampValue),result.expiresAt+7*86400000);assert.ok(Date.parse(attempt.fields.ttl.timestampValue)>Date.now()+86400000);
+  assert.equal(f.db.get('sales_authusers/reader').fields.ttl,undefined);
+ });
  console.log(count+' authentication and authorization tests passed');
 }
 module.exports={authFixture};

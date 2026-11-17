@@ -89,7 +89,9 @@ function salesV1LoadCompany_(id,alreadyChecked){
     const plans=completed?[]:salesCollect_('PlannedRevenues','projectId eq '+salesId_(p.id),started,'Estimations');if(plans.some(r=>Number(r.projectId)!==Number(p.id)))throw new Error('HQ-Planumsatz gehört zu anderem Projekt.');
     return {id:String(p.id),number:p.number||'',name:p.name||'',status,actualFinishDate,plannedFinishDate:salesDate_(p.plannedFinishDate),completed,plannedRevenues:plans.map(salesPlannedRevenue_),revenueCents:b.accepted.reduce((n,d)=>n+d.cents,0),complete:b.complete};
   });
-  const value={company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
+  // Pending app changes are an overlay owned by their jobs; a refresh from HQ must keep them (same rule as the bulk sync).
+  const pendingChanges=salesRead_('sales_companies/'+id)?.pendingChanges;
+  const value={...(pendingChanges?{pendingChanges}:{}),company,contacts:contacts.map(salesContactView_),histories:salesHistoryRows_(histories,documents,projects,started),historyLoadedAt:salesNow_(),projects:projectRows,detailVersion:3,loadedAt:salesNow_()};
   salesWrite_('sales_companies/'+id,value);salesV1IndexCompany_(value,false);return {detail:value,message:'Kundendetails einschließlich aller Kontakte, Historie und Projekte aktualisiert.'};
 }
 function syncSalesV1Company(id){salesUser_(true);return salesLock_(()=>{salesAssertPrivate_();return salesV1LoadCompany_(id);});}

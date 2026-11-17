@@ -514,7 +514,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-11-17-r28.4',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-11-17-r29',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-11-17-r28.4'));
+  assert.ok(root.innerHTML.includes('2026-11-17-r29'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });
@@ -638,5 +638,32 @@ test('later creation completion preserves history, projects and other imported c
 test('normal users cannot run HQ binding checks',()=>{
   const {f,id}=historyFixture();f.ctx.saveSalesAccess('pp@markatus.de\nTEST@example.invalid');f.setEmail('test@example.invalid');const n=f.calls.length;
   assert.throws(()=>f.ctx.checkSalesHistoryBinding(id),/Zugriff/);assert.equal(f.calls.length,n);
+});
+// --- Audit 17.11.2026 (F-1, F-4, F-6, F-12) ---
+test('F-6 repeated company request after a lost response returns the stored draft instead of a second job',()=>{
+  const f=fixture(),key='abcdef0123456789abcdef0123456789',a=f.ctx.saveSalesCompany({...f.input,requestId:key}),b=f.ctx.saveSalesCompany({...f.input,requestId:key});
+  assert.equal(a.id,b.id);assert.equal(b.replay,true);assert.equal(Object.keys(f.db).filter(k=>k.startsWith('sales_jobs/')).length,1);
+  assert.throws(()=>f.ctx.saveSalesCompany({...f.input,name:'TEST Other',requestId:key}),/anderen Eingabe/);
+  f.setEmail('other@markatus.de');f.props.SALES_ALLOWED_EMAILS='pp@markatus.de,other@markatus.de';assert.throws(()=>f.ctx.saveSalesCompany({...f.input,requestId:key}),/anderen Eingabe/);
+  assert.equal(f.calls.length,0);
+});
+test('F-4 a failure before the first company POST returns the job to pending, not uncertain',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input),orig=f.ctx.salesWrite_;
+  f.ctx.salesWrite_=(p,v)=>{if(p.startsWith('sales_jobs/')&&v.writeAttempted&&!v.hqId)throw Error('Firestore HTTP 429');return orig(p,v);};
+  const res=f.ctx.runSalesJob(r.id,'company');f.ctx.salesWrite_=orig;
+  assert.equal(res.state,'pending');assert.equal(f.db['sales_jobs/'+r.id].writeAttempted,undefined);assert.equal(f.calls.filter(c=>c.method==='post').length,0);
+  assert.equal(finishCreate(f,r.id).state,'synced');assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,1);
+});
+test('F-1 an interrupted running job is recovered: without write marker it continues, with marker it is locked as uncertain',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);Object.assign(f.db['sales_jobs/'+r.id],{state:'running',safeStage:'pending',phaseWriteAttempted:false});
+  assert.notEqual(f.ctx.runSalesJob(r.id,'company').state,'uncertain');assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/Companies').length,1);
+  const g=fixture(),s=g.ctx.saveSalesTestCompany(g.input);Object.assign(g.db['sales_jobs/'+s.id],{state:'running',safeStage:'pending',writeAttempted:true,phaseWriteAttempted:true});
+  assert.throws(()=>g.ctx.runSalesJob(s.id,'company'),/gesperrt/);assert.equal(g.db['sales_jobs/'+s.id].state,'uncertain');assert.equal(g.calls.length,0);
+  const h=fixture(),t=h.ctx.saveSalesTestCompany(h.input);Object.assign(h.db['sales_jobs/'+t.id],{state:'running',safeStage:'pending',writeAttempted:true,phaseWriteAttempted:true});
+  assert.throws(()=>h.ctx.bindSalesCompanyResult(t.id,999),e=>!/Keine offene Firmenzuordnung/.test(e.message));assert.equal(h.db['sales_jobs/'+t.id].state,'uncertain');
+});
+test('F-12 a confirmed company change stays synced when the local customer file is missing',()=>{
+  const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'New',homepage:''});
+  delete f.db['sales_companies/101'];assert.equal(f.ctx.runSalesJob(j.id).state,'synced');assert.equal(f.remote.Companies[101].industrialSector,'New');
 });
 console.log(`${count} meaningful checks passed.`);
