@@ -238,3 +238,5 @@ Veröffentlichung v0.28.2: Apps-Script-Version 45, bestehende Bereitstellung bei
 Veröffentlichungsnachweis für v0.28.3: Google-Version 46; 2026-11-16T15:27:06.964Z. Details in deployment.json.
 
 Veröffentlichungsnachweis für v0.28.4: Google-Version 47; 2026-11-17T08:25:03.328Z. Details in deployment.json.
+
+Veröffentlichungsnachweis für v0.29.0: Google-Version 48; 2026-11-17T11:59:13.272Z. Details in deployment.json.
