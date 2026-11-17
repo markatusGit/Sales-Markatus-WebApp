@@ -1593,3 +1593,7 @@ F-15 nicht umsetzbar im Spark-Tarif: Firestore lehnt das Anlegen von TTL-Richtli
 ### 17.11.2026 – r29.1: Bereinigung abgelaufener Anmeldedaten ohne TTL
 
 Nutzerentscheidung: Weil Firestore-TTL-Richtlinien im Spark-Tarif eine Abrechnung voraussetzen, soll die App abgelaufene Anmeldeversuche und Sitzungen selbst löschen. Umsetzung: nach erfolgreicher Anmeldung, höchstens alle 10 Minuten (Script-Cache), je Sammlung eine begrenzte Abfrage (bis 20 Dokumente) auf `ttl` < jetzt und eine bedingte Löschung per updateTime. Karenz: Anmeldeversuche 1 Tag, Sitzungen 7 Tage nach Ablauf. Fehler werden ignoriert und blockieren die Anmeldung nicht. Ältere Dokumente ohne `ttl` (vor r29) bleiben unberührt; deren Bereinigung wäre eine gesonderte Entscheidung. Verbrauch je Bereinigung: höchstens ca. 40 Lese- und 40 Löschvorgänge.
+
+### Veröffentlichung v0.29.1
+
+Veröffentlichung v0.29.1: Apps-Script-Version 49, bestehende Bereitstellung beibehalten. Quellcommit c9bedb8f6ea94c0e2742a5c49050a28df5eea73e. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-17T12:47:15.779Z.
