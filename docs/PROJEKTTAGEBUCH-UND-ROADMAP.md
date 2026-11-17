@@ -1579,3 +1579,13 @@ Gesondert freizugeben bzw. offen: F-11 Hosting-Deploy (alte Pilotseite nicht meh
 ### Veröffentlichung v0.29.0
 
 Veröffentlichung v0.29.0: Apps-Script-Version 48, bestehende Bereitstellung beibehalten. Quellcommit 6e799b2c135d0c916329b2ec2f893ab93921a732. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-17T11:59:13.272Z.
+
+### 17.11.2026 – Nacharbeiten r29: Hosting, TTL, autorisierte Domains
+
+Veröffentlicht: r29/v0.29.0 als Apps-Script-Version 48 auf der bestehenden Bereitstellung (`release:verify`: Google-Version, Editor und GitHub-Tag/main gleich). Live-Funktionstest durch den Nutzer steht noch aus.
+
+F-11 umgesetzt: Firebase-Hosting am 17.11.2026 nur mit `--only hosting` aus einem LF-Export des Repository-Stands deployt; hochgeladen wurden genau die vier Dateien unter `/auth/`, byte-gleich mit dem bisherigen Live-Stand. `/`, `app.mjs`, `revenue.mjs`, `style.css` und `config.js` liefern nun HTTP 404; `/auth/` HTTP 200 mit unveränderten Sicherheitsheadern. Firestore-Regeln nicht neu deployt.
+
+F-14 umgesetzt: `localhost` in der Firebase-Konsole unter Authentication → Einstellungen → Autorisierte Domains entfernt; verbleibend `sales-markatus.firebaseapp.com` und `sales-markatus.web.app`.
+
+F-15 nicht umsetzbar im Spark-Tarif: Firestore lehnt das Anlegen von TTL-Richtlinien mit „billing disabled“ ab (HTTP 403). Keine Abrechnung aktiviert, kein Tarifwechsel; die kurz committete TTL-Konfiguration wurde per Revert zurückgenommen. Das von der App geschriebene Feld `ttl` bleibt als Vorbereitung erhalten. Offene Entscheidung: alternative Bereinigung abgelaufener Anmeldeversuche/Sitzungen durch die App selbst (begrenzte Löschung, verbraucht Spark-Löschkontingent) oder Beibehaltung des Wachstums. Beim Versuch über die Cloud-Konsole öffnete ein Fehlklick den Dialog „Abrechnung aktivieren“; dieser wurde ohne Aktion verlassen.

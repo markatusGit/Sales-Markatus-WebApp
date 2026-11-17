@@ -4,6 +4,8 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+- Nach v0.29.0 (ohne neue Google-Version): F-11 Firebase-Hosting liefert nur noch `/auth/` (Anmeldedateien byte-gleich, alte Pilotseite HTTP 404). F-14 `localhost` aus den autorisierten Domains entfernt. F-15 TTL-Richtlinien im Spark-Tarif nicht verfügbar (Firestore verlangt Abrechnung); keine Abrechnung aktiviert, TTL-Konfiguration per Revert zurückgenommen, Feld `ttl` bleibt vorbereitet.
+
 ## [v0.29.0]
 
 Korrekturen aus dem unabhängigen Claude-Code-Prüfbericht vom 17.11.2026 (Befunde F-1 bis F-15; Bericht liegt nur lokal in der Auditkopie). Appkennung `2026-11-17-r29`. Alle 23 Prüfdateien bestanden, darunter 12 neue Regressionstests (synthetische Daten).
