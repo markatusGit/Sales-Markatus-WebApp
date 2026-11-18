@@ -3,6 +3,12 @@ const path = require('node:path');
 const vm = require('node:vm');
 const {root, app, appFiles, canonical, run, git, checkTrackedFiles} = require('./release-lib.cjs');
 
+function appsScriptSyntax(source, name) {
+  // Apps Script's parser rejects logical assignment, even though current Node accepts it.
+  if (/\|\|=|&&=|\?\?=/.test(source)) throw Error(`${name}: logische Zuweisungsoperatoren sind für Apps Script nicht freigegeben.`);
+  new vm.Script(source, {filename: name});
+}
+
 function check() {
   const sources = ['sales-app', 'hq-benchmark', 'firebase-pilot', 'scripts'];
   function walk(dir) {
@@ -10,7 +16,7 @@ function check() {
       const name = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(name);
       else if (/\.(cjs|mjs|js|gs)$/.test(name)) {
-        if (name.endsWith('.gs')) new vm.Script(fs.readFileSync(name, 'utf8'), {filename: name});
+        if (name.endsWith('.gs')) appsScriptSyntax(fs.readFileSync(name, 'utf8'), name);
         else run(process.execPath, ['--check', name]);
       } else if (name.endsWith('.html')) {
         for (const match of fs.readFileSync(name, 'utf8').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
@@ -28,7 +34,7 @@ function check() {
   for (const [name, expected] of [['SalesBackend.gs', expectedBackend], ['Sales.html', expectedHtml]]) {
     if (canonical(name, fs.readFileSync(path.join(app, name), 'utf8')) !== canonical(name, expected)) throw Error(`${name} veraltet. Zuerst npm run build ausführen und Änderungen prüfen/committen.`);
   }
-  new vm.Script(expectedBackend, {filename: 'SalesBackend.gs'});
+  appsScriptSyntax(expectedBackend, 'SalesBackend.gs');
   const ignore = fs.readFileSync(path.join(app, '.claspignore'), 'utf8').split(/\r?\n/).filter(Boolean);
   const expectedIgnore = ['**/**', ...appFiles.map(n => '!' + n)].sort();
   if (JSON.stringify([...ignore].sort()) !== JSON.stringify(expectedIgnore)) throw Error('.claspignore muss genau die sieben freigegebenen Dateien zulassen.');
@@ -62,4 +68,4 @@ if (require.main === module) {
   try { check(); if (process.argv.includes('--tests')) tests(); }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
-module.exports = {check, tests};
+module.exports = {check, tests, appsScriptSyntax};

@@ -4,8 +4,14 @@ const os = require('node:os');
 const path = require('node:path');
 const {canonical, digest, hashes, same, checkSettings, checkRemoteBaseline, appFiles} = require('./release-lib.cjs');
 const {tagValid, trackedHashes} = require('./release.cjs');
+const {appsScriptSyntax} = require('./check.cjs');
 let count = 0;
 function test(name, fn) { fn(); count++; console.log('PASS ' + name); }
+
+test('Apps-Script-Prüfung erkennt lokal gültige, von Google abgewiesene logische Zuweisungen',()=>{
+ for(const op of ['||=','&&=','??='])assert.throws(()=>appsScriptSyntax('let value;value '+op+' {};','Synthetic.gs'),/Apps Script/);
+ appsScriptSyntax('let value;value=value||{};','Synthetic.gs');
+});
 test('Windows-Zeilenenden ändern den Codefingerabdruck nicht', () => assert.equal(digest('Code.gs', 'a\r\nb\r\n'), digest('Code.gs', 'a\nb\n')));
 test('Inhaltsänderungen werden erkannt', () => assert.notEqual(digest('Code.gs', 'a\n'), digest('Code.gs', 'b\n')));
 test('Manifestvergleich ignoriert Einrückung und Reihenfolge der Objektschlüssel', () => assert.equal(canonical('a.json', '{"b":2,"a":1}'), canonical('a.json', '{ "a": 1, "b": 2 }')));
