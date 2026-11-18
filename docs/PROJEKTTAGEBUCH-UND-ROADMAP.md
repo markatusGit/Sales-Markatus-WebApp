@@ -1667,3 +1667,7 @@ Veröffentlichung v0.32.1: Apps-Script-Version 53, bestehende Bereitstellung bei
 ### r32.1 technisch veröffentlicht – 18.11.2026
 
 Google53, Editor und GitHub-Tag/main v0.32.1 verglichen; alle24 Prüfdateien bestanden (34 Fachfälle). Anonymer Abruf HTTP200 mit r32.1. Keine neuen Script Properties oder Bereitstellungseinstellungen. Beide Formulare bei synthetischem HQ500 geprüft; echte Bedienprobe und genaue produktive HQ-Fehlerursache noch offen. Letzter gültiger Katalog bleibt unverändert, Warnung nennt betroffenen Endpunkt. Fremde Dokumentationsdateien erhalten.
+
+### Veröffentlichung v0.33.0
+
+Veröffentlichung v0.33.0: Apps-Script-Version54, bestehende Bereitstellung und Einstellungen erhalten. Quellcommit 0ec81caf082d393716a7ea0eae2309bb514a78de. Alle24 Prüfdateien bestanden; Google-Version und Editor bytegenau geprüft. Verzögerte Versionsanzeige nach lesendem Vergleich bestätigt, kein erneuter Upload und keine zusätzliche Version. Keine Script Properties geändert. Live-Funktionstest gesondert. Zeitpunkt: 2026-11-18T20:05:53.007Z.
