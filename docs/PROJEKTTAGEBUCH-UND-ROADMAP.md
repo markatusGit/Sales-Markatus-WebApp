@@ -1671,3 +1671,7 @@ Google53, Editor und GitHub-Tag/main v0.32.1 verglichen; alle24 Prüfdateien bes
 ### Veröffentlichung v0.33.0
 
 Veröffentlichung v0.33.0: Apps-Script-Version54, bestehende Bereitstellung und Einstellungen erhalten. Quellcommit 0ec81caf082d393716a7ea0eae2309bb514a78de. Alle24 Prüfdateien bestanden; Google-Version und Editor bytegenau geprüft. Verzögerte Versionsanzeige nach lesendem Vergleich bestätigt, kein erneuter Upload und keine zusätzliche Version. Keine Script Properties geändert. Live-Funktionstest gesondert. Zeitpunkt: 2026-11-18T20:05:53.007Z.
+
+### r33 technisch veröffentlicht – 18.11.2026
+
+Google54, Editor und GitHub-Tag/main v0.33.0 bestätigt. Alle24 Prüfdateien bestanden, darunter37 Fachfälle und36 Auth-/Rechtefälle. Null HQ-Aufrufe beim Öffnen, Anlegen und Speichern sowie Konfliktprüfung erst beim Abgleich geprüft. Zentraler Katalog auch bei Delta-Abgleich; Herkunftsfehler als Abgleichhinweis, bisherige Optionen erhalten. Verbrauchsmodell unveränderter Lauf:138 Reads/147 Writes bei60 Einzelproben inklusive Metadaten. Anonymer Appabruf HTTP200 mit r33. Produktive Bedien-/HQ-Speicherprobe gesondert offen. Kein nächtlicher Tagesstart eingerichtet, weiterhin ausdrücklicher zentraler Start mit Fortsetzungsworker; täglicher Nachtlauf bleibt Roadmap. Keine neuen Script Properties oder Bereitstellungseinstellungen. Fremde lokale Dokumentationsdateien erhalten.
