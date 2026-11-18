@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 18.11.2026 – r32 veröffentlicht und technisch nachgewiesen
+
+Alle 24 Prüfdateien auch in sauberer Veröffentlichungskopie bestanden: 33 Fachfälle, 36 Auth-/Rechtefälle, 11 Releasefälle und erweiterte echte Browserabläufe mit synthetischen Daten. Gemeinsames Formular visuell geprüft. Nach kompatibler Syntaxkorrektur und lesender Bestätigung des unveränderten r31-Stands bestehende Google-Bereitstellung auf Version52/r32 aktualisiert. Quellcommit72a8f06, Releasecommit/Taga40c399/v0.32.0. Google-Version, Editor und GitHub-Tag/main durch release:verify verglichen; anonymer Appabruf HTTP200 mit Kennung2026-11-18-r32. Keine neuen Script Properties, Scopes oder Zugriffs-/Ausführungseinstellungen. Tatsächliche tenantbezogene v1-Metadaten sowie produktive Speicherung/HQ-Zuordnungsübertragung bleiben gesonderte Live-Abnahme; keine echten Kunden oder Altaufträge zu Testzwecken geändert. Fremde Dokumentationsdateien, Claude-Korrekturen und Roadmap erhalten.
+
 ### 18.11.2026 – r32: Identische Kundenanlage und -bearbeitung (lokal vorbereitet)
 
 Veröffentlichungszwischenstand: Erste Google-Übertragung nach erneut bestandener Gesamtprüfung beim Parser abgewiesen (logischer Zuweisungsoperator in neuer Entwurfsbearbeitung; Node akzeptiert ihn, Apps Script nicht). Keine neue Google-Version oder Bereitstellungsaktualisierung. Schreibweise durch kompatible ausdrückliche Zuweisung ersetzt; lokale Serverprüfung und Release-Regressionsfall erfassen diese Operatoren nun vor dem Upload. Vor einem neuen Veröffentlichungsversuch festen Google-/Editorstand lesend gegen r31 prüfen und den abgebrochenen Zustand archivieren; kein blindes Wiederholen.
