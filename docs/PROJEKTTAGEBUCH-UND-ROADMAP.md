@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 18.11.2026 – r32.1: Formulare trotz HQ-Metadatenfehler öffnen
+
+Nutzer meldet HTTP500 bei Anlage und Bearbeitung. Gemeinsamer Katalogabruf blockierte die gesamte Formularöffnung. Neue Rückfallebene verwendet ausschließlich vorhandene vollständige Basislisten und zeigt den fehlgeschlagenen Endpunkt; keine erfolgreiche Aktualisierung vortäuschen, keine Kundenwerte ändern. Ohne verwendbaren Katalog Fehler beibehalten. Ursache des produktiven HQ500 noch nicht live isoliert; insbesondere tatsächliche Herkunftsoptionen weiterhin offen. Computersteuerung wurde wegen nicht sicher erkennbarer Browseradresse beendet; keine weitere UI-Automation. Neuer Regressionstest für beide Öffnungen und fehlende Basislisten. Keine Script Properties oder Bereitstellungseinstellungen geändert. Veröffentlichung und Live-Bedienabnahme getrennt.
+
 ### 18.11.2026 – r32 veröffentlicht und technisch nachgewiesen
 
 Alle 24 Prüfdateien auch in sauberer Veröffentlichungskopie bestanden: 33 Fachfälle, 36 Auth-/Rechtefälle, 11 Releasefälle und erweiterte echte Browserabläufe mit synthetischen Daten. Gemeinsames Formular visuell geprüft. Nach kompatibler Syntaxkorrektur und lesender Bestätigung des unveränderten r31-Stands bestehende Google-Bereitstellung auf Version52/r32 aktualisiert. Quellcommit72a8f06, Releasecommit/Taga40c399/v0.32.0. Google-Version, Editor und GitHub-Tag/main durch release:verify verglichen; anonymer Appabruf HTTP200 mit Kennung2026-11-18-r32. Keine neuen Script Properties, Scopes oder Zugriffs-/Ausführungseinstellungen. Tatsächliche tenantbezogene v1-Metadaten sowie produktive Speicherung/HQ-Zuordnungsübertragung bleiben gesonderte Live-Abnahme; keine echten Kunden oder Altaufträge zu Testzwecken geändert. Fremde Dokumentationsdateien, Claude-Korrekturen und Roadmap erhalten.

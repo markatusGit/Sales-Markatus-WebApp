@@ -1,5 +1,9 @@
 # Änderungsprotokoll
 
+## [v0.32.1]
+
+- HQ-HTTP500 beim Öffnen beider Kundenformulare blockiert vorhandene vollständige Auswahllisten nicht mehr. Sichtbarer Warnhinweis mit betroffenem HQ-Endpunkt; fehlgeschlagene Aktualisierung verändert weder Katalog noch Prüfstand. Ohne vollständige Basislisten bleibt der Zugriff gesperrt. Keine erfundenen Herkunftswerte.
+
 Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frühere r-Versionen bleiben unverändert im [Projekttagebuch](docs/PROJEKTTAGEBUCH-UND-ROADMAP.md) dokumentiert.
 
 ## [Unveröffentlicht]

@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-18-r32';
+const SALES_RELEASE = '2026-11-18-r32.1';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -22,11 +22,12 @@ function salesCompanyCustomInput_(text,definition){
   return text;
 }
 function salesHqRows_(value){const rows=Array.isArray(value)?value:value?.value||value?.data||value?.d?.results;if(!Array.isArray(rows))throw Error('HQ-Auswahlliste hat ein unbekanntes Format.');return rows;}
+function salesCustomerGet_(path){try{return salesHqGet_(path);}catch(error){throw Error('HQ-Auswahlliste '+path.split('?')[0]+': '+error.message);}}
 function salesCustomerList_(entity,filter,started){
   if(!['Companies','CompanyTypes','Subsystems','Users'].includes(entity))throw Error('Unbekannte Auswahlliste.');const rows=[],seen=new Set();
   for(let page=0;page<50;page++){
     if(Date.now()-started>45000)throw Error('HQ-Auswahllisten benötigen länger. Vorhandene Werte bleiben erhalten; bitte erneut aktualisieren.');
-    const response=salesHqGet_('/v2/'+entity+'?$top=200&$skip='+rows.length+'&orderby=id'+(filter?'&$filter='+encodeURIComponent(filter):'')),batch=salesHqRows_(response.data);
+    const response=salesCustomerGet_('/v2/'+entity+'?$top=200&$skip='+rows.length+'&orderby=id'+(filter?'&$filter='+encodeURIComponent(filter):'')),batch=salesHqRows_(response.data);
     if(batch.length>200)throw Error('HQ hat die angeforderte Seitengröße nicht eingehalten.');for(const row of batch){const id=salesId_(row.id);if(seen.has(id))throw Error('HQ-Auswahlliste enthält doppelte IDs. Prüfstand bleibt erhalten.');seen.add(id);rows.push(row);}
     const key=Object.keys(response.headers||{}).find(k=>k.toLowerCase()==='hellohq-count'),total=key?Number(response.headers[key]):null;
     if(total!==null&&(!Number.isSafeInteger(total)||total<rows.length))throw Error('HQ-Auswahllistenzähler ist widersprüchlich.');
@@ -34,10 +35,17 @@ function salesCustomerList_(entity,filter,started){
   }throw Error('HQ-Auswahlliste noch nicht vollständig. Gespeicherter Prüfstand bleibt erhalten.');
 }
 function salesCustomerCatalog_(force){
+  try{return salesCustomerCatalogRefresh_(force);}catch(error){
+    const cached=salesRead_('sales_meta/catalog');
+    if(!cached||!['types','users','subsystems'].every(k=>Array.isArray(cached[k])&&cached[k].length))throw error;
+    return {...cached,customerFormWarning:'HQ-Auswahllisten konnten nicht aktualisiert werden. Gespeicherte Werte werden verwendet. '+String(error.message)};
+  }
+}
+function salesCustomerCatalogRefresh_(force){
   const old=salesRead_('sales_meta/catalog');if(!old)throw Error('Zuerst die HQ-Auswahllisten importieren.');
   if(!force&&old.customerFormVersion===1&&Date.now()-Date.parse(old.customerFormCheckedAt)<15*60000)return old;
-  const started=Date.now(),checkedAt=salesNow_(),definitions=salesCompanyCustomSelected_(salesHqRows_(salesHqGet_('/v2/Companies/CustomFieldDefinitions').data));
-  const legacy=salesHqRows_(salesHqGet_('/v1/CustomFieldDefinitions?$expand=Options').data);if(legacy.length>500)throw Error('HQ-Felddefinitionen sind nicht vollständig lesbar.');
+  const started=Date.now(),checkedAt=salesNow_(),definitions=salesCompanyCustomSelected_(salesHqRows_(salesCustomerGet_('/v2/Companies/CustomFieldDefinitions').data));
+  const legacy=salesHqRows_(salesCustomerGet_('/v1/CustomFieldDefinitions?$expand=Options').data);if(legacy.length>500)throw Error('HQ-Felddefinitionen sind nicht vollständig lesbar.');
   const fields=definitions.map(f=>{const matches=legacy.filter(d=>String(d.Category).toLowerCase()==='company'&&salesCompanyCustomKey_(d.Name)===salesCompanyCustomKey_(f.name));if(matches.length>1)throw Error('HQ-Felddefinition nicht eindeutig: '+f.name);if(salesCompanyCustomKey_(f.name)==='kundenherkunft'&&/^Dropdown/.test(f.type)&&(matches.length!==1||!Array.isArray(matches[0].Options)))throw Error('HQ-Auswahlwerte für Kundenherkunft wurden nicht vollständig geliefert.');return {...salesPick_(f,['name','type']),options:(matches[0]?.Options||[]).map(o=>String(o.OptionValue||'')).filter(Boolean)};});
   const since=old.industriesCheckedAt||old.updatedAt,from=Number.isFinite(Date.parse(since))?new Date(Date.parse(since)-120000).toISOString().replace(/\.\d{3}Z$/,'Z'):null;
   const industries=new Set(old.industries||[]),rows=salesCustomerList_('Companies',from?'updatedOn ge '+from:'',started);

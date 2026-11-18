@@ -30,6 +30,11 @@ function customerFixture(){
  }return fetch(url,options);};return f;
 }
 if(require.main===module){
+test('HQ metadata HTTP500 preserves the last catalog and keeps both customer forms available',()=>{
+ const f=customerFixture(),before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;delete f.db['sales_meta/catalog'].customerFormCheckedAt;const saved=JSON.stringify(f.db['sales_meta/catalog']);f.ctx.salesHqGet_=path=>{if(path.startsWith('/v1/CustomFieldDefinitions'))throw Error('HQ-Lesetest: HTTP 500');return get(path);};
+ for(const model of [f.ctx.getSalesLeanView('new'),f.ctx.getSalesEditor({entity:'customer',companyId:101})]){assert.match(model.catalog.customerFormWarning,/CustomFieldDefinitions.*HTTP 500/);assert.equal(model.catalog.types.length>0,true);}assert.equal(JSON.stringify(f.db['sales_meta/catalog']),saved);
+ delete f.db['sales_meta/catalog'].types;assert.throws(()=>f.ctx.getSalesLeanView('new'),/HTTP 500/);
+});
 test('common customer form saves all documented fields atomically and transfers changed sections without losing hidden data',()=>{
  const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101}),values={...m.base,name:'Synthetic common customer',industrialSector:'Synthetic new sector',newIndustry:'true',companyTypeId:'3',subsystemId:'5',responsibleUserId:'8',city:'Synthetic new city',erstelldatum:'2026-11-18',Kundenherkunft:JSON.stringify(['Synthetic extra source'])},writes=f.calls.filter(c=>c.method!=='get').length,input={...m,requestId:'common-customer-request',change:values};
  const r=f.ctx.saveSalesEntityChange(input);f.ctx.saveSalesEntityChange(input);assert.equal(f.calls.filter(c=>c.method!=='get').length,writes);assert.equal(r.patch.jobs.length,4);assert.equal(Object.values(f.db).filter(j=>j.formSignature).length,1);assert.equal(f.ctx.getSalesLeanCompany(101).company.name,values.name);assert.equal(f.db['sales_meta/catalog'].industries.includes(values.industrialSector),true);
@@ -45,7 +50,7 @@ test('common form preserves original creation intent after an HQ attempt and car
 });
 test('catalog refresh imports real HQ origin options and external industries, caches checks, and never advances a failed filter',()=>{
  const f=customerFixture();f.remote.Companies[777]={id:777,name:'Synthetic external',industrialSector:'Synthetic HQ sector',updatedOn:new Date().toISOString()};const r=f.ctx.getSalesEditor({entity:'catalog',force:true});assert.equal(r.catalog.industries.includes('Synthetic HQ sector'),true);assert.equal(r.catalog.fields.find(x=>x.name==='Kundenherkunft').options[0],'Synthetic source');const n=f.calls.length;f.ctx.getSalesEditor({entity:'customer',companyId:101});assert.equal(f.calls.length,n+1);
- const before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies?'))throw Error('Synthetic rejected filter');return get(p);};assert.throws(()=>f.ctx.getSalesEditor({entity:'catalog',force:true}),/rejected filter/);assert.equal(JSON.stringify(f.db['sales_meta/catalog']),before);
+ const before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies?'))throw Error('Synthetic rejected filter');return get(p);};assert.match(f.ctx.getSalesEditor({entity:'catalog',force:true}).catalog.customerFormWarning,/rejected filter/);assert.equal(JSON.stringify(f.db['sales_meta/catalog']),before);
 });
 test('common form rejects fabricated HQ selections, extra fields, stale values and rolls a failed multi-job save back',()=>{
  const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101});for(const change of [{...m.base,subsystemId:'999'},{...m.base,iban:'forbidden'},{...m.base,Kundenherkunft:'["Invented"]'},{...m.base,industrialSector:'Unknown'}])assert.throws(()=>f.ctx.saveSalesEntityChange({...m,requestId:'common-invalid-request',change}));
