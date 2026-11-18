@@ -189,3 +189,7 @@ Veröffentlichung v0.31.0: Apps-Script-Version 51, bestehende Bereitstellung bei
 Veröffentlichung v0.32.0: Apps-Script-Version 52, bestehende Bereitstellung beibehalten. Quellcommit 72a8f06cd3eb0c91ec4b8fe3564419fb850858ce. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-18T14:22:14.560Z.
 
 Veröffentlichung v0.32.1: Apps-Script-Version 53, bestehende Bereitstellung beibehalten. Quellcommit 11dd289f4af9a93d2ae57edc32c7c7117a1cda82. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-18T14:55:23.112Z.
+
+### r32.1 technisch veröffentlicht – 18.11.2026
+
+Google53, Editor und GitHub-Tag/main v0.32.1 verglichen; alle24 Prüfdateien bestanden (34 Fachfälle). Anonymer Abruf HTTP200 mit r32.1. Keine neuen Script Properties oder Bereitstellungseinstellungen. Beide Formulare bei synthetischem HQ500 geprüft; echte Bedienprobe und genaue produktive HQ-Fehlerursache noch offen. Letzter gültiger Katalog bleibt unverändert, Warnung nennt betroffenen Endpunkt. Fremde Dokumentationsdateien erhalten.
