@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-18-r32.1';
+const SALES_RELEASE = '2026-11-18-r33';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -34,8 +34,11 @@ function salesCustomerList_(entity,filter,started){
     if(batch.length===0){if(!filter&&total!==null&&rows.length<total)throw Error('HQ-Auswahlliste ist unvollständig.');return rows;}if(total!==null&&rows.length===total)return rows;
   }throw Error('HQ-Auswahlliste noch nicht vollständig. Gespeicherter Prüfstand bleibt erhalten.');
 }
-function salesCustomerCatalog_(force){
-  try{return salesCustomerCatalogRefresh_(force);}catch(error){
+function salesCustomerCatalog_(){
+  const catalog=salesRead_('sales_meta/catalog');if(!catalog)throw Error('Auswahllisten fehlen. Bitte zuerst synchronisieren.');return catalog;
+}
+function salesCustomerSyncCatalog_(){
+  try{return salesCustomerCatalogRefresh_(true);}catch(error){
     const cached=salesRead_('sales_meta/catalog');
     if(!cached||!['types','users','subsystems'].every(k=>Array.isArray(cached[k])&&cached[k].length))throw error;
     return {...cached,customerFormWarning:'HQ-Auswahllisten konnten nicht aktualisiert werden. Gespeicherte Werte werden verwendet. '+String(error.message)};

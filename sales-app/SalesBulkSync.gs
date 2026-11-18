@@ -93,6 +93,7 @@ function salesBulkCompany_(run,task){
   const prior=typeof salesBusinessView_==='function'?salesBulkGet_(companies.filter(c=>run.full||!run.changedCompanyIds||run.changedCompanyIds.includes(String(c.id))).map(c=>'sales_companies/'+c.id)):{};
   const entries=[];for(const raw of companies){
     if(!run.full&&run.changedCompanyIds&&!run.changedCompanyIds.includes(String(raw.id)))continue;
+    if(raw.industrialSector)run.catalogIndustries=Array.from(new Set([...(run.catalogIndustries||[]),raw.industrialSector]));
     const id=String(raw.id),company=salesCompany_(raw),cs=contacts.filter(c=>String(c.companyId)===id).map(salesContactView_),ds=docs.filter(d=>String(d.companyId)===id),hs=histories.filter(h=>String(h.companyId)===id).map(h=>salesHistory_(h,ds,byId));
     const ps=projects.filter(p=>String(p.companyId)===id).map(p=>{const v=views['sales_projectviews/'+p.id];if(!v||v.generation!==run.entities.Projects.generation)throw new Error('Projektübersicht fehlt; Kundenakte bleibt erhalten.');return v.row;});
     const value={...(prior['sales_companies/'+id]?.pendingChanges?{pendingChanges:prior['sales_companies/'+id].pendingChanges}:{}),company,contacts:cs,histories:hs,projects:ps,detailVersion:3,loadedAt:salesNow_(),historyLoadedAt:salesNow_(),syncRunId:run.id};
@@ -142,7 +143,7 @@ function salesBulkStepWork_(run){
   else if(task.kind==='bulkCompanyPlan'){
     run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
     if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
-    else run.tasks.push({kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='bulkCompany')done=salesBulkCompany_(run,task);

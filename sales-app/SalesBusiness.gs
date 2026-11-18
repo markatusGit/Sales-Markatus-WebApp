@@ -12,7 +12,7 @@ function salesCustomerValues_(raw,catalog){
 function salesCustomerSource_(companyId){
   if(String(companyId).startsWith('draft_')){const d=salesBusinessDraft_({companyId,entity:'company',targetId:companyId});if((d.draft.pendingChanges||[]).length)throw Error('Für diesen Kunden sind Änderungen vorgemerkt. Bitte zuerst den offenen HQ-Abgleich klären.');return {...d,raw:d.draft.company};}
   const id=salesId_(companyId),data=salesBusinessKnown_(id);if((data.pendingChanges||[]).some(p=>['company','types','address','assignments'].includes(p.entity)))throw Error('Für diesen Kunden sind Stammdatenänderungen offen. Bitte zuerst den HQ-Abgleich abschließen.');
-  return {ref:String(id),data,raw:salesBusinessTarget_(id,'company',id),hqId:id};
+  return {ref:String(id),data,raw:data.company,hqId:id};
 }
 function salesCustomerEditor_(input){
   const catalog=salesCustomerCatalog_(false),source=salesCustomerSource_(input.companyId);
@@ -141,6 +141,11 @@ function salesBusinessKnown_(id){
   id=String(salesId_(id));const data=salesRead_('sales_companies/'+id);
   if(!data?.company||String(data.company.id)!==id)throw new Error('Kundendetails zuerst über den HQ-Sync importieren.');return data;
 }
+function salesBusinessCachedTarget_(data,entity,targetId){
+  if(['company','types'].includes(entity)){if(Number(data.company.id)!==targetId)throw Error('Abweichendes Firmenziel.');return entity==='types'?{...data.company,companyTypes:salesCompanyTypes_(data.company.companyTypes)}:data.company;}
+  const rows=entity==='contact'?data.contacts||[]:entity==='address'?[data.company.defaultAddress,...data.company.addresses||[]]:[];
+  const row=rows.find(x=>Number(x?.id)===targetId);if(!row)throw Error('Stammdatenziel gehört nicht zum geladenen Kunden.');return row;
+}
 function salesBusinessTarget_(hqId,entity,targetId){
   hqId=salesId_(hqId);targetId=salesId_(targetId);
   if(entity==='assignments'){
@@ -164,8 +169,8 @@ function getSalesEditor(input){
   const id=salesId_(input.companyId),schema=salesBusinessSchema_(input.entity),data=salesBusinessKnown_(id);
   const pending=(data.pendingChanges||[]).filter(p=>p.entity===input.entity&&Number(p.targetId)===Number(input.targetId));
   if(pending.length)throw new Error('Für diese Stammdaten ist bereits eine Änderung offen. Bitte zuerst den HQ-Sync abschließen oder den Konflikt in der Auftragsübersicht klären.');
-  const raw=salesBusinessTarget_(id,input.entity,input.targetId);
-  const cachedCatalog=['types','company'].includes(input.entity)?salesRead_('sales_meta/catalog'):null,catalog=input.entity==='company'?salesCompanyCustomCatalog_(cachedCatalog):cachedCatalog;
+  const raw=salesBusinessCachedTarget_(data,input.entity,salesId_(input.targetId));
+  const catalog=['types','company'].includes(input.entity)?salesRead_('sales_meta/catalog'):null;
   return {companyId:id,companyName:data.company.name,entity:input.entity,targetId:salesId_(input.targetId),schema,base:salesBusinessPick_(raw,schema),types:catalog?.types||[],customFieldDefinitions:input.entity==='company'?catalog?.fields||[]:[]};
 }
 /** Unsent intent changes in place; after an HQ attempt, edits are separate dependent jobs. */
@@ -180,7 +185,7 @@ function salesBusinessDraft_(input){
   return {ref,draft,job,schema,raw,deferred};
 }
 function salesBusinessDraftEditor_(input){
-  const d=salesBusinessDraft_(input),cachedCatalog=salesRead_('sales_meta/catalog'),catalog=input.entity==='company'?salesCompanyCustomCatalog_(cachedCatalog):cachedCatalog;
+  const d=salesBusinessDraft_(input),catalog=salesRead_('sales_meta/catalog');
   if((d.draft.pendingChanges||[]).some(p=>p.entity===input.entity))throw Error('Für diese Stammdaten ist bereits eine Änderung vorgemerkt. Bitte zuerst den offenen HQ-Abgleich klären.');
   return {companyId:d.ref,companyName:d.draft.company.name,entity:input.entity,targetId:input.targetId,local:true,deferred:d.deferred,revision:d.draft.revision||0,schema:d.schema,base:salesBusinessPick_(d.raw,d.schema),types:catalog?.types||[],customFieldDefinitions:input.entity==='company'?catalog?.fields||[]:[]};
 }
@@ -353,6 +358,7 @@ function salesBusinessRun_(job,verifyOnly){
   if(job.formPrevious&&!['synced','canceled'].includes(salesRead_('sales_jobs/'+salesKey_(job.formPrevious))?.state)){if(verifyOnly)throw Error('Vorheriger Teil der Kundenänderung ist noch offen.');job.state='pending';job.message='Änderung wartet auf Abschluss des vorherigen Teils dieses Formulars.';return;}
   if(!salesBusinessDeferredTarget_(job)){if(verifyOnly)throw Error('Keine HQ-Bestätigung der Änderung: ursprüngliche Anlage noch offen.');return;}
   salesBusinessKnown_(job.hqId);const actual=salesBusinessTarget_(job.hqId,job.entity,job.targetId),schema=salesBusinessSchema_(job.entity),current=salesBusinessPick_(actual,schema);
+  if(job.formGroup&&job.change.customFields){const names=new Set(job.change.customFields.map(f=>f.name));current.customFields=(current.customFields||[]).filter(f=>names.has(f.name));}
   const conflicts=Object.keys(job.change).filter(k=>!salesBusinessEqual_(current,{[k]:job.change[k]})&&!salesBusinessEqual_(current,{[k]:job.base[k]}));
   if(conflicts.length){job.state='conflict';job.conflict={before:job.base,app:job.change,hq:salesPick_(current,Object.keys(job.change))};job.message='HQ und App unterscheiden sich. Bitte die Stammdatenwerte in der Auftragsübersicht vergleichen.';return;}
   let wrote=false;
@@ -363,6 +369,7 @@ function salesBusinessRun_(job,verifyOnly){
       salesAssertOwnContactAddress_({hqId:job.hqId},job.targetId,salesId_(actual.defaultAddressId));
     }
     const payload={...current,...job.change};
+    if(job.formGroup&&job.change.customFields)payload.customFields=[...(actual.customFields||[]).filter(f=>!job.change.customFields.some(c=>c.name===f.name)),...job.change.customFields];
     // Embedded address updates are optional. Do not resubmit an unrelated address
     // (older HQ contacts can have an incomplete address which cannot be PUT).
     if(job.entity==='contact'&&job.change.eMail!==undefined)payload.defaultAddress={...(payload.defaultAddress||{}),email:job.change.eMail};
@@ -377,7 +384,8 @@ function salesBusinessRun_(job,verifyOnly){
   const after=wrote?salesBusinessTarget_(job.hqId,job.entity,job.targetId):actual;
   if(job.entity==='assignments'&&JSON.stringify(salesAssignmentGuard_(after.legacy))!==JSON.stringify(job.assignmentGuard||salesAssignmentGuard_(actual.legacy)))throw Error('HQ hat neben der Zuordnung weitere Firmenwerte verändert. Rückprüfung offen; kein erneuter Schreibversuch.');
   if(job.entity==='contact'&&job.change.defaultAddress===undefined){const expected=salesBusinessPick_(actual.defaultAddress||{},salesBusinessSchema_('address'));if(job.change.eMail!==undefined)expected.email=job.change.eMail;if(String(after.defaultAddressId??'')!==String(actual.defaultAddressId??'')||!salesBusinessEqual_(after.defaultAddress||{},expected))throw new Error('Kontaktadresse wurde unerwartet verändert. Rückprüfung offen.');}
-  if(!salesBusinessEqual_(salesBusinessPick_(after,schema),job.change))throw new Error('Stammdaten-Rückprüfung noch offen.');
+  const confirmed=salesBusinessPick_(after,schema);if(job.formGroup&&job.change.customFields)confirmed.customFields=(confirmed.customFields||[]).filter(f=>job.change.customFields.some(c=>c.name===f.name));
+  if(!salesBusinessEqual_(confirmed,job.change))throw new Error('Stammdaten-Rückprüfung noch offen.');
   salesBusinessFinish_(job,after);
 }
 function salesBusinessTransport_(job,path,method,body){

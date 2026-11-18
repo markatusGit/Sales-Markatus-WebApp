@@ -1,5 +1,16 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r33: Firebase im normalen Betrieb
+
+Die bisherigen r32-Hinweise zu HQ-Abfragen beim Formularöffnen und zum separaten Auswahllistenbutton sind aufgehoben. Anlage, Bearbeitung und Speichern verwenden Firebase; Listen werden im zentralen Datenabgleich aktualisiert. Nächtlicher Tagesstart ist noch nicht eingerichtet. Aktuell ausdrücklich über „Synchronisieren“ starten; der vorhandene Worker setzt diesen Lauf fort. Keine neuen Script Properties oder Bereitstellungseinstellungen nötig.
+
+- Die App neu laden; Kennung „2026-11-18-r33“ erwarten. Bei anderer Kennung diese melden.
+- „Firma hinzufügen“ öffnen; gespeicherte Auswahllisten ohne HQ-Lesehinweis erwarten. Bei einem Fehler den genauen Meldungstext nennen.
+- Bei einem Kunden „Firmendaten bearbeiten“ öffnen; den in Firebase gespeicherten Stand erwarten. Bei abweichenden Daten nur den betroffenen Feldnamen melden.
+- Eine tatsächlich gewünschte Änderung speichern; sofortige Firebase-Vormerkung ohne HQ-Übertragung erwarten. Bei einem Fehler bleibt die Eingabe erhalten; Meldung nennen.
+
+Neue HQ-Auswahlwerte erscheinen erst nach einem abgeschlossenen zentralen Abgleich. Ein Fehler beim Lesen von Herkunftsoptionen erscheint dort als Hinweis; bisherige Optionen bleiben erhalten. Ein erfolgreicher Codevergleich ersetzt keine produktive Speicher-/HQ-Prüfung.
+
 ## r32: Gemeinsames Kundenformular prüfen
 
 Keine Script Properties oder Bereitstellungseinstellungen zu ändern. Kundenanlage und „Firmendaten bearbeiten“ zeigen dieselben zehn Kundenfelder; die erste Ansprechpartneranlage bleibt zusätzlich im Anlageformular. Herkunft kann entsprechend dem tatsächlichen HQ-Feld mehrere Werte enthalten. „+ Neue Branche anlegen“ merkt einen Branchennamen vor; Übertragung nach HQ erfolgt zusammen mit dem Kunden über den bestehenden Datenabgleich. Kein eigener globaler HQ-Branchen-Endpunkt wird behauptet. Die folgenden fachlichen Schritte sind gesonderte Live-Abnahme, kein Teil des technischen Codevergleichs.

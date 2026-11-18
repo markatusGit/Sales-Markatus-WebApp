@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.33.0]
+
+- Kundenanlage, Kunden-/Kontakt-/Adresseditor und Speichern lesen ausschließlich Firebase. Kein HQ-Metadatenabruf beim Öffnen, kein 15-Minuten-Nachladen und kein separater Formular-Aktualisierungsbutton.
+- Auswahllisten auch im inkrementellen zentralen Abgleich aktualisieren; Branchen aus bereits importierten Firebase-Firmen übernehmen. HQ-Herkunftsoptionen ausschließlich dort laden; Fehler als Abgleichhinweis, vorhandene Optionen erhalten. HQ-Konfliktprüfung beim Übertragen, sonstige HQ-Felder erhalten.
+- Kennung r33. Nächtlicher täglicher Abgleich bleibt Ziel; kein neuer Nachttrigger eingerichtet. Keine Script Properties oder Bereitstellungseinstellungen geändert.
+
 ## [v0.32.1]
 
 - HQ-HTTP500 beim Öffnen beider Kundenformulare blockiert vorhandene vollständige Auswahllisten nicht mehr. Sichtbarer Warnhinweis mit betroffenem HQ-Endpunkt; fehlgeschlagene Aktualisierung verändert weder Katalog noch Prüfstand. Ohne vollständige Basislisten bleibt der Zugriff gesperrt. Keine erfundenen Herkunftswerte.

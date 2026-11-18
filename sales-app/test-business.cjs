@@ -7,7 +7,7 @@ function productionFixture(){
   for(const key of Object.keys(f.db))if(/^sales_(drafts|jobs)\//.test(key))delete f.db[key];
   f.db['sales_directory/101']={company:f.db['sales_companies/101'].company,contacts:f.db['sales_companies/101'].contacts};
   vm.runInContext(['SalesV1.gs','SalesSync.gs','SalesLean.gs'].map(p=>fs.readFileSync(__dirname+'/'+p,'utf8')).join('\n'),f.ctx);
-  return f;
+  f.db['sales_companies/101'].company=JSON.parse(JSON.stringify(f.remote.Companies[101]));return f;
 }
 let count=0;function test(name,fn){fn();count++;console.log('PASS '+name);}
 function edit(f,entity,change,targetId=entity==='contact'?202:entity==='address'?501:101){
@@ -27,13 +27,27 @@ function customerFixture(){
  const fetch=f.ctx.UrlFetchApp.fetch;f.ctx.UrlFetchApp.fetch=(url,options)=>{if(url==='https://api.hellohq.io/v2/Companies/101/UpdateCompanyTypes'&&options.method==='post'){const body=JSON.parse(options.payload);f.calls.push({method:'post',path:'/v2/Companies/101/UpdateCompanyTypes',body});f.remote.Companies[101].companyTypes=body;return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(body)};}if(url==='https://api.hellohq.io/v1/Companies(101)'&&options.method==='put'){
   const body=JSON.parse(options.payload),before=legacy();for(const key of Object.keys(before).filter(k=>!['ResponsibleUsers','Subsystems'].includes(k)))assert.equal(JSON.stringify(body[key]),JSON.stringify(before[key]),key+' preserved');f.calls.push({method:'put',path:'/v1/Companies(101)',body});
   f.remote.Companies[101].responsibleUsers=body.ResponsibleUsers.map(u=>({userId:u.Id}));f.remote.Companies[101].subsystems=body.Subsystems.map(s=>({id:s.Id}));return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(legacy())};
- }return fetch(url,options);};return f;
+ }return fetch(url,options);};f.db['sales_companies/101'].company=JSON.parse(JSON.stringify(f.remote.Companies[101]));return f;
 }
 if(require.main===module){
+test('central catalog sync updates imported industries and preserves source options on legacy HQ failure',()=>{
+ const f=customerFixture(),run={errors:[],catalogIndustries:['Synthetic imported branch']};assert.equal(f.ctx.salesSyncCatalog_(run,{id:'lists'}),true);assert.equal(run.errors.length,0);assert.equal(f.db['sales_meta/catalog'].industries.includes('Synthetic imported branch'),true);
+ const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v1/CustomFieldDefinitions'))throw Error('HTTP 500 synthetic');return get(p);};f.ctx.salesSyncCatalog_(run,{id:'lists'});assert.equal(run.errors.length,1);assert.match(run.errors[0].message,/CustomFieldDefinitions.*HTTP 500/);assert.equal(f.db['sales_meta/catalog'].fields.find(f=>f.name==='Kundenherkunft').options[0],'Synthetic source');
+});
+test('normal creation, all editors, catalog reload and customer saving make zero HQ calls even with an expired catalog',()=>{
+ const f=customerFixture();f.db['sales_meta/catalog'].customerFormCheckedAt='2000-01-01';const n=f.calls.length;
+ f.ctx.salesHqGet_=()=>{throw Error('HQ forbidden outside sync');};f.ctx.salesOne_=()=>{throw Error('HQ forbidden outside sync');};
+ f.ctx.getSalesLeanView('new');f.ctx.getSalesEditor({entity:'catalog',force:true});
+ for(const [entity,targetId] of [['company',101],['types',101],['address',501],['contact',202]])f.ctx.getSalesEditor({companyId:101,entity,targetId});
+ const m=f.ctx.getSalesEditor({entity:'customer',companyId:101});f.ctx.saveSalesEntityChange({...m,requestId:'firebase-only-form',change:{...m.base,name:'Synthetic Firebase only'}});f.ctx.saveSalesCompany({...f.input,name:'Synthetic Firebase creation'});assert.equal(f.calls.length,n);
+});
+test('HQ conflicts are detected during sync after a Firebase-only common form save, preserving unrelated HQ fields',()=>{
+ const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101});f.remote.Companies[101].name='Synthetic concurrent HQ';const r=f.ctx.saveSalesEntityChange({...m,requestId:'delayed-hq-conflict',change:{...m.base,name:'Synthetic app'}});assert.equal(f.ctx.runSalesJob(r.id).state,'conflict');assert.equal(f.remote.Companies[101].name,'Synthetic concurrent HQ');
+});
 test('HQ metadata HTTP500 preserves the last catalog and keeps both customer forms available',()=>{
  const f=customerFixture(),before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;delete f.db['sales_meta/catalog'].customerFormCheckedAt;const saved=JSON.stringify(f.db['sales_meta/catalog']);f.ctx.salesHqGet_=path=>{if(path.startsWith('/v1/CustomFieldDefinitions'))throw Error('HQ-Lesetest: HTTP 500');return get(path);};
- for(const model of [f.ctx.getSalesLeanView('new'),f.ctx.getSalesEditor({entity:'customer',companyId:101})]){assert.match(model.catalog.customerFormWarning,/CustomFieldDefinitions.*HTTP 500/);assert.equal(model.catalog.types.length>0,true);}assert.equal(JSON.stringify(f.db['sales_meta/catalog']),saved);
- delete f.db['sales_meta/catalog'].types;assert.throws(()=>f.ctx.getSalesLeanView('new'),/HTTP 500/);
+ for(const model of [f.ctx.getSalesLeanView('new'),f.ctx.getSalesEditor({entity:'customer',companyId:101})]){assert.equal(model.catalog.customerFormWarning,undefined);assert.equal(model.catalog.types.length>0,true);}assert.equal(JSON.stringify(f.db['sales_meta/catalog']),saved);
+ delete f.db['sales_meta/catalog'].types;assert.throws(()=>f.ctx.salesCustomerSyncCatalog_(),/HTTP 500/);
 });
 test('common customer form saves all documented fields atomically and transfers changed sections without losing hidden data',()=>{
  const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101}),values={...m.base,name:'Synthetic common customer',industrialSector:'Synthetic new sector',newIndustry:'true',companyTypeId:'3',subsystemId:'5',responsibleUserId:'8',city:'Synthetic new city',erstelldatum:'2026-11-18',Kundenherkunft:JSON.stringify(['Synthetic extra source'])},writes=f.calls.filter(c=>c.method!=='get').length,input={...m,requestId:'common-customer-request',change:values};
@@ -49,12 +63,12 @@ test('common form preserves original creation intent after an HQ attempt and car
  }
 });
 test('catalog refresh imports real HQ origin options and external industries, caches checks, and never advances a failed filter',()=>{
- const f=customerFixture();f.remote.Companies[777]={id:777,name:'Synthetic external',industrialSector:'Synthetic HQ sector',updatedOn:new Date().toISOString()};const r=f.ctx.getSalesEditor({entity:'catalog',force:true});assert.equal(r.catalog.industries.includes('Synthetic HQ sector'),true);assert.equal(r.catalog.fields.find(x=>x.name==='Kundenherkunft').options[0],'Synthetic source');const n=f.calls.length;f.ctx.getSalesEditor({entity:'customer',companyId:101});assert.equal(f.calls.length,n+1);
- const before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies?'))throw Error('Synthetic rejected filter');return get(p);};assert.match(f.ctx.getSalesEditor({entity:'catalog',force:true}).catalog.customerFormWarning,/rejected filter/);assert.equal(JSON.stringify(f.db['sales_meta/catalog']),before);
+ const f=customerFixture();f.remote.Companies[777]={id:777,name:'Synthetic external',industrialSector:'Synthetic HQ sector',updatedOn:new Date().toISOString()};const r=({catalog:f.ctx.salesCustomerSyncCatalog_()});assert.equal(r.catalog.industries.includes('Synthetic HQ sector'),true);assert.equal(r.catalog.fields.find(x=>x.name==='Kundenherkunft').options[0],'Synthetic source');const n=f.calls.length;f.ctx.getSalesEditor({entity:'customer',companyId:101});assert.equal(f.calls.length,n);
+ const before=JSON.stringify(f.db['sales_meta/catalog']),get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies?'))throw Error('Synthetic rejected filter');return get(p);};assert.match(f.ctx.salesCustomerSyncCatalog_().customerFormWarning,/rejected filter/);assert.equal(JSON.stringify(f.db['sales_meta/catalog']),before);
 });
 test('common form rejects fabricated HQ selections, extra fields, stale values and rolls a failed multi-job save back',()=>{
  const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101});for(const change of [{...m.base,subsystemId:'999'},{...m.base,iban:'forbidden'},{...m.base,Kundenherkunft:'["Invented"]'},{...m.base,industrialSector:'Unknown'}])assert.throws(()=>f.ctx.saveSalesEntityChange({...m,requestId:'common-invalid-request',change}));
- const input={...m,requestId:'common-atomic-request',change:{...m.base,name:'Synthetic atomic',city:'Synthetic atomic city'}};const original=JSON.stringify(f.db),commit=f.ctx.salesBulkRest_;f.ctx.salesBulkRest_=()=>{throw Error('Synthetic atomic failure');};assert.throws(()=>f.ctx.saveSalesEntityChange(input),/atomic failure/);assert.equal(JSON.stringify(f.db),original);f.ctx.salesBulkRest_=commit;f.remote.Companies[101].name='Concurrent HQ';assert.throws(()=>f.ctx.saveSalesEntityChange(input),/inzwischen/);
+ const input={...m,requestId:'common-atomic-request',change:{...m.base,name:'Synthetic atomic',city:'Synthetic atomic city'}};const original=JSON.stringify(f.db),commit=f.ctx.salesBulkRest_;f.ctx.salesBulkRest_=()=>{throw Error('Synthetic atomic failure');};assert.throws(()=>f.ctx.saveSalesEntityChange(input),/atomic failure/);assert.equal(JSON.stringify(f.db),original);f.ctx.salesBulkRest_=commit;f.db['sales_companies/101'].company.name='Concurrent Firebase';assert.throws(()=>f.ctx.saveSalesEntityChange(input),/inzwischen/);
 });
 test('a lost HQ assignment response is confirmed by readback without a second write, and incomplete legacy reads never write',()=>{
  const f=customerFixture(),m=f.ctx.getSalesEditor({entity:'customer',companyId:101}),r=f.ctx.saveSalesEntityChange({...m,requestId:'assignment-lost-request',change:{...m.base,responsibleUserId:'8'}}),fetch=f.ctx.UrlFetchApp.fetch;
@@ -207,10 +221,10 @@ test('new ordinary company sends no marker and a lost POST cannot auto-adopt a n
  const before=f.calls.filter(c=>c.path==='/v2/Companies'&&c.method==='post').length;f.ctx.bindSalesCompanyResult(r.id,101);f.ctx.runSalesJob(r.id,'company');assert.equal(f.calls.filter(c=>c.path==='/v2/Companies'&&c.method==='post').length,before);
 });
 test('HQ id-shaped company types normalize at read boundary and ambiguous types stay blocked',()=>{
- const f=productionFixture();f.remote.Companies[101].companyTypes=[{id:2,name:'Interessent',number:'S-2'}];
+ const f=productionFixture();f.remote.Companies[101].companyTypes=[{id:2,name:'Interessent',number:'S-2'}];f.db['sales_companies/101'].company.companyTypes=f.remote.Companies[101].companyTypes;
  const model=f.ctx.getSalesEditor({companyId:101,entity:'types',targetId:101});assert.equal(model.base.companyTypes[0].companyTypeId,2);assert.equal(model.base.companyTypes[0].number,'S-2');assert.ok(!('id' in model.base.companyTypes[0]));assert.equal(f.ctx.salesCompany_(f.remote.Companies[101]).companyTypes[0].companyTypeId,2);
  const n=f.calls.filter(c=>c.method!=='get').length;
- for(const row of [{id:2,companyTypeId:3},{id:0},{id:'invalid'}]){f.remote.Companies[101].companyTypes=[row];assert.throws(()=>f.ctx.getSalesEditor({companyId:101,entity:'types',targetId:101}),/nicht eindeutig/);}
+ for(const row of [{id:2,companyTypeId:3},{id:0},{id:'invalid'}]){f.remote.Companies[101].companyTypes=[row];f.db['sales_companies/101'].company.companyTypes=[row];assert.throws(()=>f.ctx.getSalesEditor({companyId:101,entity:'types',targetId:101}),/nicht eindeutig/);}
  assert.equal(f.calls.filter(c=>c.method!=='get').length,n);
 });
 test('new company verifies documented id-shaped HQ types without a second company POST',()=>{

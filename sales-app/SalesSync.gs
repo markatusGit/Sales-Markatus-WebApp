@@ -130,10 +130,15 @@ function salesSyncAudit_(run){
   const index=salesV1Index_(),catalog=salesRead_('sales_meta/catalog');if(catalog){catalog.industries=Array.from(new Set(index.entries.map(e=>e.company.industrialSector).filter(Boolean))).sort();catalog.salutations=Array.from(new Set(index.entries.flatMap(e=>(e.contacts||[]).map(c=>c.salutation)).filter(Boolean))).sort();salesWrite_('sales_meta/catalog',catalog);}
 }
 function salesSyncCatalog_(run,task){
-  const names=['Users','CompanyTypes','Subsystems'];task.position=task.position||0;
-  if(task.position<names.length){const entity=names[task.position];if(salesSyncPage_(run,task,entity,entity,'').done)task.position++;return false;}
+  const started=Date.now(),lists={};for(const entity of ['Users','CompanyTypes','Subsystems'])lists[entity]=salesCustomerList_(entity,'',started);
   const old=salesRead_('sales_meta/catalog')||{},defs=salesHqGet_('/v2/Companies/CustomFieldDefinitions').data;
-  salesWrite_('sales_meta/catalog',{...old,users:salesSyncRows_(run,task,'Users').filter(u=>!u.isDeactivated).map(u=>({id:u.id,name:[u.firstName,u.lastName].filter(Boolean).join(' ')})),types:salesSyncRows_(run,task,'CompanyTypes').map(t=>({id:t.id,name:t.name})),subsystems:salesSyncRows_(run,task,'Subsystems').map(t=>({id:t.id,name:t.name})),fields:salesCompanyCustomSelected_(Array.isArray(defs)?defs:defs.data||[]),companyFieldsVersion:1,updatedAt:salesNow_()});return true;
+  const fields=salesCompanyCustomSelected_(salesHqRows_(defs)).map(f=>({...f,options:(old.fields||[]).find(o=>o.name===f.name&&o.type===f.type)?.options||[]}));
+  if(fields.some(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft'&&/^Dropdown/.test(f.type))){
+    try{const legacy=salesHqRows_(salesCustomerGet_('/v1/CustomFieldDefinitions?$expand=Options').data);for(const f of fields){if(salesCompanyCustomKey_(f.name)!=='kundenherkunft')continue;const matches=legacy.filter(d=>String(d.Category).toLowerCase()==='company'&&salesCompanyCustomKey_(d.Name)===salesCompanyCustomKey_(f.name));if(matches.length!==1||!Array.isArray(matches[0].Options))throw Error('HQ-Herkunftsoptionen unvollständig.');f.options=matches[0].Options.map(o=>String(o.OptionValue||'')).filter(Boolean);}}
+    catch(error){run.errors.push({label:'HQ-Auswahllisten · Kundenherkunft',message:String(error.message)});}
+  }
+  const industries=Array.from(new Set([...(old.industries||[]),...run.catalogIndustries||[]])).sort((a,b)=>a.localeCompare(b,'de'));
+  salesWrite_('sales_meta/catalog',{...old,customerFormWarning:null,industries,users:lists.Users.filter(u=>!u.isDeactivated).map(u=>({id:u.id,name:[u.firstName,u.lastName].filter(Boolean).join(' ')})),types:lists.CompanyTypes.map(t=>({id:t.id,name:t.name})),subsystems:lists.Subsystems.map(t=>({id:t.id,name:t.name})),fields,companyFieldsVersion:1,updatedAt:salesNow_()});return true;
 }
 function salesSyncUnassigned_(run,task){
   const contacts=task.id==='contacts',entity=contacts?'ContactPersons':'ContactHistories',page=salesSyncPage_(run,task,'all',entity,'',contacts?'DefaultAddress':undefined);
