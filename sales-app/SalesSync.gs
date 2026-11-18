@@ -43,6 +43,7 @@ function pauseSalesSync(id){
 }
 function salesSyncWrite_(task){
   const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(task.id)));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
+  if(job.draftDependency&&salesRead_('sales_jobs/'+salesKey_(job.draftDependency))?.state!=='synced')return;
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
@@ -131,7 +132,7 @@ function salesSyncCatalog_(run,task){
   const names=['Users','CompanyTypes','Subsystems'];task.position=task.position||0;
   if(task.position<names.length){const entity=names[task.position];if(salesSyncPage_(run,task,entity,entity,'').done)task.position++;return false;}
   const old=salesRead_('sales_meta/catalog')||{},defs=salesHqGet_('/v2/Companies/CustomFieldDefinitions').data;
-  salesWrite_('sales_meta/catalog',{...old,users:salesSyncRows_(run,task,'Users').filter(u=>!u.isDeactivated).map(u=>({id:u.id,name:[u.firstName,u.lastName].filter(Boolean).join(' ')})),types:salesSyncRows_(run,task,'CompanyTypes').map(t=>({id:t.id,name:t.name})),subsystems:salesSyncRows_(run,task,'Subsystems').map(t=>({id:t.id,name:t.name})),fields:(Array.isArray(defs)?defs:defs.data||[]).filter(f=>['Kundenklassifizierung','Kundenherkunft','Adressherkunft'].includes(f.name)),updatedAt:salesNow_()});return true;
+  salesWrite_('sales_meta/catalog',{...old,users:salesSyncRows_(run,task,'Users').filter(u=>!u.isDeactivated).map(u=>({id:u.id,name:[u.firstName,u.lastName].filter(Boolean).join(' ')})),types:salesSyncRows_(run,task,'CompanyTypes').map(t=>({id:t.id,name:t.name})),subsystems:salesSyncRows_(run,task,'Subsystems').map(t=>({id:t.id,name:t.name})),fields:salesCompanyCustomSelected_(Array.isArray(defs)?defs:defs.data||[]),companyFieldsVersion:1,updatedAt:salesNow_()});return true;
 }
 function salesSyncUnassigned_(run,task){
   const contacts=task.id==='contacts',entity=contacts?'ContactPersons':'ContactHistories',page=salesSyncPage_(run,task,'all',entity,'',contacts?'DefaultAddress':undefined);

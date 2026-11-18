@@ -25,6 +25,7 @@
     const list=panel.querySelector('.m-customer-list-rows'),rows=Array.from(list.querySelectorAll('[data-customer-list-row]')).filter(row=>!row.hidden);
     const height=panel.dataset.limit==='true'&&rows.length>3?Math.ceil(rows.slice(0,3).reduce((n,row)=>n+row.getBoundingClientRect().height,0))+'px':'';
     if(list.style.maxHeight!==height)list.style.maxHeight=height;
+    list.dataset.scrollable=String(!!height);
   }
   function filterCustomerCardList(panel,query){
     const normalized=customerSearchText(query),rows=panel.querySelectorAll('[data-customer-list-row]');let matches=0;

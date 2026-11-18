@@ -109,3 +109,19 @@ Für diese Version sind keine Skripteigenschaften oder Bereitstellungseinstellun
 - Für eine Kontaktkorrektur auf „Ansprechpartner bearbeiten“ klicken.
 
 Ein reines Lese- oder Hinzufügen-Konto darf diese Bearbeitungsschaltflächen nicht sehen und serverseitig nichts ändern. Die Übertragung echter Änderungen nach HQ erfolgt erst über den bestehenden kontrollierten Abgleich; dafür keinen zusätzlichen Testkunden in HQ anlegen.
+
+## r31: Bearbeitung und neue HQ-Felder prüfen
+
+Keine Skripteigenschaften oder Bereitstellungseinstellungen zu ändern. Bereits begonnene/unklare Firmenanlagen behalten ihren ursprünglichen HQ-Auftrag; neue Änderungen warten getrennt in Firebase auf dessen Abschluss. Die bisherige r30-Aussage zur gesperrten Bearbeitung wird für diese reine Firebase-Vormerkung erweitert. Bestehende Rechte bleiben unverändert.
+
+- Die App neu laden; „Stand 2026-11-18-r31“ erwarten. Bei anderer Kennung diese melden.
+- „Kunden“ öffnen.
+- Eine eigene Firma öffnen.
+- Oben neben „Zur Kundenliste“ auf „Firmendaten bearbeiten“ klicken; den Stammdateneditor erwarten. Bei fehlendem Knopf Konto und angezeigten Anlagenstatus ohne Kundeninhalte melden.
+- Ein gewünschtes vorhandenes Feld ändern.
+- „Änderungen in Firebase speichern“ anklicken; bei offenem HQ-Ausgang ausdrücklich eine Vormerkung bis zur Klärung der ursprünglichen Anlage erwarten. Bei Fehler bleibt die Eingabe erhalten; technischen Text melden.
+- Über einer kurzen Ansprechpartnerliste das Mausrad bewegen; die linke Kundenseite muss weiter scrollen. Bei Stillstand Anzahl der sichtbaren Kontakte nennen.
+- „Zur Kundenliste“ anklicken.
+- „Firma hinzufügen“ öffnen; „erstelldatum“ und „Kundenherkunft“ anhand der tatsächlichen HQ-Definition erwarten. Bei einem Hinweis auf fehlende HQ-Definition dessen Text melden, keinen Feldtyp erfinden.
+
+Ein Datum oder mehrere Herkunftswerte sind optional. Bei Mehrfachwerten genau einen HQ-Wert pro Zeile eingeben. Ein vorhandener Erstelldatum-Wert wird nach Aktualisierung des betreffenden Kunden aus HQ auch in den Kundendetails angezeigt. Kein zusätzlicher Gesamtimport allein für diese Änderung.

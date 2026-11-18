@@ -4,6 +4,13 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.31.0]
+
+- Sichtbarer gelber Knopf „Firmendaten bearbeiten“ oben beim Kundennamen. Auch bereits begonnene App-Firmenanlagen sind in Firebase bearbeitbar: Änderungen werden separat vorgemerkt und erst nach bestätigtem Abschluss des unveränderten Anlageauftrags nach HQ übertragen. Anfragekennung, Revision, aktuelle Bearbeiterrechte und bestehende Konfliktprüfung bleiben wirksam; keine Altaufträge automatisch entsperrt oder wiederholt.
+- Kurze Ansprechpartner-/Projektlisten und auf höchstens drei Treffer gefilterte Listen blockieren das Mausrad nicht mehr. Nur tatsächlich begrenzte Listen haben eigenen Scrollbereich.
+- Eigene HQ-Felder „erstelldatum“ und „Kundenherkunft“ beim Anlegen, Lesen und Bearbeiten. Feldname und Feldtyp aus HQ, Datumseingabe für Date-Felder, Mehrfachwerte als einfache Zeilen. Definitionen einmal beim expliziten Öffnen aktualisieren und dann wiederverwenden; kein vollständiger HQ-Sync zum Nachladen der Definitionen nötig. Neue Importe behalten das Erstelldatum.
+- Appkennung `2026-11-18-r31`. Zusätzliche Fachfälle und echte Browserprüfungen für Adminzugang bei unklarer Anlage, getrennte Speicherung/Abhängigkeit/Konflikte, Date-/Listenfelder und Mausradbewegungen. Keine neuen Skripteigenschaften, Scopes, Provider oder Bereitstellungseinstellungen. Produktive Speicherprobe gesondert.
+
 ## [v0.30.0]
 
 - Kunden aus der App sind vor dem ersten HQ-Schreibversuch über dieselben Schaltflächen wie importierte Kunden bearbeitbar: Firmendaten, Firmenart, Standardadresse und erster Ansprechpartner. Vorhandene Felder können geändert und leere ergänzt werden; keine freien neuen Feldnamen.

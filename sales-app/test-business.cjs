@@ -32,8 +32,35 @@ test('draft revision, foreign target, first-write guard and atomic failure prote
  f.ctx.saveSalesEntityChange(input);f.ctx.saveSalesEntityChange(input);assert.equal(f.db['sales_drafts/'+r.id].revision,1);
  assert.throws(()=>f.ctx.saveSalesEntityChange({...input,requestId:'different-request',change:{name:'Stale'}}),/inzwischen/);
  assert.throws(()=>f.ctx.getSalesEditor({companyId:ref,entity:'contact',targetId:'draft_foreign_contact'}),/gehört/);
- for(const state of ['running','uncertain','companyCreated','synced']){f.db['sales_jobs/'+r.id].state=state;assert.throws(()=>f.ctx.getSalesEditor(model),/bereits begonnen/);}
- f.db['sales_jobs/'+r.id].state='pending';f.db['sales_jobs/'+r.id].writeAttempted=true;assert.throws(()=>f.ctx.saveSalesEntityChange({...input,revision:1,requestId:'new-request'}),/bereits begonnen/);
+ for(const state of ['running','uncertain','companyCreated']){f.db['sales_jobs/'+r.id].state=state;assert.equal(f.ctx.getSalesEditor(model).deferred,true);}
+ f.db['sales_jobs/'+r.id].state='synced';assert.throws(()=>f.ctx.getSalesEditor(model),/geändert/);
+ f.db['sales_jobs/'+r.id].state='pending';f.db['sales_jobs/'+r.id].writeAttempted=true;const before=JSON.stringify(f.db['sales_jobs/'+r.id]);f.ctx.saveSalesEntityChange({...input,revision:1,requestId:'new-request'});assert.equal(JSON.stringify(f.db['sales_jobs/'+r.id]),before);assert.equal(f.db['sales_drafts/'+r.id].company.name,'Synthetic changed');
+});
+test('partially transferred customer accepts deferred edits without changing creation, then writes only after completion',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany(f.input),ref='draft_'+r.id;f.ctx.getSalesLeanView('customers');f.ctx.runSalesJob(r.id,'company');
+ const parent=JSON.stringify(f.db['sales_jobs/'+r.id]),original=JSON.stringify(f.db['sales_drafts/'+r.id].company),m=f.ctx.getSalesEditor({companyId:ref,entity:'company',targetId:ref}),input={...m,requestId:'deferred-company-edit',change:{name:'Synthetic deferred name'}},n=f.calls.length;
+ assert.equal(m.deferred,true);const saved=f.ctx.saveSalesEntityChange(input);f.ctx.saveSalesEntityChange(input);assert.equal(f.calls.length,n);assert.equal(JSON.stringify(f.db['sales_jobs/'+r.id]),parent);assert.equal(JSON.stringify(f.db['sales_drafts/'+r.id].company),original);assert.equal(f.ctx.getSalesLeanCompany(ref).company.name,'Synthetic deferred name');assert.equal(f.db['sales_drafts/'+r.id].pendingChanges.length,1);
+ f.ctx.salesSyncWrite_({id:saved.id});assert.equal(f.calls.length,n);assert.equal(f.db['sales_jobs/'+saved.id].state,'pending');assert.throws(()=>f.ctx.getSalesEditor(m),/vorgemerkt/);
+ f.ctx.runSalesJob(r.id,'contact');assert.equal(f.db['sales_jobs/'+r.id].state,'synced');const completedParent=JSON.stringify(f.db['sales_jobs/'+r.id]);assert.equal(f.remote.Companies[101].name,f.input.name);assert.equal(f.ctx.getSalesLeanCompany(ref).company.name,'Synthetic deferred name');
+ const posts=f.calls.filter(c=>c.method==='post').length;f.ctx.salesSyncWrite_({id:saved.id});assert.equal(f.db['sales_jobs/'+saved.id].state,'synced');assert.equal(f.remote.Companies[101].name,'Synthetic deferred name');assert.equal(f.calls.filter(c=>c.method==='post').length,posts);assert.equal(f.db['sales_drafts/'+r.id].pendingChanges.length,0);assert.equal(JSON.stringify(f.db['sales_jobs/'+r.id]),completedParent);assert.equal(f.ctx.getSalesLeanView('customers').companies.find(c=>c.id===ref).name,'Synthetic deferred name');
+});
+test('deferred contact/address edits preserve target ownership and can keep HQ values on conflict',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany(f.input),ref='draft_'+r.id;f.ctx.runSalesJob(r.id,'company');
+ const save=(entity,change)=>{const m=f.ctx.getSalesEditor({companyId:ref,entity,targetId:ref+'_'+entity});return f.ctx.saveSalesEntityChange({...m,change,requestId:'deferred-'+entity+'-request'});};
+ const c=save('contact',{phoneMobile:'synthetic-deferred-mobile'}),a=save('address',{city:'Synthetic deferred city'});f.ctx.runSalesJob(r.id,'contact');assert.equal(f.db['sales_jobs/'+r.id].state,'synced');f.remote.Companies[101].defaultAddress.city='Concurrent HQ city';
+ f.ctx.salesSyncWrite_({id:c.id});assert.equal(f.remote.ContactPersons[202].phoneMobile,'synthetic-deferred-mobile');assert.throws(()=>f.ctx.salesSyncWrite_({id:a.id}),/HQ und App/);assert.equal(f.db['sales_jobs/'+a.id].state,'conflict');f.ctx.resolveSalesConflict(a.id,'hq');assert.equal(f.db['sales_drafts/'+r.id].pendingChanges.length,0);assert.equal(f.ctx.getSalesLeanCompany(ref).company.defaultAddress.city,'Concurrent HQ city');
+});
+test('unclear creation stays byte-identical while deferred edits wait, including interrupted read-only reconciliation',()=>{
+ const f=productionFixture(),r=f.ctx.saveSalesCompany(f.input),ref='draft_'+r.id;f.db['sales_jobs/'+r.id].state='uncertain';f.db['sales_jobs/'+r.id].writeAttempted=true;
+ const parent=JSON.stringify(f.db['sales_jobs/'+r.id]),m=f.ctx.getSalesEditor({companyId:ref,entity:'company',targetId:ref}),saved=f.ctx.saveSalesEntityChange({...m,requestId:'uncertain-deferred-request',change:{description:'Synthetic pending description'}}),n=f.calls.length;
+ f.ctx.salesSyncWrite_({id:saved.id});assert.equal(f.calls.length,n);assert.equal(JSON.stringify(f.db['sales_jobs/'+r.id]),parent);f.db['sales_jobs/'+saved.id].state='running';assert.throws(()=>f.ctx.reconcileSalesJob(saved.id),/ursprüngliche Anlage/);assert.notEqual(f.db['sales_jobs/'+saved.id].state,'synced');
+});
+test('own HQ fields load once on demand, preserve exact HQ names and date/list types in new customers',()=>{
+ const f=productionFixture(),get=f.ctx.salesHqGet_;delete f.db['sales_meta/catalog'].companyFieldsVersion;let definitions=0;f.ctx.salesHqGet_=path=>path==='/v2/Companies/CustomFieldDefinitions'?(definitions++,{data:[{name:'Erstelldatum',type:'Date'},{name:'Kundenherkunft',type:'DropdownCheckbox'},{name:'Unrelated field',type:'Text'}]}):get(path);
+ const catalog=f.ctx.getSalesLeanView('new').catalog;f.ctx.getSalesLeanView('new');assert.equal(definitions,1);assert.equal(catalog.fields.length,2);
+ const r=f.ctx.saveSalesCompany({...f.input,erstelldatum:'2026-11-18',Kundenherkunft:'Synthetic origin\nSynthetic second origin\nSynthetic origin'}),fields=f.db['sales_drafts/'+r.id].company.customFields;
+ assert.equal(fields[0].name,'Kundenherkunft');assert.equal(fields[0].value.length,2);assert.equal(fields[1].name,'Erstelldatum');assert.equal(fields[1].value,'2026-11-18T00:00:00Z');assert.throws(()=>f.ctx.saveSalesCompany({...f.input,erstelldatum:'2026-02-30'}),/gültiges Datum/);
+ assert.equal(f.ctx.salesCompany_({id:101,name:'Synthetic',customFields:fields}).customFields.length,2);
 });
 test('new contact address and empty defined HQ fields retain their target and type',()=>{
  const f=productionFixture();f.db['sales_meta/catalog'].fields=[{name:'Kundenherkunft',type:'Text'}];

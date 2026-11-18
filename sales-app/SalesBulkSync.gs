@@ -7,7 +7,7 @@ function salesBulkSelect_(entity,raw){
   const row=salesPick_(raw,['id','updatedOn',...keys[entity]]);
   if(entity==='Companies'){
     const address=a=>a?salesPick_(a,['id','updatedOn','street','houseNumber','zipCode','city','country','description','standardForDocumentType','website']):null;
-    row.defaultAddress=address(raw.defaultAddress);row.addresses=(raw.addresses||[]).map(address);row.customFields=(raw.customFields||[]).filter(f=>['Kundenklassifizierung','Kundenherkunft','Adressherkunft'].includes(f.name));
+    row.defaultAddress=address(raw.defaultAddress);row.addresses=(raw.addresses||[]).map(address);row.customFields=salesCompanyCustomSelected_(raw.customFields);
   }
   if(entity==='ContactPersons'&&raw.defaultAddress)row.defaultAddress=salesPick_(raw.defaultAddress,['id','email']);return row;
 }
