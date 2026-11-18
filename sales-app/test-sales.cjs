@@ -41,7 +41,7 @@ function fixture(){
     else throw new Error('Unexpected external mutation '+path);
     return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(result)};
   }};
-  db['sales_meta/catalog']={companyFieldsVersion:1,users:[{id:1,name:'Test User'}],types:[{id:2,name:'Interessent'},{id:3,name:'Kunde'}],subsystems:[{id:4,name:'Testbereich'}],fields:[],industries:['App','Medien','New','Technik'],salutations:['Frau','Herr']};
+  db['sales_meta/catalog']={customerFormVersion:1,customerFormCheckedAt:new Date().toISOString(),companyFieldsVersion:1,users:[{id:1,name:'Test User'}],types:[{id:2,name:'Interessent'},{id:3,name:'Kunde'}],subsystems:[{id:4,name:'Testbereich'}],fields:[],industries:['App','Medien','New','Technik'],salutations:['Frau','Herr']};
   const input={name:'TEST Integration',kind:'Interessent',responsibleUserId:'1',subsystemId:'4',street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE',firstName:'Test',lastName:'Kontakt',addressOrigin:'Sonstige',addressOriginOther:'Manueller Test'};
   return {ctx,db,props,remote,calls,input,setEmail:x=>email=x,loseResponse:()=>failAfterCreate=true};
 }
@@ -488,7 +488,7 @@ test('UI detects an old backend and displays its release before permitting actio
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   assert.ok(preboot.length>1000);
-  const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null};
+  const root={dataset:{},innerHTML:'',addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+"state={release:'previous'};render();})();",sandbox);
   assert.ok(root.innerHTML.includes('Dateien haben unterschiedliche Stände'));
@@ -498,7 +498,7 @@ test('UI detects an old backend and displays its release before permitting actio
 test('UI uses catalog dropdowns for industry and salutation and hides deferred custom fields',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
-  const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null};
+  const root={dataset:{},innerHTML:'',addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+"state={release:APP_RELEASE,catalog:{industries:['Technik'],salutations:['Frau'],users:[],types:[],subsystems:[],fields:[]},user:{email:'test@example.invalid',admin:true},drafts:[],jobs:[],edition:null};globalThis.form=newCompany();})();",sandbox);
   assert.ok(sandbox.form.includes('<select name="industrialSector"'));
@@ -512,9 +512,9 @@ test('UI uses catalog dropdowns for industry and salutation and hides deferred c
 test('UI shows a new Firebase company and its contact before HQ has assigned an ID',()=>{
   const html=readUi(),script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
-  const root={dataset:{},innerHTML:'',addEventListener(){},querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
+  const root={dataset:{},innerHTML:'',addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-11-18-r31',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-11-18-r32',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-11-18-r31'));
+  assert.ok(root.innerHTML.includes('2026-11-18-r32'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

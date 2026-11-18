@@ -47,6 +47,7 @@ function tests() {
   const files = ['scripts/test-release.cjs', 'hq-benchmark/test-benchmark.cjs', 'hq-benchmark/test-revenue.cjs', 'hq-benchmark/test-revenue-ui.cjs', 'firebase-pilot/test-pilot.cjs', 'sales-app/test-sales.cjs', 'sales-app/test-sales-v1.cjs', 'sales-app/test-sales-sync.cjs', 'sales-app/test-sales-bulk.cjs', 'sales-app/test-sales-delta.cjs', 'sales-app/test-lean.cjs', 'sales-app/test-history-browser.cjs', 'sales-app/test-v1-browser.cjs', 'sales-app/test-worker-browser.cjs'];
   files.push('sales-app/test-lean-browser.cjs','sales-app/test-performance.cjs');
   files.push('sales-app/test-business.cjs','sales-app/test-business-browser.cjs');
+  files.push('sales-app/test-customer-form-browser.cjs');
   files.push('sales-app/test-communication.cjs','sales-app/test-communication-browser.cjs');
   files.push('sales-app/test-auth.cjs','sales-app/test-auth-browser.cjs');
   // Synthetic Firestore read/write model: keeps the documented consumption figures under regression test.

@@ -1,9 +1,43 @@
   let businessEditor=null;
+  const customerFormDrafts=new Map(),customerNewIndustries=new Set();let customerBranchDialog=null;
+  const customerToday=()=>localContactTime().slice(0,10);
+  function customerFormValues(key,base,catalog){if(!customerFormDrafts.has(key)){const markatus=(catalog.subsystems||[]).filter(x=>x.name.trim().toLowerCase()==='markatus');customerFormDrafts.set(key,{...base,subsystemId:base.subsystemId||(markatus.length===1?String(markatus[0].id):''),country:base.country||'DE',erstelldatum:base.erstelldatum||customerToday()});}return customerFormDrafts.get(key);}
+  function customerBeforeRender(){const f=root.querySelector('[data-customer-form]');if(f)customerFormDrafts.set(f.dataset.customerForm,Object.fromEntries(new FormData(f)));}
+  function customerOptions(rows,value,fallback){return [{id:'',name:'Bitte auswählen'},...rows,...(value&&!rows.some(x=>String(x.id)===String(value))?[{id:value,name:fallback}]:[])];}
+  function customerFields(catalog,v,key){
+    const origin=(catalog.fields||[]).find(f=>f.name.trim().toLowerCase()==='kundenherkunft');let selectedOrigins=[];try{selectedOrigins=JSON.parse(v.Kundenherkunft||'[]');}catch(_){}
+    const options=[...new Set([...(origin?.options||[]),...selectedOrigins])];
+    return '<div class="m-full m-form" data-customer-fields>'+field('Unternehmensname','name',v.name||'','text',true)+select('Firmenart','companyTypeId',customerOptions(catalog.types,v.companyTypeId,'Bisherige Firmenart'),v.companyTypeId||'')+
+      select('Branche','industrialSector',[{id:'',name:'Bitte auswählen'},...[...new Set([...(catalog.industries||[]),...customerNewIndustries,...(v.industrialSector?[v.industrialSector]:[])])].map(name=>({id:name,name})),{id:'__new__',name:'+ Neue Branche anlegen'}],v.industrialSector||'')+'<input type="hidden" name="newIndustry" value="'+(customerNewIndustries.has(v.industrialSector)?'true':'false')+'">'+
+      select('HQ-Unternehmensbereich','subsystemId',customerOptions(catalog.subsystems,v.subsystemId,'Bisheriger Unternehmensbereich'),v.subsystemId||'')+select('Verantwortlicher Benutzer','responsibleUserId',customerOptions(catalog.users,v.responsibleUserId,'Bisheriger Benutzer'),v.responsibleUserId||'')+
+      field('Homepage','homepage',v.homepage||'','text')+'<label class="m-field m-full">Beschreibung<textarea name="description" maxlength="20000">'+esc(v.description||'')+'</textarea></label>'+
+      '<fieldset class="m-full m-form"><legend>Adresse</legend>'+field('Straße','street',v.street||'','text',true)+field('Hausnummer','houseNumber',v.houseNumber||'')+field('Postleitzahl','zipCode',v.zipCode||'','text',true)+field('Ort','city',v.city||'','text',true)+field('Land (Code)','country',v.country||'DE','text',true)+'</fieldset>'+
+      field('Erstelldatum','erstelldatum',v.erstelldatum||customerToday(),'date')+'<div class="m-field"><span>Kundenherkunft</span><input type="hidden" name="Kundenherkunft" value="'+esc(JSON.stringify(selectedOrigins))+'"><details class="m-origin-select"><summary aria-label="Kundenherkunft auswählen">'+esc(selectedOrigins.join(', ')||'Bitte auswählen')+'</summary><div role="group" aria-label="Kundenherkunft">'+options.map(value=>'<label><input type="checkbox" data-customer-origin value="'+esc(value)+'" '+(selectedOrigins.includes(value)?'checked':'')+'> '+esc(value)+'</label>').join('')+(options.length?'':'<p class="m-muted">Keine HQ-Auswahlwerte geladen. Bitte die Auswahllisten aktualisieren.</p>')+'</div></details></div></div>';
+  }
+  function customerCatalogTools(catalog){return '<div class="m-test-actions">'+button('HQ-Auswahllisten aktualisieren','customer-catalog')+'<small>'+esc(catalog.customerFormCheckedAt?'HQ-Auswahllisten geprüft: '+new Date(catalog.customerFormCheckedAt).toLocaleString('de-DE'):'')+'</small></div>';}
+  function customerBranchHtml(){return customerBranchDialog?'<dialog class="m-contact-dialog m-branch-dialog"><form data-form="customer-branch"><h2>Neue Branche</h2>'+field('Bezeichnung','branch',customerBranchDialog.value||'','text',true)+'<p class="m-muted">Wird mit dem Kunden gespeichert und beim HQ-Abgleich übertragen.</p><div class="m-test-actions"><button class="m-button m-primary">Anlegen</button>'+button('Abbrechen','customer-branch-cancel')+'</div></form></dialog>':'';}
+  function customerAfterRender(){for(const f of root.querySelectorAll('[data-customer-form]'))for(const name of ['companyTypeId','subsystemId','responsibleUserId'])f.elements[name].required=true;const dialog=root.querySelector('.m-branch-dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();customerBranchDialog=null;render();});dialog.querySelector('input').maxLength=150;dialog.querySelector('input').pattern='.*\\S.*';dialog.querySelector('input').focus();}}
+  root.addEventListener('change',e=>{const f=e.target.closest('[data-customer-form]');if(!f)return;
+    if(e.target.matches('[data-customer-origin]')){const values=[...f.querySelectorAll('[data-customer-origin]:checked')].map(x=>x.value);f.elements.Kundenherkunft.value=JSON.stringify(values);f.querySelector('.m-origin-select summary').textContent=values.join(', ')||'Bitte auswählen';}
+    if(e.target.name==='industrialSector'){if(e.target.value==='__new__'){e.target.value=customerFormDrafts.get(f.dataset.customerForm)?.industrialSector||'';customerBeforeRender();customerBranchDialog={key:f.dataset.customerForm,value:''};render();return;}f.elements.newIndustry.value=String(customerNewIndustries.has(e.target.value));const draft=customerFormDrafts.get(f.dataset.customerForm);draft.industrialSector=e.target.value;draft.newIndustry=f.elements.newIndustry.value;}
+  });
+  root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||busy)return;
+    if(b.dataset.action==='customer-branch-cancel'){e.stopImmediatePropagation();customerBranchDialog=null;render();}
+    if(b.dataset.action==='customer-catalog'){e.stopImmediatePropagation();act(async()=>{const r=await rpc('getSalesEditor',{entity:'catalog',force:true});state.catalog=r.catalog;if(businessEditor?.entity==='customer')businessEditor.catalog=r.catalog;const cached=viewCache.get('new');if(cached)cached.catalog=r.catalog;return {message:'HQ-Auswahllisten aktualisiert.'};});}
+  });
+  root.addEventListener('submit',e=>{if(e.target.dataset.form!=='customer-branch')return;e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
+    const name=e.target.elements.branch.value.trim().replace(/\s+/g,' ');if(!name||name.length>150)return;const catalog=businessEditor?.entity==='customer'&&view==='business'?businessEditor.catalog:state.catalog,known=(catalog.industries||[]).find(x=>x.toLocaleLowerCase('de')===name.toLocaleLowerCase('de')),value=known||name;
+    if(!known){catalog.industries=[...(catalog.industries||[]),value].sort((a,b)=>a.localeCompare(b,'de'));customerNewIndustries.add(value);}const draft=customerFormDrafts.get(customerBranchDialog.key);draft.industrialSector=value;draft.newIndustry=String(!known||customerNewIndustries.has(value));const form=root.querySelector('[data-customer-form]');if(form){if(![...form.elements.industrialSector.options].some(o=>o.value===value))form.elements.industrialSector.add(new Option(value,value));form.elements.industrialSector.value=value;form.elements.newIndustry.value=draft.newIndustry;}customerBranchDialog=null;render();
+  });
   function businessApplyPatch(value,p){
     const data={...value,company:{...value.company}};
     if(p.localCompany){data.company={...data.company,...p.localCompany};if(p.entity==='contact')data.contacts=(data.contacts||[]).map(c=>String(c.id)===String(p.contact.id)?{...c,...p.contact}:c);return data;}
     if(p.entity==='company'){Object.assign(data.company,p.change);if(p.change.homepage!==undefined){data.company.homepageDisplay=p.change.homepage||'';data.company.homepageSource='App';}}
     if(p.entity==='types')data.company.companyTypes=p.change.companyTypes.map(t=>({...t,name:p.typeNames[t.companyTypeId]}));
+    if(p.entity==='assignments'){
+      if(p.change.responsibleUserIds)data.company.responsibleUsers=p.change.responsibleUserIds.map(id=>({userId:id,firstName:(p.userNames||[]).find(u=>Number(u.id)===id)?.name||'',lastName:''}));
+      if(p.change.subsystemIds)data.company.subsystems=p.change.subsystemIds.map(id=>({id,name:(p.subsystemNames||[]).find(s=>Number(s.id)===id)?.name||''}));
+    }
     if(p.entity==='contact')data.contacts=(data.contacts||[]).map(c=>Number(c.id)===Number(p.targetId)?{...c,...p.change}:c);
     if(p.entity==='address'){
       const update=a=>a&&Number(a.id)===Number(p.targetId)?{...a,...p.change}:a;
@@ -31,7 +65,7 @@
   }
   function businessAddresses(c){
     const rows=new Map([c.defaultAddress,...c.addresses||[]].filter(Boolean).map((a,i)=>[a.id?String(a.id):'local_'+i,a]));
-    return '<div class="m-company-addresses"><h3>Firmenadressen</h3>'+Array.from(rows.values()).map(a=>{const target=a.id||c.localDraftId&&!['synced','canceled'].includes(c.syncState)&&c.id+'_address';return '<div class="m-row"><h4>'+esc(a.description||'Adresse')+'</h4><p>'+esc([a.street,a.houseNumber,a.zipCode,a.city,a.country].filter(Boolean).join(' '))+'</p>'+(target?button('Adresse bearbeiten','edit-business','address:'+target):'')+'</div>';}).join('')+'</div>';
+    return '<div class="m-company-addresses"><h3>Firmenadressen</h3>'+Array.from(rows.values()).map(a=>{const target=a.id||c.localDraftId&&!['synced','canceled'].includes(c.syncState)&&c.id+'_address';return '<div class="m-row"><h4>'+esc(a.description||'Adresse')+'</h4><p>'+esc([a.street,a.houseNumber,a.zipCode,a.city,a.country].filter(Boolean).join(' '))+'</p>'+(a===c.defaultAddress?button('Adresse bearbeiten','edit-business','company:'+(c.localDraftId&&c.syncState!=='synced'?c.id:c.hqId||c.id)):'')+'</div>';}).join('')+'</div>';
   }
   function businessCustomFields(value){
     const rows=[...(value||[])];for(const f of businessEditor.customFieldDefinitions||[])if(!rows.some(x=>x.name===f.name)&&['Text','TextMultiline','Date','Dropdown','DropdownCheckbox','Boolean','Link','Float','Integer','NumericText'].includes(f.type))rows.push({name:f.name,type:f.type,value:null});return rows;
@@ -74,7 +108,7 @@
       return field(label,name,v??'',s.type==='integer'||s.type==='number'?'number':'text',!path&&schema.required?.includes(key)&&!s.nullable);
     }).join('');
   }
-  function businessPage(){return head('Stammdaten bearbeiten',businessEditor.companyName,button('Zur Firma','company',selected))+'<section class="m-panel"><div class="m-panel-body"><p>'+(businessEditor.deferred?'Die ursprüngliche HQ-Anlage ist noch offen. Änderungen werden separat in Firebase vorgemerkt und erst nach deren Abschluss übertragen. ':'')+'Nur geänderte Felder werden vorgemerkt. Übertragung beim gemeinsamen HQ-Sync. Nummern und Zuordnungen bitte nur mit den passenden HQ-Werten ändern.</p><form data-form="business" class="m-form">'+businessFields(businessEditor.schema,businessEditor.base)+'<div class="m-full"><button class="m-button m-primary">Änderungen in Firebase speichern</button></div></form></div></section>';}
+  function businessPage(){const customer=businessEditor.entity==='customer',key='edit_'+businessEditor.companyId;return head('Stammdaten bearbeiten',businessEditor.companyName,button('Zur Firma','company',selected))+'<section class="m-panel"><div class="m-panel-body"><p>'+(businessEditor.deferred?'Die ursprüngliche HQ-Anlage ist noch offen. Änderungen werden separat in Firebase vorgemerkt und erst nach deren Abschluss übertragen. ':'')+'Speicherung in der App; Übertragung beim gemeinsamen HQ-Abgleich.</p>'+(customer?customerCatalogTools(businessEditor.catalog):'')+'<form data-form="business" '+(customer?'data-customer-form="'+esc(key)+'"':'')+' class="m-form">'+(customer?customerFields(businessEditor.catalog,customerFormValues(key,businessEditor.base,businessEditor.catalog),key):businessFields(businessEditor.schema,businessEditor.base))+'<div class="m-full"><button class="m-button m-primary">Änderungen in Firebase speichern</button></div></form></div></section>'+customerBranchHtml();}
   function businessChanges(schema,base,input,path=''){
     const out={};for(const [key,s] of Object.entries(schema.properties)){
       const name=path?path+'.'+key:key,old=base?.[key];
@@ -93,7 +127,7 @@
   }
   root.addEventListener('click',e=>{
     const b=e.target.closest('[data-action="edit-business"]');if(!b||busy)return;e.stopImmediatePropagation();
-    let [entity,targetId]=b.dataset.id.split(':');act(async()=>{const companyEntity=['company','types'].includes(entity),current=!companyEntity||[detail?.company?.id,detail?.company?.hqId].map(String).includes(String(targetId)),local=current&&detail?.company?.localDraftId&&detail.company.syncState!=='synced';const companyId=local?detail.company.id:companyEntity?targetId:detail.company.hqId||detail.company.id;if(local)targetId=companyEntity?companyId:companyId+'_'+entity;if(String(local?detail?.company?.id:detail?.company?.hqId||detail?.company?.id)!==String(companyId)){detail=await loadCompany(companyId);selected=detail.company.id;}businessEditor=await rpc('getSalesEditor',{companyId,entity,targetId});view='business';});
+    let [entity,targetId]=b.dataset.id.split(':');act(async()=>{const companyEntity=['company','types'].includes(entity),current=!companyEntity||[detail?.company?.id,detail?.company?.hqId].map(String).includes(String(targetId)),local=current&&detail?.company?.localDraftId&&detail.company.syncState!=='synced';const companyId=local?detail.company.id:companyEntity?targetId:detail.company.hqId||detail.company.id;if(local)targetId=companyEntity?companyId:companyId+'_'+entity;if(String(local?detail?.company?.id:detail?.company?.hqId||detail?.company?.id)!==String(companyId)){detail=await loadCompany(companyId);selected=detail.company.id;}businessEditor=await rpc('getSalesEditor',{companyId,entity:entity==='company'?'customer':entity,targetId});customerFormDrafts.delete('edit_'+companyId);view='business';});
   });
   root.addEventListener('submit',e=>{
     if(e.target.dataset.form==='bind-customer-contact'){
@@ -106,9 +140,9 @@
     }
     if(e.target.dataset.form!=='business')return;e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
     const input=Object.fromEntries(new FormData(e.target));act(async()=>{
-      const change=businessChanges(businessEditor.schema,businessEditor.base,input);if(!Object.keys(change).length)return {message:'Keine Änderungen eingegeben.'};
+      const change=businessEditor.entity==='customer'?input:businessChanges(businessEditor.schema,businessEditor.base,input);if(!Object.keys(change).length)return {message:'Keine Änderungen eingegeben.'};
       const signature=JSON.stringify(change);if(businessEditor.pending?.signature!==signature)businessEditor.pending={signature,requestId:communicationId()};
       const r=await rpc('saveSalesEntityChange',{companyId:businessEditor.companyId,entity:businessEditor.entity,targetId:businessEditor.targetId,base:businessEditor.base,revision:businessEditor.revision,requestId:businessEditor.pending.requestId,change});
-      businessAcceptPatch(r.entityPatch,r.patch);view='company';return r;
+      for(const p of r.entityPatches||[r.entityPatch])if(p)businessAcceptPatch(p,r.patch);if(r.catalog){state.catalog=r.catalog;const cache=viewCache.get('new');if(cache)cache.catalog=r.catalog;}view='company';return r;
     },{preserve:true});
   });

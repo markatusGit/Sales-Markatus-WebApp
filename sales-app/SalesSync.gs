@@ -44,6 +44,7 @@ function pauseSalesSync(id){
 function salesSyncWrite_(task){
   const job=salesJobRecoverInterrupted_(salesRead_('sales_jobs/'+salesKey_(task.id)));if(!job)throw new Error('Gespeicherter Auftrag fehlt.');
   if(job.draftDependency&&salesRead_('sales_jobs/'+salesKey_(job.draftDependency))?.state!=='synced')return;
+  if(job.formPrevious&&!['synced','canceled'].includes(salesRead_('sales_jobs/'+salesKey_(job.formPrevious))?.state))return;
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
   if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.state!=='synced')throw new Error(after.message);return;}
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));

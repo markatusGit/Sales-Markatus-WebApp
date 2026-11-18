@@ -1,7 +1,8 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-18-r31';
+const SALES_RELEASE = '2026-11-18-r32';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
+const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
 function salesCompanyCustomSelected_(rows){return (rows||[]).filter(f=>SALES_COMPANY_CUSTOM_FIELDS.some(name=>salesCompanyCustomKey_(name)===salesCompanyCustomKey_(f.name)));}
 function salesCompanyCustomCatalog_(catalog){
@@ -13,12 +14,38 @@ function salesCompanyCustomCatalog_(catalog){
   salesWrite_('sales_meta/catalog',updated);return updated;
 }
 function salesCompanyCustomInput_(text,definition){
-  if(definition.type==='DropdownCheckbox')return Array.from(new Set(text.split(/\r?\n/).map(v=>v.trim()).filter(Boolean)));
+  if(definition.type==='DropdownCheckbox')return Array.from(new Set(text.trim().startsWith('[')?JSON.parse(text):text.split(/\r?\n/).map(v=>v.trim()).filter(Boolean)));
   if(definition.type==='Date'){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(text)||!Number.isFinite(Date.parse(text))||new Date(text+'T00:00:00Z').toISOString().slice(0,10)!==text)throw Error('Bitte ein gültiges Datum für „'+definition.name+'“ eingeben.');
     return text+'T00:00:00Z';
   }
   return text;
+}
+function salesHqRows_(value){const rows=Array.isArray(value)?value:value?.value||value?.data||value?.d?.results;if(!Array.isArray(rows))throw Error('HQ-Auswahlliste hat ein unbekanntes Format.');return rows;}
+function salesCustomerList_(entity,filter,started){
+  if(!['Companies','CompanyTypes','Subsystems','Users'].includes(entity))throw Error('Unbekannte Auswahlliste.');const rows=[],seen=new Set();
+  for(let page=0;page<50;page++){
+    if(Date.now()-started>45000)throw Error('HQ-Auswahllisten benötigen länger. Vorhandene Werte bleiben erhalten; bitte erneut aktualisieren.');
+    const response=salesHqGet_('/v2/'+entity+'?$top=200&$skip='+rows.length+'&orderby=id'+(filter?'&$filter='+encodeURIComponent(filter):'')),batch=salesHqRows_(response.data);
+    if(batch.length>200)throw Error('HQ hat die angeforderte Seitengröße nicht eingehalten.');for(const row of batch){const id=salesId_(row.id);if(seen.has(id))throw Error('HQ-Auswahlliste enthält doppelte IDs. Prüfstand bleibt erhalten.');seen.add(id);rows.push(row);}
+    const key=Object.keys(response.headers||{}).find(k=>k.toLowerCase()==='hellohq-count'),total=key?Number(response.headers[key]):null;
+    if(total!==null&&(!Number.isSafeInteger(total)||total<rows.length))throw Error('HQ-Auswahllistenzähler ist widersprüchlich.');
+    if(batch.length===0){if(!filter&&total!==null&&rows.length<total)throw Error('HQ-Auswahlliste ist unvollständig.');return rows;}if(total!==null&&rows.length===total)return rows;
+  }throw Error('HQ-Auswahlliste noch nicht vollständig. Gespeicherter Prüfstand bleibt erhalten.');
+}
+function salesCustomerCatalog_(force){
+  const old=salesRead_('sales_meta/catalog');if(!old)throw Error('Zuerst die HQ-Auswahllisten importieren.');
+  if(!force&&old.customerFormVersion===1&&Date.now()-Date.parse(old.customerFormCheckedAt)<15*60000)return old;
+  const started=Date.now(),checkedAt=salesNow_(),definitions=salesCompanyCustomSelected_(salesHqRows_(salesHqGet_('/v2/Companies/CustomFieldDefinitions').data));
+  const legacy=salesHqRows_(salesHqGet_('/v1/CustomFieldDefinitions?$expand=Options').data);if(legacy.length>500)throw Error('HQ-Felddefinitionen sind nicht vollständig lesbar.');
+  const fields=definitions.map(f=>{const matches=legacy.filter(d=>String(d.Category).toLowerCase()==='company'&&salesCompanyCustomKey_(d.Name)===salesCompanyCustomKey_(f.name));if(matches.length>1)throw Error('HQ-Felddefinition nicht eindeutig: '+f.name);if(salesCompanyCustomKey_(f.name)==='kundenherkunft'&&/^Dropdown/.test(f.type)&&(matches.length!==1||!Array.isArray(matches[0].Options)))throw Error('HQ-Auswahlwerte für Kundenherkunft wurden nicht vollständig geliefert.');return {...salesPick_(f,['name','type']),options:(matches[0]?.Options||[]).map(o=>String(o.OptionValue||'')).filter(Boolean)};});
+  const since=old.industriesCheckedAt||old.updatedAt,from=Number.isFinite(Date.parse(since))?new Date(Date.parse(since)-120000).toISOString().replace(/\.\d{3}Z$/,'Z'):null;
+  const industries=new Set(old.industries||[]),rows=salesCustomerList_('Companies',from?'updatedOn ge '+from:'',started);
+  for(const c of rows){if(from&&(!Number.isFinite(Date.parse(c.updatedOn))||Date.parse(c.updatedOn)<Date.parse(from)))throw Error('HQ hat den Branchen-Änderungsfilter nicht eingehalten.');if(String(c.industrialSector||'').trim())industries.add(String(c.industrialSector).trim());}
+  const lists={};for(const [entity,key] of [['CompanyTypes','types'],['Subsystems','subsystems'],['Users','users']]){
+    const rows=salesCustomerList_(entity,'',started);lists[key]=rows.filter(x=>entity!=='Users'||!x.isDeactivated).map(x=>({id:x.id,name:entity==='Users'?[x.firstName,x.lastName].filter(Boolean).join(' '):x.name}));
+  }
+  return salesLock_(()=>{const current=salesRead_('sales_meta/catalog')||old,catalog={...current,...lists,fields,industries:Array.from(new Set([...industries,...current.industries||[]])).sort((a,b)=>a.localeCompare(b,'de')),industriesCheckedAt:checkedAt,customerFormCheckedAt:checkedAt,customerFormVersion:1,companyFieldsVersion:1};salesWrite_('sales_meta/catalog',catalog);return catalog;});
 }
 let salesContextCache_;
 // User actions wait for the current background section (the worker yields between sections) instead of failing after 1 s.
@@ -87,7 +114,7 @@ function salesText_(value,max,required) {if (typeof value!=='string') value='';v
 function salesKey_(value) {if (!/^[a-zA-Z0-9_-]{1,100}$/.test(value||'')) throw new Error('Ungültige Datensatzkennung.');return value;}
 function salesPick_(value,keys) {const out={};keys.forEach(k=>{if(value&&value[k]!==undefined) out[k]=value[k];});return out;}
 function salesHqGet_(path) {
-  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
+  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)&&!/^\/v1\/(CustomFieldDefinitions|Companies\(\d+\))(\?[^#\r\n]*)?$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method:'get',headers:{Authorization:'Bearer '+revenueToken_(),Accept:'application/json'},followRedirects:false,muteHttpExceptions:true});
   if(r.getResponseCode()!==200) throw new Error('HQ-Lesetest: HTTP '+r.getResponseCode()+'. Kein unvollständiger Import wird freigegeben.');
   let data;try{data=JSON.parse(r.getContentText());}catch(_){throw new Error('HQ liefert kein gültiges JSON.');}
@@ -175,7 +202,7 @@ function salesCompany_(raw) {
   const website=salesWebsite_(raw);
   return {id:String(salesId_(raw.id)),name:raw.name||'',industrialSector:raw.industrialSector||'',description:raw.description||'',homepage:raw.homepage||'',
     homepageDisplay:website.value,homepageSource:website.source,
-    companyTypes:salesCompanyTypes_(raw.companyTypes),responsibleUsers:(raw.responsibleUsers||[]).map(x=>salesPick_(x,['id','userId','firstName','lastName'])),
+    subsystems:(raw.subsystems||[]).map(x=>salesPick_(x,['id','name','isMaster','currency'])),companyTypes:salesCompanyTypes_(raw.companyTypes),responsibleUsers:(raw.responsibleUsers||[]).map(x=>salesPick_(x,['id','userId','firstName','lastName'])),
     defaultAddress:pickAddress(raw.defaultAddress),addresses:(raw.addresses||[]).map(pickAddress),customFields:salesCompanyCustomSelected_(raw.customFields).map(x=>salesPick_(x,['name','type','value'])),updatedOn:raw.updatedOn||null};
 }
 function salesWebsite_(raw) {
@@ -316,7 +343,7 @@ function salesLocalCompany_(draft,catalog,job) {
   draft=salesBusinessVisibleDraft_(draft);
   const company=draft.company,user=(catalog?.users||[]).find(u=>Number(u.id)===Number(company.responsibleUserIds?.[0]));
   const addressOrigin=draft.addressOrigin==='Sonstige'?draft.addressOriginOther:draft.addressOrigin;
-  return {id:'draft_'+draft.id,localDraftId:draft.id,hqId:draft.hqId?String(draft.hqId):null,name:company.name,industrialSector:company.industrialSector||'',description:company.description||'',homepage:company.homepage||'',homepageDisplay:company.homepage||'',homepageSource:'App',defaultAddress:company.defaultAddress,addresses:[],companyTypes:(company.companyTypes||[]).map(t=>({...t,name:(catalog?.types||[]).find(x=>Number(x.id)===Number(t.companyTypeId))?.name||draft.kind})),responsibleUsers:[{userId:company.responsibleUserIds?.[0],firstName:user?.name||'',lastName:''}],customFields:[...(company.customFields||[]),...((company.customFields||[]).some(f=>f.name==='Adressherkunft')?[]:[{name:'Adressherkunft',value:addressOrigin||''}])],pendingEditCount:(draft.pendingChanges||[]).length,syncState:job?.state||'pending'};
+  return {id:'draft_'+draft.id,localDraftId:draft.id,hqId:draft.hqId?String(draft.hqId):null,name:company.name,industrialSector:company.industrialSector||'',description:company.description||'',homepage:company.homepage||'',homepageDisplay:company.homepage||'',homepageSource:'App',defaultAddress:company.defaultAddress,addresses:[],companyTypes:(company.companyTypes||[]).map(t=>({...t,name:(catalog?.types||[]).find(x=>Number(x.id)===Number(t.companyTypeId))?.name||draft.kind})),responsibleUsers:[{userId:company.responsibleUserIds?.[0],firstName:user?.name||'',lastName:''}],customFields:[...(company.customFields||[]),...((company.customFields||[]).some(f=>f.name==='Adressherkunft')?[]:[{name:'Adressherkunft',value:addressOrigin||''}])],subsystems:(company.subsystemIds||[]).map(id=>({id,name:(catalog?.subsystems||[]).find(s=>Number(s.id)===Number(id))?.name||''})),pendingEditCount:(draft.pendingChanges||[]).length,syncState:job?.state||'pending'};
 }
 function syncSalesCompany(id) {
   salesUser_(true);id=String(salesId_(id));return salesLock_(()=>{
@@ -360,8 +387,9 @@ function salesJobSummary_(j) {
   return out;
 }
 function salesDraftInput_(input,catalog) {
+  if(input.companyTypeId)input={...input,...salesCustomerValidate_(salesPick_(input,SALES_CUSTOMER_FORM_KEYS),{Kundenherkunft:'[]'},catalog)};
   const name=salesText_(input.name,150,true);
-  const typeName=input.kind==='Kunde'?'Kunde':'Interessent',type=catalog.types.find(t=>t.name.toLowerCase()===typeName.toLowerCase());
+  const requested=input.kind==='Kunde'?'Kunde':'Interessent',type=input.companyTypeId?catalog.types.find(t=>Number(t.id)===salesId_(input.companyTypeId)):catalog.types.find(t=>t.name.toLowerCase()===requested.toLowerCase()),typeName=type?.name||requested;
   if(!type) throw new Error('HQ-Firmentyp '+typeName+' fehlt in den eingelesenen Auswahllisten.');
   const userId=salesId_(input.responsibleUserId);if(!catalog.users.some(u=>Number(u.id)===userId)) throw new Error('Verantwortlichen HQ-Benutzer auswählen.');
   const subsystemId=salesId_(input.subsystemId);if(!catalog.subsystems.some(s=>Number(s.id)===subsystemId)) throw new Error('HQ-Unternehmensbereich auswählen.');
@@ -372,9 +400,9 @@ function salesDraftInput_(input,catalog) {
   const origin=salesText_(input.addressOrigin,80,false);if(!['','Wirtschaftsclub Bamberg','Logan Five','Sonstige'].includes(origin)) throw new Error('Adressherkunft ungültig.');
   const originOther=salesText_(input.addressOriginOther,200,origin==='Sonstige');
   const industry=salesText_(input.industrialSector,150,false);
-  if(industry&&!(catalog.industries||[]).includes(industry)) throw new Error('Bitte eine Branche aus der aktuellen HQ-Auswahlliste wählen.');
-  const company={name,industrialSector:industry,homepage,description:salesText_(input.description,5000,false),defaultAddress:address,companyTypes:[{companyTypeId:type.id}],responsibleUserIds:[userId],subsystemIds:[subsystemId]};
-  const customFields=[];['Kundenklassifizierung','Kundenherkunft','erstelldatum'].forEach(k=>{const text=salesText_(input[k],2000,false);if(text){const def=catalog.fields.find(f=>salesCompanyCustomKey_(f.name)===salesCompanyCustomKey_(k));if(!def)throw new Error('HQ-Feld '+k+' ist noch nicht bestätigt.');customFields.push({name:def.name,type:def.type,value:salesCompanyCustomInput_(text,def)});}});
+  if(industry&&!(catalog.industries||[]).includes(industry)&&input.newIndustry!==true&&input.newIndustry!=='true') throw new Error('Bitte eine Branche aus der aktuellen HQ-Auswahlliste wählen.');
+  const company={name,industrialSector:industry,homepage,description:salesText_(input.description,20000,false),defaultAddress:address,companyTypes:[{companyTypeId:type.id}],responsibleUserIds:[userId],subsystemIds:[subsystemId]};
+  const customFields=[];['Kundenklassifizierung','Kundenherkunft','erstelldatum'].forEach(k=>{const text=salesText_(input[k],2000,false);if(text){const def=catalog.fields.find(f=>salesCompanyCustomKey_(f.name)===salesCompanyCustomKey_(k));if(!def)throw new Error('HQ-Feld '+k+' ist noch nicht bestätigt.');const value=salesCompanyCustomInput_(text,def);if(Array.isArray(value)&&!value.length)return;if(k==='Kundenherkunft'&&Array.isArray(def.options)&&Array.isArray(value)&&value.some(x=>!def.options.includes(x)))throw Error('Kundenherkunft ist kein HQ-Auswahlwert.');customFields.push({name:def.name,type:def.type,value});}});
   if(customFields.length) company.customFields=customFields;
   const contact={};['firstName','lastName','position','salutation','eMail','phoneMobile','phoneLandline'].forEach(k=>contact[k]=salesText_(input[k],200,false));
   if(!contact.firstName||!contact.lastName) throw new Error('Bitte Vor- und Nachname des ersten Ansprechpartners eingeben.');
@@ -390,6 +418,7 @@ function salesSalutationForm_(value) {
 function saveSalesTestCompany(input) {
   const user=salesUser_();return salesLock_(()=>{salesAssertPrivate_();const cat=salesRead_('sales_meta/catalog');if(!cat) throw new Error('Zuerst HQ-Auswahllisten importieren.');
     const requestId=input?.requestId===undefined||input.requestId===''?'':salesKey_(String(input.requestId)),value=salesDraftInput_(input,cat),id=requestId?'req_'+requestId:Utilities.getUuid();
+    if(value.company.industrialSector&&!(cat.industries||[]).includes(value.company.industrialSector)){cat.industries=[...(cat.industries||[]),value.company.industrialSector].sort((a,b)=>a.localeCompare(b,'de'));salesWrite_('sales_meta/catalog',cat);}
     // A repeated request after a lost response returns the stored draft instead of creating a second HQ company.
     if(requestId){const old=salesRead_('sales_jobs/'+id);if(old){const prior=salesRead_('sales_drafts/'+id);
       if(old.kind!=='createCompany'||old.actor!==user.email||!prior||Object.keys(value).some(k=>JSON.stringify(prior[k])!==JSON.stringify(value[k])))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');

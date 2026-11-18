@@ -87,3 +87,6 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb .m-company-addresses{margin-top:20px;padding-top:16px;border-top:1px solid var(--m-line)}
 #magazin-vertrieb .m-company-addresses>.m-row{padding-left:0;padding-right:0}
 #magazin-vertrieb .m-company-addresses h4{margin:0;font-size:.94em;font-weight:500}
+#magazin-vertrieb .m-origin-select{position:relative;background:var(--m-surface);border:1px solid var(--m-line);border-radius:6px;padding:8px 12px}
+#magazin-vertrieb .m-origin-select[open]>div{display:grid;gap:8px;max-height:240px;overflow:auto;padding-top:10px}
+#magazin-vertrieb .m-origin-select label{display:flex;align-items:center;gap:9px}

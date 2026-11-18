@@ -1,5 +1,21 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r32: Gemeinsames Kundenformular prüfen
+
+Keine Script Properties oder Bereitstellungseinstellungen zu ändern. Kundenanlage und „Firmendaten bearbeiten“ zeigen dieselben zehn Kundenfelder; die erste Ansprechpartneranlage bleibt zusätzlich im Anlageformular. Herkunft kann entsprechend dem tatsächlichen HQ-Feld mehrere Werte enthalten. „+ Neue Branche anlegen“ merkt einen Branchennamen vor; Übertragung nach HQ erfolgt zusammen mit dem Kunden über den bestehenden Datenabgleich. Kein eigener globaler HQ-Branchen-Endpunkt wird behauptet. Die folgenden fachlichen Schritte sind gesonderte Live-Abnahme, kein Teil des technischen Codevergleichs.
+
+- Die App neu laden; „Stand 2026-11-18-r32“ erwarten. Bei anderer Kennung diese melden.
+- „Firma hinzufügen“ öffnen; die vereinbarten Felder und darunter die bisherige Ansprechpartneranlage erwarten. Bei fehlenden HQ-Listen den genauen Meldungstext ohne Kundeninhalte nennen.
+- Im Feld „HQ-Unternehmensbereich“ die Vorgabe „Markatus“ prüfen. Bei abweichender Vorgabe diese melden.
+- Im Feld „Erstelldatum“ das heutige Datum prüfen. Bei abweichendem Datum dieses melden.
+- „Kundenherkunft“ aufklappen; tatsächliche HQ-Auswahlwerte erwarten. Bei fehlenden Werten den Hinweistext melden.
+- Im Feld „Branche“ den Eintrag „+ Neue Branche anlegen“ auswählen; ein kleines Eingabefenster erwarten. Bei fehlendem Fenster die Kennung melden.
+- „Abbrechen“ anklicken; bisherige Formulareingaben erwarten. Bei fehlenden Eingaben den betroffenen Feldnamen melden.
+- Einen vorhandenen Kunden öffnen.
+- Oben auf „Firmendaten bearbeiten“ klicken; dieselben Kundenfelder mit bestehenden Werten erwarten. Bei Abweichungen nur Feldnamen und Meldungstext nennen.
+
+Nur tatsächlich gewünschte Änderungen speichern. „HQ-Auswahllisten aktualisieren“ liest Metadaten und neue Branchenwerte; es startet keinen vollständigen Kundenimport und überträgt keine Kundenänderungen. Geprüfte Listen werden beim Öffnen 15 Minuten gemeinsam wiederverwendet. Echte HQ-Übertragung und Rückprüfung nach fachlicher Speicherung separat über den bestehenden Datenabgleich durchführen; unklare alte Anlageaufträge nicht erneut anlegen.
+
 Stand: 16.10.2026. Dieser Ablauf ersetzt die älteren manuellen Kopieranleitungen. Der Nutzer hat Google-Veröffentlichungen per clasp dauerhaft beauftragt. Google-Version 30 ist bereits vorhanden; die erstmalige Git-Zuordnung `v0.19.1` stellt nichts neu bereit.
 
 ## Was eingerichtet ist

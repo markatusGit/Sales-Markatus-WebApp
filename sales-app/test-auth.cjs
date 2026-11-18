@@ -45,6 +45,12 @@ function authFixture({legacy=false}={}){
 }
 let count=0;function test(name,fn){fn();console.log('PASS '+name);count++;}
 if(require.main===module){
+ test('shared customer form and catalog keep separate create/edit permissions and reject unknown fields',()=>{
+  const f=authFixture();let reads=0;f.ctx.salesRead_=()=>{reads++;return null;};f.request(f.user('creator',{'company.create':true}));
+  for(const method of ['getSalesEditor','saveSalesEntityChange'])assert.throws(()=>f.ctx.salesAuthDispatch_(method,[{entity:'customer',companyId:101}]),/AUTH_DENIED/);assert.equal(reads,0);
+  f.request(f.user('reader'));assert.throws(()=>f.ctx.salesAuthDispatch_('getSalesEditor',[{entity:'catalog',force:true}]),/AUTH_DENIED/);assert.equal(reads,0);
+  f.request(f.user('editor',{'company.edit':true}));assert.throws(()=>f.ctx.salesAuthDispatch_('saveSalesEntityChange',[{entity:'customer',change:{iban:'forged'}}]),/Finanzfelder/);assert.equal(reads,0);
+ });
  test('customer edit permissions apply equally to unsent drafts, imported records and blank fields',()=>{
   const f=authFixture();let reads=0;f.ctx.salesRead_=()=>{reads++;return null;};
   for(const id of [101,'draft_synthetic'])for(const permissions of [{},{'company.create':true},{'contact.create':true}]){f.request(f.user('limited',permissions));for(const entity of ['company','address','types','contact'])for(const method of ['getSalesEditor','saveSalesEntityChange'])assert.throws(()=>f.ctx.salesAuthDispatch_(method,[{companyId:id,targetId:id,entity,change:{homepage:'https://synthetic.invalid'}}]),/AUTH_DENIED/);}

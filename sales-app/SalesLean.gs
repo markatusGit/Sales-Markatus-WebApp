@@ -126,7 +126,8 @@ function getSalesLeanView(name,selectedId){
   if(name==='contacts')return {directory:salesV1Index_().entries,drafts:salesList_('sales_drafts'),jobs:salesList_('sales_jobs').map(salesJobSummary_)};
   if(name==='invoices')return {editions:salesV1Editions_(),companies:salesLeanNames_()};
   if(name==='admin')return {editions:salesLeanRoster_(),access:user.admin?salesAccess_():null};
-  if(name==='new'||name==='change'){const catalog=salesRead_('sales_meta/catalog');return {catalog:name==='new'?salesCompanyCustomCatalog_(catalog):catalog};}
+  if(name==='new')return {catalog:salesCustomerCatalog_(false)};
+  if(name==='change')return {catalog:salesRead_('sales_meta/catalog')};
   if(name==='import')return {syncRun:salesLeanSyncStatus_(),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
   if(name==='test'){
     const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),catalog=salesRead_('sales_meta/catalog');

@@ -138,4 +138,4 @@ function bindSalesCustomerContact(id,hqId){
     salesWrite_('sales_jobs/'+job.id,job);salesCommunicationAfterJob_(job);return {id:job.id,message:job.message,patch:{job:salesJobSummary_(job)}};
   });
 }
-function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind==='createContact'?0:1)-(b.kind==='createContact'?0:1));}
+function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind==='createContact'?0:1)-(b.kind==='createContact'?0:1)||(a.formGroup&&b.formGroup?a.formGroup.localeCompare(b.formGroup)||a.formOrder-b.formOrder:a.formGroup?1:b.formGroup?-1:0));}

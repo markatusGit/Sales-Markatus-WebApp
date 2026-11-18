@@ -8,7 +8,7 @@
     if(patch.editions){const id=selectedEditionId;state.editions=patch.editions;state.edition=patch.editions.find(e=>e.id===id)||patch.editions[0]||null;selectedEditionId=state.edition?.id||'';patch.editions.forEach(e=>{if(!e.summaryOnly)editionCache.set(e.id,e);});}
   }
   async function ensureView(name,force=false){
-    if(name==='import')force=true;
+    if(name==='import'||name==='new')force=true;
     if(!force&&loadedViews.has(name)){mergeLean(viewCache.get(name));return;}
     if(['home','customers','magazine','contacts','invoices','admin','new','change','test','import'].includes(name)){const patch=await rpc('getSalesLeanView',name,selectedEditionId);viewCache.set(name,patch);mergeLean(patch);}
     loadedViews.add(name);
@@ -31,6 +31,7 @@
     if(!state||!value)return;
     const p=value.patch;
     if(p){
+      if(p.jobs)for(const job of p.jobs){const index=state.jobs.findIndex(j=>j.id===job.id);if(index<0)state.jobs.push(job);else state.jobs[index]=job;}
       for(const [field,item] of [['jobs',p.job],['drafts',p.draft],['localCompanies',p.localCompany]])if(item){const i=state[field].findIndex(x=>x.id===item.id);if(i<0)state[field].push(item);else state[field][i]=item;}
       if(p.draft){const ids=['draft_'+p.draft.id,String(p.draft.hqId)];for(const id of ids){const previous=companyCache.get(id);companyCache.delete(id);if(previous&&p.job?.kind==='history'&&p.job.state==='pending')companyCache.set(id,{...previous,histories:[...(previous.histories||[]).filter(h=>h.jobId!==p.job.id),{...p.job.history,id:'local_'+p.job.id,jobId:p.job.id,source:'app',syncState:'pending'}]});}}
     }

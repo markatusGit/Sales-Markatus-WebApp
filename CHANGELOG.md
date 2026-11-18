@@ -4,6 +4,13 @@ Neue Veröffentlichungen verwenden Git-Tags im Format `vMAJOR.MINOR.PATCH`. Frü
 
 ## [Unveröffentlicht]
 
+## [v0.32.0]
+
+- Kundenanlage und Kundenbearbeitung verwenden dieselbe kompakte Feldkomponente: Unternehmensname, Firmenart, Branche, HQ-Unternehmensbereich, Verantwortlicher Benutzer, Homepage, Beschreibung, Adresse, Erstelldatum und Kundenherkunft. Neue Kunden: Markatus/heutiges Datum als Vorgabe. Bestehende Werte einschließlich nicht mehr aktiver Zuordnungen erhalten; bisherige Ansprechpartneranlage unverändert.
+- Echte HQ-Auswahlwerte für Kundenherkunft über v1-Felddefinitionen mit Options, bei DropdownCheckbox Mehrfachauswahl. Firmenart, Bereiche und Benutzer aus HQ; Branchen inkrementell aus geänderten HQ-Firmen prüfen. Gemeinsamer 15-Minuten-Prüfstand und ausdrückliche Aktualisierung statt Hintergrundabfragen. Neue Branche im Dialog anlegen, mit Kunden speichern und im kontrollierten Abgleich nach HQ übertragen.
+- Gemeinsame Validierung, Anfragekennung und atomare Firebase-Speicherung. Nur geänderte Bereiche als geordnete, voneinander abhängige HQ-Aufträge; keine vollständige Kundendaten-/Historienneuladung. Benutzer-/Bereichsänderungen über dokumentierten v1-Firmenweg, sonstige Felder vollständig erhalten und mit dauerhaftem Prüfabdruck zurücklesen. Unvollständige Lesestände oder unklare Schreibausgänge bleiben gesperrt. Ursprüngliche offene Firmenanlagen bleiben unverändert.
+- Kennung `2026-11-18-r32`; 33 Fachfälle, zusätzliche Rechtefälle und neue Browserprüfung für identische Felder, Auswahlstrukturen, Vorgaben, neue Branche, erhaltene Entwürfe und verlorene Antworten. Keine neuen Script Properties, Scopes, Anmeldeanbieter oder Bereitstellungseinstellungen. Produktive Bedien-/Speicherprobe gesondert.
+
 ## [v0.31.0]
 
 - Sichtbarer gelber Knopf „Firmendaten bearbeiten“ oben beim Kundennamen. Auch bereits begonnene App-Firmenanlagen sind in Firebase bearbeitbar: Änderungen werden separat vorgemerkt und erst nach bestätigtem Abschluss des unveränderten Anlageauftrags nach HQ übertragen. Anfragekennung, Revision, aktuelle Bearbeiterrechte und bestehende Konfliktprüfung bleiben wirksam; keine Altaufträge automatisch entsperrt oder wiederholt.
