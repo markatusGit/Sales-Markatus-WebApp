@@ -4,7 +4,7 @@
 
 Bisher können Kunden in der App nicht gelöscht werden. Nutzer legt fest (Papierkorb am selben Tag verworfen):
 - Kunden werden direkt und endgültig gelöscht, in der App und in HQ, damit beide gleich bleiben.
-- Das geschieht immer erst nach Freigabe durch einen Admin.
+- Alle Nutzer dürfen einen Löschantrag stellen; gelöscht wird immer erst nach Freigabe durch einen Admin.
 - Es gibt keinen Papierkorb und keine Wiederherstellung.
 - Hat der Kunde Belege, Umsätze oder offene Aufträge, wird nicht gelöscht. Die App zeigt einen Hinweis, dass vorher aufgeräumt werden muss.
 - Kunden sollen grundsätzlich möglichst nie gelöscht werden.

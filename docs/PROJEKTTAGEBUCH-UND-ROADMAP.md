@@ -13,7 +13,7 @@ Nutzerfrage: Kann ein Admin Kunden in der App löschen? Bestätigt: Bisher gibt 
 
 **Vorbedingung „vorher aufräumen“:** Hat der Kunde Belege oder Umsätze in Ausgaben oder offene Aufträge, wird das Löschen nicht ausgeführt. Stattdessen zeigt die App einen Hinweis, was noch vorhanden ist. Das muss vorher jemand bereinigen. Die App räumt nichts automatisch auf.
 
-Noch offen: Darf auch ein Nicht-Admin einen Löschantrag stellen, den ein Admin freigibt, oder löscht nur der Admin selbst mit Bestätigung? Ebenfalls offen ist, ob Ansprechpartner, Historie und Projekte als „aufzuräumen“ gelten oder mitgelöscht werden. Das hängt vom HQ-Test mit der TEST-Firma ab.
+**Löschantrag (vom Nutzer am 20.11.2026 entschieden):** Alle Nutzer dürfen einen Löschantrag für einen Kunden stellen. Ausgeführt wird er erst, wenn ein Admin ihn freigibt. Noch offen ist, ob Ansprechpartner, Historie und Projekte als „aufzuräumen“ gelten oder mitgelöscht werden. Das hängt vom HQ-Test mit der TEST-Firma ab.
 
 Am selben Tag als Lösungsvorschlag für Sync-Meldungen besprochen: Paket A (R14), B und C (R16). Kein Code geändert, nichts nach Google veröffentlicht.
 
@@ -115,7 +115,7 @@ Keine der folgenden späteren Funktionen erhält durch diesen Eintrag bereits ei
 | R12 | App-Nutzer ohne eigenes HQ-Konto | Am 24.09.2026 ausdrücklich als spätere Nutzergruppe bestätigt | Verantwortlichen HQ-Benutzer zunächst auswählen; spätere Zuordnungs- und Autorenregel klären |
 | R13 | Rechnungen über mehrere Magazinausgaben aufteilen | Am 24.09.2026 als real vorkommend bestätigt, für den aktuellen Test ausdrücklich zurückgestellt | Rechnungspositionen oder fachliche Zuordnung je Ausgabe prüfen; keine ungeprüfte anteilige Verteilung |
 | R14 | Paket A „Zu klären“: Admin-Klärungsliste für Sync-Meldungen | Am 20.11.2026 als Lösungsvorschlag besprochen; Nutzer will den Löschabgleich aus R15 darin bauen; noch nicht umgesetzt | Umfang: Klärungsliste nach Fallart, Klärungs-Assistent für unklare Aufträge (nur lesende HQ-Prüfung, danach Zuordnen / Admin-Freigabe zum erneuten Senden / Treffer anzeigen), „Auftrag verwerfen“ mit Begründung, „Autor bestätigen“, Folgefälle unter dem auslösenden Auftrag, Löschabgleich gegen HQ. Nichts automatisch nach HQ schreiben |
-| R15 | Kunden löschen (App und HQ, ohne Papierkorb, nur nach Admin-Freigabe) | Am 20.11.2026 vom Nutzer festgelegt, am selben Tag Papierkorb gestrichen; noch nicht umgesetzt | Siehe Tagebucheintrag vom 20.11.2026; Löschen gesperrt mit Hinweis bei Belegen/Umsätzen oder offenen Aufträgen; HQ-Löschung zuerst mit eigener TEST-Firma prüfen; offen, ob Nicht-Admins Löschanträge stellen dürfen |
+| R15 | Kunden löschen (App und HQ, ohne Papierkorb, nur nach Admin-Freigabe) | Am 20.11.2026 vom Nutzer festgelegt, am selben Tag Papierkorb gestrichen; noch nicht umgesetzt | Siehe Tagebucheintrag vom 20.11.2026; Löschen gesperrt mit Hinweis bei Belegen/Umsätzen oder offenen Aufträgen; HQ-Löschung zuerst mit eigener TEST-Firma prüfen; alle Nutzer dürfen Löschanträge stellen, ein Admin gibt frei |
 | R16 | Paket B/C: Sync-Meldungen sauberer einordnen, Ausgabenprüfung verlinken | Am 20.11.2026 als Vorschlag besprochen; nicht beauftragt | B: HTTP400 als „von HQ abgelehnt“ mit Korrektur, Historien-Suche (einer/keiner/mehrere), 404-Firmen neu zuordnen, vorübergehende HQ500 erst nach drei Läufen melden. C: Direktlinks zur Ausgabenprüfung |
 
 ### Ergänzende Ideen vom 23.09.2026 – noch nicht beauftragt
