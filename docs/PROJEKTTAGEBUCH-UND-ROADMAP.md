@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 20.11.2026 – r34.2: Startfehler von r34.1 behoben
+
+Nutzer meldet nach r34.1 „Uncaught SyntaxError: Failed to execute 'write' on 'Document': Invalid or unexpected token · Zeile 809, Spalte 119“. Ausgelieferte Seite anonym abgerufen und dekodiert: HtmlService hatte Kommentare entfernt und dabei in der Anmeldezeile `.replace(/\//g,'_')` den Rest der Zeile als Kommentar abgeschnitten. Im lokalen Browser per document.write reproduziert. Wahrscheinlich brachte das neue Löschmodul (Zitate in Template-Platzhaltern) den Kommentarfilter aus dem Tritt; auch r34.0 könnte betroffen gewesen sein. Korrektur ohne doppelten Schrägstrich, Löschmodul ohne verschachtelte Zitate, zwei neue dauerhafte Prüfungen. Alle Prüfdateien bestanden. Live-Prüfung durch Nutzer offen.
+
 ### 20.11.2026 – r34.1: Löschknopf oben, nicht übertragene Kunden löschbar
 
 Nutzer findet den Löschknopf nicht und möchte auch noch nicht synchronisierte Firmen löschen. Ursache: Der Knopf stand in r34 unterhalb der Kopfzeile neben „Aus Firebase neu laden“ und fehlte bei App-Kunden ohne abgeschlossene HQ-Übertragung. Jetzt oben neben „Firmendaten bearbeiten“ in beiden Kundenansichten. Nicht übertragene Kunden: gleicher Antrag und gleiche Admin-Freigabe; danach sofortige Löschung nur in Firebase (Entwurf als gelöscht markiert, nicht gesendete Aufträge verworfen, Namensliste bereinigt), kein HQ-Aufruf. Begonnene HQ-Übertragungen sperren. 13 Löschfälle und erweiterter Browsertest; alle 26 Prüfdateien bestanden. Live-Prüfung offen.

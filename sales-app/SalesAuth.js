@@ -39,7 +39,7 @@
     const pending={popup,createdAt:Date.now()};salesLoginPending=pending;
     try{
       const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join(''),stateKey=Array.from(crypto.getRandomValues(new Uint8Array(24)),n=>n.toString(16).padStart(2,'0')).join('');
-      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)),challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)),challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').split('/').join('_').replace(/=+$/,'');
       const response=await salesDirectRpc('beginSalesLogin',{origin:location.origin,state:stateKey,challenge,release:APP_RELEASE});
       if(salesLoginPending!==pending)return;
       if(response.reloadRequired){popup.close();salesLoginPending=null;salesNewRelease=response.release;render();return;}

@@ -1,5 +1,10 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r34.2: Startfehler behoben
+
+- Die App neu laden (bei Bedarf Strg+F5); Kennung „2026-11-20-r34.2“ erwarten und keine rote Fehlermeldung.
+- Danach die Schritte zu r34.1 und r34 verwenden.
+
 ## r34.1: Löschknopf und nicht übertragene Kunden
 
 - Die App neu laden; Kennung „2026-11-20-r34.1“ erwarten.

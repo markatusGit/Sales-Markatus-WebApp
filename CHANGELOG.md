@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.34.2]
+
+- Korrektur: r34.1 brach beim Laden mit „Failed to execute 'write' on 'Document': Invalid or unexpected token“ ab. Ursache: HtmlService entfernt Kommentare vor der Auslieferung; ein regulärer Ausdruck mit doppeltem Schrägstrich in der PKCE-Anmeldung wurde dabei als Kommentar abgeschnitten. Durch split/join ersetzt; das Lösch-Oberflächenmodul verwendet keine Zitate mehr in Template-Platzhaltern.
+- Neue Schutzprüfungen: check.cjs lehnt doppelte Schrägstriche im Seitencode ab; scripts/test-htmlservice.cjs entfernt Kommentare mit einem bewusst einfachen Modell und verlangt danach gültige Skripte (schlägt beim alten Stand an, besteht beim neuen).
+- Kennung `2026-11-20-r34.2`. Keine Script Properties oder Bereitstellungseinstellungen geändert.
+
 ## [v0.34.1]
 
 - „Kunde löschen“ steht jetzt oben in der Kundenakte neben „Firmendaten bearbeiten“ (vorher weiter unten neben „Aus Firebase neu laden“).

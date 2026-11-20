@@ -35,12 +35,28 @@ function check() {
     if (canonical(name, fs.readFileSync(path.join(app, name), 'utf8')) !== canonical(name, expected)) throw Error(`${name} veraltet. Zuerst npm run build ausführen und Änderungen prüfen/committen.`);
   }
   appsScriptSyntax(expectedBackend, 'SalesBackend.gs');
+  htmlServiceCommentSafe(expectedHtml, 'Sales.html');
   const ignore = fs.readFileSync(path.join(app, '.claspignore'), 'utf8').split(/\r?\n/).filter(Boolean);
   const expectedIgnore = ['**/**', ...appFiles.map(n => '!' + n)].sort();
   if (JSON.stringify([...ignore].sort()) !== JSON.stringify(expectedIgnore)) throw Error('.claspignore muss genau die sieben freigegebenen Dateien zulassen.');
   git('diff', '--check');
   checkTrackedFiles();
   console.log('PASS Syntax, JSON, generierte Dateien, Uploadliste und Git-Zugangsdatenprüfung');
+}
+// HtmlService strips comments with its own scanner before serving the page. A double slash inside code
+// (for example in a regular expression or URL string) can be taken as a comment and cut the rest of the
+// line, which breaks the whole page (r34.1: "Failed to execute 'write' on 'Document'"). Allow // only as a
+// real comment: at the start of a line or after whitespace that follows a statement end.
+function htmlServiceCommentSafe(html, name) {
+  const bad = [];
+  html.replace(/\r/g, '').split('\n').forEach((line, i) => {
+    for (let at = line.indexOf('//'); at >= 0; at = line.indexOf('//', at + 2)) {
+      const before = line.slice(0, at);
+      if (/^\s*$/.test(before) || /[;{}),\]]\s+$/.test(before)) continue;
+      bad.push(`Zeile ${i + 1}: ${line.slice(Math.max(0, at - 40), at + 20)}`);
+    }
+  });
+  if (bad.length) throw Error(`${name}: doppelter Schrägstrich im Code wird von HtmlService als Kommentar abgeschnitten. Umschreiben (z. B. 'https:/'+'/' oder split('/')):\n` + bad.slice(0, 10).join('\n'));
 }
 function tests() {
   const env = {...process.env};
@@ -58,7 +74,7 @@ function tests() {
   files.push('sales-app/test-delete.cjs','sales-app/test-delete-browser.cjs');
   files.push('sales-app/test-auth.cjs','sales-app/test-auth-browser.cjs');
   // Synthetic Firestore read/write model: keeps the documented consumption figures under regression test.
-  files.push('scripts/audit-firestore.cjs');
+  files.push('scripts/audit-firestore.cjs','scripts/test-htmlservice.cjs');
   for (const name of files) {
     console.log(`Prüfe ${name}`);
     const output = run(process.execPath, [path.join(root, name)], {env});

@@ -1,6 +1,6 @@
 # Projektüberblick – Sales Markatus
 
-### 20.11.2026 – r34.1/v0.34.1: Kunden löschen (R15)
+### 20.11.2026 – r34.2/v0.34.2: Kunden löschen (R15), Startfehler von r34.1 behoben
 
 Jeder Nutzer kann in der Kundenakte oben neben „Firmendaten bearbeiten“ über „Kunde löschen“ mit Grund beantragen (auch noch nicht an HQ übertragene App-Kunden; diese werden nach Freigabe sofort nur in der App gelöscht); der Admin gibt unter „Verwaltung“ → „Löschanträge für Kunden“ mit zweiter Bestätigung frei. Gelöscht wird erst im nächsten zentralen HQ-Abgleich: Kontakthistorie, Ansprechpartner und Firma in HQ, danach alles in der App. Kein Papierkorb. Projekte, Belege, Planumsätze oder offene Aufträge sperren mit Hinweis „erst aufräumen“. Alle 26 Prüfdateien bestanden. Live-Prüfung mit einer eigenen TEST-Firma steht aus. Keine neuen Script Properties oder Bereitstellungseinstellungen.
 
