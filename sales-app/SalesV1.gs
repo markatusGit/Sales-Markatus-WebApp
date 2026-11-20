@@ -5,6 +5,8 @@ function salesV1Index_(){
   // Fully loaded entries take precedence over preliminary discovery pages.
   (salesRead_('sales_meta/directory')?.entries||[]).forEach(e=>entries.set(String(e.company.id),e));
   records.filter(e=>e.company).forEach(e=>entries.set(String(e.company.id),e));
+  // Customers deleted through the app stay out of rebuilt lists, even if an old discovery page still names them.
+  (salesRead_('sales_meta/deleted_companies')?.ids||[]).forEach(id=>entries.delete(String(id)));
   return {entries:Array.from(entries.values())};
 }
 function salesV1Editions_(){return salesList_('sales_editions');}

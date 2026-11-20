@@ -12,7 +12,7 @@ test('cold and warm home loads never scan customer data, drafts, jobs or raw col
 });
 test('names index bootstraps once and later costs one read without contacts or details',()=>{
  const {f,audit}=baseline();const first=audit.measure('first names',()=>f.ctx.getSalesLeanView('customers'));
- assert.equal(first.readDocumentsModel,3193);assert.equal(first.writtenDocuments,1);
+ assert.equal(first.readDocumentsModel,3194);assert.equal(first.writtenDocuments,1);
  const second=audit.measure('warm names',()=>f.ctx.getSalesLeanView('customers'));assert.equal(second.readDocumentsModel,1);assert.equal(second.result.companies.length,3189);
  assert.deepEqual(Object.keys(second.result.companies[0]).sort(),['id','name']);assert.equal(second.writtenDocuments,0);
 });

@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-18-r33';
+const SALES_RELEASE = '2026-11-20-r34';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -109,7 +109,7 @@ function salesWrite_(path,value) {
   if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
 function salesList_(collection) {
-  if (!/^sales_(jobs|drafts|editions|directory)$/.test(collection)) throw new Error('Ungültige Sammlung.');
+  if (!/^sales_(jobs|drafts|editions|directory|deletions)$/.test(collection)) throw new Error('Ungültige Sammlung.');
   const c=salesContext_(), result=[];let next='';
   for (let i=0;i<1000;i++) {
     const page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=100'+(next?'&pageToken='+encodeURIComponent(next):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
@@ -647,6 +647,8 @@ function runSalesJob(id,step) {
 }
 function salesJobFailState_(job,e) {
   const reason=e?.message||'Unbekannter Fehler';
+  // Deletions re-read HQ before every step, so a failure never needs a manual reconcile.
+  if(job.kind==='deleteCompany')return salesDeleteFailed_(job,reason);
   if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e?.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
   // Without a persisted write marker for this phase, HQ was not contacted: return to the stored stage instead of locking the job.
   else if(job.kind==='createCompany'&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message=(job.safeStage==='pending'?'Noch nicht an HQ gesendet: ':'HQ-Rückprüfung noch offen: ')+reason;}

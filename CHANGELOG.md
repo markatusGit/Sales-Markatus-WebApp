@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## [v0.34.0]
+
+- Kunden löschen (Roadmap R15): Jeder Nutzer mit Kundenleserecht kann in der Kundenakte über „Kunde löschen“ einen Löschantrag mit Pflichtgrund stellen. Der Antrag wird nur in Firebase gespeichert; der Status steht in der ohnehin gelesenen Kundenakte (kein zusätzlicher Lesevorgang beim Öffnen).
+- Unter „Verwaltung“ → „Löschanträge für Kunden“ liest der Admin die Anträge nur auf Klick, gibt sie mit einer zweiten Bestätigung frei oder lehnt sie ab. Kein Papierkorb, keine Wiederherstellung.
+- Sperre statt automatischem Aufräumen: Projekte, Belege, Planumsätze oder offene Aufträge verhindern Antrag und Freigabe mit dem Hinweis, vorher aufzuräumen. Im zentralen HQ-Abgleich wird vor dem Löschen in HQ erneut auf Projekte, Belege und Planumsätze geprüft; dann wird nichts gelöscht.
+- Ausführung nur im zentralen HQ-Abgleich und nur mit Admin-Freigabe: zuerst Kontakthistorie, dann Ansprechpartner, dann die Firma per dokumentiertem HQ-DELETE; Rückprüfung per Lesezugriff (HTTP 404). Danach werden Kundenakte, Verzeichnis, Rohdaten, Namens-/Filterlisten und Bestandszähler in der App bereinigt, damit keine neue Bestandsabweichung entsteht. Höchstens 80 HQ-Löschungen pro Abgleich, Rest im nächsten Lauf. Fehler werden beim nächsten Abgleich erneut geprüft und nach drei Fehlversuchen angehalten.
+- Kennung `2026-11-20-r34`. Neue Prüfdateien test-delete (10 Fälle) und test-delete-browser; Lesezähler beim einmaligen Aufbau des Namensindex +1 (Liste gelöschter Kunden). Keine neuen Script Properties, Scopes oder Bereitstellungseinstellungen. HQ-Löschung noch nicht live mit einer TEST-Firma geprüft.
+
 ## [v0.33.0]
 
 - Kundenanlage, Kunden-/Kontakt-/Adresseditor und Speichern lesen ausschließlich Firebase. Kein HQ-Metadatenabruf beim Öffnen, kein 15-Minuten-Nachladen und kein separater Formular-Aktualisierungsbutton.

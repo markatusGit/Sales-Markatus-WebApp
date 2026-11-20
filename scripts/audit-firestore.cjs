@@ -96,8 +96,8 @@ function legacyMain() {
   const initial = measure('Appstart / Frisch laden / Mein-Tag-Minutenabruf', () => f.ctx.getSalesV1State());
   assert.equal(initial.readDocumentsModel, 3221); assert.equal(initial.firebaseRequests, 42); assert.equal(initial.writtenDocuments, 0);
   const company = measure('Bestandskunde öffnen', () => f.ctx.getSalesV1Company('10001'));
-  assert.equal(company.readDocumentsModel, 3193); assert.equal(company.firebaseRequests, 36);
-  assert.equal(measure('Denselben Bestandskunden erneut öffnen', () => f.ctx.getSalesV1Company('10001')).readDocumentsModel, 3193);
+  assert.equal(company.readDocumentsModel, 3194); assert.equal(company.firebaseRequests, 36);
+  assert.equal(measure('Denselben Bestandskunden erneut öffnen', () => f.ctx.getSalesV1Company('10001')).readDocumentsModel, 3194);
   assert.equal(measure('Sync-Status bei fehlendem Lauf', () => f.ctx.getSalesSyncStatus()).readDocumentsModel, 1);
   assert.equal(measure('Ohne Firmenzuordnung ansehen', () => f.ctx.getSalesUnassigned()).readDocumentsModel, 2);
   const settings = measure('Ziel/Termine speichern einschließlich UI-Vollabruf', () => { const saved = f.ctx.saveSalesV1EditionSettings({editionId: 'project-501', revision: 0, target: 100}); return {saved, state: f.ctx.getSalesV1State()}; });

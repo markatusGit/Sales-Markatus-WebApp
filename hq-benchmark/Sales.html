@@ -96,7 +96,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-18-r33</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-20-r34</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -107,7 +107,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-18-r33</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-20-r34</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -121,8 +121,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-11-18-r33';
-  const UI_BUILD='2026-11-18-r33';
+  const APP_RELEASE='2026-11-20-r34';
+  const UI_BUILD='2026-11-20-r34';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -234,7 +234,7 @@ window.__salesStarted=false;
   function localStatus(c){const names={pending:'Nur in Firebase',ready:'HQ-Fortsetzung offen',companyCreated:'Firma angelegt · Rückprüfung offen',companyConfirmed:'Firma in HQ bestätigt · Kontakt offen',contactCreated:'Kontakt in HQ · Prüfung offen',uncertain:'HQ-Ausgang prüfen',synced:'In HQ bestätigt'};return names[c.syncState]||'HQ-Abgleich offen';}
   function revenue(id){if(state?.edition?.summaryOnly)return id?(state.edition.companyRevenue?.[id]||0):(state.edition.revenueCents||0);return (state?.edition?.documents||[]).filter(d=>!id||d.companyId===id).reduce((sum,d)=>sum+d.cents,0);}
   function addr(c){return c.defaultAddress||c.addresses?.find(a=>a.standardForDocumentType==='Invoice')||null;}
-  function hqCompany(){const c=detail?.company||companies().find(c=>c.id===selected);if(!c)return empty('Firma fehlt.');const a=addr(c);return head(c.name,'Stammdatenänderungen werden beim gemeinsamen HQ-Sync übertragen.',button('Firmendaten bearbeiten','edit-business','company:'+(c.hqId||c.id),true)+button('Zur Kundenliste','nav','customers'))+`<div class="m-test-actions">${button('Aus Firebase neu laden','read-company',c.id)}</div>${!detail?'<div class="m-note">Firmendetails noch nicht nach Firebase übertragen. Die Grunddaten wurden bereits aus HQ erfasst.</div>':detail.detailVersion!==3?'<div class="m-note">Älterer Firmendatenstand in Firebase. Bitte den HQ-Sync unter Datenabgleich starten.</div>':''}<section class="m-panel m-section"><div class="m-panel-head"><h2>Allgemein</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Firmenart</dt><dd>${esc(c.companyTypes.map(t=>t.name||'').filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Kundennummer</dt><dd>${esc(c.companyTypes.map(t=>t.number).filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Branche</dt><dd>${esc(c.industrialSector||'Nicht hinterlegt')}</dd><dt>HQ-Unternehmensbereich</dt><dd>${esc((c.subsystems||[]).map(s=>s.name).filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Verantwortlicher Benutzer</dt><dd>${esc(c.responsibleUsers.map(u=>[u.firstName,u.lastName].filter(Boolean).join(' ')).join(', ')||'Nicht hinterlegt')}</dd><dt>Homepage</dt><dd class="m-value">${esc(c.homepageDisplay||c.homepage||'Von HQ nicht geliefert')}${c.homepageSource&&c.homepageSource!=='Firma'?'<br><small>'+esc(c.homepageSource)+'</small>':''}</dd><dt>Adresse</dt><dd>${a?esc([a.street,a.houseNumber,a.zipCode,a.city,a.country].filter(Boolean).join(' ')):'Nicht hinterlegt'}<br><small>${c.defaultAddress?'Standardadresse':a?'Rechnungsadresse':'Keine Adresse'}</small></dd><dt>Beschreibung</dt><dd class="m-detail">${esc(c.description||'Nicht hinterlegt')}</dd>${businessCompanyCustomDetails(c)}</dl>${businessAddresses(c)}</div></section>${customerCardList('contacts','Ansprechpartner',detail?.contacts||[],customerContactRow,detail?'Keine Ansprechpartner vorhanden.':'Noch nicht importiert.')}${customerCardList('projects','Projekte',detail?.projects||[],projectRow,detail?'Keine direkt zugeordneten Projekte vorhanden.':'Noch nicht importiert.')}`;}
+  function hqCompany(){const c=detail?.company||companies().find(c=>c.id===selected);if(!c)return empty('Firma fehlt.');const a=addr(c);return head(c.name,'Stammdatenänderungen werden beim gemeinsamen HQ-Sync übertragen.',button('Firmendaten bearbeiten','edit-business','company:'+(c.hqId||c.id),true)+button('Zur Kundenliste','nav','customers'))+`<div class="m-test-actions">${button('Aus Firebase neu laden','read-company',c.id)}${deleteCustomerButton(c)}</div>${deleteCustomerPanel(c)}${!detail?'<div class="m-note">Firmendetails noch nicht nach Firebase übertragen. Die Grunddaten wurden bereits aus HQ erfasst.</div>':detail.detailVersion!==3?'<div class="m-note">Älterer Firmendatenstand in Firebase. Bitte den HQ-Sync unter Datenabgleich starten.</div>':''}<section class="m-panel m-section"><div class="m-panel-head"><h2>Allgemein</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Firmenart</dt><dd>${esc(c.companyTypes.map(t=>t.name||'').filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Kundennummer</dt><dd>${esc(c.companyTypes.map(t=>t.number).filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Branche</dt><dd>${esc(c.industrialSector||'Nicht hinterlegt')}</dd><dt>HQ-Unternehmensbereich</dt><dd>${esc((c.subsystems||[]).map(s=>s.name).filter(Boolean).join(', ')||'Nicht hinterlegt')}</dd><dt>Verantwortlicher Benutzer</dt><dd>${esc(c.responsibleUsers.map(u=>[u.firstName,u.lastName].filter(Boolean).join(' ')).join(', ')||'Nicht hinterlegt')}</dd><dt>Homepage</dt><dd class="m-value">${esc(c.homepageDisplay||c.homepage||'Von HQ nicht geliefert')}${c.homepageSource&&c.homepageSource!=='Firma'?'<br><small>'+esc(c.homepageSource)+'</small>':''}</dd><dt>Adresse</dt><dd>${a?esc([a.street,a.houseNumber,a.zipCode,a.city,a.country].filter(Boolean).join(' ')):'Nicht hinterlegt'}<br><small>${c.defaultAddress?'Standardadresse':a?'Rechnungsadresse':'Keine Adresse'}</small></dd><dt>Beschreibung</dt><dd class="m-detail">${esc(c.description||'Nicht hinterlegt')}</dd>${businessCompanyCustomDetails(c)}</dl>${businessAddresses(c)}</div></section>${customerCardList('contacts','Ansprechpartner',detail?.contacts||[],customerContactRow,detail?'Keine Ansprechpartner vorhanden.':'Noch nicht importiert.')}${customerCardList('projects','Projekte',detail?.projects||[],projectRow,detail?'Keine direkt zugeordneten Projekte vorhanden.':'Noch nicht importiert.')}`;}
   function test(){return head('Aufträge und Firmen','Eingaben zuerst in Firebase speichern; Übertragung beim gemeinsamen HQ-Sync.')+`<section class="m-panel m-section"><div class="m-panel-head"><h2>In der App angelegte Firmen</h2>${button('Firma anlegen','nav','new',true)}</div><div class="m-panel-body"><p>Die Eingabe wird zuerst in Firebase gespeichert. Anschließend den Auftrag ansehen und die Übertragung bewusst starten. Bestandskunden können direkt in ihrer Kundenansicht bearbeitet werden.</p></div>${state.drafts.map(d=>`<div class="m-row"><h3>${esc(d.company.name)}</h3><p>${esc(d.kind)} · ${d.hqId?'HQ-ID '+esc(d.hqId):'Noch ohne bestätigte HQ-ID'} · Adressherkunft: ${esc(d.addressOrigin==='Sonstige'?d.addressOriginOther:d.addressOrigin||'Nicht hinterlegt')}</p><div class="m-test-actions">${d.hqId?button('Homepage in HQ prüfen','audit-test',d.id)+(auditId===d.id&&audit?.markerPresent&&audit.creationState==='synced'?button('Testmarkierung entfernen','cleanup-marker',d.id):'')+button('Firmendaten bearbeiten','edit-business','company:'+d.hqId)+button('Firmendetails','company',String(d.hqId)):''}</div>${auditId===d.id&&audit?`<dl class="m-dl"><dt>In Firebase eingegeben</dt><dd>${esc(audit.draftHomepage||'Leer')}</dd><dt>HQ-Firmenfeld</dt><dd>${esc(audit.hqHomepage||'Leer')}</dd><dt>HQ-Standardadresse</dt><dd>${esc(audit.hqAddressWebsite||'Leer')}</dd><dt>In Firebase angezeigt</dt><dd>${esc(audit.appHomepage||'Leer')}</dd><dt>Nach HQ-Neulesung</dt><dd>${esc(audit.displayHomepage||'Leer')} (${esc(audit.displaySource)})</dd><dt>Technische Kennzeichnung</dt><dd>${audit.markerPresent?'Noch vorhanden':'Nicht vorhanden'}</dd><dt>Anlageauftrag</dt><dd>${esc(audit.creationState)}</dd><dt>Ansprechpartner</dt><dd>${esc(audit.contactStatus)}</dd></dl>`:''}</div>`).join('')}</section>${jobs()}`;}
   function createButton(j){
     if(!state.user.admin||!j||!['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(j.state))return '';
@@ -374,7 +374,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   }
   function v1Admin(){
     let body=admin().replace('COBURGER #70 · Ziel und Termine',esc(editionLabel(state.edition))+' · Ziel und Termine');body=editionSelectors()+body;if(!state.user.admin)return body;
-    body=(salesUsesLogin()?salesUsersPanel():salesSetupPanel())+body;
+    body=(salesUsesLogin()?salesUsersPanel():salesSetupPanel())+deletionAdminPanel()+body;
     return body+storageInventoryPanel()+projectSearchPanel()+(state.syncRun?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+'<p class="m-note">Alle eingelesenen HQ-Unternehmen und Ansprechpartner bleiben verfügbar, auch ohne Magazinrechnung. Weitere Ausgaben können aus dem gespeicherten Bestand verknüpft werden.</p><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
   }
   async function continueV1Import(editionsOnly=false){
@@ -883,6 +883,48 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     });
   });
 
+  // Customer deletion (R15): any user requests, the admin approves, the central HQ sync deletes. No trash bin.
+  let deleteFormOpen=null,deletionRows=null,deletionConfirm=null;
+  const deleteStates={requested:'Wartet auf Freigabe durch einen Admin',approved:'Freigegeben · wird beim nächsten HQ-Abgleich gelöscht',blocked:'Nicht gelöscht · erst aufräumen',failed:'Löschung angehalten',rejected:'Abgelehnt',done:'Gelöscht'};
+  function deleteCustomerButton(c){
+    if(detail?.deletion&&['requested','approved'].includes(detail.deletion.state))return '';
+    if(c.localDraftId&&c.syncState!=='synced')return '';
+    return button('Kunde löschen','delete-customer',String(c.hqId||c.id));
+  }
+  function deleteCustomerPanel(c){
+    const d=detail?.deletion,id=String(c.hqId||c.id);let out='';
+    if(d)out+=`<div class="m-note" role="status" data-deletion-status><strong>Löschantrag: ${esc(deleteStates[d.state]||d.state)}</strong>${d.message&&d.state!=='requested'?'<br>'+esc(d.message):''}<br><small>Gestellt von ${esc(d.requestedBy||'')} am ${esc(dateLabel(d.requestedAt))} · Grund: ${esc(d.reason||'')}</small></div>`;
+    if(deleteFormOpen===id)out+=`<form class="m-panel m-section" data-form="delete-request" data-company="${esc(id)}"><div class="m-panel-head"><h2>Kunde löschen</h2></div><div class="m-panel-body"><p>Nach der Freigabe durch einen Admin wird der Kunde beim nächsten HQ-Abgleich <strong>in HQ und in der App endgültig gelöscht</strong>, zusammen mit seinen Ansprechpartnern und der Kontakthistorie. Es gibt keinen Papierkorb.</p><p>Gibt es zu diesem Kunden noch Projekte, Belege, Planumsätze oder offene Aufträge, wird nicht gelöscht. Diese müssen vorher aufgeräumt werden. Kunden sollten möglichst nie gelöscht werden.</p><label class="m-field">Grund für die Löschung (Pflicht)<textarea name="reason" maxlength="500" required></textarea></label><div class="m-test-actions"><button type="submit" class="m-button m-primary">Löschantrag stellen</button>${button('Abbrechen','delete-cancel',id)}</div><p class="m-status" role="status"></p></div></form>`;
+    return out;
+  }
+  function deletionRow(d){
+    const key=d.hqId+':'+d.revision,open=['requested','failed','blocked'].includes(d.state);
+    const actions=!open?'':deletionConfirm===key?`<div class="m-note"><strong>Wirklich endgültig löschen?</strong> ${esc(d.name)} wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht, mit Ansprechpartnern und Kontakthistorie. Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">${button('Ja, endgültig löschen','deletion-approve',key,true)}${button('Abbrechen','deletion-confirm-cancel',key)}</div>`:`<div class="m-test-actions">${button(d.state==='requested'?'Löschung freigeben':'Erneut freigeben','deletion-confirm',key,true)}${button(d.state==='requested'?'Ablehnen':'Antrag schließen','deletion-reject',key)}</div>`;
+    return `<div class="m-row" data-deletion-row="${esc(d.hqId)}"><h3>${esc(d.name)} · HQ-ID ${esc(d.hqId)}</h3><p>${esc(deleteStates[d.state]||d.state)}</p><p>Grund: ${esc(d.reason||'')}</p><p><small>Gestellt von ${esc(d.requestedBy||'')} am ${esc(dateLabel(d.requestedAt))}${d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):''}</small></p>${d.message&&d.state!=='requested'?`<p class="m-muted">${esc(d.message)}</p>`:''}${actions}</div>`;
+  }
+  function deletionAdminPanel(){
+    const rows=deletionRows,list=!rows?'<p>Die Liste wird nur auf Klick aus Firebase gelesen.</p>':!rows.length?'<p>Keine Löschanträge vorhanden.</p>':rows.map(deletionRow).join('');
+    return `<section class="m-panel m-section" data-deletion-admin><div class="m-panel-head"><h2>Löschanträge für Kunden</h2>${button(rows?'Neu laden':'Löschanträge anzeigen','deletions-load')}</div><div class="m-panel-body"><p class="m-note">Freigegebene Kunden werden beim nächsten HQ-Abgleich in HQ und in der App endgültig gelöscht, mit Ansprechpartnern und Kontakthistorie. Vorher wird in HQ erneut geprüft, dass keine Projekte, Belege oder Planumsätze bestehen.</p>${list}</div></section>`;
+  }
+  function deleteClick(a,id){
+    if(a==='delete-customer'){deleteFormOpen=id;render();return true;}
+    if(a==='delete-cancel'){deleteFormOpen=null;render();return true;}
+    if(a==='deletion-confirm'){deletionConfirm=id;render();return true;}
+    if(a==='deletion-confirm-cancel'){deletionConfirm=null;render();return true;}
+    if(a==='deletions-load'){act(async()=>{deletionRows=(await rpc('listSalesCustomerDeletions')).deletions;deletionConfirm=null;return {message:'Löschanträge aus Firebase geladen.'};});return true;}
+    if(a==='deletion-approve'||a==='deletion-reject'){
+      const [hqId,revision]=String(id).split(':');
+      act(async()=>{const r=await rpc('decideSalesCustomerDelete',{hqId:Number(hqId),revision:Number(revision),approve:a==='deletion-approve'});deletionConfirm=null;deletionRows=(await rpc('listSalesCustomerDeletions')).deletions;return r;});return true;
+    }
+    return false;
+  }
+  function deleteSubmit(form,input){
+    if(form.dataset.form!=='delete-request')return false;
+    const id=form.dataset.company;
+    act(async()=>{const r=await rpc('requestSalesCustomerDelete',{companyId:id,reason:input.reason});deleteFormOpen=null;if(detail&&r.deletion)detail={...detail,deletion:r.deletion};return r;},{preserve:true});
+    return true;
+  }
+
   const SALES_LOGIN_CONFIG="AUTH_RUNTIME_CONFIG";
   let salesLoginSession=null,salesLoginPending=null,salesUserRows=[],salesUserCursor=null,salesInvitationLink='';
   let salesSetupConfig=null,salesSetupBound=false,salesNewRelease='',salesReauthentication=false;
@@ -970,7 +1012,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(!salesUsesLogin()||!state)return;
     const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'unavailable',test:'owner',new:'company.create',change:'company.edit'};
     for(const b of root.querySelectorAll('[data-action="nav"]')){const rule=navRules[b.dataset.id];if(rule&&!salesCan(rule)&&!(b.dataset.id==='admin'&&state.user.admin))b.hidden=true;}
-    const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read'};
+    const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read','delete-customer':'customers.read','deletions-load':'owner','deletion-confirm':'owner','deletion-approve':'owner','deletion-reject':'owner'};
     for(const b of root.querySelectorAll('[data-action]')){
       let rule=actionRules[b.dataset.action];if(b.dataset.action==='edit-business'&&b.dataset.id.startsWith('contact:'))rule='contact.edit';
       if(rule&&(rule==='owner'?!state.user.admin:!salesCan(rule)))b.hidden=true;
@@ -1001,7 +1043,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
       const r=await rpc('updateSalesUser',{uid:form.dataset.uid,revision:Number(form.dataset.revision),status:form.elements.status.value,permissions});salesUserRows=salesUserRows.map(u=>u.uid===r.user.uid?r.user:u);return r;});
   });
 
-  root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;if(a==='pause-import'){v1Click(a,id);return;}if(busy)return;if(v1Click(a,id))return;if(a==='theme'){theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;b.textContent=theme==='dark'?'Helle Ansicht':'Dunkle Ansicht';try{localStorage.setItem('sales-theme',theme);}catch(_){}return;}if(a==='nav')return act(async()=>{search='';message='';await openView(id);});
+  root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;if(a==='pause-import'){v1Click(a,id);return;}if(busy)return;if(deleteClick(a,id))return;if(v1Click(a,id))return;if(a==='theme'){theme=theme==='dark'?'light':'dark';root.dataset.theme=theme;b.textContent=theme==='dark'?'Helle Ansicht':'Dunkle Ansicht';try{localStorage.setItem('sales-theme',theme);}catch(_){}return;}if(a==='nav')return act(async()=>{search='';message='';await openView(id);});
     if(a==='reload')return act(async()=>{await refreshCurrentView();return {message:'Diese Ansicht frisch aus Firebase geladen. Kein HQ-Aufruf.'};});
     if(a==='company')return act(async()=>{historyFilter='all';selected=id;detail=await loadCompany(id);if(detail?.company?.localDraftId)selected=detail.company.id;view='company';});
     if(a==='read-company')return act(async()=>{detail=await loadCompany(id,true);return {message:detail?'Firmendetails aus Firebase geladen.':'Noch keine Firmendetails in Firebase. Bitte den Detailimport starten.'};});
@@ -1023,7 +1065,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   });
   root.addEventListener('input',e=>{if(e.target.id==='customer-name-search'){search=e.target.value;root.querySelector('#customer-rows').innerHTML=v1SimpleCustomerRows();return;}if(e.target.id==='contact-search'){const position=e.target.selectionStart;search=e.target.value;render();const input=root.querySelector('#contact-search');input.focus();input.setSelectionRange(position,position);return;}if(e.target.id==='search'){search=e.target.value;root.querySelector('#customer-rows').innerHTML=v1CustomerRows(view!=='magazine');}});
   root.addEventListener('change',e=>{if(v1Change(e))return;if(e.target.name==='addressOrigin'){const label=root.querySelector('#origin-other');label.hidden=e.target.value!=='Sonstige';label.querySelector('input').required=e.target.value==='Sonstige';}});
-  root.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const form=e.target;if(form.elements.homepage)form.elements.homepage.value=normalizeHomepageInput(form.elements.homepage.value);if(!form.reportValidity())return;const input=Object.fromEntries(new FormData(form)),kind=form.dataset.form;
+  root.addEventListener('submit',e=>{e.preventDefault();if(busy)return;const form=e.target;if(form.elements.homepage)form.elements.homepage.value=normalizeHomepageInput(form.elements.homepage.value);if(!form.reportValidity())return;const input=Object.fromEntries(new FormData(form)),kind=form.dataset.form;if(deleteSubmit(form,input))return;
     if(kind==='project-search'){searchV1Projects(input.term);return;}
     if(kind==='edition-selection'){importSelectedV1Projects(form);return;}
     // The request key stays on the form until success, so a retry after a lost response is recognised by the server.

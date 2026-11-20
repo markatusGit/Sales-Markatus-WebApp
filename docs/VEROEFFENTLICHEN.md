@@ -1,5 +1,22 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r34: Kunden löschen live mit einer TEST-Firma prüfen
+
+Keine Script Properties oder Bereitstellungseinstellungen zu ändern. Die Löschung in HQ ist bisher nur mit synthetischen Daten geprüft. Für den ersten echten Test ausschließlich eine eigene TEST-Firma ohne Projekte, Belege und Planumsätze verwenden.
+
+- Die App neu laden; Kennung „2026-11-20-r34“ erwarten. Bei anderer Kennung diese melden.
+- Unter „Kunden“ die eigene TEST-Firma öffnen.
+- Auf „Kunde löschen“ klicken; ein Formular mit dem Pflichtfeld „Grund für die Löschung“ erwarten.
+- Als Grund „Test Löschfunktion“ eintragen und „Löschantrag stellen“ anklicken; den Hinweis „Wartet auf Freigabe durch einen Admin“ erwarten. Bei „Löschen nicht möglich“ den genannten Grund melden.
+- Links „Verwaltung“ öffnen.
+- Bei „Löschanträge für Kunden“ auf „Löschanträge anzeigen“ klicken; den Antrag der TEST-Firma erwarten.
+- „Löschung freigeben“ anklicken; die Rückfrage „Wirklich endgültig löschen?“ erwarten.
+- „Ja, endgültig löschen“ anklicken; den Status „Freigegeben · wird beim nächsten HQ-Abgleich gelöscht“ erwarten.
+- Unter „Datenabgleich“ den Abgleich mit „Synchronisieren“ starten und bis zum Ende laufen lassen.
+- In HQ nach der TEST-Firma suchen; erwartet wird, dass Firma, Ansprechpartner und Kontakthistorie fehlen. Falls sie noch vorhanden ist, die Meldung des Abgleichs zum Löschauftrag melden.
+- In der App unter „Kunden“ nach der TEST-Firma suchen; erwartet wird kein Treffer.
+- Unter „Verwaltung“ → „Löschanträge anzeigen“ den Status „Gelöscht“ erwarten.
+
 ## r33: Firebase im normalen Betrieb
 
 Die bisherigen r32-Hinweise zu HQ-Abfragen beim Formularöffnen und zum separaten Auswahllistenbutton sind aufgehoben. Anlage, Bearbeitung und Speichern verwenden Firebase; Listen werden im zentralen Datenabgleich aktualisiert. Nächtlicher Tagesstart ist noch nicht eingerichtet. Aktuell ausdrücklich über „Synchronisieren“ starten; der vorhandene Worker setzt diesen Lauf fort. Keine neuen Script Properties oder Bereitstellungseinstellungen nötig.

@@ -349,6 +349,7 @@ function salesBusinessDeferredTarget_(job){
   job.hqId=salesId_(draft.hqId);job.targetId=salesId_(target);return true;
 }
 function salesBusinessRun_(job,verifyOnly){
+  if(job.kind==='deleteCompany'){salesDeleteRun_(job,verifyOnly);return;}
   if(['communication','createContact'].includes(job.kind)){salesCommunicationRun_(job,verifyOnly);return;}
   if(job.kind==='history'){
     if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);return;}

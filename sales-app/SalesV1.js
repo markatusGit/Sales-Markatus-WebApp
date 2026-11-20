@@ -78,7 +78,7 @@
   }
   function v1Admin(){
     let body=admin().replace('COBURGER #70 · Ziel und Termine',esc(editionLabel(state.edition))+' · Ziel und Termine');body=editionSelectors()+body;if(!state.user.admin)return body;
-    body=(salesUsesLogin()?salesUsersPanel():salesSetupPanel())+body;
+    body=(salesUsesLogin()?salesUsersPanel():salesSetupPanel())+deletionAdminPanel()+body;
     return body+storageInventoryPanel()+projectSearchPanel()+(state.syncRun?.state!=='running'?button('Ausgaben aus Firebase verknüpfen','v1-editions'):'')+'<p class="m-note">Alle eingelesenen HQ-Unternehmen und Ansprechpartner bleiben verfügbar, auch ohne Magazinrechnung. Weitere Ausgaben können aus dem gespeicherten Bestand verknüpft werden.</p><div class="m-test-actions">'+button('Datenabgleich öffnen','nav','import')+button('Technische Testseite öffnen','nav','test')+'</div>';
   }
   async function continueV1Import(editionsOnly=false){
