@@ -108,12 +108,12 @@ function getSalesLeanCompany(id){return salesCommunicationMerge_(salesLeanCompan
 function salesLeanCompanyBase_(id){
   salesUser_();
   if(String(id).startsWith('draft_')){
-    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company)throw new Error('Firebase-Firma fehlt.');
+    const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company||draft.deletedAt)throw new Error(draft?.deletedAt?'Dieser Kunde wurde gelöscht.':'Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog'),local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     const contacts=draft.contact?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
     const pending=(draft.pendingChanges||[]).map(p=>({...p,targetId:p.entity==='contact'?job?.contactId:p.entity==='address'?stored?.company?.defaultAddress?.id:draft.hqId}));
     const visible=stored?salesBusinessView_({...stored,pendingChanges:[...(stored.pendingChanges||[]),...pending]}):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state,pendingEditCount:pending.length}:local;
-    return {...(visible||{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
+    return {...(visible||{}),...(!draft.hqId&&draft.deletion?{deletion:draft.deletion}:{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
   const stored=salesRead_('sales_companies/'+id);

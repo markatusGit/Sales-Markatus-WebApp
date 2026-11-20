@@ -35,6 +35,7 @@ function fixture(){
   return f;
 }
 function request(f,reason='Doppelt angelegt'){f.as(TEAM);try{return f.ctx.requestSalesCustomerDelete({companyId:'101',reason});}finally{f.as(ADMIN);}}
+function request2(f,companyId){f.as(TEAM);try{return f.ctx.requestSalesCustomerDelete({companyId,reason:'Synthetic'});}finally{f.as(ADMIN);}}
 function approve(f){const d=f.db['sales_deletions/101'];return f.ctx.decideSalesCustomerDelete({hqId:101,revision:d.revision,approve:true});}
 function runSync(f){const run={entities:JSON.parse(JSON.stringify(f.db['sales_meta/bulk'].entities)),companyIds:['101','102'],errors:[]};for(const e of Object.values(run.entities))e.knownIds=e.ids.slice();
   const id=f.db['sales_deletions/101'].jobId;try{f.ctx.salesSyncWrite_({kind:'write',id},run);}catch(e){run.error=e.message;}return run;}
@@ -121,6 +122,33 @@ test('authorization registry: requests need customer read access, listing and de
 test('UI: delete button and request form in the customer file, admin approval needs a second confirmation click',()=>{
   const ui=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   for(const s of ["deleteCustomerButton(c)","deleteCustomerPanel(c)","if(deleteClick(a,id))return;","if(deleteSubmit(form,input))return;","deletionAdminPanel()","'Ja, endgültig löschen'","'delete-customer':'customers.read'","'deletion-approve':'owner'"])assert.ok(ui.includes(s),s);
+});
+test('unsent app customers: request, admin approval deletes only in Firebase, cancels unsent jobs, never calls HQ',()=>{
+  const f=fixture(),created=f.ctx.saveSalesCompany({...f.input,name:'Synthetic unsent customer'}),ref='draft_'+created.id;
+  f.db['sales_meta/lean_names'].rows.push({id:ref,name:'Synthetic unsent customer'});
+  f.db['sales_jobs/unsent-edit']={id:'unsent-edit',kind:'entityChange',business:1,draftDependency:created.id,companyRef:ref,state:'pending'};
+  const n=f.calls.length;f.as(TEAM);const r=f.ctx.requestSalesCustomerDelete({companyId:ref,reason:'Falsch angelegt'});f.as(ADMIN);
+  assert.match(r.message,/noch nicht in HQ/);const doc=f.db['sales_deletions/'+ref];assert.equal(doc.local,true);assert.equal(doc.state,'requested');
+  assert.equal(f.ctx.getSalesLeanCompany(ref).deletion.state,'requested');
+  const listed=f.ctx.listSalesCustomerDeletions().deletions.find(d=>d.key===ref);assert.equal(listed.local,true);
+  const done=f.ctx.decideSalesCustomerDelete({key:ref,revision:doc.revision,approve:true});assert.match(done.message,/in der App gelöscht \(2 offene Aufträge verworfen\)/);
+  assert.equal(f.db['sales_deletions/'+ref].state,'done');assert.ok(f.db['sales_drafts/'+created.id].deletedAt);
+  assert.equal(f.db['sales_jobs/'+created.id].state,'canceled');assert.equal(f.db['sales_jobs/unsent-edit'].state,'canceled');
+  assert.equal(f.db['sales_meta/lean_names'].rows.some(c=>c.id===ref),false);assert.throws(()=>f.ctx.getSalesLeanCompany(ref),/gelöscht/);
+  assert.equal(f.calls.length,n,'no HQ request at all');assert.equal(Object.keys(f.db).some(k=>k.startsWith('sales_jobs/delete_')),false);
+});
+test('unsent customer with a started HQ transfer cannot be deleted; a customer transferred meanwhile blocks the old request',()=>{
+  const f=fixture(),a=f.ctx.saveSalesCompany({...f.input,name:'Synthetic started'});f.db['sales_jobs/'+a.id].writeAttempted=true;
+  assert.throws(()=>request2(f,'draft_'+a.id),/bereits begonnen/);
+  const b=f.ctx.saveSalesCompany({...f.input,name:'Synthetic later synced'});request2(f,'draft_'+b.id);
+  Object.assign(f.db['sales_jobs/'+b.id],{state:'synced',hqId:101});f.db['sales_drafts/'+b.id].hqId=101;
+  const r=f.ctx.decideSalesCustomerDelete({key:'draft_'+b.id,revision:1,approve:true});assert.match(r.message,/inzwischen an HQ übertragen/);
+  assert.equal(f.db['sales_deletions/draft_'+b.id].state,'blocked');assert.equal(f.db['sales_drafts/'+b.id].deletedAt,undefined);
+});
+test('UI: delete button sits in the header next to "Firmendaten bearbeiten" for HQ and unsent customers',()=>{
+  const ui=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
+  assert.equal(ui.split("true)+deleteCustomerButton(c)+button('Zur Kundenliste','nav','customers'))+deleteCustomerPanel(c)").length-1,1);
+  assert.ok(ui.includes(":'')+deleteCustomerButton(c)+button('Zur Kundenliste','nav','customers'))+deleteCustomerPanel(c)+"));
 });
 console.log(count+' customer deletion checks passed.');
 }

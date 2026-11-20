@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.34.1]
+
+- „Kunde löschen“ steht jetzt oben in der Kundenakte neben „Firmendaten bearbeiten“ (vorher weiter unten neben „Aus Firebase neu laden“).
+- Auch noch nicht an HQ übertragene App-Kunden lassen sich löschen: gleicher Antrag, gleiche Admin-Freigabe. Nach der Freigabe wird der Kunde sofort und nur in Firebase gelöscht; seine noch nicht gesendeten Aufträge werden verworfen. Kein HQ-Aufruf. Hat die HQ-Übertragung bereits begonnen (unklar/teilweise), bleibt Löschen gesperrt, bis der Abgleich bzw. die Klärung abgeschlossen ist. Wird der Kunde zwischen Antrag und Freigabe übertragen, wird der alte Antrag gesperrt und muss neu gestellt werden.
+- Kennung `2026-11-20-r34.1`. test-delete jetzt 13 Fälle, Browserprüfung um Knopfposition und App-Kunden erweitert. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 ## [v0.34.0]
 
 - Kunden löschen (Roadmap R15): Jeder Nutzer mit Kundenleserecht kann in der Kundenakte über „Kunde löschen“ einen Löschantrag mit Pflichtgrund stellen. Der Antrag wird nur in Firebase gespeichert; der Status steht in der ohnehin gelesenen Kundenakte (kein zusätzlicher Lesevorgang beim Öffnen).

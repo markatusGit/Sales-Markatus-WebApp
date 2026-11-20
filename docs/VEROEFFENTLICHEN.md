@@ -1,5 +1,15 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r34.1: Löschknopf und nicht übertragene Kunden
+
+- Die App neu laden; Kennung „2026-11-20-r34.1“ erwarten.
+- Einen Kunden öffnen; oben neben „Firmendaten bearbeiten“ den Knopf „Kunde löschen“ erwarten.
+- Für einen noch nicht übertragenen App-Kunden: „Kunde löschen“ anklicken; den Hinweis „noch nicht an HQ übertragen“ erwarten.
+- Grund eintragen und „Löschantrag stellen“ anklicken.
+- Unter „Verwaltung“ → „Löschanträge anzeigen“ den Antrag mit „noch nicht in HQ“ erwarten.
+- „Löschung freigeben“ und danach „Ja, endgültig löschen“ anklicken; den Status „Gelöscht“ erwarten. Der Kunde fehlt danach in der Kundenliste; in HQ passiert nichts.
+- Für HQ-Kunden gilt weiter die Anleitung zu r34.
+
 ## r34: Kunden löschen live mit einer TEST-Firma prüfen
 
 Keine Script Properties oder Bereitstellungseinstellungen zu ändern. Die Löschung in HQ ist bisher nur mit synthetischen Daten geprüft. Für den ersten echten Test ausschließlich eine eigene TEST-Firma ohne Projekte, Belege und Planumsätze verwenden.

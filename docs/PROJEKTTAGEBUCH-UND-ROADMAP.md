@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 20.11.2026 – r34.1: Löschknopf oben, nicht übertragene Kunden löschbar
+
+Nutzer findet den Löschknopf nicht und möchte auch noch nicht synchronisierte Firmen löschen. Ursache: Der Knopf stand in r34 unterhalb der Kopfzeile neben „Aus Firebase neu laden“ und fehlte bei App-Kunden ohne abgeschlossene HQ-Übertragung. Jetzt oben neben „Firmendaten bearbeiten“ in beiden Kundenansichten. Nicht übertragene Kunden: gleicher Antrag und gleiche Admin-Freigabe; danach sofortige Löschung nur in Firebase (Entwurf als gelöscht markiert, nicht gesendete Aufträge verworfen, Namensliste bereinigt), kein HQ-Aufruf. Begonnene HQ-Übertragungen sperren. 13 Löschfälle und erweiterter Browsertest; alle 26 Prüfdateien bestanden. Live-Prüfung offen.
+
 ### 20.11.2026 – r34: Kunden löschen (R15) lokal umgesetzt und geprüft
 
 Nutzer beauftragt den Einbau: Ansprechpartner und Historie werden mitgelöscht; bei Projekten erscheint ein Hinweis, dass erst aufgeräumt werden muss. Gemeinsam mit den Entscheidungen vom selben Tag umgesetzt: Jeder Nutzer darf einen Löschantrag stellen, nur der Admin gibt frei, kein Papierkorb, Löschen in App und HQ, Belege/Umsätze und offene Aufträge sperren ebenfalls.
