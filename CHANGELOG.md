@@ -316,3 +316,5 @@ Veröffentlichung v0.33.0: Apps-Script-Version54, bestehende Bereitstellung und 
 Veröffentlichungsnachweis für v0.34.0: Google-Version 55; 2026-11-20T10:53:51.398Z. Details in deployment.json.
 
 Veröffentlichungsnachweis für v0.34.1: Google-Version 56; 2026-11-20T12:00:23.865Z. Details in deployment.json.
+
+Veröffentlichungsnachweis für v0.34.2: Google-Version 57; 2026-11-20T12:23:52.532Z. Details in deployment.json.
