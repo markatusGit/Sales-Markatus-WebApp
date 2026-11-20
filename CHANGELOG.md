@@ -6,6 +6,7 @@
 - Bei Adminfreigabe werden ausschließlich die zugehörigen Schreibfehlermeldungen des gespeicherten Syncs zusammen mit der Auftragsverwerfung entfernt. Laufkennung, Fortschritt, Aufgaben und Kontingentpause bleiben erhalten.
 - Ein ausdrücklich administrativ vorgemerkter, fehlender Planumsatz ohne Projektzuordnung wird erst beim fortgesetzten zentralen Sync erneut geprüft. Einzelabruf und gefilterte leere HQ-Liste müssen das Fehlen bestätigen. Lokale Rohdaten, beide Zähler, Fehlerstatus und Prüfprotokoll mit vorherigem Datensatz werden atomar aktualisiert; kein HQ-Schreiben. Wieder erschienene Datensätze werden erhalten/aktualisiert, technische Fehler oder geänderte Zuordnungen stoppen die Klärung ohne Datenverlust.
 - Kennung `2026-11-20-r34.6`. Keine neuen Script Properties oder Bereitstellungseinstellungen. Kontingentgrenzen und Tageswechsel unverändert.
+- Abschlussnachweis: Google61, Editor und GitHub-Tag bestätigt; alle27 Prüfdateien bestanden. Produktiv letzter Löschantrag mit vier erst nach Adminfreigabe zu verwerfenden Änderungen und die Planumsatz108-Klärung für den gespeicherten Lauf vorgemerkt/zurückgelesen. Acht Testkundenstatusdone, einerrequested; Sync unverändert41/47. Tatsächliche Planumsatz-HQ-Prüfung erst beim Fortsetzen, endgültige letzte Kundenfreigabe durch den Nutzer.
 
 ## [v0.34.5]
 

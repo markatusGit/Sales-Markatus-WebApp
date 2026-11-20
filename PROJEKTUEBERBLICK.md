@@ -1,5 +1,11 @@
 # Projektüberblick – Sales Markatus
 
+### 20.11.2026 – r34.6 veröffentlicht; Vormerkungen produktiv bestätigt
+
+Google61/Editor/GitHub-Tagv0.34.6 bestätigt; Quellcommitc46cb56, Releasecommit8a6e54f. Alle27 Prüfdateien einschließlich20 Lösch-,24 Delta- und erweitertem Browserfall bestanden. Kurz verzögerte Google-Versionsanzeige lesend geklärt und vorhandenen Release per release:recover abgeschlossen; keine zusätzliche Version/Bereitstellung erzeugt. Anschließend im Originalprojekt release:verify erfolgreich.
+
+Produktiv mit bestehender Google-IAM-Anmeldung und getesteter Einzelantragslogik in einer Firebase-Transaktion gespeichert und zurückgelesen: letzter Testkundenantrag im Statusrequested, genau vier eigene Änderungen erst nach Adminfreigabe zu verwerfen; separate Planumsatz108-Klärung für denselben gespeicherten Lauf vorbereitet. Alle neun Testkundenstatus lesend geprüft: acht inzwischen done, einer requested. Die vier Änderungen unverändert uncertain/uncertain/pending/conflict; Planumsatz-Rohdaten weiterhin vorhanden. Lauf unverändert41/47, keine Fortsetzung, keine neue Kundenfreigabe und kein HQ-Aufruf durch diese Vormerkung. Die vier Schreibmeldungen verschwinden nach der separaten Adminfreigabe; tatsächliche Planumsatz-Rückprüfung erst beim morgen manuell fortgesetzten Sync. Script Properties, Bereitstellung, Kontingent und Trigger unverändert. Reiner Abschlussnachweis, keine weitere Google-Veröffentlichung nötig.
+
 ### 20.11.2026 – r34.6: Sync-Klärung und letzter Testkundenantrag
 
 Nutzer beauftragt die Behebung aller gemeldeten Syncprobleme außer dem Kontingent; den gespeicherten Lauf erst morgen fortsetzen. Rein lesend bestätigt: alle vier Schreibfehler gehören zu den vier offenen Kontakt-/Kommunikations-/Stammdatenänderungen des letzten zur Löschung beauftragten Testkunden. Sechs weitere neue Löschanträge wurden auf r34.5 live gespeichert, zwei Freigaben bestanden bereits. r34.5/Google60/Tagv0.34.5 und Editor/GitHub per release:verify bestätigt; Live-Anmeldung und Reparatur alter Listenfreigaben geprüft.
