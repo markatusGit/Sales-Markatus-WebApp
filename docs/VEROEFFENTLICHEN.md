@@ -1,5 +1,26 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r34.6: Eigene offene Änderungen und Planumsatz-Klärung
+
+Keine Script Properties oder Bereitstellungseinstellungen ändern. Die Auftragsverwerfung erfolgt erst bei der endgültigen Adminfreigabe. Kontingent und gespeicherter Fortschritt bleiben erhalten.
+
+- Die App neu laden; Kennung „2026-11-20-r34.6“ erwarten. Bei anderer Kennung diese melden.
+- Den betroffenen selbst angelegten Kunden öffnen.
+- „Kunde löschen“ anklicken.
+- „Offene eigene Kontakt- und Stammdatenänderungen bei der Adminfreigabe verwerfen“ aktivieren, falls diese Änderungen zusammen mit dem Kunden verworfen werden sollen.
+- Den Löschgrund eintragen.
+- „Löschantrag stellen“ anklicken; gespeicherten Antrag erwarten. Bis zur späteren Adminfreigabe bleiben alle Änderungen erhalten.
+- „Verwaltung“ öffnen.
+- Zum Abschnitt „Löschanträge für Kunden“ scrollen.
+- „Löschanträge anzeigen“ beziehungsweise „Neu laden“ anklicken; beim Antrag die zusätzliche Anzahl vorgemerkter Änderungen erwarten.
+- „Löschung freigeben“ anklicken; die Rückfrage erwarten.
+- Ausschließlich bei gewollter Löschung samt Verwerfung „Ja, endgültig löschen“ anklicken; der Kunde verschwindet aus der Liste, seine vorgemerkten Aufträge werden verworfen und deren alte Schreibmeldungen entfernt. Bei neu hinzugekommenen Aufträgen bleibt die Freigabe mit Aufräumhinweis gesperrt.
+
+Die ausdrücklich vorbereitete Planumsatz-Klärung wird erst beim Fortsetzen desselben zentralen Laufs geprüft. Bei bestätigtem HQ-Fehlen lokale Kopie mit Prüfprotokoll/Zählern bereinigen; bei Wiedererscheinen aktualisieren, bei technischer Unsicherheit erhalten. In HQ wird nichts verändert.
+
+- Nach Erneuerung des Tagesbudgets „Datenabgleich“ öffnen.
+- „HQ-Sync fortsetzen“ anklicken; Fortschritt desselben gespeicherten Laufs erwarten. Bei erneuter Pause deren Meldung mitteilen.
+
 ## r34.5: Suchtreffer vormerken und alte Freigaben ausblenden
 
 Keine Script Properties oder Bereitstellungseinstellungen ändern. Beim ersten Laden der Kundenliste werden ältere, bereits freigegebene Löschungen einmalig aus den gespeicherten Listen entfernt. Ihre Freigaben bleiben bestehen; HQ wird dabei nicht aufgerufen.

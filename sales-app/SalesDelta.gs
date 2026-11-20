@@ -104,6 +104,25 @@ function salesDeltaProbe_(run,task){
   task.pendingPage='sales_imports/'+run.id+'-probe-'+task.id+'-'+task.index;salesWrite_(task.pendingPage,{entries});salesWrite_('sales_meta/sync',run);
   return salesDeltaProbe_(run,task);
 }
+/** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
+function salesDeltaResolvePlan_(run){
+  if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(20,10);
+  const path='sales_meta/plan_cleanup_'+salesKey_(run.id),request=salesRead_(path);
+  if(!request||request.approved!==true||request.runId!==run.id||request.state!=='approved')throw Error('Planumsatz-Klärung nicht freigegeben.');
+  const id=String(salesId_(request.id)),rawPath=salesBulkCollection_('PlannedRevenues')+'/'+id,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk'),m=run.entities.PlannedRevenues,cm=cache?.entities?.PlannedRevenues;
+  if(!raw||raw.generation!==request.generation||raw.generation!==m.generation||raw.generation!==cm?.generation||JSON.stringify(raw.row)!==JSON.stringify(request.before)||raw.row.projectId)throw Error('Planumsatz oder Zuordnung inzwischen geändert. Bestand bleibt erhalten.');
+  let actual=null;try{actual=salesHqGet_('/v2/PlannedRevenues/'+id+'?expand=Estimations').data;}catch(e){if(!/HTTP 404/.test(e.message||''))throw e;}
+  if(actual&&(String(actual.id)!==id||actual.projectId||Number(actual.companyId)!==Number(raw.row.companyId)))throw Error('HQ-Planumsatz hat eine abweichende Zuordnung. Bestand bleibt zur Prüfung erhalten.');
+  if(!actual){const page=salesV1Page_('PlannedRevenues','id eq '+id,0,2,'Estimations');if(page.total!==0||page.rows.length||!page.done)throw Error('HQ-Liste bestätigt den fehlenden Planumsatz nicht eindeutig. Bestand bleibt erhalten.');}
+  const nextRun=JSON.parse(JSON.stringify(run)),nextCache=JSON.parse(JSON.stringify(cache)),nextRequest={...request,state:actual?'refreshed':'removed',resolvedAt:salesNow_(),verification:actual?'single-get':'single-404-and-filtered-empty-list'};
+  if(!actual){for(const meta of [nextRun.entities.PlannedRevenues,nextCache.entities.PlannedRevenues]){if(!Number.isSafeInteger(meta.count)||meta.count<1)throw Error('Planumsatz-Zähler nicht prüfbar. Bestand bleibt erhalten.');meta.count--;for(const key of ['ids','knownIds','touchedIds'])if(Array.isArray(meta[key]))meta[key]=meta[key].filter(x=>String(x)!==id);}}
+  nextRun.planCleanupPending=false;nextRun.revision++;nextRun.updatedAt=salesNow_();nextRun.errors=(nextRun.errors||[]).filter(e=>!(e.label==='HQ-Einzelprüfung · Planumsätze'&&e.message==='Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'));
+  const update=(p,value)=>({update:{name:salesBulkName_(p),fields:{payload:{stringValue:salesBulkPayload_(p,value)}}}});
+  const rawWrite=actual?update(rawPath,{...raw,row:actual}):{delete:salesBulkName_(rawPath)};
+  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};}
+  salesBulkRest_('commit',{writes:[rawWrite,update(path,nextRequest),update('sales_meta/bulk',nextCache),update('sales_meta/sync',nextRun),update('sales_meta/lean_sync',salesSyncSummary_(nextRun))]});
+  Object.assign(run,nextRun);
+}
 function salesDeltaEditionTasks_(run,onlyPending){
   const byBucket={};for(const e of salesV1Editions_().filter(e=>e.syncEnabled!==false)){
     if(!onlyPending&&e.loadedAt&&!e.cacheLinkPending&&!run.full&&!(run.changedProjectIds||[]).includes(String(e.projectId)))continue;

@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## [v0.34.6]
+
+- Löschanträge für eigene App-Anlagen können ausdrücklich vormerken, deren offene nichtfinanzielle Kontakt-/Stammdatenänderungen erst bei der späteren Adminfreigabe zu verwerfen. Ohne Auswahl bleibt die Auftragsperre erhalten. Die Verwaltung zeigt die Zahl; die Kennungen sind beim Antrag festgeschrieben. Fremde, finanzielle, unbekannte oder neue Aufträge bleiben gesperrt.
+- Bei Adminfreigabe werden ausschließlich die zugehörigen Schreibfehlermeldungen des gespeicherten Syncs zusammen mit der Auftragsverwerfung entfernt. Laufkennung, Fortschritt, Aufgaben und Kontingentpause bleiben erhalten.
+- Ein ausdrücklich administrativ vorgemerkter, fehlender Planumsatz ohne Projektzuordnung wird erst beim fortgesetzten zentralen Sync erneut geprüft. Einzelabruf und gefilterte leere HQ-Liste müssen das Fehlen bestätigen. Lokale Rohdaten, beide Zähler, Fehlerstatus und Prüfprotokoll mit vorherigem Datensatz werden atomar aktualisiert; kein HQ-Schreiben. Wieder erschienene Datensätze werden erhalten/aktualisiert, technische Fehler oder geänderte Zuordnungen stoppen die Klärung ohne Datenverlust.
+- Kennung `2026-11-20-r34.6`. Keine neuen Script Properties oder Bereitstellungseinstellungen. Kontingentgrenzen und Tageswechsel unverändert.
+
 ## [v0.34.5]
 
 - Frühere Adminfreigaben aus r34/r34.1 werden beim nächsten Laden der Kundenliste einmalig auch aus den gespeicherten Namens- und Filterlisten entfernt. Freigabe, Löschauftrag und mögliche spätere Wiederanzeige bei HQ-Sperren bleiben erhalten. Kein HQ-Aufruf und keine neue Freigabe durch diese Reparatur.

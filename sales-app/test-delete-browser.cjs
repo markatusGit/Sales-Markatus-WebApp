@@ -5,6 +5,9 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
  const batch=f.ctx.saveSalesCompany({...f.input,name:'Synthetic batch B good'});f.db['sales_meta/lean_names'].rows.push({id:'draft_'+batch.id,name:'Synthetic batch B good'});
  f.db['sales_meta/lean_names'].rows.find(c=>c.id==='102').name='Synthetic batch A blocked';f.db['sales_directory/102']={company:{id:102,name:'Synthetic batch A blocked'}};
  f.db['sales_rawprojects/9']={row:{id:9,companyId:102},generation:'g1',companyBucket:'38'};
+ const own=f.ctx.saveSalesCompany({...f.input,name:'Synthetic discard customer'});Object.assign(f.db['sales_jobs/'+own.id],{state:'synced',hqId:104});f.db['sales_drafts/'+own.id].hqId=104;
+ f.db['sales_directory/104']={company:{id:104,name:'Synthetic discard customer'}};f.db['sales_meta/lean_names'].rows=f.db['sales_meta/lean_names'].rows.filter(c=>c.id!=='draft_'+own.id);f.db['sales_meta/lean_names'].rows.push({id:'draft_'+own.id,hqId:'104',name:'Synthetic discard customer'});
+ for(let i=0;i<2;i++)f.db['sales_jobs/discard-'+i]={id:'discard-'+i,kind:'communication',state:'uncertain',hqId:104,companyRef:'draft_'+own.id};
  try{
   const page=await browser.newPage(),calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
   await page.exposeFunction('fixtureRpc',(name,args)=>{calls.push({name,args});return JSON.parse(JSON.stringify(f.ctx[name](...args)));});
@@ -53,6 +56,15 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
   assert.equal(f.db['sales_deletions/102'],undefined,'blocked entry stays unchanged');assert.equal(f.db['sales_deletions/draft_'+batch.id].state,'requested','continues after the blocked entry without approving');
   await page.locator('#customer-delete-batch').getByText('Synthetic batch A blocked: Löschen nicht möglich.',{exact:false}).waitFor();
   assert.equal(calls.filter(c=>c.name==='decideSalesCustomerDelete').length,decisions,'batch only requests');
-  assert.deepEqual(errors,[]);console.log('PASS deletion requests, partial batch failure and two-step admin approval in a real browser');
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('heading',{name:'Kunden',exact:true}).waitFor();await page.getByLabel('Nach Namen suchen',{exact:true}).fill('Synthetic discard customer');
+  await page.getByRole('button',{name:'Synthetic discard customer',exact:true}).click();await page.getByRole('heading',{name:'Synthetic discard customer',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Kunde löschen',exact:true}).click();await page.getByLabel('Grund für die Löschung (Pflicht)',{exact:true}).fill('Synthetic explicit cleanup');
+  const discard=page.getByLabel('Offene eigene Kontakt- und Stammdatenänderungen bei der Adminfreigabe verwerfen',{exact:true});assert.equal(await discard.isChecked(),false);await discard.check();
+  await page.getByRole('button',{name:'Löschantrag stellen',exact:true}).click();await page.locator('[data-deletion-status]').waitFor();assert.equal(f.db['sales_jobs/discard-0'].state,'uncertain');
+  await page.getByRole('button',{name:'Verwaltung',exact:true}).click();await page.getByRole('button',{name:'Neu laden',exact:true}).click();
+  const ownRow=page.locator('[data-deletion-row="104"]');await ownRow.getByText('Bei der Freigabe werden zusätzlich 2 offene eigene',{exact:false}).waitFor();
+  await ownRow.getByRole('button',{name:'Löschung freigeben',exact:true}).click();assert.equal(f.db['sales_jobs/discard-0'].state,'uncertain');
+  await ownRow.getByRole('button',{name:'Ja, endgültig löschen',exact:true}).click();await ownRow.getByText('Freigegeben · wird beim nächsten HQ-Abgleich gelöscht',{exact:true}).waitFor();assert.equal(f.db['sales_jobs/discard-0'].state,'canceled');assert.equal(f.db['sales_jobs/discard-1'].state,'canceled');
+  assert.deepEqual(errors,[]);console.log('PASS batch requests and explicit discard of own changes only after two-step admin approval in a real browser');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

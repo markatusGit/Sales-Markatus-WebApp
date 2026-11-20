@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-20-r34.5';
+const SALES_RELEASE = '2026-11-20-r34.6';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -1540,6 +1540,7 @@ function salesBulkStep_(run){
   try{return salesBulkStepWork_(run);}finally{salesBulkStepCache_=null;}
 }
 function salesBulkStepWork_(run){
+  if(run.planCleanupPending)salesDeltaResolvePlan_(run);
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
@@ -1670,6 +1671,25 @@ function salesDeltaProbe_(run,task){
   if(!entries.length){task.index++;return task.index>=task.ids.length;}
   task.pendingPage='sales_imports/'+run.id+'-probe-'+task.id+'-'+task.index;salesWrite_(task.pendingPage,{entries});salesWrite_('sales_meta/sync',run);
   return salesDeltaProbe_(run,task);
+}
+/** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
+function salesDeltaResolvePlan_(run){
+  if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(20,10);
+  const path='sales_meta/plan_cleanup_'+salesKey_(run.id),request=salesRead_(path);
+  if(!request||request.approved!==true||request.runId!==run.id||request.state!=='approved')throw Error('Planumsatz-Klärung nicht freigegeben.');
+  const id=String(salesId_(request.id)),rawPath=salesBulkCollection_('PlannedRevenues')+'/'+id,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk'),m=run.entities.PlannedRevenues,cm=cache?.entities?.PlannedRevenues;
+  if(!raw||raw.generation!==request.generation||raw.generation!==m.generation||raw.generation!==cm?.generation||JSON.stringify(raw.row)!==JSON.stringify(request.before)||raw.row.projectId)throw Error('Planumsatz oder Zuordnung inzwischen geändert. Bestand bleibt erhalten.');
+  let actual=null;try{actual=salesHqGet_('/v2/PlannedRevenues/'+id+'?expand=Estimations').data;}catch(e){if(!/HTTP 404/.test(e.message||''))throw e;}
+  if(actual&&(String(actual.id)!==id||actual.projectId||Number(actual.companyId)!==Number(raw.row.companyId)))throw Error('HQ-Planumsatz hat eine abweichende Zuordnung. Bestand bleibt zur Prüfung erhalten.');
+  if(!actual){const page=salesV1Page_('PlannedRevenues','id eq '+id,0,2,'Estimations');if(page.total!==0||page.rows.length||!page.done)throw Error('HQ-Liste bestätigt den fehlenden Planumsatz nicht eindeutig. Bestand bleibt erhalten.');}
+  const nextRun=JSON.parse(JSON.stringify(run)),nextCache=JSON.parse(JSON.stringify(cache)),nextRequest={...request,state:actual?'refreshed':'removed',resolvedAt:salesNow_(),verification:actual?'single-get':'single-404-and-filtered-empty-list'};
+  if(!actual){for(const meta of [nextRun.entities.PlannedRevenues,nextCache.entities.PlannedRevenues]){if(!Number.isSafeInteger(meta.count)||meta.count<1)throw Error('Planumsatz-Zähler nicht prüfbar. Bestand bleibt erhalten.');meta.count--;for(const key of ['ids','knownIds','touchedIds'])if(Array.isArray(meta[key]))meta[key]=meta[key].filter(x=>String(x)!==id);}}
+  nextRun.planCleanupPending=false;nextRun.revision++;nextRun.updatedAt=salesNow_();nextRun.errors=(nextRun.errors||[]).filter(e=>!(e.label==='HQ-Einzelprüfung · Planumsätze'&&e.message==='Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'));
+  const update=(p,value)=>({update:{name:salesBulkName_(p),fields:{payload:{stringValue:salesBulkPayload_(p,value)}}}});
+  const rawWrite=actual?update(rawPath,{...raw,row:actual}):{delete:salesBulkName_(rawPath)};
+  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};}
+  salesBulkRest_('commit',{writes:[rawWrite,update(path,nextRequest),update('sales_meta/bulk',nextCache),update('sales_meta/sync',nextRun),update('sales_meta/lean_sync',salesSyncSummary_(nextRun))]});
+  Object.assign(run,nextRun);
 }
 function salesDeltaEditionTasks_(run,onlyPending){
   const byBucket={};for(const e of salesV1Editions_().filter(e=>e.syncEnabled!==false)){
@@ -3076,6 +3096,12 @@ function salesDeleteUnsent_(job){return !!job&&['pending','ready'].includes(job.
 function salesDeleteLocalJobs_(draftId){
   return salesList_('sales_jobs').filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(j.id===draftId||j.draftId===draftId||j.draftDependency===draftId||j.companyRef==='draft_'+draftId));
 }
+function salesDeleteDiscardable_(job){
+  if(!['createContact','communication','history','entityChange','companyChange','contactEmail','cleanupMarker'].includes(job.kind))return false;
+  if(job.kind==='entityChange'&&!['company','customer','contact','address','types'].includes(job.entity))return false;
+  const financial=value=>value&&typeof value==='object'&&Object.entries(value).some(([k,v])=>salesAuthFinancialKey_(k)||/budget/i.test(k)||k==='documentDispatch'||financial(v));
+  return !financial(job);
+}
 function salesDeleteRawRows_(entity,hqId){
   const cache=salesRead_('sales_meta/bulk'),generation=cache?.entities?.[entity]?.generation;
   if(!generation)throw Error('Der gespeicherte HQ-Bestand ist unvollständig. Bitte zuerst den HQ-Abgleich abschließen.');
@@ -3101,7 +3127,7 @@ function salesDeleteBlockers_(ref){
   const documents=salesDeleteRawRows_('Documents',ref.hqId).length;if(documents)out.push(count(documents,'Beleg','Belege'));
   const plans=salesDeleteRawRows_('PlannedRevenues',ref.hqId).length;if(plans)out.push(count(plans,'Planumsatz','Planumsätze'));
   // A customer whose own creation is still open has no other way out: its jobs are discarded instead of blocking.
-  const own=ref.pendingDraft?salesDeleteLocalJobs_(ref.draftId):[],open=salesDeleteOpenJobs_(ref).filter(j=>!own.some(o=>o.id===j.id)),jobs=open.length+(imported?.pendingChanges||[]).filter(p=>!open.some(j=>j.id===p.jobId)&&!own.some(o=>o.id===p.jobId)).length;if(jobs)out.push(count(jobs,'offener Auftrag','offene Aufträge'));
+  const own=ref.pendingDraft?salesDeleteLocalJobs_(ref.draftId):ref.draftId&&(ref.discardOwnChanges||ref.discardJobIds)?salesDeleteLocalJobs_(ref.draftId).filter(j=>salesDeleteDiscardable_(j)&&(!ref.discardJobIds||ref.discardJobIds.includes(j.id))):[],open=salesDeleteOpenJobs_(ref).filter(j=>!own.some(o=>o.id===j.id)),jobs=open.length+(imported?.pendingChanges||[]).filter(p=>!open.some(j=>j.id===p.jobId)&&!own.some(o=>o.id===p.jobId)).length;if(jobs)out.push(count(jobs,'offener Auftrag','offene Aufträge'));
   return {stored,statusPath,jobs:own,blockers:out};
 }
 function salesDeleteBlockedMessage_(blockers){
@@ -3138,17 +3164,24 @@ function salesDeleteRestore_(doc){
   add('sales_meta/lean_names',h.names);add('sales_meta/lean_filters',h.filters);
   if(doc.hqId){const tomb=salesRead_('sales_meta/deleted_companies');if(tomb?.ids?.includes(String(doc.hqId)))salesWrite_('sales_meta/deleted_companies',{ids:tomb.ids.filter(x=>x!==String(doc.hqId))});}
 }
-function salesDeleteView_(d){return d?salesPick_(d,['key','local','uncertain','pendingDraft','hqId','name','reason','state','message','requestedBy','requestedAt','decidedBy','decidedAt','jobId','revision','completedAt']):null;}
+function salesDeleteView_(d){return d?salesPick_(d,['key','local','uncertain','pendingDraft','hqId','name','reason','state','message','requestedBy','requestedAt','decidedBy','decidedAt','jobId','revision','completedAt','discardJobCount']):null;}
 function requestSalesCustomerDelete(input){
   const user=salesUser_();return salesLock_(()=>{
     salesAssertPrivate_();const reason=salesText_(input?.reason,500,true),ref=salesDeleteRef_(input?.companyId),path='sales_deletions/'+ref.key,prior=salesRead_(path);
     if(prior&&['requested','approved'].includes(prior.state))return {message:prior.state==='requested'?'Für diesen Kunden liegt bereits ein Löschantrag vor. Er wartet auf die Freigabe durch einen Admin.':'Die Löschung ist bereits freigegeben.',deletion:salesDeleteView_(prior)};
+    ref.discardOwnChanges=input?.discardOwnChanges===true;
     const check=salesDeleteBlockers_(ref);if(check.blockers.length)throw Error(salesDeleteBlockedMessage_(check.blockers));
-    const now=salesNow_(),value={key:ref.key,...(check.statusPath!==undefined?{statusPath:check.statusPath}:{}),...(ref.local?{local:true}:{}),...(ref.uncertain?{uncertain:true}:{}),...(ref.pendingDraft?{pendingDraft:true}:{}),hqId:ref.hqId,draftId:ref.draftId,name:check.stored.company.name,reason,state:'requested',message:'Wartet auf Freigabe durch einen Admin.',requestedBy:user.email,...(user.uid?{requestedByUid:user.uid}:{}),requestedAt:now,revision:(prior?.revision||0)+1,log:[...(prior?.log||[]).slice(-20),{action:'requested',by:user.email,at:now,reason}]};
+    const now=salesNow_(),value={key:ref.key,...(ref.discardOwnChanges&&!ref.pendingDraft?{discardJobIds:check.jobs.map(j=>j.id),discardJobCount:check.jobs.length}:{}),...(check.statusPath!==undefined?{statusPath:check.statusPath}:{}),...(ref.local?{local:true}:{}),...(ref.uncertain?{uncertain:true}:{}),...(ref.pendingDraft?{pendingDraft:true}:{}),hqId:ref.hqId,draftId:ref.draftId,name:check.stored.company.name,reason,state:'requested',message:'Wartet auf Freigabe durch einen Admin.',requestedBy:user.email,...(user.uid?{requestedByUid:user.uid}:{}),requestedAt:now,revision:(prior?.revision||0)+1,log:[...(prior?.log||[]).slice(-20),{action:'requested',by:user.email,at:now,reason}]};
     salesDeleteSave_(value,check.stored);return {message:ref.uncertain?'Löschantrag gespeichert. Ein Admin muss ihn freigeben. Danach wird der Kunde sofort in der App gelöscht. Seine HQ-Übertragung war begonnen, aber nicht bestätigt: bitte in HQ prüfen, ob die Firma dort angelegt wurde.':ref.local?'Löschantrag gespeichert. Ein Admin muss ihn freigeben. Der Kunde ist noch nicht in HQ und wird nach der Freigabe sofort in der App gelöscht.':'Löschantrag gespeichert. Ein Admin muss ihn freigeben; erst dann wird der Kunde beim nächsten HQ-Abgleich in HQ und in der App gelöscht.',deletion:salesDeleteView_(value)};
   });
 }
 function salesDeleteAdmin_(){const user=salesUser_(true);if(!user.admin)throw Error('AUTH_DENIED: Nur ein Admin darf Löschanträge bearbeiten.');return user;}
+function salesDeleteResolvedErrors_(jobs){
+  if(!jobs.length)return [];const ids=new Set(jobs.map(j=>j.id)),run=salesRead_('sales_meta/sync');if(!run)return [];
+  const errors=(run.errors||[]).filter(e=>!(e.kind==='write'&&ids.has(e.id)));if(errors.length===(run.errors||[]).length)return [];
+  run.errors=errors;run.revision++;run.updatedAt=salesNow_();
+  return [{path:'sales_meta/sync',value:run},{path:'sales_meta/lean_sync',value:salesSyncSummary_(run)}];
+}
 function listSalesCustomerDeletions(){
   salesDeleteAdmin_();const rows=salesList_('sales_deletions').sort((a,b)=>String(b.requestedAt).localeCompare(String(a.requestedAt)));
   const open=rows.filter(d=>['requested','approved','failed','blocked'].includes(d.state)),done=rows.filter(d=>!open.includes(d)).slice(0,20);
@@ -3161,7 +3194,7 @@ function decideSalesCustomerDelete(input){
     if(!['requested','failed','blocked'].includes(doc.state))throw Error('Dieser Löschantrag ist bereits entschieden.');
     const now=salesNow_();doc.revision++;doc.decidedBy=user.email;doc.decidedAt=now;
     if(input.approve!==true){doc.state='rejected';doc.message='Vom Admin abgelehnt. Der Kunde bleibt erhalten.';doc.log=[...(doc.log||[]).slice(-20),{action:'rejected',by:user.email,at:now}];salesDeleteSave_(doc,salesDeleteStatusDoc_(doc));return {message:'Löschantrag abgelehnt. Der Kunde bleibt erhalten.',deletion:salesDeleteView_(doc)};}
-    let ref={hqId,draftId:doc.draftId||null,key,...(doc.pendingDraft?{pendingDraft:true}:{})};
+    let ref={hqId,draftId:doc.draftId||null,key,...(doc.pendingDraft?{pendingDraft:true}:{}),...(doc.discardJobIds?{discardJobIds:doc.discardJobIds}:{})};
     if(doc.local){
       try{ref=salesDeleteRef_('draft_'+doc.draftId);}catch(e){ref=null;doc.message=e.message;}
       if(!ref?.local){doc.state='blocked';doc.message=ref?'Der Kunde wurde inzwischen an HQ übertragen. Bitte den Löschantrag in der Kundenakte neu stellen.':doc.message;doc.log=[...(doc.log||[]).slice(-20),{action:'blocked',by:user.email,at:now}];salesDeleteSave_(doc,null);return {message:doc.message,deletion:salesDeleteView_(doc)};}
@@ -3175,7 +3208,7 @@ function decideSalesCustomerDelete(input){
     // The customer's own unfinished creation jobs stop now, so the sync does not continue them before the deletion.
     const own=(check.jobs||[]).map(j=>({...j,state:'canceled',updatedAt:now,message:'Wegen freigegebener Kundenlöschung verworfen.'}));
     const hiddenIds=salesDeleteHide_(doc);
-    salesDeleteSave_(doc,check.stored,[{path:'sales_jobs/'+id,value:job},...own.map(j=>({path:'sales_jobs/'+j.id,value:j}))]);
+    salesDeleteSave_(doc,check.stored,[{path:'sales_jobs/'+id,value:job},...own.map(j=>({path:'sales_jobs/'+j.id,value:j})),...salesDeleteResolvedErrors_(own)]);
     return {message:'Löschung freigegeben. Der Kunde ist ab sofort aus der Kundenliste entfernt und wird beim nächsten HQ-Abgleich in HQ gelöscht.',deletion:salesDeleteView_(doc),hiddenIds,patch:{jobs:[job,...own].map(salesJobSummary_)}};
   });
 }
@@ -3185,7 +3218,7 @@ function salesDeleteLocal_(doc,check,user,now){
   const jobs=check.jobs.map(j=>({...j,state:'canceled',updatedAt:now,message:'Kunde vor der HQ-Übertragung gelöscht (Admin-Freigabe). Nichts an HQ gesendet.'}));
   draft.deletedAt=now;doc.state='done';doc.completedAt=now;doc.message=(doc.uncertain?'Kunde in der App gelöscht. Seine HQ-Übertragung war begonnen, aber nicht bestätigt: bitte in HQ prüfen, ob die Firma dort angelegt wurde, und sie gegebenenfalls dort löschen':'Kunde war noch nicht in HQ und wurde in der App gelöscht')+(jobs.length?' ('+jobs.length+(jobs.length===1?' offener Auftrag':' offene Aufträge')+' verworfen).':'.');
   doc.log=[...(doc.log||[]).slice(-20),{action:'approved',by:user.email,at:now},{action:'deleted',by:user.email,at:now}];
-  salesDeleteSave_(doc,draft,jobs.map(j=>({path:'sales_jobs/'+j.id,value:j})));
+  salesDeleteSave_(doc,draft,[...jobs.map(j=>({path:'sales_jobs/'+j.id,value:j})),...salesDeleteResolvedErrors_(jobs)]);
   salesBulkRest_('commit',{writes:[{delete:salesBulkName_('sales_communication/'+ref)}]});
   const hiddenIds=salesDeleteHide_(doc);delete doc.hidden;salesWrite_('sales_deletions/'+doc.key,doc);
   return {message:doc.message,deletion:salesDeleteView_(doc),hiddenIds,patch:{jobs:jobs.map(salesJobSummary_)}};

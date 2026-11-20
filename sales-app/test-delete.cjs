@@ -204,6 +204,26 @@ test('legacy approvals disappear on the next customer list read, once only, pres
   f.remote.Projects[9]={id:9,companyId:101};runSync(f);assert.ok(f.db['sales_meta/lean_names'].rows.some(c=>c.id==='101'),'a later HQ block restores the customer');
   assert.equal(f.db['sales_meta/deleted_companies'].ids.includes('101'),false);
 });
+test('discarding own changes is opt-in and only performed for the frozen job list after admin approval',()=>{
+  const f=fixture(),c=f.ctx.saveSalesCompany({...f.input,name:'Synthetic own changes'});
+  Object.assign(f.db['sales_jobs/'+c.id],{state:'synced',hqId:101});f.db['sales_drafts/'+c.id].hqId=101;f.db['sales_meta/lean_testowners']={rows:{'101':c.id}};
+  for(const [i,kind] of ['createContact','communication','communication','entityChange'].entries())f.db['sales_jobs/own-'+i]={id:'own-'+i,kind,entity:'company',state:i===3?'conflict':i===2?'pending':'uncertain',hqId:101,companyRef:'draft_'+c.id};
+  assert.throws(()=>request2(f,'101'),/4 offene Aufträge/);
+  const r=f.ctx.requestSalesCustomerDelete({companyId:'101',reason:'Synthetic cleanup',discardOwnChanges:true});assert.equal(r.deletion.discardJobCount,4);
+  assert.equal(f.db['sales_jobs/own-0'].state,'uncertain');assert.deepEqual(plain(f.db['sales_deletions/101'].discardJobIds).sort(),['own-0','own-1','own-2','own-3']);
+  f.db['sales_meta/sync']={id:'synthetic-paused',state:'running',revision:10,cursor:0,done:0,tasks:[{kind:'bulkRead',id:'Companies'}],stats:{},companyIds:[],errors:[...[0,1,2,3].map(i=>({kind:'write',id:'own-'+i,message:'Synthetic blocked'})),{label:'Synthetic unrelated',message:'Keep'}]};f.props.SALES_SYNC_HOLD='synthetic-hold';
+  approve(f);for(let i=0;i<4;i++)assert.equal(f.db['sales_jobs/own-'+i].state,'canceled');assert.equal(f.calls.filter(c=>c.method==='delete').length,0);
+  const run=f.db['sales_meta/sync'];assert.equal(run.id,'synthetic-paused');assert.equal(run.cursor,0);assert.equal(run.state,'running');assert.equal(run.errors.length,1);assert.equal(run.errors[0].label,'Synthetic unrelated');assert.equal(f.props.SALES_SYNC_HOLD,'synthetic-hold');assert.equal(f.db['sales_meta/lean_sync'].errors.length,1);
+});
+test('opt-in keeps financial, unknown, foreign and newly added jobs blocked',()=>{
+  const own=()=>{const f=fixture(),c=f.ctx.saveSalesCompany({...f.input,name:'Synthetic protected'});Object.assign(f.db['sales_jobs/'+c.id],{state:'synced',hqId:101});f.db['sales_drafts/'+c.id].hqId=101;f.db['sales_meta/lean_testowners']={rows:{'101':c.id}};return {f,c};};
+  for(const extra of [{kind:'entityChange',entity:'company',change:{budget:10}},{kind:'financialOrder'},{kind:'communication',companyRef:'draft_other'}]){
+    const {f,c}=own();f.db['sales_jobs/protected']={id:'protected',kind:'communication',state:'pending',hqId:101,companyRef:'draft_'+c.id,...extra};
+    assert.throws(()=>f.ctx.requestSalesCustomerDelete({companyId:'101',reason:'Synthetic',discardOwnChanges:true}),/offener Auftrag/);assert.equal(f.db['sales_jobs/protected'].state,'pending');
+  }
+  const {f,c}=own();f.db['sales_jobs/first']={id:'first',kind:'communication',state:'pending',hqId:101,companyRef:'draft_'+c.id};f.ctx.requestSalesCustomerDelete({companyId:'101',reason:'Synthetic',discardOwnChanges:true});
+  f.db['sales_jobs/later']={...f.db['sales_jobs/first'],id:'later'};assert.equal(approve(f).deletion.state,'blocked');assert.equal(f.db['sales_jobs/first'].state,'pending');assert.equal(f.db['sales_jobs/later'].state,'pending');
+});
 console.log(count+' customer deletion checks passed.');
 }
 module.exports={fixture,ADMIN,TEAM};

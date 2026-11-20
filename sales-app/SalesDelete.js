@@ -33,17 +33,18 @@
     }
     if(deleteFormOpen===id){
       const started=unsent&&c.localDraftId&&!['pending','ready'].includes(c.syncState),intro=started||c.localDraftId&&c.syncState!=='synced'&&c.hqId?deleteTexts.started:unsent?deleteTexts.unsent:deleteTexts.hq;
-      out+='<form class="m-panel m-section" data-form="delete-request" data-company="'+esc(id)+'"><div class="m-panel-head"><h2>Kunde löschen</h2></div><div class="m-panel-body">'+intro+deleteTexts.cleanup+'<label class="m-field">Grund für die Löschung (Pflicht)<textarea name="reason" maxlength="500" required></textarea></label><div class="m-test-actions"><button type="submit" class="m-button m-primary">Löschantrag stellen</button>'+button('Abbrechen','delete-cancel',id)+'</div><p class="m-status" role="status"></p></div></form>';
+      out+='<form class="m-panel m-section" data-form="delete-request" data-company="'+esc(id)+'"><div class="m-panel-head"><h2>Kunde löschen</h2></div><div class="m-panel-body">'+intro+deleteTexts.cleanup+(c.localDraftId?'<label class="m-check"><input type="checkbox" name="discardOwnChanges"> Offene eigene Kontakt- und Stammdatenänderungen bei der Adminfreigabe verwerfen</label>':'')+'<label class="m-field">Grund für die Löschung (Pflicht)<textarea name="reason" maxlength="500" required></textarea></label><div class="m-test-actions"><button type="submit" class="m-button m-primary">Löschantrag stellen</button>'+button('Abbrechen','delete-cancel',id)+'</div><p class="m-status" role="status"></p></div></form>';
     }
     return out;
   }
   function deletionRow(d){
+    const discard=d.discardJobCount?'<p class="m-note">Bei der Freigabe werden zusätzlich '+d.discardJobCount+' offene eigene Kontakt- und Stammdatenänderungen verworfen. Neue oder andere offene Aufträge bleiben gesperrt.</p>':'';
     const key=(d.key||d.hqId)+':'+d.revision,open=['requested','failed','blocked'].includes(d.state);
     let actions='';
     if(open&&deletionConfirm===key)actions='<div class="m-note"><strong>Wirklich endgültig löschen?</strong> '+esc(d.name)+' '+(d.uncertain?deleteTexts.confirmUncertain:d.local?deleteTexts.confirmLocal:deleteTexts.confirmHq)+' Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">'+button('Ja, endgültig löschen','deletion-approve',key,true)+button('Abbrechen','deletion-confirm-cancel',key)+'</div>';
     else if(open)actions='<div class="m-test-actions">'+button(d.state==='requested'?'Löschung freigeben':'Erneut freigeben','deletion-confirm',key,true)+button(d.state==='requested'?'Ablehnen':'Antrag schließen','deletion-reject',key)+'</div>';
     const place=d.local?'noch nicht in HQ':'HQ-ID '+esc(d.hqId),decided=d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):'',note=d.message&&d.state!=='requested'?'<p class="m-muted">'+esc(d.message)+'</p>':'';
-    return '<div class="m-row" data-deletion-row="'+esc(d.key||d.hqId)+'"><h3>'+esc(d.name)+' · '+place+'</h3><p>'+esc(deleteStates[d.state]||d.state)+'</p><p>Grund: '+esc(d.reason||'')+'</p><p><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+decided+'</small></p>'+note+actions+'</div>';
+    return '<div class="m-row" data-deletion-row="'+esc(d.key||d.hqId)+'"><h3>'+esc(d.name)+' · '+place+'</h3><p>'+esc(deleteStates[d.state]||d.state)+'</p><p>Grund: '+esc(d.reason||'')+'</p><p><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+decided+'</small></p>'+note+discard+actions+'</div>';
   }
   function deletionAdminPanel(){
     const rows=deletionRows,list=!rows?'<p>Die Liste wird nur auf Klick aus Firebase gelesen.</p>':!rows.length?'<p>Keine Löschanträge vorhanden.</p>':rows.map(deletionRow).join('');
@@ -79,6 +80,6 @@
     }
     if(form.dataset.form!=='delete-request')return false;
     const id=form.dataset.company;
-    act(async()=>{const r=await rpc('requestSalesCustomerDelete',{companyId:id,reason:input.reason});deleteFormOpen=null;if(detail&&r.deletion)detail={...detail,deletion:r.deletion};return r;},{preserve:true});
+    act(async()=>{const r=await rpc('requestSalesCustomerDelete',{companyId:id,reason:input.reason,discardOwnChanges:input.discardOwnChanges==='on'});deleteFormOpen=null;if(detail&&r.deletion)detail={...detail,deletion:r.deletion};return r;},{preserve:true});
     return true;
   }

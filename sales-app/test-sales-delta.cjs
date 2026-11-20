@@ -93,4 +93,34 @@ test('edition refresh cannot supersede a paused sync and missing metadata never 
 test('changed probe cache write can resume after a lost response without advancing the watermark early',()=>{
  const f=bulkFixture();f.finishBulk();const meta=JSON.stringify(f.db['sales_meta/bulk']);f.remote.Companies[101].name='Synthetic changed silently';f.ctx.startSalesSync();let run=f.db['sales_meta/sync'];while(run.tasks[run.cursor].kind!=='deltaProbe')run=f.step();f.failCommit='after';f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),meta);const id=f.db['sales_meta/sync'].id;f.ctx.startSalesSync();run=finish(f);assert.equal(run.id,id);assert.equal(f.db['sales_companies/101'].company.name,'Synthetic changed silently');assert.equal(run.entities.Companies.count,2);
 });
+function cleanupFixture(){
+ const f=bulkFixture();f.remote.PlannedRevenues[108]={id:108,companyId:102,projectId:null,netTotal:100,updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();f.ctx.startSalesSync();const run=f.ctx.salesRead_('sales_meta/sync'),raw=f.ctx.salesRead_('sales_rawplans/108');
+ run.planCleanupPending=true;run.errors=[{label:'HQ-Einzelprüfung · Planumsätze',message:'Kennung 108 wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'},{kind:'write',id:'unrelated',message:'Synthetic unrelated'}];
+ f.ctx.salesWrite_('sales_meta/sync',run);f.ctx.salesWrite_('sales_meta/plan_cleanup_'+run.id,{approved:true,runId:run.id,id:108,generation:raw.generation,before:raw.row,state:'approved',source:'synthetic explicit request'});delete f.remote.PlannedRevenues[108];return {f,run,raw};
+}
+test('explicit orphan-plan cleanup rechecks HQ twice and atomically adjusts raw row, both counters and audit without resuming the run',()=>{
+ const {f,run,raw}=cleanupFixture(),cursor=run.cursor,tasks=JSON.stringify(run.tasks),calls=f.calls.length;f.props.SALES_SYNC_HOLD='synthetic-hold';f.ctx.salesDeltaResolvePlan_(run);
+ assert.equal(f.db['sales_rawplans/108'],undefined);assert.equal(f.db['sales_meta/bulk'].entities.PlannedRevenues.count,0);assert.equal(run.entities.PlannedRevenues.count,0);assert.ok(!run.entities.PlannedRevenues.knownIds.includes('108'));assert.ok(!f.db['sales_meta/bulk'].entities.PlannedRevenues.ids.includes('108'));
+ assert.equal(run.cursor,cursor);assert.equal(JSON.stringify(run.tasks),tasks);assert.equal(run.planCleanupPending,false);assert.equal(run.errors.length,1);assert.equal(run.errors[0].id,'unrelated');assert.equal(f.props.SALES_SYNC_HOLD,'synthetic-hold');
+ const request=f.db['sales_meta/plan_cleanup_'+run.id];assert.equal(request.state,'removed');assert.deepEqual(request.before,raw.row);assert.equal(f.calls.length-calls,2);assert.ok(f.calls.slice(calls).every(c=>c.method==='get'));
+ assert.throws(()=>f.ctx.salesDeltaResolvePlan_(run),/nicht freigegeben/);assert.equal(f.db['sales_meta/bulk'].entities.PlannedRevenues.count,0);
+});
+test('orphan-plan cleanup keeps a reappeared record and its indexes instead of deleting it',()=>{
+ const {f,run,raw}=cleanupFixture();f.remote.PlannedRevenues[108]={...raw.row,netTotal:150};f.ctx.salesDeltaResolvePlan_(run);
+ assert.equal(f.db['sales_rawplans/108'].row.netTotal,150);assert.equal(f.fields['sales_rawplans/108'].companyBucket.stringValue,'38');assert.equal(f.fields['sales_rawplans/108'].projectBucket.stringValue,'none');assert.equal(run.entities.PlannedRevenues.count,1);assert.equal(f.db['sales_meta/plan_cleanup_'+run.id].state,'refreshed');
+});
+test('cleanup stops on an HQ error, contradictory list, changed generation or a project-linked plan without dropping financial data',()=>{
+ for(const mode of ['http','list','generation','project']){const {f,run}=cleanupFixture(),get=f.ctx.salesHqGet_;
+  if(mode==='http')f.ctx.salesHqGet_=()=>{throw Error('HQ-Lesetest: HTTP 503');};
+  if(mode==='list')f.ctx.salesHqGet_=path=>path.includes('/PlannedRevenues?')?{data:[{id:108}],headers:{'helloHQ-Count':1}}:get(path);
+  if(mode==='generation')f.ctx.salesWrite_('sales_rawplans/108',{...f.db['sales_rawplans/108'],generation:'other'});
+  if(mode==='project')f.ctx.salesWrite_('sales_rawplans/108',{...f.db['sales_rawplans/108'],row:{...f.db['sales_rawplans/108'].row,projectId:99}});
+  const before=JSON.stringify(f.db);assert.throws(()=>f.ctx.salesDeltaResolvePlan_(run),/HTTP 503|nicht eindeutig|inzwischen geändert/);assert.equal(JSON.stringify(f.db),before);assert.equal(run.planCleanupPending,true);
+ }
+});
+test('lost cleanup commit response keeps a durable once-only checkpoint for the next resume',()=>{
+ const {f,run}=cleanupFixture();f.failCommit='after';assert.throws(()=>f.ctx.salesDeltaResolvePlan_(run),/response lost/);
+ const saved=f.ctx.salesRead_('sales_meta/sync');assert.equal(saved.planCleanupPending,false);assert.equal(saved.entities.PlannedRevenues.count,0);assert.equal(f.db['sales_meta/bulk'].entities.PlannedRevenues.count,0);assert.equal(f.db['sales_meta/plan_cleanup_'+run.id].state,'removed');
+ f.step();assert.equal(f.db['sales_meta/bulk'].entities.PlannedRevenues.count,0);assert.equal(f.db['sales_rawplans/108'],undefined);
+});
 for(const c of cases){c.fn();console.log('PASS',c.name);}console.log(cases.length+' delta checks passed.');

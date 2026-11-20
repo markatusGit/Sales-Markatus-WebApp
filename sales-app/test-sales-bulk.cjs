@@ -15,7 +15,7 @@ function bulkFixture(){
    if(op==='batchGet')return body.documents.map(n=>{const path=n.split('/documents/')[1];return fields[path]?{found:document(path)}:{missing:n};}).reverse();
    if(op==='commit'){
      if(f.failCommit==='before'){f.failCommit=null;throw Error('Synthetic commit failed');}
-     for(const w of body.writes){const path=w.update.name.split('/documents/')[1];fields[path]=clone(w.update.fields);f.db[path]=f.ctx.salesBulkDecode_(document(path));}
+     for(const w of body.writes){if(w.delete){const path=w.delete.split('/documents/')[1];delete fields[path];delete f.db[path];continue;}const path=w.update.name.split('/documents/')[1];fields[path]=clone(w.update.fields);f.db[path]=f.ctx.salesBulkDecode_(document(path));}
      if(f.failCommit==='after'){f.failCommit=null;throw Error('Synthetic response lost');}return {writeResults:body.writes.map(()=>({updateTime:'2026-01-01'}))};
    }
    if(op==='runQuery'){
@@ -28,7 +28,7 @@ function bulkFixture(){
    if(single){f.calls.push({method:'get',path});const row=f.remote[single[1]]?.[single[2]];if(!row)throw Error('HQ-Lesetest: HTTP 404');return {data:clone(row),headers:{}};}
    const m=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\?/.exec(path);if(!m)return get(path);
    f.calls.push({method:'get',path});const q=new URL('https://fixture'+path).searchParams,filter=q.get('$filter')||'';let rows=Object.values(f.remote[m[1]]||{}).map(clone).sort((a,b)=>a.id-b.id);
-   const id=/id gt (\d+)/.exec(filter),since=/updatedOn ge datetime'([^']+)'/.exec(filter);if(id)rows=rows.filter(r=>r.id>Number(id[1]));if(since)rows=rows.filter(r=>[r.updatedOn,r.createdOn,...(filter.includes('defaultAddress/updatedOn')?[r.defaultAddress?.updatedOn,...(r.addresses||[]).map(a=>a.updatedOn)]:[])].some(d=>Date.parse(d)>=Date.parse(since[1])));
+   const id=/id gt (\d+)/.exec(filter),exact=/^id eq (\d+)$/.exec(filter),since=/updatedOn ge datetime'([^']+)'/.exec(filter);if(id)rows=rows.filter(r=>r.id>Number(id[1]));if(exact)rows=rows.filter(r=>r.id===Number(exact[1]));if(since)rows=rows.filter(r=>[r.updatedOn,r.createdOn,...(filter.includes('defaultAddress/updatedOn')?[r.defaultAddress?.updatedOn,...(r.addresses||[]).map(a=>a.updatedOn)]:[])].some(d=>Date.parse(d)>=Date.parse(since[1])));
    const top=Number(q.get('$top')||200),skip=Number(q.get('$skip')||0);return {data:rows.slice(skip,skip+top),headers:{'helloHQ-Count':rows.length}};
  };
  for(const entity of ['Companies','ContactPersons','ContactHistories','Projects','Documents','PlannedRevenues']){f.remote[entity]=f.remote[entity]||{};Object.values(f.remote[entity]).forEach(r=>r.updatedOn='2026-01-01T00:00:00Z');}
