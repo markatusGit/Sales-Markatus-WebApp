@@ -1,5 +1,21 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 20.11.2026 – Festgelegt: Kunden löschen und Papierkorb (noch nicht umgesetzt)
+
+Nutzerfrage: Kann ein Admin Kunden in der App löschen? Bestätigt: Bisher gibt es dafür weder eine Serverfunktion noch einen Knopf. Bisherige Regel: „Fehlende HQ-Firmen nicht automatisch löschen/archivieren, Archivierungsregeln später.“ Der Nutzer legt fest (Roadmap R15; Löschabgleich in Paket A/R14):
+
+1. **Bezeichnung „Löschen“, mit Papierkorb:** Gelöschte Kunden kommen in einen Papierkorb und lassen sich von dort wiederherstellen. Löschen und Wiederherstellen dürfen nur Administratoren. Es wird vermerkt, wer wann mit welcher Begründung gelöscht hat.
+2. **Löschabgleich gegen HQ** im Zuge von Paket A: Kunden, die es in HQ nicht mehr gibt, werden erkannt und dem Admin zum Löschen in den Papierkorb vorgeschlagen. Gelöscht wird erst nach Bestätigung.
+3. **Löschen in der App darf den Kunden auch in HQ löschen**, aber nur nach Freigabe durch einen Admin. Vorher mit einer eigenen TEST-Firma prüfen: welchen HQ-Endpunkt es gibt und was mit Ansprechpartnern, Historie, Belegen und Projekten passiert. Gemäß r33 erst im zentralen Abgleich ausführen, davor lesend prüfen.
+4. **Endgültiges Löschen** nur im Papierkorb, für einen bereits gelöschten Kunden. Danach ist keine Wiederherstellung mehr möglich.
+
+Offene Fachfragen vor der Umsetzung:
+- (a) Erfolgt die HQ-Löschung schon beim Verschieben in den Papierkorb oder erst beim endgültigen Löschen? Nach einer HQ-Löschung hieße Wiederherstellen: Neuanlage mit neuer HQ-ID.
+- (b) Zählen Belege und Umsätze gelöschter Kunden in vergangenen Ausgaben weiter?
+- (c) Was passiert mit offenen Aufträgen des Kunden?
+
+Am selben Tag als Lösungsvorschlag für Sync-Meldungen besprochen: Paket A (R14), B und C (R16). Kein Code geändert, nichts nach Google veröffentlicht.
+
 ### 18.11.2026 – r33: HQ ausschließlich im zentralen Abgleich
 
 Nutzer stellt verbindlich klar: HQ-Abgleich nur nachts einmal täglich bzw. derzeit nach ausdrücklichem Synchronisieren. Sonstige Appbedienung ausschließlich Firebase. Frühere Entscheidung zum HQ-Nachladen beim Formularöffnen/15-Minuten-Prüfen ausdrücklich ersetzt. Kunden-/Kontakt-/Adresseditor und Formularspeicherung verwenden den gespeicherten Kundenstand; vorhandene Autorisierung und Konfliktprüfung beim späteren HQ-Schreiben erhalten. Separaten HQ-Listenbutton entfernt. Auch inkrementeller zentraler Abgleich aktualisiert Stammlisten; Branchennamen aus bereits importierten Firebase-Daten. Herkunftsoptionen nur im Abgleich, Fehler dort als Hinweis mit Erhalt vorhandener Optionen. Kein zusätzlicher Firmen-Gesamtimport. Gemeinsame Formulardaten erhalten sonstige aktuelle HQ-Felder beim Schreiben. Neue Null-HQ- und verzögerte Konfliktprüfungen; bestehende Tests an gespeicherte Ausgangsdaten angepasst. Nächtlicher automatischer Tagesstart bleibt Roadmap, derzeit manueller zentraler Start mit vorhandenem Fortsetzungsworker. Keine neuen Trigger, Script Properties oder Bereitstellungseinstellungen eingerichtet. Fremde Dokumentationsdateien und Claude-Korrekturen erhalten. Lokal in Prüfung, noch nicht veröffentlicht.
@@ -24,7 +40,7 @@ Speicherung: Ein Formular atomar als bis zu vier bestehende entityChange-Aufträ
 
 Prüfung: Alle 24 Prüfdateien erfolgreich, darunter 33 Fachfälle, 36 Auth-/Rechtefälle und beide Kunden-Browserabläufe; neue eigene Browserdatei erhält alle bisherigen Prüfungen. Gleichheit der Felder, HQ-Auswahlstrukturen, Markatus-/Datums-Vorgaben, neue Branche, erhaltene nicht angezeigte Werte, Mehrfachauswahl, wiederholte Speicherung, atomarer Fehler, Fremdzuordnung, Rechte, verlorene HQ-Antwort und geordnete Teilaufträge geprüft. Formular mit synthetischen Daten visuell geprüft. Veröffentlichung folgt. Keine produktiven Kunden-/HQ-Schreibtests durchgeführt; tatsächlicher tenantbezogener Metadatenabruf und Bedien-/Speicherabnahme gesondert. Keine neuen Script Properties, Scopes, Firebase-Regeln/Provider oder Bereitstellungseinstellungen. Claude-Korrekturen, fremde lokale Dokumentationsdateien und sämtliche Roadmap-Wünsche erhalten.
 
-Zuletzt aktualisiert: 18. November 2026.
+Zuletzt aktualisiert: 20. November 2026.
 
 ## Zweck und Pflege
 
@@ -97,6 +113,9 @@ Keine der folgenden späteren Funktionen erhält durch diesen Eintrag bereits ei
 | R11 | Erweiterte Teamansichten, Priorisierung und Auswertungen | Konzeptvorschlag, noch nicht gesondert beauftragt | Pilotfeedback abwarten |
 | R12 | App-Nutzer ohne eigenes HQ-Konto | Am 24.09.2026 ausdrücklich als spätere Nutzergruppe bestätigt | Verantwortlichen HQ-Benutzer zunächst auswählen; spätere Zuordnungs- und Autorenregel klären |
 | R13 | Rechnungen über mehrere Magazinausgaben aufteilen | Am 24.09.2026 als real vorkommend bestätigt, für den aktuellen Test ausdrücklich zurückgestellt | Rechnungspositionen oder fachliche Zuordnung je Ausgabe prüfen; keine ungeprüfte anteilige Verteilung |
+| R14 | Paket A „Zu klären“: Admin-Klärungsliste für Sync-Meldungen | Am 20.11.2026 als Lösungsvorschlag besprochen; Nutzer will den Löschabgleich aus R15 darin bauen; noch nicht umgesetzt | Umfang: Klärungsliste nach Fallart, Klärungs-Assistent für unklare Aufträge (nur lesende HQ-Prüfung, danach Zuordnen / Admin-Freigabe zum erneuten Senden / Treffer anzeigen), „Auftrag verwerfen“ mit Begründung, „Autor bestätigen“, Folgefälle unter dem auslösenden Auftrag, Löschabgleich gegen HQ. Nichts automatisch nach HQ schreiben |
+| R15 | Kunden löschen mit Papierkorb (nur Admin) | Am 20.11.2026 vom Nutzer festgelegt; noch nicht umgesetzt | Siehe Tagebucheintrag 20.11.2026 „Kunden löschen und Papierkorb“; HQ-Löschung zuerst mit eigener TEST-Firma prüfen |
+| R16 | Paket B/C: Sync-Meldungen sauberer einordnen, Ausgabenprüfung verlinken | Am 20.11.2026 als Vorschlag besprochen; nicht beauftragt | B: HTTP400 als „von HQ abgelehnt“ mit Korrektur, Historien-Suche (einer/keiner/mehrere), 404-Firmen neu zuordnen, vorübergehende HQ500 erst nach drei Läufen melden. C: Direktlinks zur Ausgabenprüfung |
 
 ### Ergänzende Ideen vom 23.09.2026 – noch nicht beauftragt
 

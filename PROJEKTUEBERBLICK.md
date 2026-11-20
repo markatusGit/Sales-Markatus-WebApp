@@ -1,5 +1,15 @@
 # Projektüberblick – Sales Markatus
 
+### 20.11.2026 – Entscheidung: Kunden löschen mit Papierkorb (Roadmap R15, noch nicht umgesetzt)
+
+Bisher können Kunden in der App nicht gelöscht werden. Nutzer legt fest:
+- „Löschen“ nur durch Admins, mit Papierkorb und Wiederherstellung.
+- Der Löschabgleich gegen HQ kommt in Paket A/R14 (Klärungsliste).
+- App-Löschung darf nach Admin-Freigabe auch in HQ löschen; das zuerst mit einer TEST-Firma prüfen.
+- Endgültiges Löschen nur aus dem Papierkorb.
+
+Offene Fachfragen und Details stehen im Tagebuch. Paket B/C als Vorschlag in R16. Nur Dokumentation, kein Code, keine Google-Veröffentlichung.
+
 ### 18.11.2026 – r33: HQ ausschließlich im zentralen Abgleich
 
 Nutzer stellt verbindlich klar: HQ-Abgleich nur nachts einmal täglich bzw. derzeit nach ausdrücklichem Synchronisieren. Sonstige Appbedienung ausschließlich Firebase. Frühere Entscheidung zum HQ-Nachladen beim Formularöffnen/15-Minuten-Prüfen ausdrücklich ersetzt. Kunden-/Kontakt-/Adresseditor und Formularspeicherung verwenden den gespeicherten Kundenstand; vorhandene Autorisierung und Konfliktprüfung beim späteren HQ-Schreiben erhalten. Separaten HQ-Listenbutton entfernt. Auch inkrementeller zentraler Abgleich aktualisiert Stammlisten; Branchennamen aus bereits importierten Firebase-Daten. Herkunftsoptionen nur im Abgleich, Fehler dort als Hinweis mit Erhalt vorhandener Optionen. Kein zusätzlicher Firmen-Gesamtimport. Gemeinsame Formulardaten erhalten sonstige aktuelle HQ-Felder beim Schreiben. Neue Null-HQ- und verzögerte Konfliktprüfungen; bestehende Tests an gespeicherte Ausgangsdaten angepasst. Nächtlicher automatischer Tagesstart bleibt Roadmap, derzeit manueller zentraler Start mit vorhandenem Fortsetzungsworker. Keine neuen Trigger, Script Properties oder Bereitstellungseinstellungen eingerichtet. Fremde Dokumentationsdateien und Claude-Korrekturen erhalten. Lokal in Prüfung, noch nicht veröffentlicht.
