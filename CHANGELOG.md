@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.34.3]
+
+- „Kunde löschen“ auch bei App-Kunden, deren HQ-Übertragung begonnen, aber nicht bestätigt ist (bisher fehlte dort der Knopf). Mit bekannter HQ-ID: Löschung im nächsten HQ-Abgleich in HQ und App, die eigenen offenen Anlage-/Folgeaufträge werden bei der Freigabe verworfen. Ohne bestätigte HQ-ID: sofortige Löschung in der App mit dem Hinweis, in HQ zu prüfen, ob die Firma dort angelegt wurde.
+- Freigegebene Kunden verschwinden sofort aus der Kundenliste und den Filterlisten, nicht erst nach dem HQ-Abgleich. Spätere Schreibvorgänge (z. B. Aktualisierung durch den Abgleich) nehmen sie nicht wieder auf. Wird die Löschung im Abgleich wegen Projekten/Belegen gesperrt oder nach drei Fehlversuchen angehalten, erscheint der Kunde wieder.
+- Kennung `2026-11-20-r34.3`. test-delete 15 Fälle, Browserprüfung erweitert. Keine Script Properties oder Bereitstellungseinstellungen geändert.
+
 ## [v0.34.2]
 
 - Korrektur: r34.1 brach beim Laden mit „Failed to execute 'write' on 'Document': Invalid or unexpected token“ ab. Ursache: HtmlService entfernt Kommentare vor der Auslieferung; ein regulärer Ausdruck mit doppeltem Schrägstrich in der PKCE-Anmeldung wurde dabei als Kommentar abgeschnitten. Durch split/join ersetzt; das Lösch-Oberflächenmodul verwendet keine Zitate mehr in Template-Platzhaltern.

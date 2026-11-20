@@ -137,13 +137,38 @@ test('unsent app customers: request, admin approval deletes only in Firebase, ca
   assert.equal(f.db['sales_meta/lean_names'].rows.some(c=>c.id===ref),false);assert.throws(()=>f.ctx.getSalesLeanCompany(ref),/gelöscht/);
   assert.equal(f.calls.length,n,'no HQ request at all');assert.equal(Object.keys(f.db).some(k=>k.startsWith('sales_jobs/delete_')),false);
 });
-test('unsent customer with a started HQ transfer cannot be deleted; a customer transferred meanwhile blocks the old request',()=>{
-  const f=fixture(),a=f.ctx.saveSalesCompany({...f.input,name:'Synthetic started'});f.db['sales_jobs/'+a.id].writeAttempted=true;
-  assert.throws(()=>request2(f,'draft_'+a.id),/bereits begonnen/);
+test('started transfer without confirmed HQ ID: deletable in the app with an HQ check warning; a customer transferred meanwhile blocks the old request',()=>{
+  const f=fixture(),a=f.ctx.saveSalesCompany({...f.input,name:'Synthetic started'});Object.assign(f.db['sales_jobs/'+a.id],{state:'uncertain',writeAttempted:true});
+  const ref='draft_'+a.id;f.db['sales_meta/lean_names'].rows.push({id:ref,name:'Synthetic started'});
+  const r=request2(f,ref);assert.match(r.message,/bitte in HQ prüfen/);assert.equal(f.db['sales_deletions/'+ref].uncertain,true);
+  const n=f.calls.length,done=f.ctx.decideSalesCustomerDelete({key:ref,revision:1,approve:true});
+  assert.match(done.message,/in der App gelöscht.*bitte in HQ prüfen/s);assert.equal(f.db['sales_jobs/'+a.id].state,'canceled');assert.ok(f.db['sales_drafts/'+a.id].deletedAt);
+  assert.equal(f.db['sales_meta/lean_names'].rows.some(c=>c.id===ref),false);assert.equal(f.calls.length,n,'no HQ request');
   const b=f.ctx.saveSalesCompany({...f.input,name:'Synthetic later synced'});request2(f,'draft_'+b.id);
   Object.assign(f.db['sales_jobs/'+b.id],{state:'synced',hqId:101});f.db['sales_drafts/'+b.id].hqId=101;
-  const r=f.ctx.decideSalesCustomerDelete({key:'draft_'+b.id,revision:1,approve:true});assert.match(r.message,/inzwischen an HQ übertragen/);
+  const blocked=f.ctx.decideSalesCustomerDelete({key:'draft_'+b.id,revision:1,approve:true});assert.match(blocked.message,/inzwischen an HQ übertragen/);
   assert.equal(f.db['sales_deletions/draft_'+b.id].state,'blocked');assert.equal(f.db['sales_drafts/'+b.id].deletedAt,undefined);
+});
+test('started transfer with a known HQ ID: request on the app customer, own open jobs are discarded, HQ deletion in the sync',()=>{
+  const f=fixture(),c=f.ctx.saveSalesCompany({...f.input,name:'Synthetic half transferred'}),ref='draft_'+c.id;
+  Object.assign(f.db['sales_jobs/'+c.id],{state:'uncertain',hqId:101,writeAttempted:true});f.db['sales_drafts/'+c.id].hqId=101;
+  f.db['sales_jobs/own-history']={id:'own-history',kind:'history',draftId:c.id,hqId:101,state:'uncertain'};
+  f.db['sales_meta/lean_names'].rows=[{id:ref,name:'Synthetic half transferred',hqId:'101'},{id:'102',name:'Other'}];
+  const r=request2(f,ref);assert.equal(r.deletion.key,'101');assert.equal(f.db['sales_deletions/101'].pendingDraft,true);
+  assert.equal(f.db['sales_drafts/'+c.id].deletion.state,'requested','status copy in the app customer');assert.equal(f.ctx.getSalesLeanCompany(ref).deletion.state,'requested');
+  const d=approve(f);assert.match(d.message,/ab sofort aus der Kundenliste entfernt/);
+  assert.equal(f.db['sales_jobs/'+c.id].state,'canceled');assert.equal(f.db['sales_jobs/own-history'].state,'canceled');
+  assert.deepEqual(plain(f.db['sales_meta/lean_names'].rows.map(x=>x.id)),['102'],'hidden right after the approval');
+  assert.equal(runSync(f).error,undefined);assert.equal(f.remote.Companies[101],undefined);assert.ok(f.db['sales_drafts/'+c.id].deletedAt);assert.equal(f.db['sales_deletions/101'].state,'done');
+});
+test('approved HQ customers leave the customer list at once; a block found in the sync brings them back',()=>{
+  const f=fixture();request(f);assert.ok(f.db['sales_meta/lean_names'].rows.some(c=>c.id==='101'),'still listed while only requested');
+  const r=approve(f);assert.deepEqual(plain(r.hiddenIds).sort(),['101']);
+  assert.deepEqual(plain(f.db['sales_meta/lean_names'].rows.map(c=>c.id)),['102']);assert.deepEqual(plain(f.db['sales_meta/lean_filters'].rows.map(c=>c.id)),['102']);
+  f.ctx.salesWrite_('sales_directory/101',{company:{id:101,name:'Synthetic rewrite'}});f.ctx.salesWrite_('sales_companies/101',{...f.db['sales_companies/101']});assert.deepEqual(plain(f.db['sales_meta/lean_names'].rows.map(c=>c.id)),['102'],'later writes do not bring it back');
+  f.remote.Projects[9]={id:9,companyId:101};runSync(f);assert.equal(f.db['sales_deletions/101'].state,'blocked');
+  assert.deepEqual(plain(f.db['sales_meta/lean_names'].rows.map(c=>c.id)).sort(),['101','102'],'restored after the block');
+  assert.equal(f.db['sales_meta/deleted_companies'].ids.includes('101'),false);assert.equal(f.db['sales_deletions/101'].hidden,undefined);
 });
 test('UI: delete button sits in the header next to "Firmendaten bearbeiten" for HQ and unsent customers',()=>{
   const ui=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');

@@ -18,9 +18,16 @@ function salesLeanSyncStatus_(){
   const cached=salesRead_('sales_meta/lean_sync');if(cached){const value={...cached,pauseRequested:PropertiesService.getScriptProperties().getProperty('SALES_SYNC_PAUSE')===cached.id};return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(value):value;}
   return salesLock_(()=>{const again=salesRead_('sales_meta/lean_sync');if(again)return again;const run=salesRead_('sales_meta/sync'),summary=salesSyncSummary_(run);if(run)salesWrite_('sales_meta/lean_sync',summary);return typeof salesWorkerStatus_==='function'?salesWorkerStatus_(summary):summary;});
 }
+/** Customers with an approved or completed deletion never come back into the compact lists through a later write. */
+function salesLeanGone_(entries){
+  const gone=new Set((salesRead_('sales_meta/deleted_companies')?.ids||[]).map(String));
+  for(const e of entries){const v=e.value;if(!v||!(v.deletedAt||v.deletion?.state==='approved'))continue;if(/^sales_drafts\//.test(e.path)){gone.add('draft_'+v.id);if(v.hqId&&v.deletedAt)gone.add(String(v.hqId));}else if(v.company)gone.add(String(v.company.id));}
+  return gone;
+}
 function salesLeanFiltersUpdate_(entries){
-  const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>salesLeanFilterRow_(e.value.company));
+  let changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>salesLeanFilterRow_(e.value.company));
   if(!changes.length)return;const path='sales_meta/lean_filters',old=salesRead_(path);if(!old)return;
+  const gone=salesLeanGone_(entries);changes=changes.filter(c=>!gone.has(String(c.id)));if(!changes.length)return;
   const map=new Map(old.rows.map(c=>[c.id,c]));let changed=false;
   for(const c of changes)if(JSON.stringify(map.get(c.id))!==JSON.stringify(c)){map.set(c.id,c);changed=true;}
   if(changed)salesWrite_(path,{rows:Array.from(map.values())});
@@ -43,7 +50,7 @@ function salesLeanNames_(){
     const again=salesRead_(path);if(again)return again.rows;
     // Once, on the first explicit Customers click: migrate the existing directory to names only.
     const map=new Map(salesV1Index_().entries.map(e=>[String(e.company.id),{id:String(e.company.id),name:e.company.name}]));
-    for(const d of salesList_('sales_drafts'))if(d.company&&!d.deletedAt)map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:(d.pendingChanges||[]).find(p=>p.change.name!==undefined)?.change.name||map.get(String(d.hqId))?.name||d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
+    for(const d of salesList_('sales_drafts'))if(d.company&&!d.deletedAt&&d.deletion?.state!=='approved')map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:(d.pendingChanges||[]).find(p=>p.change.name!==undefined)?.change.name||map.get(String(d.hqId))?.name||d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
     const rows=Array.from(map.values());salesWrite_(path,{rows});return rows;
   });
 }
@@ -51,6 +58,7 @@ function salesLeanNamesUpdate_(entries){
   const changes=entries.filter(e=>/^sales_(directory|companies)\/\d+$/.test(e.path)&&e.value.company).map(e=>({id:String(e.value.company.id),name:e.value.company.name}));
   for(const e of entries)if(/^sales_drafts\//.test(e.path)&&e.value.company)changes.push({id:'draft_'+e.value.id,name:salesBusinessVisibleDraft_(e.value).company.name,...(e.value.hqId?{hqId:String(e.value.hqId)}:{})});
   if(!changes.length)return;const path='sales_meta/lean_names',old=salesRead_(path);if(!old)return;
+  const gone=salesLeanGone_(entries),kept=changes.filter(c=>!gone.has(c.id)&&!(c.hqId&&gone.has(c.hqId)));if(!kept.length)return;changes.length=0;changes.push(...kept);
   const map=new Map(old.rows.map(c=>[c.hqId||c.id,c]));let changed=false;
   for(const c of changes)if(c.hqId&&map.has(c.hqId)&&!entries.some(e=>e.path==='sales_drafts/'+c.id.slice(6)&&(e.value.pendingChanges||[]).some(p=>p.change.name!==undefined)))c.name=map.get(c.hqId).name;
   for(let c of changes){const key=c.hqId||c.id;if(c.hqId&&map.delete(c.id))changed=true;const prior=map.get(key);if(!c.id.startsWith('draft_')&&prior?.id.startsWith('draft_'))c={...prior,name:c.name};if(JSON.stringify(prior)!==JSON.stringify(c)){map.set(key,c);changed=true;}}
@@ -113,7 +121,7 @@ function salesLeanCompanyBase_(id){
     const contacts=draft.contact?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
     const pending=(draft.pendingChanges||[]).map(p=>({...p,targetId:p.entity==='contact'?job?.contactId:p.entity==='address'?stored?.company?.defaultAddress?.id:draft.hqId}));
     const visible=stored?salesBusinessView_({...stored,pendingChanges:[...(stored.pendingChanges||[]),...pending]}):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state,pendingEditCount:pending.length}:local;
-    return {...(visible||{}),...(!draft.hqId&&draft.deletion?{deletion:draft.deletion}:{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
+    return {...(visible||{}),...(draft.deletion?{deletion:draft.deletion}:{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
   }
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
   const stored=salesRead_('sales_companies/'+id);

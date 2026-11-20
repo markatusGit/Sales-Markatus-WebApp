@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 20.11.2026 – r34.3: Löschknopf bei begonnener Übertragung, sofort aus der Kundenliste
+
+Nutzer: Bei manchen Kunden fehlt der Löschknopf; freigegebene Kunden sollen sofort aus der Kundenübersicht verschwinden. Ursache: Knopf war bei App-Kunden mit begonnener, unbestätigter HQ-Übertragung (z. B. unklar/Rückprüfung offen) bewusst ausgeblendet. Jetzt löschbar: mit HQ-ID über den zentralen Abgleich (eigene offene Aufträge werden bei Freigabe verworfen), ohne bestätigte HQ-ID sofort in der App mit Prüfhinweis für HQ. Nach der Freigabe sofort aus Namens- und Filterliste und aus dem geöffneten Browser entfernt; spätere Schreibvorgänge nehmen den Kunden nicht wieder auf; bei Sperre/Abbruch im Abgleich wiederhergestellt. Alle Prüfdateien bestanden. Live-Prüfung offen.
+
 ### 20.11.2026 – r34.2: Startfehler von r34.1 behoben
 
 Nutzer meldet nach r34.1 „Uncaught SyntaxError: Failed to execute 'write' on 'Document': Invalid or unexpected token · Zeile 809, Spalte 119“. Ausgelieferte Seite anonym abgerufen und dekodiert: HtmlService hatte Kommentare entfernt und dabei in der Anmeldezeile `.replace(/\//g,'_')` den Rest der Zeile als Kommentar abgeschnitten. Im lokalen Browser per document.write reproduziert. Wahrscheinlich brachte das neue Löschmodul (Zitate in Template-Platzhaltern) den Kommentarfilter aus dem Tritt; auch r34.0 könnte betroffen gewesen sein. Korrektur ohne doppelten Schrägstrich, Löschmodul ohne verschachtelte Zitate, zwei neue dauerhafte Prüfungen. Alle Prüfdateien bestanden. Live-Prüfung durch Nutzer offen.

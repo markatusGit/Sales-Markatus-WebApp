@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-delete.cjs');
 (async()=>{
- const f=fixture(),unsent=f.ctx.saveSalesCompany({...f.input,name:'Synthetic unsent customer'});f.db['sales_meta/lean_names'].rows.push({id:'draft_'+unsent.id,name:'Synthetic unsent customer'});const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
+ const f=fixture(),started=f.ctx.saveSalesCompany({...f.input,name:'Synthetic started customer'});Object.assign(f.db['sales_jobs/'+started.id],{state:'uncertain',writeAttempted:true});const unsent=f.ctx.saveSalesCompany({...f.input,name:'Synthetic unsent customer'});f.db['sales_meta/lean_names'].rows.push({id:'draft_'+unsent.id,name:'Synthetic unsent customer'},{id:'draft_'+started.id,name:'Synthetic started customer'});const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
  try{
   const page=await browser.newPage(),calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
   await page.exposeFunction('fixtureRpc',(name,args)=>{calls.push({name,args});return JSON.parse(JSON.stringify(f.ctx[name](...args)));});
@@ -26,7 +26,9 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
   assert.equal(calls.filter(c=>c.name==='decideSalesCustomerDelete').length,0,'first click only asks again');
   await page.screenshot({path:path.join(out,'r34-delete-approve.png'),fullPage:true});
   await page.getByRole('button',{name:'Ja, endgültig löschen',exact:true}).click();await page.locator('[data-deletion-row="101"]').filter({hasText:'Freigegeben · wird beim nächsten HQ-Abgleich gelöscht'}).waitFor();
-  assert.equal(f.db['sales_deletions/101'].state,'approved');assert.equal(f.calls.filter(c=>c.method==='delete').length,0,'approval never writes to HQ');
+  assert.equal(f.db['sales_deletions/101'].state,'approved');
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('heading',{name:'Kunden',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Synthetic production customer',exact:true}).count(),0,'approved customer left the list without an HQ sync');assert.equal(f.calls.filter(c=>c.method==='delete').length,0,'approval never writes to HQ');
   const writesBefore=f.calls.filter(c=>c.method!=='get').length;
   await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('button',{name:'Synthetic unsent customer',exact:true}).click();await page.getByRole('heading',{name:'Synthetic unsent customer',exact:true}).waitFor();
   await page.locator('.m-pagehead').getByRole('button',{name:'Kunde löschen',exact:true}).click();await page.getByText('noch nicht an HQ übertragen',{exact:false}).waitFor();
@@ -35,6 +37,8 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
   const row=page.locator('[data-deletion-row="draft_'+unsent.id+'"]');await row.getByText('noch nicht in HQ',{exact:false}).waitFor();
   await row.getByRole('button',{name:'Löschung freigeben',exact:true}).click();await row.getByText('sofort in der App gelöscht',{exact:false}).waitFor();await row.getByRole('button',{name:'Ja, endgültig löschen',exact:true}).click();
   await page.locator('[data-deletion-row="draft_'+unsent.id+'"]').getByText('Gelöscht',{exact:true}).waitFor();assert.ok(f.db['sales_drafts/'+unsent.id].deletedAt);assert.equal(f.calls.filter(c=>c.method!=='get').length,writesBefore,'no HQ write at all');
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('button',{name:'Synthetic started customer',exact:true}).click();await page.getByRole('heading',{name:'Synthetic started customer',exact:true}).waitFor();
+  assert.equal(await page.locator('.m-pagehead').getByRole('button',{name:'Kunde löschen',exact:true}).count(),1,'started transfer also has the delete button');
   assert.deepEqual(errors,[]);console.log('PASS customer deletion request, clean-up hint and two-step admin approval (HQ and unsent customers) in a real browser');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
