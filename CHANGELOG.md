@@ -1,5 +1,10 @@
 # Änderungsprotokoll
 
+## [v0.34.4]
+
+- Korrektur: Kunden, für die in Firebase nur der Verzeichniseintrag und noch keine vollständige Kundenakte gespeichert ist, ließen sich nicht löschen („Kundendetails fehlen in Firebase“). Antrag und Freigabe verwenden jetzt den Verzeichniseintrag (oder die Kundenliste); der Löschstatus steht dann im Verzeichniseintrag. Projekte werden zusätzlich über die gespeicherten HQ-Rohdaten geprüft, nicht nur über die Kundenakte.
+- Kennung `2026-11-20-r34.4`. test-delete 16 Fälle. Keine Script Properties oder Bereitstellungseinstellungen geändert.
+
 ## [v0.34.3]
 
 - „Kunde löschen“ auch bei App-Kunden, deren HQ-Übertragung begonnen, aber nicht bestätigt ist (bisher fehlte dort der Knopf). Mit bekannter HQ-ID: Löschung im nächsten HQ-Abgleich in HQ und App, die eigenen offenen Anlage-/Folgeaufträge werden bei der Freigabe verworfen. Ohne bestätigte HQ-ID: sofortige Löschung in der App mit dem Hinweis, in HQ zu prüfen, ob die Firma dort angelegt wurde.

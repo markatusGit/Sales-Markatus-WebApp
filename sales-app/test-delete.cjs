@@ -170,6 +170,15 @@ test('approved HQ customers leave the customer list at once; a block found in th
   assert.deepEqual(plain(f.db['sales_meta/lean_names'].rows.map(c=>c.id)).sort(),['101','102'],'restored after the block');
   assert.equal(f.db['sales_meta/deleted_companies'].ids.includes('101'),false);assert.equal(f.db['sales_deletions/101'].hidden,undefined);
 });
+test('customers without a full customer file (directory or list entry only) can be deleted; raw projects still block',()=>{
+  const f=fixture();delete f.db['sales_companies/101'];
+  const r=request(f);assert.equal(r.deletion.state,'requested');assert.equal(f.db['sales_deletions/101'].statusPath,'sales_directory/101');
+  assert.equal(f.db['sales_directory/101'].deletion.state,'requested');assert.equal(f.ctx.getSalesLeanCompany('101').deletion.state,'requested');
+  approve(f);assert.equal(runSync(f).error,undefined);assert.equal(f.remote.Companies[101],undefined);assert.equal(f.db['sales_directory/101'],undefined);assert.equal(f.db['sales_deletions/101'].state,'done');
+  const g=fixture();delete g.db['sales_companies/101'];delete g.db['sales_directory/101'];
+  const only=request(g);assert.equal(only.deletion.name,'Synthetic production customer');assert.equal(g.db['sales_deletions/101'].statusPath,null);
+  const h=fixture();h.db['sales_rawprojects/9']={row:{id:9,companyId:101},generation:'g1',companyBucket:'37'};assert.throws(()=>request(h),/1 Projekt/);
+});
 test('UI: delete button sits in the header next to "Firmendaten bearbeiten" for HQ and unsent customers',()=>{
   const ui=fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');
   assert.equal(ui.split("true)+deleteCustomerButton(c)+button('Zur Kundenliste','nav','customers'))+deleteCustomerPanel(c)").length-1,1);

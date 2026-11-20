@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-20-r34.3';
+const SALES_RELEASE = '2026-11-20-r34.4';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Adressherkunft','erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -1972,7 +1972,7 @@ function salesLeanCompanyBase_(id){
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
   const stored=salesRead_('sales_companies/'+id);
   if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
-  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true}:null;
+  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true,...(entry.deletion?{deletion:entry.deletion}:{})}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
@@ -3087,15 +3087,18 @@ function salesDeleteBlockers_(ref){
     const draft=salesRead_('sales_drafts/'+salesKey_(ref.draftId));if(!draft?.company||draft.deletedAt)throw Error('Kunde fehlt.');
     return {stored:draft,jobs:salesDeleteLocalJobs_(ref.draftId),blockers:[]};
   }
-  const imported=salesRead_('sales_companies/'+ref.hqId),draft=ref.pendingDraft?salesRead_('sales_drafts/'+salesKey_(ref.draftId)):null,stored=ref.pendingDraft?draft:imported;
-  if(!stored?.company)throw Error('Kundendetails fehlen in Firebase. Bitte zuerst den HQ-Abgleich ausführen.');
+  const imported=salesRead_('sales_companies/'+ref.hqId),draft=ref.pendingDraft?salesRead_('sales_drafts/'+salesKey_(ref.draftId)):null;
+  let stored=ref.pendingDraft?draft:imported,statusPath=ref.pendingDraft?'sales_drafts/'+salesKey_(ref.draftId):'sales_companies/'+ref.hqId;
+  // Customers known only from the directory (no full customer file yet) are deletable too; the status copy then lives in the directory entry.
+  if(!stored?.company){const entry=salesRead_('sales_directory/'+ref.hqId);if(entry?.company){stored=entry;statusPath='sales_directory/'+ref.hqId;}}
+  if(!stored?.company){const row=(salesRead_('sales_meta/lean_names')?.rows||[]).find(c=>String(c.id)===String(ref.hqId)||String(c.hqId||'')===String(ref.hqId));if(!row)throw Error('Kunde ist in Firebase nicht gespeichert. Bitte die Kundenliste neu laden.');stored={company:{id:ref.hqId,name:row.name}};statusPath=null;}
   const out=[],count=(n,one,many)=>n+' '+(n===1?one:many);
-  const projects=(imported?.projects||[]).length;if(projects)out.push(count(projects,'Projekt','Projekte'));
+  const projects=Math.max((imported?.projects||[]).length,salesDeleteRawRows_('Projects',ref.hqId).length);if(projects)out.push(count(projects,'Projekt','Projekte'));
   const documents=salesDeleteRawRows_('Documents',ref.hqId).length;if(documents)out.push(count(documents,'Beleg','Belege'));
   const plans=salesDeleteRawRows_('PlannedRevenues',ref.hqId).length;if(plans)out.push(count(plans,'Planumsatz','Planumsätze'));
   // A customer whose own creation is still open has no other way out: its jobs are discarded instead of blocking.
   const own=ref.pendingDraft?salesDeleteLocalJobs_(ref.draftId):[],open=salesDeleteOpenJobs_(ref).filter(j=>!own.some(o=>o.id===j.id)),jobs=open.length+(imported?.pendingChanges||[]).filter(p=>!open.some(j=>j.id===p.jobId)&&!own.some(o=>o.id===p.jobId)).length;if(jobs)out.push(count(jobs,'offener Auftrag','offene Aufträge'));
-  return {stored,jobs:own,blockers:out};
+  return {stored,statusPath,jobs:own,blockers:out};
 }
 function salesDeleteBlockedMessage_(blockers){
   return 'Löschen nicht möglich. Zu diesem Kunden gibt es noch: '+blockers.join(', ')+'. Bitte zuerst aufräumen (Projekte, Belege und Planumsätze in HQ, offene Aufträge in der Auftragsübersicht). Kunden sollten möglichst nie gelöscht werden.';
@@ -3103,11 +3106,12 @@ function salesDeleteBlockedMessage_(blockers){
 /** The status copy lives in the customer file, which opening a customer reads anyway (no extra read). */
 function salesDeleteSave_(doc,stored,extra){
   const writes=[{path:'sales_deletions/'+(doc.key||doc.hqId),value:doc},...(extra||[])];
-  if(stored?.company){if(['requested','approved','blocked','failed'].includes(doc.state))stored.deletion=salesDeleteView_(doc);else delete stored.deletion;writes.push({path:salesDeleteStatusPath_(doc),value:stored});}
+  const statusPath=salesDeleteStatusPath_(doc);
+  if(stored?.company&&statusPath){if(['requested','approved','blocked','failed'].includes(doc.state))stored.deletion=salesDeleteView_(doc);else delete stored.deletion;writes.push({path:statusPath,value:stored});}
   salesBulkRest_('commit',{writes:writes.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}}))});
 }
-function salesDeleteStatusPath_(doc){return doc.local||doc.pendingDraft?'sales_drafts/'+salesKey_(doc.draftId):'sales_companies/'+doc.hqId;}
-function salesDeleteStatusDoc_(doc){return salesRead_(salesDeleteStatusPath_(doc));}
+function salesDeleteStatusPath_(doc){if(doc.statusPath!==undefined)return doc.statusPath;return doc.local||doc.pendingDraft?'sales_drafts/'+salesKey_(doc.draftId):'sales_companies/'+doc.hqId;}
+function salesDeleteStatusDoc_(doc){const path=salesDeleteStatusPath_(doc);return path?salesRead_(path):null;}
 /** After the approval the customer leaves the customer list at once; a later block restores the stored rows. */
 function salesDeleteHide_(doc){
   const keys=new Set([doc.key,doc.hqId?String(doc.hqId):null,doc.draftId?'draft_'+doc.draftId:null].filter(Boolean)),hit=c=>keys.has(String(c.id))||keys.has(String(c.hqId||''));
@@ -3129,7 +3133,7 @@ function requestSalesCustomerDelete(input){
     salesAssertPrivate_();const reason=salesText_(input?.reason,500,true),ref=salesDeleteRef_(input?.companyId),path='sales_deletions/'+ref.key,prior=salesRead_(path);
     if(prior&&['requested','approved'].includes(prior.state))return {message:prior.state==='requested'?'Für diesen Kunden liegt bereits ein Löschantrag vor. Er wartet auf die Freigabe durch einen Admin.':'Die Löschung ist bereits freigegeben.',deletion:salesDeleteView_(prior)};
     const check=salesDeleteBlockers_(ref);if(check.blockers.length)throw Error(salesDeleteBlockedMessage_(check.blockers));
-    const now=salesNow_(),value={key:ref.key,...(ref.local?{local:true}:{}),...(ref.uncertain?{uncertain:true}:{}),...(ref.pendingDraft?{pendingDraft:true}:{}),hqId:ref.hqId,draftId:ref.draftId,name:check.stored.company.name,reason,state:'requested',message:'Wartet auf Freigabe durch einen Admin.',requestedBy:user.email,...(user.uid?{requestedByUid:user.uid}:{}),requestedAt:now,revision:(prior?.revision||0)+1,log:[...(prior?.log||[]).slice(-20),{action:'requested',by:user.email,at:now,reason}]};
+    const now=salesNow_(),value={key:ref.key,...(check.statusPath!==undefined?{statusPath:check.statusPath}:{}),...(ref.local?{local:true}:{}),...(ref.uncertain?{uncertain:true}:{}),...(ref.pendingDraft?{pendingDraft:true}:{}),hqId:ref.hqId,draftId:ref.draftId,name:check.stored.company.name,reason,state:'requested',message:'Wartet auf Freigabe durch einen Admin.',requestedBy:user.email,...(user.uid?{requestedByUid:user.uid}:{}),requestedAt:now,revision:(prior?.revision||0)+1,log:[...(prior?.log||[]).slice(-20),{action:'requested',by:user.email,at:now,reason}]};
     salesDeleteSave_(value,check.stored);return {message:ref.uncertain?'Löschantrag gespeichert. Ein Admin muss ihn freigeben. Danach wird der Kunde sofort in der App gelöscht. Seine HQ-Übertragung war begonnen, aber nicht bestätigt: bitte in HQ prüfen, ob die Firma dort angelegt wurde.':ref.local?'Löschantrag gespeichert. Ein Admin muss ihn freigeben. Der Kunde ist noch nicht in HQ und wird nach der Freigabe sofort in der App gelöscht.':'Löschantrag gespeichert. Ein Admin muss ihn freigeben; erst dann wird der Kunde beim nächsten HQ-Abgleich in HQ und in der App gelöscht.',deletion:salesDeleteView_(value)};
   });
 }
@@ -3153,6 +3157,7 @@ function decideSalesCustomerDelete(input){
     }
     const check=salesDeleteBlockers_(ref);
     if(check.blockers.length){doc.state='blocked';doc.message=salesDeleteBlockedMessage_(check.blockers);doc.log=[...(doc.log||[]).slice(-20),{action:'blocked',by:user.email,at:now}];salesDeleteSave_(doc,check.stored);return {message:doc.message,deletion:salesDeleteView_(doc)};}
+    if(check.statusPath!==undefined)doc.statusPath=check.statusPath;
     if(ref.local){doc.uncertain=!!ref.uncertain;return salesDeleteLocal_(doc,check,user,now);}
     const id=salesKey_('delete_'+hqId+'_'+doc.revision),job={id,kind:'deleteCompany',business:1,hqId,draftId:ref.draftId,name:doc.name,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid,approvedByUid:user.uid}:{}),approvedBy:user.email,requestedBy:doc.requestedBy,createdAt:now,updatedAt:now,message:'Löschung freigegeben. Wird beim nächsten HQ-Abgleich in HQ und danach in der App ausgeführt.'};
     doc.state='approved';doc.jobId=id;doc.message=job.message;doc.log=[...(doc.log||[]).slice(-20),{action:'approved',by:user.email,at:now}];

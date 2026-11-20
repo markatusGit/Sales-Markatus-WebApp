@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 20.11.2026 – r34.4: Löschen ohne vollständige Kundenakte
+
+Nutzer meldet beim Löschantrag „Kundendetails fehlen in Firebase. Bitte zuerst den HQ-Abgleich ausführen.“ Ursache: Die Prüfung verlangte die vollständige Kundenakte; manche Kunden haben nur einen Verzeichniseintrag (Ansicht zeigt dann nur Grunddaten). Jetzt Rückfall auf Verzeichniseintrag bzw. Kundenliste, Status im Verzeichniseintrag, Projekte zusätzlich über HQ-Rohdaten geprüft. Alle Prüfdateien bestanden. Live-Prüfung offen.
+
 ### 20.11.2026 – r34.3: Löschknopf bei begonnener Übertragung, sofort aus der Kundenliste
 
 Nutzer: Bei manchen Kunden fehlt der Löschknopf; freigegebene Kunden sollen sofort aus der Kundenübersicht verschwinden. Ursache: Knopf war bei App-Kunden mit begonnener, unbestätigter HQ-Übertragung (z. B. unklar/Rückprüfung offen) bewusst ausgeblendet. Jetzt löschbar: mit HQ-ID über den zentralen Abgleich (eigene offene Aufträge werden bei Freigabe verworfen), ohne bestätigte HQ-ID sofort in der App mit Prüfhinweis für HQ. Nach der Freigabe sofort aus Namens- und Filterliste und aus dem geöffneten Browser entfernt; spätere Schreibvorgänge nehmen den Kunden nicht wieder auf; bei Sperre/Abbruch im Abgleich wiederhergestellt. Alle Prüfdateien bestanden. Live-Prüfung offen.

@@ -126,7 +126,7 @@ function salesLeanCompanyBase_(id){
   id=String(salesId_(id));const own=salesLeanOwnDraft_(id);if(own)return salesLeanCompanyBase_('draft_'+own);if(!salesLeanKnown_(id))throw new Error('Firma gehört nicht zum bestätigten App-Bestand.');
   const stored=salesRead_('sales_companies/'+id);
   if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
-  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true}:null;
+  const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true,...(entry.deletion?{deletion:entry.deletion}:{})}:null;
 }
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
