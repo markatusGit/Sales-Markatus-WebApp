@@ -19,7 +19,9 @@ function salesDeleteRef_(companyId){
     // Transfer started without a confirmed HQ ID: only the app entry can be deleted; HQ must be checked by hand.
     return {local:true,uncertain:true,hqId:null,draftId:draft.id,key:'draft_'+draft.id};
   }
-  const hqId=salesId_(companyId);return {hqId,draftId:salesDeleteOwnDraft_(hqId),key:String(hqId)};
+  const hqId=salesId_(companyId),draftId=salesDeleteOwnDraft_(hqId);
+  if(draftId&&salesRead_('sales_jobs/'+salesKey_(draftId))?.state!=='synced')return salesDeleteRef_('draft_'+draftId);
+  return {hqId,draftId,key:String(hqId)};
 }
 function salesDeleteUnsent_(job){return !!job&&['pending','ready'].includes(job.state)&&!job.writeAttempted&&!job.phaseWriteAttempted&&!job.contactAttempted;}
 function salesDeleteLocalJobs_(draftId){
@@ -72,7 +74,14 @@ function salesDeleteHide_(doc){
   if(hidden.names.length)salesWrite_('sales_meta/lean_names',{...names,rows:names.rows.filter(c=>!hit(c))});
   if(hidden.filters.length)salesWrite_('sales_meta/lean_filters',{...filters,rows:filters.rows.filter(c=>!hit(c))});
   if(doc.hqId){const tomb=salesRead_('sales_meta/deleted_companies')||{ids:[]};if(!tomb.ids.includes(String(doc.hqId)))salesWrite_('sales_meta/deleted_companies',{ids:[...tomb.ids,String(doc.hqId)].slice(-5000)});}
-  doc.hidden=hidden;return Array.from(keys);
+  const merge=(old,rows)=>Array.from(new Map([...(old||[]),...rows].map(c=>[String(c.id),c])).values());
+  doc.hidden={names:merge(doc.hidden?.names,hidden.names),filters:merge(doc.hidden?.filters,hidden.filters)};return Array.from(keys);
+}
+/** One-time repair of approvals made before immediate list removal was introduced. Never approves a request or calls HQ. */
+function salesDeleteMigrateVisibility_(){
+  for(const doc of salesList_('sales_deletions').filter(d=>d.state==='approved')){
+    salesDeleteHide_(doc);salesWrite_('sales_deletions/'+(doc.key||doc.hqId),doc);
+  }
 }
 function salesDeleteRestore_(doc){
   const h=doc.hidden;delete doc.hidden;if(!h)return;

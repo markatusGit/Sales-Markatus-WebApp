@@ -2,6 +2,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-delete.cjs');
 (async()=>{
  const f=fixture(),started=f.ctx.saveSalesCompany({...f.input,name:'Synthetic started customer'});Object.assign(f.db['sales_jobs/'+started.id],{state:'uncertain',writeAttempted:true});const unsent=f.ctx.saveSalesCompany({...f.input,name:'Synthetic unsent customer'});f.db['sales_meta/lean_names'].rows.push({id:'draft_'+unsent.id,name:'Synthetic unsent customer'},{id:'draft_'+started.id,name:'Synthetic started customer'});const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
+ const batch=f.ctx.saveSalesCompany({...f.input,name:'Synthetic batch B good'});f.db['sales_meta/lean_names'].rows.push({id:'draft_'+batch.id,name:'Synthetic batch B good'});
+ f.db['sales_meta/lean_names'].rows.find(c=>c.id==='102').name='Synthetic batch A blocked';f.db['sales_directory/102']={company:{id:102,name:'Synthetic batch A blocked'}};
+ f.db['sales_rawprojects/9']={row:{id:9,companyId:102},generation:'g1',companyBucket:'38'};
  try{
   const page=await browser.newPage(),calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
   await page.exposeFunction('fixtureRpc',(name,args)=>{calls.push({name,args});return JSON.parse(JSON.stringify(f.ctx[name](...args)));});
@@ -39,6 +42,17 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
   await page.locator('[data-deletion-row="draft_'+unsent.id+'"]').getByText('Gelöscht',{exact:true}).waitFor();assert.ok(f.db['sales_drafts/'+unsent.id].deletedAt);assert.equal(f.calls.filter(c=>c.method!=='get').length,writesBefore,'no HQ write at all');
   await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('button',{name:'Synthetic started customer',exact:true}).click();await page.getByRole('heading',{name:'Synthetic started customer',exact:true}).waitFor();
   assert.equal(await page.locator('.m-pagehead').getByRole('button',{name:'Kunde löschen',exact:true}).count(),1,'started transfer also has the delete button');
-  assert.deepEqual(errors,[]);console.log('PASS customer deletion request, clean-up hint and two-step admin approval (HQ and unsent customers) in a real browser');
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('heading',{name:'Kunden',exact:true}).waitFor();
+  await page.getByLabel('Nach Namen suchen',{exact:true}).fill('Synthetic batch');
+  await page.getByRole('button',{name:'Treffer zur Löschung vormerken',exact:true}).click();
+  await page.getByRole('heading',{name:'2 Kunden zur Löschung vormerken',exact:true}).waitFor();
+  await page.getByLabel('Grund für die Löschung (Pflicht)',{exact:true}).fill('Synthetic cleanup');
+  const decisions=calls.filter(c=>c.name==='decideSalesCustomerDelete').length;
+  await page.getByRole('button',{name:'Löschanträge stellen',exact:true}).click();
+  await page.getByText('Löschanträge geprüft',{exact:true}).waitFor();
+  assert.equal(f.db['sales_deletions/102'],undefined,'blocked entry stays unchanged');assert.equal(f.db['sales_deletions/draft_'+batch.id].state,'requested','continues after the blocked entry without approving');
+  await page.locator('#customer-delete-batch').getByText('Synthetic batch A blocked: Löschen nicht möglich.',{exact:false}).waitFor();
+  assert.equal(calls.filter(c=>c.name==='decideSalesCustomerDelete').length,decisions,'batch only requests');
+  assert.deepEqual(errors,[]);console.log('PASS deletion requests, partial batch failure and two-step admin approval in a real browser');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

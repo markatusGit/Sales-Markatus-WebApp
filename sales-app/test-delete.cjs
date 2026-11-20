@@ -184,6 +184,26 @@ test('UI: delete button sits in the header next to "Firmendaten bearbeiten" for 
   assert.equal(ui.split("true)+deleteCustomerButton(c)+button('Zur Kundenliste','nav','customers'))+deleteCustomerPanel(c)").length-1,1);
   assert.ok(ui.includes(":'')+deleteCustomerButton(c)+button('Zur Kundenliste','nav','customers'))+deleteCustomerPanel(c)+"));
 });
+test('numeric HQ references of partly transferred app customers keep the draft and cancel only its own jobs after approval',()=>{
+  const f=fixture(),c=f.ctx.saveSalesCompany({...f.input,name:'Synthetic partial numeric'});
+  Object.assign(f.db['sales_jobs/'+c.id],{state:'uncertain',hqId:101,writeAttempted:true});f.db['sales_drafts/'+c.id].hqId=101;
+  f.db['sales_meta/lean_testowners']={rows:{'101':c.id}};
+  f.db['sales_jobs/own-change']={id:'own-change',kind:'entityChange',draftDependency:c.id,companyRef:'draft_'+c.id,state:'pending'};
+  assert.equal(request2(f,'101').deletion.pendingDraft,true);assert.equal(f.db['sales_jobs/'+c.id].state,'uncertain','request never cancels jobs');
+  approve(f);assert.equal(f.db['sales_jobs/'+c.id].state,'canceled');assert.equal(f.db['sales_jobs/own-change'].state,'canceled');
+  assert.equal(f.calls.filter(c=>c.method==='delete').length,0,'approval does not call HQ');
+});
+test('legacy approvals disappear on the next customer list read, once only, preserving restoration snapshots and requested customers',()=>{
+  const f=fixture();request(f);approve(f);const doc=f.db['sales_deletions/101'];
+  f.db['sales_meta/lean_names'].rows.push({id:'101',name:'Synthetic legacy row'});f.db['sales_meta/lean_filters'].rows.push({id:'101',name:'Synthetic legacy row'});
+  delete f.db['sales_meta/deleted_companies'];
+  f.db['sales_deletions/102']={key:'102',hqId:102,state:'requested',name:'Other'};
+  const before=f.calls.length,rows=f.ctx.salesLeanNames_();assert.deepEqual(plain(rows.map(c=>c.id)),['102']);assert.equal(f.db['sales_meta/lean_names'].deletionVisibilityVersion,1);
+  assert.equal(f.db['sales_deletions/101'].state,'approved');assert.equal(f.db['sales_deletions/102'].state,'requested');assert.equal(f.calls.length,before,'no HQ requests');
+  const log=JSON.stringify(f.db['sales_deletions/101']);f.ctx.salesLeanNames_();assert.equal(JSON.stringify(f.db['sales_deletions/101']),log);
+  f.remote.Projects[9]={id:9,companyId:101};runSync(f);assert.ok(f.db['sales_meta/lean_names'].rows.some(c=>c.id==='101'),'a later HQ block restores the customer');
+  assert.equal(f.db['sales_meta/deleted_companies'].ids.includes('101'),false);
+});
 console.log(count+' customer deletion checks passed.');
 }
 module.exports={fixture,ADMIN,TEAM};

@@ -1736,6 +1736,14 @@ Veröffentlichung v0.34.2: Apps-Script-Version 57, bestehende Bereitstellung bei
 
 Veröffentlichung v0.34.3: Apps-Script-Version 58, bestehende Bereitstellung beibehalten. Quellcommit 2ddafaf1593e7aa035efa999879271f4fcb337f0. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-20T12:49:21.346Z.
 
+### 20.11.2026 – r34.5: Beauftragte Testkundenbereinigung vorbereiten
+
+Nutzer beauftragt alle Kunden mit „Test“ im Namen; die endgültige Bestätigung übernimmt er selbst in der Verwaltung. Live neun Namenssuchtreffer, darunter zwei bereits freigegebene Anträge. Beide erscheinen auch nach Firebase-Neuladen weiter in der Liste: ältere Freigaben vor Einführung des sofortigen Ausblendens hatten weder entfernte Indexzeilen noch eine Löschmarkierung. Neue einmalige Migration beim ausdrücklichen Laden der Kundenliste ergänzt beides, erhält Freigaben/Aufträge und Wiederanzeigedaten für spätere HQ-Sperren. Keine HQ-Abfragen oder Löschungen durch die Migration; danach weiterhin ein Lesezugriff je regulärem Kundenlistenabruf.
+
+Zusätzlich Fehler beim Löschziel behoben: Oberfläche bevorzugte bei App-Anlagen die HQ-ID und verlor damit die Kennzeichnung der noch offenen ursprünglichen Anlage. Nun Entwurfskennung übergeben und numerische Aufrufe serverseitig derselben Anlage zuordnen; eigene offene Aufträge werden erst bei Freigabe verworfen, fremde Aufträge/Projekte/Belege/Planumsätze bleiben Sperren. Sammelvormerkung bis 20 angezeigte Suchtreffer nutzt die unveränderte Einzelantragsschnittstelle, zeigt vorab feste Namen und Pflichtgrund und danach Ergebnis je Kunde. Einzelfehler stoppen die übrigen Anträge nicht; keine Sammelfreigabe.
+
+Prüfungen für Altfreigaben, Rückkehr bei HQ-Sperre, numerische Entwurfszuordnung und Browser-Sammelanträge mit teilweisem Fehler ergänzt. Stand zunächst lokal vorbereitet; tatsächliche Anträge, Release und GitHub-Nachweis nach Abschluss gesondert ergänzen. Keine Kundeninhalte/Zugangsdaten dokumentiert. Keine neuen Script Properties oder Bereitstellungseinstellungen. Bestehende Roadmap und fremde Dokumentationsdateien erhalten.
+
 ### Veröffentlichung v0.34.4
 
 Veröffentlichung v0.34.4: Apps-Script-Version 59, bestehende Bereitstellung beibehalten. Quellcommit dc691d99aa3696ff97cd0c8b36c4e54b1163c388. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-20T13:07:19.043Z.

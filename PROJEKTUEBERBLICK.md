@@ -1,5 +1,9 @@
 # Projektüberblick – Sales Markatus
 
+### 20.11.2026 – r34.5: Testkunden zur Löschung vormerken und Löschablauf reparieren
+
+Auftrag: alle Kunden mit „Test“ im Namen zur Löschung vormerken; der Nutzer bestätigt anschließend selbst in der Verwaltung. Live zunächst neun Treffer und zwei bereits freigegebene Anträge festgestellt, die trotzdem noch in der Kundenliste erscheinen. Umgesetzt: einmalige Reparatur alter Freigaben in den kompakten Listen, korrekte Entwurfszuordnung begonnener App-Anlagen und Sammelvormerkung für höchstens 20 ausdrücklich angezeigte Suchtreffer mit Einzelresultaten. Alle 27 Prüfdateien bestanden, darunter 18 Löschfälle und der Browserfall mit teilweisem Sammelfehler. Keine Freigaben oder HQ-Löschungen durch diese Arbeit auslösen. Veröffentlichung und tatsächliche Vormerkung werden getrennt nachgewiesen. Keine neuen Script Properties oder Bereitstellungseinstellungen. Fremde Dokumentationsänderungen und bestehende Roadmap bleiben erhalten.
+
 ### 20.11.2026 – r34.4/v0.34.4: Kunden löschen (R15)
 
 Jeder Nutzer kann in der Kundenakte oben neben „Firmendaten bearbeiten“ über „Kunde löschen“ mit Grund beantragen (auch noch nicht an HQ übertragene App-Kunden; diese werden nach Freigabe sofort nur in der App gelöscht); der Admin gibt unter „Verwaltung“ → „Löschanträge für Kunden“ mit zweiter Bestätigung frei. Nach der Freigabe verschwindet der Kunde sofort aus der Kundenliste; auch App-Kunden mit begonnener Übertragung sind löschbar. In HQ gelöscht wird erst im nächsten zentralen HQ-Abgleich: Kontakthistorie, Ansprechpartner und Firma in HQ, danach alles in der App. Kein Papierkorb. Projekte, Belege, Planumsätze oder offene Aufträge sperren mit Hinweis „erst aufräumen“. Alle 26 Prüfdateien bestanden. Live-Prüfung mit einer eigenen TEST-Firma steht aus. Keine neuen Script Properties oder Bereitstellungseinstellungen.

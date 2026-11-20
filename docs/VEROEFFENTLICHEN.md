@@ -1,5 +1,23 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r34.5: Suchtreffer vormerken und alte Freigaben ausblenden
+
+Keine Script Properties oder Bereitstellungseinstellungen ändern. Beim ersten Laden der Kundenliste werden ältere, bereits freigegebene Löschungen einmalig aus den gespeicherten Listen entfernt. Ihre Freigaben bleiben bestehen; HQ wird dabei nicht aufgerufen.
+
+- Die bisherige App-Adresse neu laden; Kennung „2026-11-20-r34.5“ erwarten. Bei anderer Kennung diese melden.
+- „Kunden“ öffnen; bereits freigegebene Kunden dürfen nicht mehr erscheinen. Bei abweichendem Ergebnis „Ansicht aktualisieren“ anklicken und danach den Löschstatus melden.
+- In „Nach Namen suchen“ den gewünschten Namensteil eintragen.
+- „Treffer zur Löschung vormerken“ anklicken; eine feste Liste mit höchstens 20 Namen erwarten. Bei falschen Namen „Abbrechen“ anklicken.
+- In „Grund für die Löschung (Pflicht)“ den Grund eintragen.
+- „Löschanträge stellen“ anklicken; für jeden angezeigten Kunden ein Ergebnis erwarten. Ein gesperrter Kunde bleibt unverändert und zeigt seinen konkreten Grund; die übrigen Anträge werden trotzdem versucht.
+- „Verwaltung“ öffnen.
+- Zum Abschnitt „Löschanträge für Kunden“ scrollen.
+- „Löschanträge anzeigen“ beziehungsweise „Neu laden“ anklicken; die gespeicherten Anträge erwarten. Bei fehlendem Antrag das zugehörige Einzelergebnis melden.
+- Beim gewünschten Antrag „Löschung freigeben“ anklicken; die Rückfrage „Wirklich endgültig löschen?“ erwarten.
+- Ausschließlich bei gewollter endgültiger Löschung „Ja, endgültig löschen“ anklicken; bei einem App-Kunden „Gelöscht“, bei einem HQ-Kunden „Freigegeben · wird beim nächsten HQ-Abgleich gelöscht“ erwarten. Bei einer Sperre den angegebenen Aufräumgrund klären.
+
+Begonnene App-Anlagen mit unbestätigtem HQ-Ergebnis zeigen weiterhin ihren Prüfhinweis. Eine reine App-Löschung bestätigt keine erfolgte HQ-Löschung. Der tatsächliche zentrale HQ-Löschlauf bleibt eine gesonderte Live-Prüfung nach Nutzerfreigabe.
+
 ## r34.2: Startfehler behoben
 
 - Die App neu laden (bei Bedarf Strg+F5); Kennung „2026-11-20-r34.2“ erwarten und keine rote Fehlermeldung.

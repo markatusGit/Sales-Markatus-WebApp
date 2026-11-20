@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## [v0.34.5]
+
+- Frühere Adminfreigaben aus r34/r34.1 werden beim nächsten Laden der Kundenliste einmalig auch aus den gespeicherten Namens- und Filterlisten entfernt. Freigabe, Löschauftrag und mögliche spätere Wiederanzeige bei HQ-Sperren bleiben erhalten. Kein HQ-Aufruf und keine neue Freigabe durch diese Reparatur.
+- Begonnene App-Anlagen werden beim Löschantrag auch über eine numerische HQ-ID ihrem ursprünglichen Entwurf zugeordnet. Der Löschknopf übergibt die Entwurfskennung; eigene offene Anlageaufträge blockieren damit nicht irrtümlich. Erst die Adminfreigabe verwirft diese Aufträge.
+- Suchtreffer lassen sich in Gruppen bis 20 Kunden zur Löschung vormerken: feste Namensliste, Pflichtgrund, Ergebnis je Kunde; Fehler eines Kunden verhindern die übrigen Anträge nicht. Bestehende Einzelprüfung und separate Adminfreigabe bleiben erhalten.
+- Kennung `2026-11-20-r34.5`. Keine neuen Script Properties oder Bereitstellungseinstellungen. Endgültige produktive HQ-Löschung bleibt bis zur Nutzerfreigabe ungeprüft.
+
 ## [v0.34.4]
 
 - Korrektur: Kunden, für die in Firebase nur der Verzeichniseintrag und noch keine vollständige Kundenakte gespeichert ist, ließen sich nicht löschen („Kundendetails fehlen in Firebase“). Antrag und Freigabe verwenden jetzt den Verzeichniseintrag (oder die Kundenliste); der Löschstatus steht dann im Verzeichniseintrag. Projekte werden zusätzlich über die gespeicherten HQ-Rohdaten geprüft, nicht nur über die Kundenakte.
