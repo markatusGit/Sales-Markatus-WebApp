@@ -1,14 +1,17 @@
 # Projektüberblick – Sales Markatus
 
-### 20.11.2026 – Entscheidung: Kunden löschen mit Papierkorb (Roadmap R15, noch nicht umgesetzt)
+### 20.11.2026 – Entscheidung: Kunden löschen (Roadmap R15, noch nicht umgesetzt)
 
-Bisher können Kunden in der App nicht gelöscht werden. Nutzer legt fest:
-- „Löschen“ nur durch Admins, mit Papierkorb und Wiederherstellung.
+Bisher können Kunden in der App nicht gelöscht werden. Nutzer legt fest (Papierkorb am selben Tag verworfen):
+- Kunden werden direkt und endgültig gelöscht, in der App und in HQ, damit beide gleich bleiben.
+- Das geschieht immer erst nach Freigabe durch einen Admin.
+- Es gibt keinen Papierkorb und keine Wiederherstellung.
+- Hat der Kunde Belege, Umsätze oder offene Aufträge, wird nicht gelöscht. Die App zeigt einen Hinweis, dass vorher aufgeräumt werden muss.
+- Kunden sollen grundsätzlich möglichst nie gelöscht werden.
 - Der Löschabgleich gegen HQ kommt in Paket A/R14 (Klärungsliste).
-- App-Löschung darf nach Admin-Freigabe auch in HQ löschen; das zuerst mit einer TEST-Firma prüfen.
-- Endgültiges Löschen nur aus dem Papierkorb.
+- Die HQ-Löschung wird zuerst mit einer TEST-Firma geprüft.
 
-Offene Fachfragen und Details stehen im Tagebuch. Paket B/C als Vorschlag in R16. Nur Dokumentation, kein Code, keine Google-Veröffentlichung.
+Details und offene Punkte stehen im Tagebuch. Paket B/C als Vorschlag in R16. Nur Dokumentation, kein Code, keine Google-Veröffentlichung.
 
 ### 18.11.2026 – r33: HQ ausschließlich im zentralen Abgleich
 

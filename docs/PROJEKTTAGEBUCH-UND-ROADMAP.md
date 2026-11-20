@@ -1,6 +1,6 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
-### 20.11.2026 – Festgelegt: Kunden löschen und Papierkorb (noch nicht umgesetzt)
+### 20.11.2026 – Festgelegt: Kunden löschen (zuerst mit Papierkorb, dann ohne; noch nicht umgesetzt)
 
 Nutzerfrage: Kann ein Admin Kunden in der App löschen? Bestätigt: Bisher gibt es dafür weder eine Serverfunktion noch einen Knopf. Bisherige Regel: „Fehlende HQ-Firmen nicht automatisch löschen/archivieren, Archivierungsregeln später.“ Der Nutzer legt fest (Roadmap R15; Löschabgleich in Paket A/R14):
 
@@ -9,10 +9,11 @@ Nutzerfrage: Kann ein Admin Kunden in der App löschen? Bestätigt: Bisher gibt 
 3. **Löschen in der App darf den Kunden auch in HQ löschen**, aber nur nach Freigabe durch einen Admin. Vorher mit einer eigenen TEST-Firma prüfen: welchen HQ-Endpunkt es gibt und was mit Ansprechpartnern, Historie, Belegen und Projekten passiert. Gemäß r33 erst im zentralen Abgleich ausführen, davor lesend prüfen.
 4. **Endgültiges Löschen** nur im Papierkorb, für einen bereits gelöschten Kunden. Danach ist keine Wiederherstellung mehr möglich.
 
-Offene Fachfragen vor der Umsetzung:
-- (a) Erfolgt die HQ-Löschung schon beim Verschieben in den Papierkorb oder erst beim endgültigen Löschen? Nach einer HQ-Löschung hieße Wiederherstellen: Neuanlage mit neuer HQ-ID.
-- (b) Zählen Belege und Umsätze gelöschter Kunden in vergangenen Ausgaben weiter?
-- (c) Was passiert mit offenen Aufträgen des Kunden?
+**Am selben Tag geändert – ersetzt die Punkte 1 und 4 (kein Papierkorb):** Der Nutzer will keine Abweichung zwischen App und HQ. Deshalb gibt es keinen Papierkorb. Ein Kunde wird direkt und endgültig gelöscht, in der App und in HQ. Das geschieht immer erst nach Freigabe durch einen Admin, und eine Wiederherstellung gibt es nicht. Kunden, die bereits in HQ fehlen (Löschabgleich, Punkt 2), werden nach Admin-Bestätigung ebenfalls direkt aus der App gelöscht. Grundsätzlich sollen Kunden möglichst nie gelöscht werden.
+
+**Vorbedingung „vorher aufräumen“:** Hat der Kunde Belege oder Umsätze in Ausgaben oder offene Aufträge, wird das Löschen nicht ausgeführt. Stattdessen zeigt die App einen Hinweis, was noch vorhanden ist. Das muss vorher jemand bereinigen. Die App räumt nichts automatisch auf.
+
+Noch offen: Darf auch ein Nicht-Admin einen Löschantrag stellen, den ein Admin freigibt, oder löscht nur der Admin selbst mit Bestätigung? Ebenfalls offen ist, ob Ansprechpartner, Historie und Projekte als „aufzuräumen“ gelten oder mitgelöscht werden. Das hängt vom HQ-Test mit der TEST-Firma ab.
 
 Am selben Tag als Lösungsvorschlag für Sync-Meldungen besprochen: Paket A (R14), B und C (R16). Kein Code geändert, nichts nach Google veröffentlicht.
 
@@ -114,7 +115,7 @@ Keine der folgenden späteren Funktionen erhält durch diesen Eintrag bereits ei
 | R12 | App-Nutzer ohne eigenes HQ-Konto | Am 24.09.2026 ausdrücklich als spätere Nutzergruppe bestätigt | Verantwortlichen HQ-Benutzer zunächst auswählen; spätere Zuordnungs- und Autorenregel klären |
 | R13 | Rechnungen über mehrere Magazinausgaben aufteilen | Am 24.09.2026 als real vorkommend bestätigt, für den aktuellen Test ausdrücklich zurückgestellt | Rechnungspositionen oder fachliche Zuordnung je Ausgabe prüfen; keine ungeprüfte anteilige Verteilung |
 | R14 | Paket A „Zu klären“: Admin-Klärungsliste für Sync-Meldungen | Am 20.11.2026 als Lösungsvorschlag besprochen; Nutzer will den Löschabgleich aus R15 darin bauen; noch nicht umgesetzt | Umfang: Klärungsliste nach Fallart, Klärungs-Assistent für unklare Aufträge (nur lesende HQ-Prüfung, danach Zuordnen / Admin-Freigabe zum erneuten Senden / Treffer anzeigen), „Auftrag verwerfen“ mit Begründung, „Autor bestätigen“, Folgefälle unter dem auslösenden Auftrag, Löschabgleich gegen HQ. Nichts automatisch nach HQ schreiben |
-| R15 | Kunden löschen mit Papierkorb (nur Admin) | Am 20.11.2026 vom Nutzer festgelegt; noch nicht umgesetzt | Siehe Tagebucheintrag 20.11.2026 „Kunden löschen und Papierkorb“; HQ-Löschung zuerst mit eigener TEST-Firma prüfen |
+| R15 | Kunden löschen (App und HQ, ohne Papierkorb, nur nach Admin-Freigabe) | Am 20.11.2026 vom Nutzer festgelegt, am selben Tag Papierkorb gestrichen; noch nicht umgesetzt | Siehe Tagebucheintrag vom 20.11.2026; Löschen gesperrt mit Hinweis bei Belegen/Umsätzen oder offenen Aufträgen; HQ-Löschung zuerst mit eigener TEST-Firma prüfen; offen, ob Nicht-Admins Löschanträge stellen dürfen |
 | R16 | Paket B/C: Sync-Meldungen sauberer einordnen, Ausgabenprüfung verlinken | Am 20.11.2026 als Vorschlag besprochen; nicht beauftragt | B: HTTP400 als „von HQ abgelehnt“ mit Korrektur, Historien-Suche (einer/keiner/mehrere), 404-Firmen neu zuordnen, vorübergehende HQ500 erst nach drei Läufen melden. C: Direktlinks zur Ausgabenprüfung |
 
 ### Ergänzende Ideen vom 23.09.2026 – noch nicht beauftragt
