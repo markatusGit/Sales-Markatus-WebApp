@@ -308,3 +308,5 @@ Veröffentlichungsnachweis für v0.32.1: Google-Version 53; 2026-11-18T14:55:23.
 Veröffentlichung v0.33.0: Apps-Script-Version54, bestehende Bereitstellung und Einstellungen erhalten. Quellcommit 0ec81caf082d393716a7ea0eae2309bb514a78de. Alle24 Prüfdateien bestanden; Google-Version und Editor bytegenau geprüft. Verzögerte Versionsanzeige nach lesendem Vergleich bestätigt, kein erneuter Upload und keine zusätzliche Version. Keine Script Properties geändert. Live-Funktionstest gesondert. Zeitpunkt: 2026-11-18T20:05:53.007Z.
 
 Veröffentlichungsnachweis für v0.34.0: Google-Version 55; 2026-11-20T10:53:51.398Z. Details in deployment.json.
+
+Veröffentlichungsnachweis für v0.34.1: Google-Version 56; 2026-11-20T12:00:23.865Z. Details in deployment.json.
