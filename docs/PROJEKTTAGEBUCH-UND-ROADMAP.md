@@ -1727,3 +1727,7 @@ Veröffentlichung v0.34.1: Apps-Script-Version 56, bestehende Bereitstellung bei
 ### Veröffentlichung v0.34.2
 
 Veröffentlichung v0.34.2: Apps-Script-Version 57, bestehende Bereitstellung beibehalten. Quellcommit de6fd464026f49524c319b9ad5ae477c66dff657. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-20T12:23:52.532Z.
+
+### Veröffentlichung v0.34.3
+
+Veröffentlichung v0.34.3: Apps-Script-Version 58, bestehende Bereitstellung beibehalten. Quellcommit 2ddafaf1593e7aa035efa999879271f4fcb337f0. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-20T12:49:21.346Z.
