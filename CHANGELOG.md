@@ -2,6 +2,7 @@
 
 ## [v0.38.2]
 
+- Veröffentlichung nachgewiesen: bestehende Google-Bereitstellung auf Version 68, alle 27 Prüfdateien und Codevergleich bestanden. Öffentliche Loginhülle mit Kennung `2026-11-23-r38.2` erreicht.
 - Der HQ-Löschabgleich versucht bei Serverfehlern der Kennungsliste kleinere Seiten. Fällt die zusätzliche Kennungssuche oder Mengenprüfung aus, bleibt der Prüfpunkt sichtbar und der übrige Lauf kann abschließen. Eine lokale Löschung verlangt weiterhin beide bestätigenden HQ-Abrufe.
 - Kennung `2026-11-23-r38.2`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
 

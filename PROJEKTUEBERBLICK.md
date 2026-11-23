@@ -4,6 +4,8 @@
 
 Der gemeldete Lauf steht gespeichert bei 14 von 17 Abschnitten in der zusätzlichen Löschprüfung für Unternehmen. Der Serverfehler HTTP 500 kam vor der ersten gespeicherten Kennungsseite. Lokale Korrektur: Eine fehlerhafte Kennungsseite mit 50 statt 200 Kennungen erneut anfragen. Bleibt die Kennungsliste oder eine ergänzende Mengenprüfung wegen eines HQ-Serverfehlers offen, bearbeitet der Lauf die übrigen Abschnitte und zeigt den offenen Punkt. Lokale Kopien werden nur nach bestätigter Löschung entfernt. Der produktive Lauf wird getrennt vom Release geprüft.
 
+**Veröffentlicht als v0.38.2 und Apps-Script-Version 68.** Alle 27 Prüfdateien in der sauberen Veröffentlichungskopie bestanden. Dieselbe Google-Bereitstellung meldete Version 68 nach kurzer Verzögerung. Feste Version und Editor stimmen mit dem Quellcommit überein. Die öffentliche Loginhülle lieferte HTTP 200 und die Kennung `2026-11-23-r38.2`. Kleinere Kennungsseiten und ein weiterhin ausfallender HQ-Löschabgleich wurden mit synthetischen Daten geprüft. Der bereits pausierte produktive Lauf wurde für diese Veröffentlichung nicht fortgesetzt. Google- und GitHub-Zuordnung lassen sich über `release:verify` nachvollziehen. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 ### 23.11.2026 – r38.1: Wiedervorlage erfassen oder erneut planen
 
 „Erfassen“ bietet „Speichern“ für eine neue Kommunikation und „Wiedervorlage“ für einen neuen Termin. In der normalen Kundenkommunikation ist „Nicht erreicht“ weiterhin verfügbar. Der Server lehnt dieses Ergebnis beim Abschluss einer Wiedervorlage ab. Diese Entscheidung ersetzt den entsprechenden Teil von r38.
