@@ -6,6 +6,8 @@ Persönliche Wiedervorlagen werden in der Kundenkommunikation mit „Wiedervorla
 
 „Verschieben“ ändert den Termin. „Erfassen“ öffnet das bekannte Kommunikationsformular. „Speichern“ und „Nicht erreicht“ speichern die Kommunikation und schließen den Termin. Eine erneute „Wiedervorlage“ setzt den Termin weiter. Die Wiedervorlagen selbst liegen in Firebase. Neue Kontakthistorie nimmt am bestehenden HQ-Abgleich teil. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
 
+**Veröffentlicht als v0.38.0 und Apps-Script-Version 66.** Alle 27 Prüfdateien bestanden. Feste Google-Version, Google-Editor und GitHub-Tag stimmen überein. Die öffentliche Anmeldeseite lieferte HTTP 200 und die Kennung `2026-11-23-r38`. Der künstliche Firebase-Prüfpfad verweigerte anonymen Zugriff mit HTTP 403. Anlage, Verschieben und Erfassen wurden mit synthetischen Daten geprüft. Für die Veröffentlichung wurde kein produktiver Kontakt oder Termin angelegt. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 ### 23.11.2026 – r37: CRM-Änderungen begründen und Überschreibungen freigeben
 
 Nutzerentscheidung: Firmen, Ansprechpartner und Kontakthistorie bei Neuanlage zwischen Firebase und HQ spiegeln. Ergänzungen an bestehenden Kunden gezielt übertragen. App-Änderungen brauchen einen Grund, auch beim Ausfüllen eines leeren Feldes. Einen vorhandenen Wert erst nach Freigabe durch den Admin überschreiben. Bei einer zwischenzeitlichen Änderung desselben Feldes gilt HQ.
