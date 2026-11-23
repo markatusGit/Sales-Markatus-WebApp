@@ -2,6 +2,7 @@
 
 ## [v0.37.0]
 
+- Veröffentlichung nachgewiesen: bestehende Google-Bereitstellung auf Version 65, alle 27 Prüfdateien und Codevergleich bestanden. Öffentliche Loginhülle mit Kennung `2026-11-23-r37` erreicht.
 - App-Stammdatenänderungen verlangen einen Änderungsgrund. Ergänzungen leerer Felder gehen über den zentralen HQ-Abgleich. Änderungen und das Leeren vorhandener Werte brauchen eine Admin-Freigabe.
 - Admin-Entscheidungen und Rückfragen im Änderungsauftrag. Mitarbeitende antworten unter „Meine Änderungen“. Aktuelle HQ-Werte haben bei einer konkurrierenden Änderung Vorrang, auch nach einer zuvor erteilten Freigabe.
 - Kennung `2026-11-23-r37`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
