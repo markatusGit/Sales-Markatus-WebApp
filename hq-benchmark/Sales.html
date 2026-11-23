@@ -49,6 +49,15 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb .m-contact-dialog{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:10px;padding:24px;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
 #magazin-vertrieb .m-contact-dialog::backdrop{background:#0009}
 #magazin-vertrieb .m-contact-dialog .m-form{gap:12px;margin:18px 0}
+#magazin-vertrieb .m-home-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:22px;align-items:start}
+#magazin-vertrieb .m-reminders-in-history{border-bottom:2px solid var(--m-line);padding-bottom:10px}
+#magazin-vertrieb .m-reminder-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#magazin-vertrieb .m-reminder-heading h3{flex-basis:100%}
+#magazin-vertrieb .m-reminder-heading time{font-weight:600}
+#magazin-vertrieb .m-reminder-note{white-space:pre-wrap;overflow-wrap:anywhere}
+#magazin-vertrieb .m-reminder-dialog form{margin-top:16px}
+#magazin-vertrieb .m-reminder-dialog textarea{min-height:85px;resize:vertical}
+@media(max-width:900px){#magazin-vertrieb .m-home-columns{grid-template-columns:minmax(0,1fr)}#magazin-vertrieb .m-home-columns>.m-reminders{grid-row:1}}
 #magazin-vertrieb .m-dialog-error{color:var(--m-warn)}
 @media(max-width:1050px){
  #magazin-vertrieb .m-customer-tabs{display:flex;gap:8px;flex:none;margin-bottom:12px}
@@ -96,7 +105,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-23-r37</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-23-r38</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -107,7 +116,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-23-r37</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-23-r38</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -121,8 +130,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-11-23-r37';
-  const UI_BUILD='2026-11-23-r37';
+  const APP_RELEASE='2026-11-23-r38';
+  const UI_BUILD='2026-11-23-r38';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -187,7 +196,7 @@ window.__salesStarted=false;
     const rows=detail?.histories||[],isDocument=h=>h.documentDispatch||h.contactHistoryChannel==='SentDocument';
     const actions=(state.user.admin&&(c.hqId||!c.localDraftId)?button('Historie aus HQ aktualisieren','sync-history',c.id):'');
     const cards=rows.slice().sort((a,b)=>(Date.parse(b.contactOn)||0)-(Date.parse(a.contactOn)||0)).map(h=>historyRow(h).replace('<div class="m-row"','<div class="m-row" data-history-row data-document="'+!!isDocument(h)+'"')).join('');
-    return `<section class="m-panel m-section"><div class="m-history-toolbar"><div class="m-panel-head"><h2>Kontakt-Historie</h2><span data-history-count aria-live="polite">${rows.length} Einträge in Firebase</span></div><div class="m-panel-body"><div class="m-history-filters"><input type="search" data-history-search aria-label="Kontakthistorie durchsuchen" placeholder="Kontakthistorie durchsuchen …" value="${esc(communicationDraft().historyQuery||'')}"><select name="historyFilter" aria-label="Anzeige">${[{id:'all',name:'Alle Einträge'},{id:'communication',name:'Kommunikation'},{id:'documents',name:'Rechnungen / Dokumentversand'}].map(o=>`<option value="${o.id}" ${historyFilter===o.id?'selected':''}>${o.name}</option>`).join('')}</select></div><div class="m-test-actions">${actions}</div><p class="m-muted">Letzter vollständiger Historienimport: ${esc(detail?.historyLoadedAt?new Date(detail.historyLoadedAt).toLocaleString('de-DE'):'Noch nicht mit dieser Version geprüft')}</p></div></div><div class="m-history-rows">${cards}<div class="m-empty" data-history-empty hidden>${rows.length?'Keine passenden Einträge.':'Keine Einträge für diese Auswahl. Noch nicht importierte Daten sind keine bestätigte leere Historie.'}</div></div></section>`;
+    return `<section class="m-panel m-section">${reminderPanel(true)}<div class="m-history-toolbar"><div class="m-panel-head"><h2>Kontakt-Historie</h2><span data-history-count aria-live="polite">${rows.length} Einträge in Firebase</span></div><div class="m-panel-body"><div class="m-history-filters"><input type="search" data-history-search aria-label="Kontakthistorie durchsuchen" placeholder="Kontakthistorie durchsuchen …" value="${esc(communicationDraft().historyQuery||'')}"><select name="historyFilter" aria-label="Anzeige">${[{id:'all',name:'Alle Einträge'},{id:'communication',name:'Kommunikation'},{id:'documents',name:'Rechnungen / Dokumentversand'}].map(o=>`<option value="${o.id}" ${historyFilter===o.id?'selected':''}>${o.name}</option>`).join('')}</select></div><div class="m-test-actions">${actions}</div><p class="m-muted">Letzter vollständiger Historienimport: ${esc(detail?.historyLoadedAt?new Date(detail.historyLoadedAt).toLocaleString('de-DE'):'Noch nicht mit dieser Version geprüft')}</p></div></div><div class="m-history-rows">${cards}<div class="m-empty" data-history-empty hidden>${rows.length?'Keine passenden Einträge.':'Keine Einträge für diese Auswahl. Noch nicht importierte Daten sind keine bestätigte leere Historie.'}</div></div></section>`;
   }
   function plannedRevenueRow(r){
     const intervals={Once:'einmalig',Monthly:'monatlich',Weekly:'wöchentlich',Fortnightly:'alle zwei Wochen',BiMonthly:'alle zwei Monate',QuarterAnnually:'vierteljährlich',HalfAnnually:'halbjährlich',Annually:'jährlich',TwoYears:'alle zwei Jahre',ThreeYears:'alle drei Jahre',FourYears:'alle vier Jahre',FiveYears:'alle fünf Jahre'};
@@ -264,9 +273,9 @@ window.__salesStarted=false;
     if(salesUsesLogin()&&salesNewRelease){root.innerHTML=salesUpdatePage(salesNewRelease);return;}
     if(salesUsesLogin()&&!salesLoginSession){root.innerHTML=salesLoginPage();return;}
     customerBeforeRender();communicationBeforeRender();root.dataset.theme=theme;if(state&&state.release!==APP_RELEASE){root.innerHTML=salesUsesLogin()?salesUpdatePage(state.release):`<div class="m-login"><h1>Dateien haben unterschiedliche Stände</h1><p>Bitte SalesBackend.gs und Sales.html vollständig ersetzen und eine neue Version der bestehenden Web-App bereitstellen.</p><p>Oberfläche: ${esc(UI_BUILD)} · Server: ${esc(state.release||'alter Stand')}</p></div>`;return;}if(!state){root.innerHTML=`<div class="m-login"><h1>Sales Markatus</h1><p>${esc(error||'Lade Firebase-Daten …')}</p>${error?button('Erneut versuchen','reload'):''}</div>`;return;}
-    const pages={home:v1Home,customers:v1Customers,company,business:businessPage,reviews:reviewListPage,magazine:v1Magazine,invoices:v1Invoices,import:v1Import,test,preview:previewPage,new:newCompany,change:changeForm,admin:v1Admin,contacts:v1Contacts,unassigned:v1Unassigned,reminders:()=>head('Wiedervorlagen')+empty('Die gemeinsame Wiedervorlagenverwaltung folgt in einem späteren V1-Schritt.')};
-    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${salesUsesLogin()?button('Abmelden','auth-logout'):''}${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Magazinvertrieb<br>Lesedaten aus HQ<br>Manueller Datenabgleich</p></div></aside><main class="m-main">${(pages[view]||v1Home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?.loadedAt?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>`;
-    communicationAfterRender();customerAfterRender();salesUiPermissions();
+    const pages={home:v1Home,customers:v1Customers,company,business:businessPage,reviews:reviewListPage,magazine:v1Magazine,invoices:v1Invoices,import:v1Import,test,preview:previewPage,new:newCompany,change:changeForm,admin:v1Admin,contacts:v1Contacts,unassigned:v1Unassigned,reminders:reminderPage};
+    root.innerHTML=`<div class="m-top"><strong>MARKATUS · SALES <small>Stand ${esc(UI_BUILD)}</small></strong><div class="m-actions"><small>${esc(state.user.email)}</small>${salesUsesLogin()?button('Abmelden','auth-logout'):''}${button(theme==='dark'?'Helle Ansicht':'Dunkle Ansicht','theme')}</div></div><div class="m-status ${error?'m-error':''}" role="status" aria-live="polite">${esc(error||message||'Firebase-Daten geladen.')} ${busy?'Bitte warten …':''}</div><div class="m-layout"><aside class="m-side"><div class="m-nav-title">Magazinvertrieb</div><nav class="m-nav">${nav.map(([id,label])=>`<button type="button" data-action="nav" data-id="${id}" aria-current="${view===id?'page':'false'}" ${busy?'disabled':''}>${label}</button>`).join('')}</nav><div class="m-side-bottom"><p>Magazinvertrieb<br>Lesedaten aus HQ<br>Manueller Datenabgleich</p></div></aside><main class="m-main">${(pages[view]||v1Home)()}</main></div><footer class="m-footer"><span>Apps Script · Firebase · HQ</span><span>${state.edition?.loadedAt?'HQ-Import '+esc(new Date(state.edition.loadedAt).toLocaleString('de-DE')):'Noch kein Ausgabeimport'}</span></footer>${reminderDialogHtml()}`;
+    communicationAfterRender();customerAfterRender();reminderAfterRender();salesUiPermissions();
   }
   async function act(fn,{reload=false,preserve=false}={}){if(busy)return;busy=true;root.setAttribute('aria-busy','true');error='';let result,authHandled=false;if(preserve){root.querySelectorAll('button').forEach(b=>b.disabled=true);}else render();try{result=await fn();if(result?.message)message=result.message;if(reload)state=await rpc('getSalesState');}catch(e){if(e.salesAuthHandled){authHandled=true;return;}error=e.message;if(preserve){busy=false;root.querySelectorAll('button').forEach(b=>b.disabled=false);const status=root.querySelector('.m-status');if(status){status.textContent=error;status.classList.add('m-error');}return;}}finally{if(!authHandled){busy=false;root.setAttribute('aria-busy','false');}}render();return result;}
   async function runCreateJob(id,step){
@@ -334,11 +343,13 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     return (selection.message?'<p class="m-note">'+esc(selection.message)+'</p>':'')+rows.map(c=>'<div class="m-listitem"><div><h3><button class="m-link" data-action="company" data-id="'+esc(c.id)+'">'+esc(c.name)+'</button></h3><p>'+esc([addr(c)?.city,c.industrialSector].filter(Boolean).join(' · '))+'</p><div class="m-tags">'+tag(c.localDraftId?localStatus(c):'HQ · nur lesen')+(c.companyTypes||[]).map(t=>tag(t.name)).join('')+'</div></div><div class="m-list-end"><strong>'+(state.edition?.loadedAt?money(revenue(String(c.hqId||c.id))):'Noch nicht importiert')+'</strong><small>'+esc(editionLabel(state.edition))+(state.edition?.complete?'':' · vorläufig')+'</small></div></div>').join('')+(rows.length?'':empty('Keine passenden Kunden im geladenen Datenbestand.'));
   }
   function v1Home(){
-    if(salesUsesLogin()&&!salesCan('finance.read'))return head('Mein Tag','Gemeinsamer Kundenbestand')+'<section class="m-panel"><div class="m-panel-head"><h2>Kunden und Kommunikation</h2></div><div class="m-panel-body"><p>Deine freigegebenen Kunden findest du unter Kunden.</p>'+button('Kunden öffnen','nav','customers')+(salesCan('sync.read')?button('Datenabgleich öffnen','nav','import'):'')+'</div></section>';
-    const e=state.edition,run=state.syncRun;return head('Mein Tag','Gemeinsamer Datenstand aus Firebase',button('Frisch aus Firebase laden','reload'))+editionSelectors()+
+    const heading=head('Mein Tag','',button('Frisch aus Firebase laden','reload'));
+    const layout=content=>heading+'<div class="m-home-columns"><div>'+content+'</div>'+reminderPanel()+'</div>';
+    if(salesUsesLogin()&&!salesCan('finance.read'))return layout('<section class="m-panel"><div class="m-panel-head"><h2>Kunden und Kommunikation</h2></div><div class="m-panel-body">'+button('Kunden öffnen','nav','customers')+(salesCan('sync.read')?button('Datenabgleich öffnen','nav','import'):'')+'</div></section>');
+    const e=state.edition,run=state.syncRun;return layout(editionSelectors()+
       '<div class="m-summaries"><div class="m-summary"><span>Unternehmen im Bestand</span><b>'+(loadedViews.has('customers')||loadedViews.has('magazine')?v1Companies().length:'Bei Kunden anzeigen')+'</b><small>Ohne doppelte HQ-Firmen</small></div><div class="m-summary"><span>Fakturierter Netto-Umsatz</span><b>'+(e?.loadedAt?money(revenue()):'Noch nicht importiert')+'</b><small>'+esc(editionLabel(e))+(e?.complete?'':' · vorläufig')+'</small></div><div class="m-summary"><span>Offene Übertragungen</span><b>'+(loadedViews.has('import')||loadedViews.has('test')?state.jobs.filter(j=>!['synced','canceled'].includes(j.state)).length:'Im Datenabgleich')+'</b><small>Eigene Firmen</small></div></div>'+
       (e?.changes?.length?'<p class="m-note">Ausgabe aktualisiert: Ziel '+money(e.changes[0].before.targetCents)+' → '+money(e.settings.targetCents)+' · '+esc(new Date(e.changes[0].at).toLocaleString('de-DE'))+'</p>':'')+
-      '<section class="m-panel m-section"><div class="m-panel-head"><h2>'+esc(editionLabel(e))+'</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Zielumsatz</dt><dd>'+money(e?.settings?.targetCents)+'</dd><dt>Anzeigenschluss</dt><dd>'+esc(e?.settings?.adDeadline||'Noch offen')+'</dd><dt>Drucktermin</dt><dd>'+esc(e?.settings?.printDate||'Noch offen')+'</dd><dt>Veröffentlichung</dt><dd>'+esc(e?.settings?.releaseDate||'Noch offen')+'</dd></dl><p>Letzter Ausgabeimport: '+esc(e?.loadedAt?new Date(e.loadedAt).toLocaleString('de-DE'):'Noch keiner')+'</p>'+button('Datenabgleich öffnen','nav','import')+(run?.errors?.length?'<p class="m-note">Der letzte Import enthält '+run.errors.length+' fehlgeschlagene Abschnitte. Details im Datenabgleich.</p>':'')+'</div></section>';
+      '<section class="m-panel m-section"><div class="m-panel-head"><h2>'+esc(editionLabel(e))+'</h2></div><div class="m-panel-body"><dl class="m-dl"><dt>Zielumsatz</dt><dd>'+money(e?.settings?.targetCents)+'</dd><dt>Anzeigenschluss</dt><dd>'+esc(e?.settings?.adDeadline||'Noch offen')+'</dd><dt>Drucktermin</dt><dd>'+esc(e?.settings?.printDate||'Noch offen')+'</dd><dt>Veröffentlichung</dt><dd>'+esc(e?.settings?.releaseDate||'Noch offen')+'</dd></dl><p>Letzter Ausgabeimport: '+esc(e?.loadedAt?new Date(e.loadedAt).toLocaleString('de-DE'):'Noch keiner')+'</p>'+button('Datenabgleich öffnen','nav','import')+(run?.errors?.length?'<p class="m-note">Der letzte Import enthält '+run.errors.length+' fehlgeschlagene Abschnitte. Details im Datenabgleich.</p>':'')+'</div></section>');
   }
   function v1SimpleCustomerRows(){const q=search.toLocaleLowerCase('de');const rows=v1Companies().filter(c=>String(c.name||'').toLocaleLowerCase('de').includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'de'));return rows.map(c=>'<div class="m-row">'+button(c.name,'company',c.id)+'</div>').join('')||empty('Keine passenden Kunden.');}
   function v1Customers(){return head('Kunden','Unternehmen und Interessenten aus Firebase',salesUsesLogin()&&salesCan('company.create')?button('Firma hinzufügen','nav','new'):'')+'<label class="m-field">Nach Namen suchen<input id="customer-name-search" value="'+esc(search)+'" placeholder="Unternehmensname"></label><div id="customer-delete-batch">'+deleteBatchPanel()+'</div><section id="customer-rows" class="m-panel m-section">'+v1SimpleCustomerRows()+'</section>';}
@@ -483,13 +494,14 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   const leanMutations=new Set(['bindSalesCompanyResult','saveSalesCompany','saveSalesTestCompany','saveSalesHistory','saveSalesCompanyChange','queueSalesContactEmail','queueSalesMarkerCleanup','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding']);
   function mergeLean(patch){
     if(!patch)return;
-    if(patch.lean){state.preferences=patch.preferences;state.editions=patch.editions.map(e=>editionCache.get(e.id)||e);state.edition=patch.edition;selectedEditionId=state.edition?.id||'';return;}
+    if(patch.lean){state.preferences=patch.preferences;state.editions=patch.editions.map(e=>editionCache.get(e.id)||e);state.edition=patch.edition;if(patch.reminders)reminderSetRows(patch.reminders);selectedEditionId=state.edition?.id||'';return;}
     if(patch.syncRun!==undefined)acceptSyncStatus(patch.syncRun);
     for(const key of ['companies','directory','drafts','jobs','catalog','localCompanies','unassignedSummary','access'])if(patch[key]!==undefined)state[key]=patch[key];
     if(patch.editions){const id=selectedEditionId;state.editions=patch.editions;state.edition=patch.editions.find(e=>e.id===id)||patch.editions[0]||null;selectedEditionId=state.edition?.id||'';patch.editions.forEach(e=>{if(!e.summaryOnly)editionCache.set(e.id,e);});}
   }
   async function ensureView(name,force=false){
     if(name==='reviews'){ownReviews=await rpc('listSalesChangeReviews');return;}
+    if(name==='reminders'){reminderSetRows(await rpc('listSalesReminders'));return;}
     if(name==='import'||name==='new')force=true;
     if(!force&&loadedViews.has(name)){mergeLean(viewCache.get(name));return;}
     if(['home','customers','magazine','contacts','invoices','admin','new','change','test','import'].includes(name)){const patch=await rpc('getSalesLeanView',name,selectedEditionId);viewCache.set(name,patch);mergeLean(patch);}
@@ -808,16 +820,21 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     }
     draft.historySource=detail?.histories;return draft;
   }
+  function communicationForm(d,contacts,overlay=false){
+    const options=[{id:'',name:'Bitte auswählen'},...contacts.map(c=>({id:contactKey(c),name:[c.firstName,c.lastName].filter(Boolean).join(' ')}))];
+    if(!overlay)options.push({id:'__new',name:'+ Neuen Ansprechpartner anlegen'});
+    const id=overlay?'reminder-communication-text':'communication-text',disabled=busy?'disabled':'';
+    return '<form data-form="'+(overlay?'reminder-capture':'communication')+'" novalidate><div class="m-capture-fields">'+select('Ansprechpartner','communicationContact',options,d.contact)+field('Datum / Uhrzeit','communicationTime',d.time,'datetime-local',true)+'</div><label class="m-field" for="'+id+'">Gespräch / Notiz</label><textarea id="'+id+'" aria-label="Gespräch / Notiz" name="communicationText" maxlength="10000" placeholder="Was wurde besprochen?">'+esc(d.text)+'</textarea><div class="m-capture-actions"><button class="m-button m-primary" type="submit" '+disabled+'>Speichern</button><button class="m-button" type="submit" name="notReached" value="true" '+disabled+'>Nicht erreicht</button>'+(d.pending?'':button('Wiedervorlage','reminder-schedule',overlay?'capture':'company'))+(overlay?button('Abbrechen','reminder-cancel'):'')+'</div></form>';
+  }
   function communicationPanel(){
-    const d=communicationDraft(),contacts=detail?.contacts||[];
+    const d=communicationDraft();
     if(!d.manualTime&&!d.pending)d.time=localContactTime();
-    const options=[{id:'',name:'Bitte auswählen'},...contacts.map(c=>({id:contactKey(c),name:[c.firstName,c.lastName].filter(Boolean).join(' ')})),{id:'__new',name:'+ Neuen Ansprechpartner anlegen'}];
-    return '<aside class="m-communication m-panel" aria-label="Kundenkommunikation"><div class="m-capture"><h2>Kommunikation</h2><p class="m-muted m-customer-label">'+esc(detail?.company?.name||'')+'</p><form data-form="communication" novalidate><div class="m-capture-fields">'+select('Ansprechpartner','communicationContact',options,d.contact)+field('Datum / Uhrzeit','communicationTime',d.time,'datetime-local',true)+'</div><label class="m-field" for="communication-text">Gespräch / Notiz</label><textarea id="communication-text" aria-label="Gespräch / Notiz" name="communicationText" maxlength="10000" placeholder="Was wurde besprochen?">'+esc(d.text)+'</textarea><div class="m-capture-actions"><button class="m-button m-primary" type="submit" '+(busy?'disabled':'')+'>Speichern</button><button class="m-button" type="submit" name="notReached" value="true" '+(busy?'disabled':'')+'>Nicht erreicht</button></div></form></div><div class="m-history-scroll" tabindex="0" aria-label="Kontakt-Historie scrollen">'+historyPanel(detail?.company||{})+'</div></aside>';
+    return '<aside class="m-communication m-panel" aria-label="Kundenkommunikation"><div class="m-capture"><h2>Kommunikation</h2><p class="m-muted m-customer-label">'+esc(detail?.company?.name||'')+'</p>'+communicationForm(d,detail?.contacts||[])+'</div><div class="m-history-scroll" tabindex="0" aria-label="Kontakt-Historie scrollen">'+historyPanel(detail?.company||{})+'</div></aside>';
   }
   function contactDialogHtml(){
     if(!contactDialog||contactDialog.companyRef!==communicationKey())return '';
     const v=contactDialog.values;
-    return '<dialog class="m-contact-dialog" aria-labelledby="contact-dialog-title"><form data-form="communication-contact"><h2 id="contact-dialog-title">Ansprechpartner anlegen</h2><p>'+esc(detail.company.name)+'</p><div class="m-form">'+field('Vorname','firstName',v.firstName||'','text',true)+field('Nachname','lastName',v.lastName||'','text',true)+field('Position','position',v.position||'')+field('E-Mail','eMail',v.eMail||'','email')+field('Mobiltelefon','phoneMobile',v.phoneMobile||'','tel')+field('Festnetztelefon','phoneLandline',v.phoneLandline||'','tel')+'</div><p class="m-muted">Vorname und Nachname sind Pflicht. Weitere Angaben sind optional.</p><p class="m-dialog-error" role="alert">'+esc(contactDialog.error||'')+'</p><div class="m-capture-actions"><button class="m-button m-primary" '+(busy?'disabled':'')+'>Anlegen</button>'+button('Abbrechen','communication-cancel')+'</div></form></dialog>';
+    return '<dialog class="m-contact-dialog" data-contact-dialog aria-labelledby="contact-dialog-title"><form data-form="communication-contact"><h2 id="contact-dialog-title">Ansprechpartner anlegen</h2><p>'+esc(detail.company.name)+'</p><div class="m-form">'+field('Vorname','firstName',v.firstName||'','text',true)+field('Nachname','lastName',v.lastName||'','text',true)+field('Position','position',v.position||'')+field('E-Mail','eMail',v.eMail||'','email')+field('Mobiltelefon','phoneMobile',v.phoneMobile||'','tel')+field('Festnetztelefon','phoneLandline',v.phoneLandline||'','tel')+'</div><p class="m-muted">Vorname und Nachname sind Pflicht. Weitere Angaben sind optional.</p><p class="m-dialog-error" role="alert">'+esc(contactDialog.error||'')+'</p><div class="m-capture-actions"><button class="m-button m-primary" '+(busy?'disabled':'')+'>Anlegen</button>'+button('Abbrechen','communication-cancel')+'</div></form></dialog>';
   }
   function company(){
     const c=detail?.company||companies().find(x=>String(x.id)===String(selected));
@@ -847,7 +864,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(busy||d.pending)root.querySelectorAll('.m-capture input,.m-capture select,.m-capture textarea').forEach(el=>el.disabled=true);
     if(d.pending&&!busy){const hint=document.createElement('p');hint.className='m-muted';hint.textContent='Speicherung noch nicht bestätigt. Erneut anklicken prüft denselben Auftrag.';root.querySelector('.m-capture').append(hint);}
     if(busy||contactDialog?.pending)root.querySelectorAll('.m-contact-dialog input').forEach(el=>el.disabled=true);
-    const dialog=root.querySelector('dialog');
+    const dialog=root.querySelector('dialog[data-contact-dialog]');
     if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)closeContactDialog();});if(!busy)dialog.querySelector('[name="firstName"]').focus();}
     communicationClock=setInterval(()=>{
       if(view!=='company'||d.manualTime||d.pending||busy)return;
@@ -890,7 +907,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
       e.stopImmediatePropagation();historyFilter=e.target.value;communicationDraft().historyScroll=0;
       filterCommunicationHistory();root.querySelector('.m-history-scroll').scrollTop=0;return;
     }
-    if(e.target.name!=='communicationContact')return;e.stopImmediatePropagation();const d=communicationDraft();
+    if(e.target.name!=='communicationContact'||e.target.form?.dataset.form!=='communication')return;e.stopImmediatePropagation();const d=communicationDraft();
     if(e.target.value==='__new'){
       e.target.value=d.contact;const key=communicationKey();contactDialog=contactDialogDrafts.get(key)||{companyRef:key,requestId:communicationId(),values:{}};contactDialogDrafts.set(key,contactDialog);render();
     }else d.contact=e.target.value;
@@ -922,6 +939,111 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     act(async()=>{
       const r=await rpc('saveSalesCommunication',d.pending);acceptCommunicationResult(r);
       d.text='';d.pending=null;d.manualTime=false;d.time=localContactTime();d.scrollToTop=true;historyFilter='all';return r;
+    });
+  });
+
+  let reminderDialog=null;
+  function reminderDate(days=0){
+    const parts=new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const fields=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+    return new Date(Date.UTC(Number(fields.year),Number(fields.month)-1,Number(fields.day)+days)).toISOString().slice(0,10);
+  }
+  function reminderSetRows(rows){
+    state.reminders=rows;
+    const home=viewCache.get('home');if(home)home.reminders=rows;
+  }
+  function reminderAccept(result){
+    const id=result.reminder?.id||result.closedReminderId;
+    if(!id)return;
+    const rows=(state.reminders||[]).filter(row=>row.id!==id);
+    if(result.reminder)rows.push(result.reminder);
+    reminderSetRows(rows);
+  }
+  function reminderPanel(companyOnly=false){
+    const rows=(state.reminders||[]).filter(r=>!companyOnly||r.companyRef===communicationKey()).sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.id.localeCompare(b.id));
+    if(companyOnly&&!rows.length)return '';
+    const today=reminderDate(),canEdit=!salesUsesLogin()||salesCan('communication.create');
+    const cards=rows.map(r=>{
+      const status=r.dueDate<today?tag('Überfällig','warn'):r.dueDate===today?tag('Heute','warn'):'';
+      return '<div class="m-row m-reminder-row" data-reminder-id="'+esc(r.id)+'"><div class="m-reminder-heading">'+(companyOnly?'':'<h3>'+button(r.companyName,'company',r.companyRef)+'</h3>')+'<time datetime="'+esc(r.dueDate)+'">'+esc(dateLabel(r.dueDate))+'</time>'+status+'</div>'+(r.content?'<p class="m-reminder-note">'+esc(r.content)+'</p>':'')+(canEdit?'<div class="m-test-actions">'+button('Verschieben','reminder-move',r.id)+button('Erfassen','reminder-capture',r.id,true)+'</div>':'')+'</div>';
+    }).join('');
+    return '<section class="'+(companyOnly?'m-reminders-in-history':'m-panel m-reminders')+'"><div class="m-panel-head"><h2>Wiedervorlagen</h2></div>'+ (cards||empty('Keine offenen Wiedervorlagen.'))+'</section>';
+  }
+  function reminderPage(){return head('Wiedervorlagen','Offene Termine von früh nach spät',button('Ansicht aktualisieren','reload'))+reminderPanel();}
+  function reminderDialogHtml(){
+    if(!reminderDialog)return '';
+    const d=reminderDialog,alert=error?'<p class="m-dialog-error" role="alert">'+esc(error)+'</p>':'';
+    const title=d.kind==='capture'?'Kommunikation erfassen':d.move?'Wiedervorlage verschieben':'Wiedervorlage';
+    const form=d.kind==='capture'?communicationForm(d.model,d.contacts,true):'<form data-form="reminder-date">'+field('Wiedervorlagedatum','dueDate',d.dueDate,'date',true)+'<div class="m-capture-actions"><button class="m-button m-primary" '+(busy?'disabled':'')+'>Speichern</button>'+button('Abbrechen','reminder-cancel')+'</div></form>';
+    return '<dialog class="m-contact-dialog m-reminder-dialog" aria-labelledby="reminder-dialog-title"><h2 id="reminder-dialog-title">'+title+'</h2><p>'+esc(d.companyName)+'</p>'+(d.kind==='capture'&&d.row.content?'<p class="m-reminder-note m-note">'+esc(d.row.content)+'</p>':'')+alert+form+'</dialog>';
+  }
+  function reminderClose(){reminderDialog=reminderDialog?.previous||null;error='';render();}
+  function reminderAfterRender(){
+    const dialog=root.querySelector('.m-reminder-dialog');if(!dialog)return;
+    dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)reminderClose();});
+    const capture=dialog.querySelector('[data-form="reminder-capture"]');
+    if(capture){capture.elements.communicationContact.required=true;if(reminderDialog.model.pending)capture.querySelectorAll('input,select,textarea').forEach(el=>el.disabled=true);}
+  }
+  root.addEventListener('click',e=>{
+    const b=e.target.closest('[data-action^="reminder-"]');if(!b)return;
+    e.stopImmediatePropagation();if(busy)return;
+    const action=b.dataset.action,id=b.dataset.id;
+    if(action==='reminder-cancel'){reminderClose();return;}
+    if(action==='reminder-schedule'){
+      const form=b.closest('form'),fromCapture=id==='capture',previous=fromCapture?reminderDialog:null;
+      reminderDialog={kind:'date',dueDate:reminderDate(7),companyRef:previous?.row.companyRef||communicationKey(),companyName:previous?.companyName||detail.company.name,row:previous?.row,previous,
+        contactRef:form.elements.communicationContact.value,content:form.elements.communicationText.value||previous?.row.content||''};
+      error='';render();return;
+    }
+    const row=(state.reminders||[]).find(r=>r.id===id);if(!row)return;
+    if(action==='reminder-move'){
+      reminderDialog={kind:'date',dueDate:row.dueDate,companyRef:row.companyRef,companyName:row.companyName,row,move:true};
+      error='';render();return;
+    }
+    if(action==='reminder-capture')act(async()=>{
+      const customer=await loadCompany(row.companyRef),contacts=customer?.contacts||[];
+      if(!customer?.company)throw Error('Der Kunde der Wiedervorlage ist nicht mehr verfügbar.');
+      const person=contacts.find(c=>contactKey(c)===row.contactRef||String(c.id)===row.contactRef);
+      reminderDialog={kind:'capture',row,companyName:customer.company.name,contacts,model:{contact:person?contactKey(person):contacts.length===1?contactKey(contacts[0]):'',time:localContactTime(),text:''}};
+    });
+  });
+  root.addEventListener('input',e=>{
+    if(e.target.form?.dataset.form!=='reminder-capture')return;
+    const model=reminderDialog.model;
+    if(e.target.name==='communicationText')model.text=e.target.value;
+    if(e.target.name==='communicationTime')model.time=e.target.value;
+    if(e.target.name==='communicationContact')model.contact=e.target.value;
+  });
+  root.addEventListener('change',e=>{
+    if(e.target.form?.dataset.form==='reminder-capture'&&e.target.name==='communicationContact')reminderDialog.model.contact=e.target.value;
+  });
+  root.addEventListener('submit',e=>{
+    const form=e.target,kind=form.dataset.form;if(!['reminder-date','reminder-capture'].includes(kind))return;
+    e.preventDefault();e.stopImmediatePropagation();if(busy)return;
+    const d=reminderDialog;
+    if(kind==='reminder-date'){
+      if(!form.reportValidity())return;
+      const dueDate=form.elements.dueDate.value;
+      if(!d.requestId||d.dueDate!==dueDate)d.requestId=communicationId();
+      d.dueDate=dueDate;
+      const input={companyRef:d.companyRef,dueDate,requestId:d.requestId,...(d.row?{id:d.row.id,revision:d.row.revision}:{}),...(!d.move?{contactRef:d.contactRef,content:d.content}:{})};
+      act(async()=>{
+        const result=await rpc('saveSalesReminder',input);reminderAccept(result);
+        if(!d.row&&view==='company'){const model=communicationDraft();model.text='';model.scrollToTop=true;}
+        reminderDialog=null;return result;
+      });return;
+    }
+    if(!d.model.pending){
+      const notReached=e.submitter?.name==='notReached';form.elements.communicationText.required=!notReached;
+      if(!form.reportValidity())return;
+      const date=new Date(form.elements.communicationTime.value);if(!Number.isFinite(date.getTime()))return;
+      d.model.pending={companyRef:d.row.companyRef,reminderId:d.row.id,reminderRevision:d.row.revision,requestId:communicationId(),contactRef:form.elements.communicationContact.value,contactOn:date.toISOString(),content:form.elements.communicationText.value,notReached};
+    }
+    act(async()=>{
+      const result=await rpc('saveSalesCommunication',d.model.pending);reminderAccept(result);
+      if(detail?.company&&communicationKey()===d.row.companyRef)acceptCommunicationResult(result);
+      else companyCache.delete(String(d.row.companyRef));
+      reminderDialog=null;return result;
     });
   });
 
@@ -1038,7 +1160,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   function salesForgetLogin(text='',reauthenticate=false){
     salesReauthentication=reauthenticate;
     salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
-    state=null;detail=null;preview=null;audit=null;businessEditor=null;ownReviews=[];customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
+    state=null;detail=null;preview=null;audit=null;businessEditor=null;ownReviews=[];reminderDialog=null;customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
     projectResults=null;companyResults=null;unassignedData=null;storageInventory=null;projectChoices={};projectSearchTerm='';projectSearchError='';selected=null;selectedEditionId='';search='';message='';
     customerListObserver?.disconnect();customerListObserver=null;
     for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';
@@ -1096,7 +1218,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   }
   function salesUiPermissions(){
     if(!salesUsesLogin()||!state)return;
-    const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'unavailable',test:'owner',new:'company.create',change:'company.edit'};
+    const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'home.read',test:'owner',new:'company.create',change:'company.edit'};
     for(const b of root.querySelectorAll('[data-action="nav"]')){const rule=navRules[b.dataset.id];if(rule&&!salesCan(rule)&&!(b.dataset.id==='admin'&&state.user.admin))b.hidden=true;}
     const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read','delete-customer':'customers.read','delete-batch-open':'customers.read','deletions-load':'owner','deletion-confirm':'owner','deletion-approve':'owner','deletion-reject':'owner'};
     for(const b of root.querySelectorAll('[data-action]')){

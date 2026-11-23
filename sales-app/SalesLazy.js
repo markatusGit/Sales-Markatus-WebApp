@@ -2,13 +2,14 @@
   const leanMutations=new Set(['bindSalesCompanyResult','saveSalesCompany','saveSalesTestCompany','saveSalesHistory','saveSalesCompanyChange','queueSalesContactEmail','queueSalesMarkerCleanup','runSalesJob','reconcileSalesJob','resolveSalesConflict','checkSalesHistoryBinding']);
   function mergeLean(patch){
     if(!patch)return;
-    if(patch.lean){state.preferences=patch.preferences;state.editions=patch.editions.map(e=>editionCache.get(e.id)||e);state.edition=patch.edition;selectedEditionId=state.edition?.id||'';return;}
+    if(patch.lean){state.preferences=patch.preferences;state.editions=patch.editions.map(e=>editionCache.get(e.id)||e);state.edition=patch.edition;if(patch.reminders)reminderSetRows(patch.reminders);selectedEditionId=state.edition?.id||'';return;}
     if(patch.syncRun!==undefined)acceptSyncStatus(patch.syncRun);
     for(const key of ['companies','directory','drafts','jobs','catalog','localCompanies','unassignedSummary','access'])if(patch[key]!==undefined)state[key]=patch[key];
     if(patch.editions){const id=selectedEditionId;state.editions=patch.editions;state.edition=patch.editions.find(e=>e.id===id)||patch.editions[0]||null;selectedEditionId=state.edition?.id||'';patch.editions.forEach(e=>{if(!e.summaryOnly)editionCache.set(e.id,e);});}
   }
   async function ensureView(name,force=false){
     if(name==='reviews'){ownReviews=await rpc('listSalesChangeReviews');return;}
+    if(name==='reminders'){reminderSetRows(await rpc('listSalesReminders'));return;}
     if(name==='import'||name==='new')force=true;
     if(!force&&loadedViews.has(name)){mergeLean(viewCache.get(name));return;}
     if(['home','customers','magazine','contacts','invoices','admin','new','change','test','import'].includes(name)){const patch=await rpc('getSalesLeanView',name,selectedEditionId);viewCache.set(name,patch);mergeLean(patch);}

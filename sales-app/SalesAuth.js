@@ -25,7 +25,7 @@
   function salesForgetLogin(text='',reauthenticate=false){
     salesReauthentication=reauthenticate;
     salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
-    state=null;detail=null;preview=null;audit=null;businessEditor=null;ownReviews=[];customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
+    state=null;detail=null;preview=null;audit=null;businessEditor=null;ownReviews=[];reminderDialog=null;customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
     projectResults=null;companyResults=null;unassignedData=null;storageInventory=null;projectChoices={};projectSearchTerm='';projectSearchError='';selected=null;selectedEditionId='';search='';message='';
     customerListObserver?.disconnect();customerListObserver=null;
     for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';
@@ -83,7 +83,7 @@
   }
   function salesUiPermissions(){
     if(!salesUsesLogin()||!state)return;
-    const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'unavailable',test:'owner',new:'company.create',change:'company.edit'};
+    const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'home.read',test:'owner',new:'company.create',change:'company.edit'};
     for(const b of root.querySelectorAll('[data-action="nav"]')){const rule=navRules[b.dataset.id];if(rule&&!salesCan(rule)&&!(b.dataset.id==='admin'&&state.user.admin))b.hidden=true;}
     const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read','delete-customer':'customers.read','delete-batch-open':'customers.read','deletions-load':'owner','deletion-confirm':'owner','deletion-approve':'owner','deletion-reject':'owner'};
     for(const b of root.querySelectorAll('[data-action]')){

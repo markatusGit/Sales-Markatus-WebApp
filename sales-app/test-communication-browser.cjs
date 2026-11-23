@@ -130,7 +130,44 @@ const {communicationFixture}=require('./test-communication.cjs');
     }
     if(size===4)await contactsPanel.getByRole('searchbox').fill('no matching boundary contact');
   }
+  await page.getByRole('button',{name:'Kunden',exact:true}).click();await page.getByRole('button',{name:'Synthetic production customer',exact:true}).click();
+  const hqBeforeReminders=f.calls.length,dialog=page.getByRole('dialog');
+  const schedule=async (text,dueDate)=>{
+    await note.fill(text);await person.selectOption('204');
+    await page.getByRole('button',{name:'Wiedervorlage',exact:true}).click();
+    assert.equal(await dialog.getByLabel('Wiedervorlagedatum').inputValue(),'2026-10-29');
+    if(dueDate)await dialog.getByLabel('Wiedervorlagedatum').fill(dueDate);
+    await dialog.getByRole('button',{name:'Speichern',exact:true}).click();
+    await page.locator('.m-reminders-in-history').getByText(text,{exact:true}).waitFor();
+  };
+  await schedule('Synthetic later task');await schedule('Synthetic overdue <task>','2026-10-20');
+  const historyReminders=page.locator('.m-reminders-in-history');assert.equal(await historyReminders.locator('.m-reminder-row').count(),2);
+  assert.equal(await historyReminders.evaluate(el=>el.nextElementSibling.className),'m-history-toolbar');
+  await page.getByRole('button',{name:'Mein Tag',exact:true}).click();
+  const homeRows=page.locator('.m-home-columns .m-reminder-row');
+  const dates=()=>homeRows.locator('time').evaluateAll(rows=>rows.map(row=>row.dateTime));
+  assert.deepEqual(await dates(),['2026-10-20','2026-10-29']);await homeRows.first().getByText('Überfällig',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(out,'r38-reminders-home.png')});
+  await homeRows.first().getByRole('button',{name:'Verschieben',exact:true}).click();
+  assert.equal(await dialog.getByLabel('Wiedervorlagedatum').inputValue(),'2026-10-20');await dialog.getByLabel('Wiedervorlagedatum').fill('2026-10-24');
+  await dialog.getByRole('button',{name:'Speichern',exact:true}).click();await dialog.waitFor({state:'hidden'});
+  assert.deepEqual(await dates(),['2026-10-24','2026-10-29']);await homeRows.first().getByText('Synthetic overdue <task>',{exact:true}).waitFor();
+  await homeRows.first().getByRole('button',{name:'Erfassen',exact:true}).click();
+  assert.equal(await dialog.getByLabel('Ansprechpartner',{exact:true}).inputValue(),'204');assert.ok(await dialog.getByLabel('Datum / Uhrzeit',{exact:true}).inputValue());
+  await dialog.getByRole('button',{name:'Nicht erreicht',exact:true}).waitFor();await dialog.getByRole('button',{name:'Wiedervorlage',exact:true}).waitFor();
+  await page.screenshot({path:path.join(out,'r38-reminders-capture.png')});
+  await dialog.getByLabel('Gespräch / Notiz',{exact:true}).fill('Synthetic rescheduled context');
+  await dialog.getByRole('button',{name:'Wiedervorlage',exact:true}).click();
+  await dialog.getByLabel('Wiedervorlagedatum').fill('2026-11-07');await dialog.getByRole('button',{name:'Speichern',exact:true}).click();
+  await homeRows.last().getByText('Synthetic rescheduled context',{exact:true}).waitFor();assert.deepEqual(await dates(),['2026-10-29','2026-11-07']);
+  await homeRows.first().getByRole('button',{name:'Erfassen',exact:true}).click();
+  await dialog.getByLabel('Gespräch / Notiz',{exact:true}).fill('Synthetic captured from home');await dialog.getByRole('button',{name:'Speichern',exact:true}).click();
+  await dialog.waitFor({state:'hidden'});assert.deepEqual(await dates(),['2026-11-07']);
+  await homeRows.first().getByRole('button',{name:'Synthetic production customer',exact:true}).click();
+  await page.getByText('Synthetic captured from home',{exact:true}).waitFor();
+  await historyReminders.getByRole('button',{name:'Erfassen',exact:true}).click();await dialog.getByRole('button',{name:'Nicht erreicht',exact:true}).click();
+  await historyReminders.waitFor({state:'detached'});assert.equal(f.ctx.listSalesReminders().length,0);assert.equal(f.calls.length,hqBeforeReminders);
   assert.deepEqual(errors,[]);assert.ok(!calls.some(c=>c.name==='getSalesV1State'));
-  console.log('PASS compact local list/history searches, full collapsed content, combined filters, sticky search, drafts, customer isolation, contact creation, replay and mobile tabs');
+  console.log('PASS local communication, mobile tabs, personal reminders, ordering, date defaults, move and capture in both views');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

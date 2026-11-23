@@ -9,7 +9,7 @@ function salesCommunicationCompany_(ref){
   }
   const id=salesId_(ref),data=salesRead_('sales_companies/'+id)||salesRead_('sales_directory/'+id);
   if(!data?.company||Number(data.company.id)!==id)throw new Error('Kunde nicht im bestätigten App-Bestand.');
-  return {ref,hqId:id,company:data.company,contacts:data.contacts||[],name:data.company.name};
+  return {ref,hqId:id,company:data.company,contacts:data.contacts||[],name:data.company.name,deletion:data.deletion};
 }
 function salesCommunicationData_(ref){return salesRead_('sales_communication/'+ref)||{contacts:[],histories:[]};}
 function salesCommunicationView_(data,base){
@@ -44,6 +44,7 @@ function salesCommunicationInput_(input,kind){
     if(typeof input.notReached!=='boolean')throw new Error('Ungültiges Kontaktergebnis.');
     out.notReached=input.notReached;out.content=salesText_(input.content,10000,!input.notReached);
     out.contactRef=salesKey_(String(input.contactRef));out.contactOn=salesHistoryDate_(input.contactOn);
+    if(input.reminderId!==undefined){out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;}
   }
   return out;
 }
@@ -72,10 +73,11 @@ function salesCommunicationResult_(job,data){
   const result={id:job.id,message:job.state==='synced'?'Bereits gespeichert und in HQ bestätigt.':job.kind==='createContact'?'Ansprechpartner gespeichert; HQ-Abgleich offen.':'Kommunikation gespeichert; HQ-Abgleich offen.',patch:{job:salesJobSummary_(job)}};
   if(job.kind==='createContact')result.contact=data.contacts.find(c=>c.jobId===job.id);
   else result.communication=data.histories.find(h=>h.jobId===job.id);
+  if(job.capture.reminderId){result.closedReminderId=job.capture.reminderId;result.message='Wiedervorlage erledigt. '+result.message;}
   return result;
 }
-function salesCommunicationCommit_(job,data){
-  const entries=[{path:'sales_jobs/'+job.id,value:job},{path:'sales_communication/'+job.companyRef,value:data}];
+function salesCommunicationCommit_(job,data,extra=[]){
+  const entries=[{path:'sales_jobs/'+job.id,value:job},{path:'sales_communication/'+job.companyRef,value:data},...extra];
   // Existing chunk writer prepares any large payload first; publish both root documents atomically.
   const writes=entries.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}}));
   salesBulkRest_('commit',{writes});
@@ -83,17 +85,17 @@ function salesCommunicationCommit_(job,data){
 function salesCommunicationSave_(input,kind){
   const user=salesUser_(),capture=salesCommunicationInput_(input,kind);
   return salesLock_(()=>{
-    salesAssertPrivate_();const id=salesKey_('comm_'+capture.requestId),path='sales_jobs/'+id,old=salesRead_(path);
+    salesAssertPrivate_(capture.reminderId?['sales_reminders/security-probe']:[]);const id=salesKey_('comm_'+capture.requestId),path='sales_jobs/'+id,old=salesRead_(path);
     if(old){
       if(old.actor!==user.email||old.kind!==kind||JSON.stringify(old.capture)!==JSON.stringify(capture))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');
       const data=salesCommunicationData_(old.companyRef),before=JSON.stringify(data);salesCommunicationApplyJob_(old,data);if(JSON.stringify(data)!==before)salesWrite_('sales_communication/'+old.companyRef,data);return salesCommunicationResult_(old,data);
     }
-    const ctx=salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
+    const ctx=capture.reminderId?salesReminderCompany_(capture.companyRef):salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
     if(kind!=='createContact')salesCommunicationContact_(ctx,data,capture.contactRef);
     if(kind==='createContact'&&[...ctx.contacts,...data.contacts].some(c=>String(c.firstName).trim().toLocaleLowerCase('de')===capture.firstName.toLocaleLowerCase('de')&&String(c.lastName).trim().toLocaleLowerCase('de')===capture.lastName.toLocaleLowerCase('de')))throw new Error('Ein Ansprechpartner mit diesem Namen ist bereits vorhanden. Bitte den vorhandenen Kontakt auswählen.');
     const job={id,kind,business:1,companyRef:ctx.ref,hqId:ctx.hqId,name:ctx.name,capture,actor:user.email,...(user.uid?{actorUid:user.uid}:{}),state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),message:'In Firebase gespeichert; kontrollierter HQ-Abgleich offen.'};
     if(kind==='createContact')job.contact=salesPick_(capture,['firstName','lastName','position','eMail','phoneMobile','phoneLandline']);
-    salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data);
+    salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data,capture.reminderId?salesReminderCompletion_(capture,user):[]);
     return salesCommunicationResult_(job,data);
   });
 }

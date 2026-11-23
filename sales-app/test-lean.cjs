@@ -6,9 +6,9 @@ function test(name,fn){fn();count++;console.log('PASS '+name);}
 test('cold and warm home loads never scan customer data, drafts, jobs or raw collections',()=>{
  const {f,audit}=baseline();
  const first=audit.measure('cold home',()=>f.ctx.getSalesLeanState());
- assert.equal(first.readDocumentsModel,26);assert.equal(first.writtenDocuments,1);assert.equal(first.result.companies.length,0);assert.equal(first.result.directory.length,0);assert.equal(first.hqRequests,0);
- const warm=audit.measure('warm home',()=>f.ctx.getSalesLeanState());assert.equal(warm.readDocumentsModel,2);assert.equal(warm.writtenDocuments,0);
- assert.ok(Object.keys(warm.readsByCollection).every(c=>c==='sales_meta'));
+ assert.equal(first.readDocumentsModel,27);assert.equal(first.writtenDocuments,1);assert.equal(first.result.companies.length,0);assert.equal(first.result.directory.length,0);assert.equal(first.hqRequests,0);
+ const warm=audit.measure('warm home',()=>f.ctx.getSalesLeanState());assert.equal(warm.readDocumentsModel,3);assert.equal(warm.writtenDocuments,0);
+ assert.equal(warm.readsByCollection.sales_reminders,1);assert.ok(Object.keys(warm.readsByCollection).every(c=>['sales_meta','sales_reminders'].includes(c)));
 });
 test('names index bootstraps once and later costs one read without contacts or details',()=>{
  const {f,audit}=baseline();const first=audit.measure('first names',()=>f.ctx.getSalesLeanView('customers'));

@@ -1,5 +1,15 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 23.11.2026 – r38: Wiedervorlagen aus der Kundenkommunikation
+
+Nutzerwunsch: Eigene Datumsspalte in „Mein Tag“ mit alten und bald fälligen Terminen zuerst. „Wiedervorlage“ neben „Speichern“ und „Nicht erreicht“ in der Kundenkommunikation. Der kurze Datumsdialog schlägt heute plus sieben Tage vor und speichert die vorhandene Gesprächsnotiz als Kontext. In der Kontakthistorie stehen offene Termine als eigener Block ganz oben. In beiden Ansichten gibt es „Verschieben“ und „Erfassen“ mit der bekannten Kommunikationsmaske.
+
+Umsetzung: Die Wiedervorlage gehört zum Konto, das sie anlegt. Die Listen zeigen offene Termine frühestes Datum zuerst und kennzeichnen überfällige und heutige Einträge. Der Termin ist ein Kalendertag in Berliner Zeit. „Verschieben“ behält Notiz und Ansprechpartner. „Erfassen“ zeigt den bisherigen Kontext oberhalb der neuen Gesprächsnotiz und übernimmt den Ansprechpartner, sofern er noch verfügbar ist. „Speichern“ oder „Nicht erreicht“ schließen die Wiedervorlage zusammen mit der neuen Kommunikation in derselben Firebase-Transaktion. „Wiedervorlage“ in diesem Dialog terminisiert denselben Vorgang neu. Eine dort eingetragene Notiz wird zum neuen Kontext. Leere neue Notizen behalten den bisherigen Kontext. Die bestehende Navigation „Wiedervorlagen“ zeigt dieselbe persönliche Liste. Gemeinsame Listen, Zuordnung an andere Teammitglieder und Benachrichtigungen stehen weiter im Fachkonzept und in der Roadmap.
+
+Technik: Firebase-Dokument pro Konto, stabile Speicherkennungen und Revisionsprüfung. Entwürfe vor HQ-Bestätigung funktionieren ebenfalls. Bestätigt gelöschte Kunden erscheinen bei der aktuellen Listenabfrage nicht mehr. Die normale Kundenakte verursacht durch Wiedervorlagen keinen zusätzlichen Abruf. Der App-Start liest das eigene Wiedervorlagendokument zusätzlich. Nur gespeicherte Kommunikation legt über den bisherigen Weg einen HQ-Auftrag an. Keine neue Script Property, Bereitstellungseinstellung oder Trigger erforderlich.
+
+Lokal geprüft: 14 Kommunikations- und Wiedervorlagefälle und 9 Prüfungen der Ansichtsabrufe. Der echte Browser prüfte Terminstandard über den Wechsel zur Winterzeit, Reihenfolge, Trennung der Historie, Terminänderung, erneute Wiedervorlage, Erfassung in beiden Ansichten und Mobilansicht. Spalte und Kommunikationsdialog visuell kontrolliert. Der vollständige Freigabelauf folgt in der sauberen Veröffentlichungskopie.
+
 ### 23.11.2026 – r37: Pflichtgrund und Admin-Freigabe für App-Überschreibungen
 
 Nutzerentscheidung: Neue Firmen, Ansprechpartner und Kontakthistorien werden im zentralen Abgleich in beide Richtungen übernommen. Ein zusätzlicher Ansprechpartner wird separat angelegt. Ergänzungen leerer Felder wie eine fehlende Telefonnummer brauchen in der App einen Grund und gehen beim Abgleich nach HQ. Für Änderungen vorhandener Werte kann der Admin den neuen Wert übernehmen, den alten behalten oder den einreichenden Mitarbeiter fragen. Bei konkurrierender HQ-Änderung gilt der aktuelle HQ-Stand für Firebase. Finanzdaten folgen der Entscheidung aus r35.1.

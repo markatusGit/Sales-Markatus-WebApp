@@ -1,5 +1,21 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r38: Wiedervorlagen prüfen
+
+Keine neuen Script Properties oder Bereitstellungseinstellungen. Für die Bedienabnahme eine geeignete Test-Kundenakte verwenden.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-23-r38“. Bei anderer Kennung diese melden.
+- Eine Test-Kundenakte öffnen.
+- In „Gespräch / Notiz“ einen kurzen Testtext eintragen.
+- „Wiedervorlage“ anklicken. Erwartet wird ein Datumsfenster mit dem Datum in sieben Tagen. Bei einer Abweichung das angezeigte Datum melden.
+- Im Datumsfenster „Speichern“ anklicken. Erwartet wird die Wiedervorlage mit dem Testtext über der Kontakthistorie. Bei einer Abweichung den angezeigten Hinweis melden.
+- „Mein Tag“ öffnen. Erwartet wird derselbe Termin in der Spalte „Wiedervorlagen“. Bei einem fehlenden Termin „Frisch aus Firebase laden“ anklicken.
+- Beim Testtermin „Verschieben“ anklicken.
+- Im Datumsfenster einen anderen Tag auswählen.
+- Im Datumsfenster „Speichern“ anklicken. Erwartet wird der neue Termin mit derselben Notiz. Bei einer anderen Anzeige den angezeigten Hinweis melden.
+- Beim Testtermin „Erfassen“ anklicken. Erwartet wird das Kommunikationsfenster mit „Ansprechpartner“, „Datum / Uhrzeit“, „Gespräch / Notiz“, „Speichern“, „Nicht erreicht“ und „Wiedervorlage“.
+- Im Kommunikationsfenster „Nicht erreicht“ anklicken. Erwartet wird der Abschluss der Wiedervorlage samt neuem Historieneintrag. Bei einer Abweichung den angezeigten Hinweis melden.
+
 ## r37: Änderungsanträge in der App prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen. Die folgenden Schritte betreffen einen bewusst gewählten Testfall.

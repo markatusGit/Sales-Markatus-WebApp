@@ -42,7 +42,7 @@ function salesLeanRoster_(){
 function getSalesLeanState(selectedId){
   const user=salesUser_(),preferences=salesRead_('sales_meta/preferences')||{},editions=salesLeanRoster_();
   const edition=editions.find(e=>e.id===selectedId)||editions.find(e=>e.id===preferences.currentEditionId)||editions.find(e=>e.id===SALES.edition)||editions[0]||null;
-  return {release:SALES_RELEASE,lean:true,user,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},preferences,editions,edition,companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],catalog:null,access:null,syncRun:null,importRun:null,unassignedSummary:null};
+  return {release:SALES_RELEASE,lean:true,user,reminders:salesReminderList_(user),capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},preferences,editions,edition,companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],catalog:null,access:null,syncRun:null,importRun:null,unassignedSummary:null};
 }
 function salesLeanNames_(){
   const path='sales_meta/lean_names',cached=salesRead_(path);if(cached?.deletionVisibilityVersion===1)return cached.rows;
@@ -185,7 +185,7 @@ function mutateSalesLean(name,args){
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
 function getSalesStorageInventoryPage(input){
   salesUser_(true);input=input||{};
-  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
+  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_reminders','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
   const collection=input.collection||collections[0],index=collections.indexOf(collection),token=input.pageToken||'';
   if(index<0||typeof token!=='string'||token.length>5000||/[\r\n]/.test(token))throw new Error('Ungültige Inventurseite.');
   const c=salesContext_(),page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=50'+(token?'&pageToken='+encodeURIComponent(token):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});

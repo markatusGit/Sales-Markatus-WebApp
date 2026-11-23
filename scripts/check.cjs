@@ -29,8 +29,8 @@ function check() {
   sources.forEach(dir => walk(path.join(root, dir)));
   ['package.json', 'deployment.json', 'firebase.json'].forEach(n => JSON.parse(fs.readFileSync(path.join(root, n), 'utf8')));
   const read = n => fs.readFileSync(path.join(root, 'sales-app', n), 'utf8');
-  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs','SalesLean.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs','SalesDelete.gs','SalesAuth.gs','SalesAuthorization.gs','SalesPermissions.js'].map(read).join('\n');
-  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesPermissions.js','SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js','SalesDelete.js','SalesAuth.js'].map(read).join('\n'));
+  const expectedBackend = ['Sales.gs','SalesStorage.gs','SalesV1.gs','SalesSync.gs','SalesBulkStore.gs','SalesBulkSync.gs','SalesDelta.gs','SalesWorker.gs','SalesLean.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs','SalesReminders.gs','SalesDelete.gs','SalesAuth.gs','SalesAuthorization.gs','SalesPermissions.js'].map(read).join('\n');
+  const expectedHtml = read('Sales.template.html').replace('<!--DEMO_STYLES-->', '<style>' + read('Sales.styles.css') + '</style>').replace('// V1_FUNCTIONS', ['SalesPermissions.js','SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js','SalesReminders.js','SalesDelete.js','SalesAuth.js'].map(read).join('\n'));
   for (const [name, expected] of [['SalesBackend.gs', expectedBackend], ['Sales.html', expectedHtml]]) {
     if (canonical(name, fs.readFileSync(path.join(app, name), 'utf8')) !== canonical(name, expected)) throw Error(`${name} veraltet. Zuerst npm run build ausführen und Änderungen prüfen/committen.`);
   }

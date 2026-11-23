@@ -175,7 +175,7 @@ function main(){
  const {f,audit}=baseline(),scenarios=[];
  function measure(label,fn){const row=audit.measure(label,fn);delete row.result;scenarios.push(row);console.log(`${label}: ${row.readDocumentsModel} Reads, ${row.writtenDocuments} Writes, ${row.firebaseRequests} Firebase-Requests`);return row;}
  measure('Startseite: einmaliger Aufbau der Ausgabenübersicht',()=>f.ctx.getSalesLeanState());
- assert.equal(measure('Startseite: regulärer Aufruf',()=>f.ctx.getSalesLeanState()).readDocumentsModel,2);
+ assert.equal(measure('Startseite: regulärer Aufruf',()=>f.ctx.getSalesLeanState()).readDocumentsModel,3);
  measure('Kundenliste: einmaliger Aufbau des Namensindex',()=>f.ctx.getSalesLeanView('customers'));
  assert.equal(measure('Kundenliste: regulärer Aufruf',()=>f.ctx.getSalesLeanView('customers')).readDocumentsModel,1);
  measure('Kundenakte: einmaliger Aufbau kleiner Zuordnungsindizes',()=>f.ctx.getSalesLeanCompany('10001'));

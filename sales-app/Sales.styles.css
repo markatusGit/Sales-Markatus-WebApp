@@ -47,6 +47,15 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 #magazin-vertrieb .m-contact-dialog{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:10px;padding:24px;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
 #magazin-vertrieb .m-contact-dialog::backdrop{background:#0009}
 #magazin-vertrieb .m-contact-dialog .m-form{gap:12px;margin:18px 0}
+#magazin-vertrieb .m-home-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:22px;align-items:start}
+#magazin-vertrieb .m-reminders-in-history{border-bottom:2px solid var(--m-line);padding-bottom:10px}
+#magazin-vertrieb .m-reminder-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#magazin-vertrieb .m-reminder-heading h3{flex-basis:100%}
+#magazin-vertrieb .m-reminder-heading time{font-weight:600}
+#magazin-vertrieb .m-reminder-note{white-space:pre-wrap;overflow-wrap:anywhere}
+#magazin-vertrieb .m-reminder-dialog form{margin-top:16px}
+#magazin-vertrieb .m-reminder-dialog textarea{min-height:85px;resize:vertical}
+@media(max-width:900px){#magazin-vertrieb .m-home-columns{grid-template-columns:minmax(0,1fr)}#magazin-vertrieb .m-home-columns>.m-reminders{grid-row:1}}
 #magazin-vertrieb .m-dialog-error{color:var(--m-warn)}
 @media(max-width:1050px){
  #magazin-vertrieb .m-customer-tabs{display:flex;gap:8px;flex:none;margin-bottom:12px}

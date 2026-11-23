@@ -1,5 +1,11 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – r38: Wiedervorlagen in „Mein Tag“ und in der Kundenakte
+
+Persönliche Wiedervorlagen werden in der Kundenkommunikation mit „Wiedervorlage“ angelegt. Der Dialog übernimmt den Text aus „Gespräch / Notiz“ und schlägt in Berliner Zeit heute plus sieben Kalendertage vor. „Mein Tag“ zeigt die offenen Termine in einer eigenen Spalte von früh nach spät. Die Kundenakte zeigt ihre offenen Wiedervorlagen über der normalen Kontakthistorie.
+
+„Verschieben“ ändert den Termin. „Erfassen“ öffnet das bekannte Kommunikationsformular. „Speichern“ und „Nicht erreicht“ speichern die Kommunikation und schließen den Termin. Eine erneute „Wiedervorlage“ setzt den Termin weiter. Die Wiedervorlagen selbst liegen in Firebase. Neue Kontakthistorie nimmt am bestehenden HQ-Abgleich teil. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r37: CRM-Änderungen begründen und Überschreibungen freigeben
 
 Nutzerentscheidung: Firmen, Ansprechpartner und Kontakthistorie bei Neuanlage zwischen Firebase und HQ spiegeln. Ergänzungen an bestehenden Kunden gezielt übertragen. App-Änderungen brauchen einen Grund, auch beim Ausfüllen eines leeren Feldes. Einen vorhandenen Wert erst nach Freigabe durch den Admin überschreiben. Bei einer zwischenzeitlichen Änderung desselben Feldes gilt HQ.

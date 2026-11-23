@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.38.0]
+
+- Persönliche Wiedervorlagen mit Datum und Gesprächsnotiz aus der Kundenkommunikation. Datumsvorschlag heute plus sieben Kalendertage in Berliner Zeit.
+- Eigene Spalte in „Mein Tag“. Dieselben offenen Termine stehen in der Kundenakte über der Kontakthistorie. In beiden Ansichten lassen sie sich verschieben und über das gemeinsame Kommunikationsformular bearbeiten.
+- „Speichern“ und „Nicht erreicht“ protokollieren den Kontakt und schließen die Wiedervorlage atomar. „Wiedervorlage“ terminiert sie erneut. Kennung `2026-11-23-r38`. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 ## [v0.37.0]
 
 - Veröffentlichung nachgewiesen: bestehende Google-Bereitstellung auf Version 65, alle 27 Prüfdateien und Codevergleich bestanden. Öffentliche Loginhülle mit Kennung `2026-11-23-r37` erreicht.

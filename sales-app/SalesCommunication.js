@@ -63,16 +63,21 @@
     }
     draft.historySource=detail?.histories;return draft;
   }
+  function communicationForm(d,contacts,overlay=false){
+    const options=[{id:'',name:'Bitte auswählen'},...contacts.map(c=>({id:contactKey(c),name:[c.firstName,c.lastName].filter(Boolean).join(' ')}))];
+    if(!overlay)options.push({id:'__new',name:'+ Neuen Ansprechpartner anlegen'});
+    const id=overlay?'reminder-communication-text':'communication-text',disabled=busy?'disabled':'';
+    return '<form data-form="'+(overlay?'reminder-capture':'communication')+'" novalidate><div class="m-capture-fields">'+select('Ansprechpartner','communicationContact',options,d.contact)+field('Datum / Uhrzeit','communicationTime',d.time,'datetime-local',true)+'</div><label class="m-field" for="'+id+'">Gespräch / Notiz</label><textarea id="'+id+'" aria-label="Gespräch / Notiz" name="communicationText" maxlength="10000" placeholder="Was wurde besprochen?">'+esc(d.text)+'</textarea><div class="m-capture-actions"><button class="m-button m-primary" type="submit" '+disabled+'>Speichern</button><button class="m-button" type="submit" name="notReached" value="true" '+disabled+'>Nicht erreicht</button>'+(d.pending?'':button('Wiedervorlage','reminder-schedule',overlay?'capture':'company'))+(overlay?button('Abbrechen','reminder-cancel'):'')+'</div></form>';
+  }
   function communicationPanel(){
-    const d=communicationDraft(),contacts=detail?.contacts||[];
+    const d=communicationDraft();
     if(!d.manualTime&&!d.pending)d.time=localContactTime();
-    const options=[{id:'',name:'Bitte auswählen'},...contacts.map(c=>({id:contactKey(c),name:[c.firstName,c.lastName].filter(Boolean).join(' ')})),{id:'__new',name:'+ Neuen Ansprechpartner anlegen'}];
-    return '<aside class="m-communication m-panel" aria-label="Kundenkommunikation"><div class="m-capture"><h2>Kommunikation</h2><p class="m-muted m-customer-label">'+esc(detail?.company?.name||'')+'</p><form data-form="communication" novalidate><div class="m-capture-fields">'+select('Ansprechpartner','communicationContact',options,d.contact)+field('Datum / Uhrzeit','communicationTime',d.time,'datetime-local',true)+'</div><label class="m-field" for="communication-text">Gespräch / Notiz</label><textarea id="communication-text" aria-label="Gespräch / Notiz" name="communicationText" maxlength="10000" placeholder="Was wurde besprochen?">'+esc(d.text)+'</textarea><div class="m-capture-actions"><button class="m-button m-primary" type="submit" '+(busy?'disabled':'')+'>Speichern</button><button class="m-button" type="submit" name="notReached" value="true" '+(busy?'disabled':'')+'>Nicht erreicht</button></div></form></div><div class="m-history-scroll" tabindex="0" aria-label="Kontakt-Historie scrollen">'+historyPanel(detail?.company||{})+'</div></aside>';
+    return '<aside class="m-communication m-panel" aria-label="Kundenkommunikation"><div class="m-capture"><h2>Kommunikation</h2><p class="m-muted m-customer-label">'+esc(detail?.company?.name||'')+'</p>'+communicationForm(d,detail?.contacts||[])+'</div><div class="m-history-scroll" tabindex="0" aria-label="Kontakt-Historie scrollen">'+historyPanel(detail?.company||{})+'</div></aside>';
   }
   function contactDialogHtml(){
     if(!contactDialog||contactDialog.companyRef!==communicationKey())return '';
     const v=contactDialog.values;
-    return '<dialog class="m-contact-dialog" aria-labelledby="contact-dialog-title"><form data-form="communication-contact"><h2 id="contact-dialog-title">Ansprechpartner anlegen</h2><p>'+esc(detail.company.name)+'</p><div class="m-form">'+field('Vorname','firstName',v.firstName||'','text',true)+field('Nachname','lastName',v.lastName||'','text',true)+field('Position','position',v.position||'')+field('E-Mail','eMail',v.eMail||'','email')+field('Mobiltelefon','phoneMobile',v.phoneMobile||'','tel')+field('Festnetztelefon','phoneLandline',v.phoneLandline||'','tel')+'</div><p class="m-muted">Vorname und Nachname sind Pflicht. Weitere Angaben sind optional.</p><p class="m-dialog-error" role="alert">'+esc(contactDialog.error||'')+'</p><div class="m-capture-actions"><button class="m-button m-primary" '+(busy?'disabled':'')+'>Anlegen</button>'+button('Abbrechen','communication-cancel')+'</div></form></dialog>';
+    return '<dialog class="m-contact-dialog" data-contact-dialog aria-labelledby="contact-dialog-title"><form data-form="communication-contact"><h2 id="contact-dialog-title">Ansprechpartner anlegen</h2><p>'+esc(detail.company.name)+'</p><div class="m-form">'+field('Vorname','firstName',v.firstName||'','text',true)+field('Nachname','lastName',v.lastName||'','text',true)+field('Position','position',v.position||'')+field('E-Mail','eMail',v.eMail||'','email')+field('Mobiltelefon','phoneMobile',v.phoneMobile||'','tel')+field('Festnetztelefon','phoneLandline',v.phoneLandline||'','tel')+'</div><p class="m-muted">Vorname und Nachname sind Pflicht. Weitere Angaben sind optional.</p><p class="m-dialog-error" role="alert">'+esc(contactDialog.error||'')+'</p><div class="m-capture-actions"><button class="m-button m-primary" '+(busy?'disabled':'')+'>Anlegen</button>'+button('Abbrechen','communication-cancel')+'</div></form></dialog>';
   }
   function company(){
     const c=detail?.company||companies().find(x=>String(x.id)===String(selected));
@@ -102,7 +107,7 @@
     if(busy||d.pending)root.querySelectorAll('.m-capture input,.m-capture select,.m-capture textarea').forEach(el=>el.disabled=true);
     if(d.pending&&!busy){const hint=document.createElement('p');hint.className='m-muted';hint.textContent='Speicherung noch nicht bestätigt. Erneut anklicken prüft denselben Auftrag.';root.querySelector('.m-capture').append(hint);}
     if(busy||contactDialog?.pending)root.querySelectorAll('.m-contact-dialog input').forEach(el=>el.disabled=true);
-    const dialog=root.querySelector('dialog');
+    const dialog=root.querySelector('dialog[data-contact-dialog]');
     if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)closeContactDialog();});if(!busy)dialog.querySelector('[name="firstName"]').focus();}
     communicationClock=setInterval(()=>{
       if(view!=='company'||d.manualTime||d.pending||busy)return;
@@ -145,7 +150,7 @@
       e.stopImmediatePropagation();historyFilter=e.target.value;communicationDraft().historyScroll=0;
       filterCommunicationHistory();root.querySelector('.m-history-scroll').scrollTop=0;return;
     }
-    if(e.target.name!=='communicationContact')return;e.stopImmediatePropagation();const d=communicationDraft();
+    if(e.target.name!=='communicationContact'||e.target.form?.dataset.form!=='communication')return;e.stopImmediatePropagation();const d=communicationDraft();
     if(e.target.value==='__new'){
       e.target.value=d.contact;const key=communicationKey();contactDialog=contactDialogDrafts.get(key)||{companyRef:key,requestId:communicationId(),values:{}};contactDialogDrafts.set(key,contactDialog);render();
     }else d.contact=e.target.value;

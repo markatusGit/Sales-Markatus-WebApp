@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r37';
+const SALES_RELEASE = '2026-11-23-r38';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -172,9 +172,9 @@ function salesCollect_(entity,filter,started,expand) {
   throw new Error('HQ-Seitenlimit erreicht.');
 }
 function salesOne_(entity,id) {const data=salesHqGet_('/v2/'+entity+'/'+salesId_(id)).data;if(!data||Number(data.id)!==Number(id)) throw new Error('HQ-Objekt stimmt nicht mit der angefragten ID überein.');return data;}
-function salesAssertPrivate_() {
+function salesAssertPrivate_(extraPaths=[]) {
   const c=salesContext_();
-  for(const path of ['sales_editions/'+SALES.edition,'sales_jobs/security-probe','sales_companies/security-probe','sales_directory/security-probe','sales_chunks/security-probe','sales_meta/security-probe','sales_imports/security-probe']) {
+  for(const path of ['sales_editions/'+SALES.edition,'sales_jobs/security-probe','sales_companies/security-probe','sales_directory/security-probe','sales_chunks/security-probe','sales_meta/security-probe','sales_imports/security-probe',...extraPaths]) {
     const r=UrlFetchApp.fetch(pilotUrl_(c.project,path),{method:'get',muteHttpExceptions:true,followRedirects:false});
     if(r.getResponseCode()===429)throw Error('Firestore HTTP 429 bei Schutzprüfung.');
     if(![401,403].includes(r.getResponseCode())) throw new Error('Firestore-Schutz für die App-Daten fehlt. Import angehalten.');
@@ -2028,7 +2028,7 @@ function salesLeanRoster_(){
 function getSalesLeanState(selectedId){
   const user=salesUser_(),preferences=salesRead_('sales_meta/preferences')||{},editions=salesLeanRoster_();
   const edition=editions.find(e=>e.id===selectedId)||editions.find(e=>e.id===preferences.currentEditionId)||editions.find(e=>e.id===SALES.edition)||editions[0]||null;
-  return {release:SALES_RELEASE,lean:true,user,capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},preferences,editions,edition,companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],catalog:null,access:null,syncRun:null,importRun:null,unassignedSummary:null};
+  return {release:SALES_RELEASE,lean:true,user,reminders:salesReminderList_(user),capabilities:{editionRefreshViaSync:typeof startSalesEditionRefresh==='function'},preferences,editions,edition,companies:[],directory:[],drafts:[],jobs:[],localCompanies:[],catalog:null,access:null,syncRun:null,importRun:null,unassignedSummary:null};
 }
 function salesLeanNames_(){
   const path='sales_meta/lean_names',cached=salesRead_(path);if(cached?.deletionVisibilityVersion===1)return cached.rows;
@@ -2171,7 +2171,7 @@ function mutateSalesLean(name,args){
 /** Read-only, explicitly paged inventory. No customer contents, delete endpoint or automatic scanner. */
 function getSalesStorageInventoryPage(input){
   salesUser_(true);input=input||{};
-  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
+  const collections=['sales_meta','sales_editions','sales_directory','sales_companies','sales_jobs','sales_drafts','sales_communication','sales_reminders','sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawprojects','sales_rawdocuments','sales_rawplans','sales_projectviews','sales_imports','sales_chunks'];
   const collection=input.collection||collections[0],index=collections.indexOf(collection),token=input.pageToken||'';
   if(index<0||typeof token!=='string'||token.length>5000||/[\r\n]/.test(token))throw new Error('Ungültige Inventurseite.');
   const c=salesContext_(),page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=50'+(token?'&pageToken='+encodeURIComponent(token):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
@@ -3160,7 +3160,7 @@ function salesCommunicationCompany_(ref){
   }
   const id=salesId_(ref),data=salesRead_('sales_companies/'+id)||salesRead_('sales_directory/'+id);
   if(!data?.company||Number(data.company.id)!==id)throw new Error('Kunde nicht im bestätigten App-Bestand.');
-  return {ref,hqId:id,company:data.company,contacts:data.contacts||[],name:data.company.name};
+  return {ref,hqId:id,company:data.company,contacts:data.contacts||[],name:data.company.name,deletion:data.deletion};
 }
 function salesCommunicationData_(ref){return salesRead_('sales_communication/'+ref)||{contacts:[],histories:[]};}
 function salesCommunicationView_(data,base){
@@ -3195,6 +3195,7 @@ function salesCommunicationInput_(input,kind){
     if(typeof input.notReached!=='boolean')throw new Error('Ungültiges Kontaktergebnis.');
     out.notReached=input.notReached;out.content=salesText_(input.content,10000,!input.notReached);
     out.contactRef=salesKey_(String(input.contactRef));out.contactOn=salesHistoryDate_(input.contactOn);
+    if(input.reminderId!==undefined){out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;}
   }
   return out;
 }
@@ -3223,10 +3224,11 @@ function salesCommunicationResult_(job,data){
   const result={id:job.id,message:job.state==='synced'?'Bereits gespeichert und in HQ bestätigt.':job.kind==='createContact'?'Ansprechpartner gespeichert; HQ-Abgleich offen.':'Kommunikation gespeichert; HQ-Abgleich offen.',patch:{job:salesJobSummary_(job)}};
   if(job.kind==='createContact')result.contact=data.contacts.find(c=>c.jobId===job.id);
   else result.communication=data.histories.find(h=>h.jobId===job.id);
+  if(job.capture.reminderId){result.closedReminderId=job.capture.reminderId;result.message='Wiedervorlage erledigt. '+result.message;}
   return result;
 }
-function salesCommunicationCommit_(job,data){
-  const entries=[{path:'sales_jobs/'+job.id,value:job},{path:'sales_communication/'+job.companyRef,value:data}];
+function salesCommunicationCommit_(job,data,extra=[]){
+  const entries=[{path:'sales_jobs/'+job.id,value:job},{path:'sales_communication/'+job.companyRef,value:data},...extra];
   // Existing chunk writer prepares any large payload first; publish both root documents atomically.
   const writes=entries.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}}));
   salesBulkRest_('commit',{writes});
@@ -3234,17 +3236,17 @@ function salesCommunicationCommit_(job,data){
 function salesCommunicationSave_(input,kind){
   const user=salesUser_(),capture=salesCommunicationInput_(input,kind);
   return salesLock_(()=>{
-    salesAssertPrivate_();const id=salesKey_('comm_'+capture.requestId),path='sales_jobs/'+id,old=salesRead_(path);
+    salesAssertPrivate_(capture.reminderId?['sales_reminders/security-probe']:[]);const id=salesKey_('comm_'+capture.requestId),path='sales_jobs/'+id,old=salesRead_(path);
     if(old){
       if(old.actor!==user.email||old.kind!==kind||JSON.stringify(old.capture)!==JSON.stringify(capture))throw new Error('Speicherkennung gehört zu einer anderen Eingabe.');
       const data=salesCommunicationData_(old.companyRef),before=JSON.stringify(data);salesCommunicationApplyJob_(old,data);if(JSON.stringify(data)!==before)salesWrite_('sales_communication/'+old.companyRef,data);return salesCommunicationResult_(old,data);
     }
-    const ctx=salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
+    const ctx=capture.reminderId?salesReminderCompany_(capture.companyRef):salesCommunicationCompany_(capture.companyRef),data=salesCommunicationData_(ctx.ref);
     if(kind!=='createContact')salesCommunicationContact_(ctx,data,capture.contactRef);
     if(kind==='createContact'&&[...ctx.contacts,...data.contacts].some(c=>String(c.firstName).trim().toLocaleLowerCase('de')===capture.firstName.toLocaleLowerCase('de')&&String(c.lastName).trim().toLocaleLowerCase('de')===capture.lastName.toLocaleLowerCase('de')))throw new Error('Ein Ansprechpartner mit diesem Namen ist bereits vorhanden. Bitte den vorhandenen Kontakt auswählen.');
     const job={id,kind,business:1,companyRef:ctx.ref,hqId:ctx.hqId,name:ctx.name,capture,actor:user.email,...(user.uid?{actorUid:user.uid}:{}),state:'pending',createdAt:salesNow_(),updatedAt:salesNow_(),message:'In Firebase gespeichert; kontrollierter HQ-Abgleich offen.'};
     if(kind==='createContact')job.contact=salesPick_(capture,['firstName','lastName','position','eMail','phoneMobile','phoneLandline']);
-    salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data);
+    salesCommunicationApplyJob_(job,data);salesCommunicationCommit_(job,data,capture.reminderId?salesReminderCompletion_(capture,user):[]);
     return salesCommunicationResult_(job,data);
   });
 }
@@ -3290,6 +3292,64 @@ function bindSalesCustomerContact(id,hqId){
   });
 }
 function salesCommunicationOrder_(jobs){return jobs.slice().sort((a,b)=>(a.kind==='createContact'?0:1)-(b.kind==='createContact'?0:1)||(a.formGroup&&b.formGroup?a.formGroup.localeCompare(b.formGroup)||a.formOrder-b.formOrder:a.formGroup?1:b.formGroup?-1:0));}
+
+/** Personal reminders share the Firebase workspace without entering the HQ queue. */
+function salesReminderPath_(user){
+  const key=user.uid?salesAuthHash_(user.uid):Array.from(user.email,c=>c.codePointAt(0).toString(16)).join('-');
+  return 'sales_reminders/'+key;
+}
+function salesReminderBook_(user){return salesRead_(salesReminderPath_(user))||{rows:[]};}
+function salesReminderDate_(date){
+  if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Bitte ein gültiges Wiedervorlagedatum auswählen.');
+  const parsed=new Date(date+'T00:00:00Z');
+  if(!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==date)throw Error('Bitte ein gültiges Wiedervorlagedatum auswählen.');
+  return date;
+}
+function salesReminderList_(user){
+  const open=salesReminderBook_(user).rows.filter(r=>!r.closed);
+  if(!open.length)return [];
+  const deleted=new Set((salesRead_('sales_meta/deleted_companies')?.ids||[]).map(String)),drafts=new Map();
+  return open.filter(row=>{
+    if(!row.companyRef.startsWith('draft_'))return !deleted.has(row.companyRef);
+    if(!drafts.has(row.companyRef))drafts.set(row.companyRef,salesRead_('sales_drafts/'+salesKey_(row.companyRef.slice(6))));
+    const draft=drafts.get(row.companyRef);
+    return draft?.company&&!draft.deletedAt&&draft.deletion?.state!=='approved'&&!deleted.has(String(draft.hqId));
+  }).sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.id.localeCompare(b.id));
+}
+function listSalesReminders(){return salesReminderList_(salesUser_());}
+function salesReminderCompany_(ref){
+  const ctx=salesCommunicationCompany_(ref);
+  if(ctx.draft?.deletion?.state==='approved'||ctx.deletion?.state==='approved')throw Error('Für diesen Kunden ist eine Löschung freigegeben.');
+  return ctx;
+}
+function salesReminderOpen_(book,id,companyRef,revision){
+  const row=book.rows.find(r=>r.id===id);
+  if(!row||row.closed||row.companyRef!==companyRef||row.revision!==revision)throw Error('Die Wiedervorlage wurde inzwischen geändert. Bitte die Ansicht aktualisieren.');
+  return row;
+}
+function saveSalesReminder(input){
+  const user=salesUser_(),companyRef=salesKey_(input?.companyRef),request=salesKey_(input?.requestId),dueDate=salesReminderDate_(input?.dueDate);
+  const id=input.id?salesKey_(input.id):request,moveOnly=input.id&&input.contactRef===undefined&&input.content===undefined;
+  const content=moveOnly?undefined:salesText_(input.content,10000,false),contactRef=moveOnly?undefined:input.contactRef?salesKey_(input.contactRef):'';
+  return salesLock_(()=>{
+    salesAssertPrivate_(['sales_reminders/security-probe']);
+    const book=salesReminderBook_(user),prior=book.rows.find(r=>r.id===id);
+    if(prior&&prior.companyRef===companyRef&&(!input.id||prior.lastRequest===request))return prior.closed?{closedReminderId:id,message:'Wiedervorlage bereits erledigt.'}:{reminder:prior,message:'Wiedervorlage bereits gespeichert.'};
+    if(prior&&!input.id)throw Error('Speicherkennung gehört zu einer anderen Wiedervorlage.');
+    if(input.id)salesReminderOpen_(book,id,companyRef,input.revision);
+    const ctx=salesReminderCompany_(companyRef),person=contactRef?salesCommunicationContact_(ctx,salesCommunicationData_(ctx.ref),contactRef):null;
+    const row={id,companyRef,companyName:ctx.company.name||ctx.name,dueDate,contactRef:moveOnly?prior.contactRef:person?.ref||'',content:moveOnly?prior.content:content,revision:(prior?.revision||0)+1,lastRequest:request};
+    book.rows=book.rows.filter(r=>r.id!==id).concat(row);
+    salesWrite_(salesReminderPath_(user),book);
+    return {reminder:row,message:input.id?'Wiedervorlage verschoben.':'Wiedervorlage gespeichert.'};
+  });
+}
+function salesReminderCompletion_(capture,user){
+  if(!capture.reminderId)return [];
+  const book=salesReminderBook_(user),row=salesReminderOpen_(book,capture.reminderId,capture.companyRef,capture.reminderRevision);
+  book.rows=book.rows.map(r=>r.id===row.id?{id:row.id,companyRef:row.companyRef,closed:true}:r);
+  return [{path:salesReminderPath_(user),value:book}];
+}
 
 /** Customer deletion (R15). Any user requests, an admin approves, the central sync deletes in HQ and then in the app.
  * No trash bin, no restore. Projects, documents, planned revenues and open jobs block the deletion until someone cleans up.
@@ -3687,7 +3747,8 @@ function salesAuthOwner_(){const user=salesAuthRequest_?.user;if(!user?.admin)th
 
 /** Explicit operation registry. Old public RPCs cannot establish an authenticated context. */
 function salesAuthRule_(method,args){
-  if(['listSalesChangeReviews','respondSalesChangeReview'].includes(method))return 'home.read';
+  if(['listSalesChangeReviews','respondSalesChangeReview','listSalesReminders'].includes(method))return 'home.read';
+  if(method==='saveSalesReminder')return 'communication.create';
   const rules={getSalesLeanState:'home.read',getSalesLeanCompany:'customers.read',getSalesLeanEdition:'magazine.read',saveSalesCompany:'company.create',saveSalesTestCompany:'company.create',saveSalesCompanyChange:'company.edit',saveSalesCommunication:'communication.create',saveSalesHistory:'communication.create',createSalesCustomerContact:'contact.create',getSalesSyncStatus:'sync.read',startSalesSync:'sync.run',pauseSalesSync:'sync.run',runSalesSyncStep:'sync.run',syncSalesLeanCompany:'sync.run',syncSalesLeanHistory:'sync.run',saveSalesLeanEditionSettings:'settings.edit',searchSalesProjects:'settings.edit',searchSalesCompanies:'sync.run',addSalesCompany:'sync.run',saveSalesEditionConfig:'settings.edit',setSalesEditionEnabled:'settings.edit',getSalesUnassigned:'sync.read',getSalesJobPreview:'sync.read',requestSalesCustomerDelete:'customers.read'};
   if(method==='getSalesLeanView')return ({home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',admin:'settings.read',import:'sync.read',new:'company.create',change:'company.edit',test:'owner'})[args[0]]||'deny';
   if(method==='getSalesEditor'&&args[0]?.entity==='catalog')return salesAuthRequest_.user.admin||salesAuthRequest_.user.permissions['company.edit']?'company.edit':'company.create';
@@ -3710,6 +3771,8 @@ function salesAuthDispatch_(method,args){
   salesAuthRequest_.requiredPermission=rule;
   if(method==='listSalesChangeReviews')return listSalesChangeReviews();
   if(method==='respondSalesChangeReview')return respondSalesChangeReview(...args);
+  if(method==='listSalesReminders')return listSalesReminders();
+  if(method==='saveSalesReminder')return saveSalesReminder(...args);
   const methods={getSalesJobInspection,getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,getSalesTestAudit,setupSalesSyncWorker,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh,requestSalesCustomerDelete,listSalesCustomerDeletions,decideSalesCustomerDelete};
   if(!Object.prototype.hasOwnProperty.call(methods,method))throw Error('AUTH_DENIED: Aktion nicht freigegeben.');
   salesAuthValidateWrite_(method,args);

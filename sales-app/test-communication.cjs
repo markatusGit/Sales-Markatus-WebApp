@@ -11,11 +11,12 @@ function communicationFixture(){
 }
 const capture=(requestId,extra={})=>({companyRef:'101',requestId,contactRef:'202',content:'Synthetic communication',contactOn:'2026-10-22T09:15:00.000Z',notReached:false,...extra});
 const contact=(requestId,extra={})=>({companyRef:'101',requestId,firstName:'Synthetic',lastName:'Additional',...extra});
+const reminder=(requestId,extra={})=>({companyRef:'101',requestId,dueDate:'2026-10-27',contactRef:'202',content:'Synthetic reminder',...extra});
 let count=0;function test(name,fn){fn();console.log('PASS '+name);count++;}
 if(require.main===module){
 test('new public RPCs authenticate without customer or HQ access',()=>{
  const f=communicationFixture();f.setEmail('outsider@example.invalid');let reads=0;f.ctx.salesRead_=()=>{reads++;};
- for(const name of ['saveSalesCommunication','createSalesCustomerContact','bindSalesCustomerContact'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
+ for(const name of ['saveSalesCommunication','createSalesCustomerContact','bindSalesCustomerContact','saveSalesReminder','listSalesReminders'])assert.throws(()=>f.ctx[name]({}),/Zugriff/);
  assert.equal(reads,0);
 });
 test('capture uses three scoped reads and two writes, with zero lists or HQ calls; retry adds no write',()=>{
@@ -89,6 +90,45 @@ test('moved HQ contact blocks a note before POST, while a lost history response 
  const f=communicationFixture(),r=f.ctx.saveSalesCommunication(capture('moved'));f.remote.ContactPersons[202].companyId=999;assert.equal(f.ctx.runSalesJob(r.id).state,'pending');assert.equal(f.calls.filter(c=>c.path==='/v2/ContactHistories'&&c.method==='post').length,0);
  f.remote.ContactPersons[202].companyId=101;const fetch=f.ctx.UrlFetchApp.fetch;f.ctx.UrlFetchApp.fetch=(url,opt)=>{const res=fetch(url,opt);if(url.endsWith('/ContactHistories')&&opt.method==='post')throw Error('Synthetic lost response');return res;};
  assert.equal(f.ctx.runSalesJob(r.id).state,'uncertain');assert.equal(f.ctx.reconcileSalesJob(r.id).state,'synced');assert.equal(f.calls.filter(c=>c.path==='/v2/ContactHistories'&&c.method==='post').length,1);assert.equal(f.ctx.getSalesLeanCompany(101).histories.length,1);
+});
+test('personal reminders sort by date and preserve their note on a confirmed move without creating HQ jobs',()=>{
+ const f=communicationFixture(),n=f.calls.length;
+ const later=f.ctx.saveSalesReminder(reminder('later')).reminder;
+ assert.equal(f.ctx.saveSalesReminder(reminder('later')).reminder.id,later.id);
+ const early=f.ctx.saveSalesReminder(reminder('early',{dueDate:'2026-10-18',contactRef:'',content:''})).reminder;
+ assert.equal(f.ctx.getSalesLeanState().reminders.map(r=>r.id).join(','),'early,later');
+ assert.throws(()=>f.ctx.saveSalesReminder(reminder('invalid',{dueDate:'2026-02-30'})),/gültiges/);
+ assert.throws(()=>f.ctx.saveSalesReminder(reminder('outside',{contactRef:'999'})),/Ansprechpartner/);
+ const move={companyRef:'101',id:later.id,revision:later.revision,dueDate:'2026-10-16',requestId:'move'};
+ const moved=f.ctx.saveSalesReminder(move).reminder;assert.equal(moved.contactRef,later.contactRef);assert.equal(moved.content,later.content);
+ assert.equal(f.ctx.saveSalesReminder(move).reminder.revision,2);
+ assert.throws(()=>f.ctx.saveSalesReminder({...move,requestId:'stale'}),/inzwischen/);
+ assert.equal(f.ctx.listSalesReminders().map(r=>r.id).join(','),[later.id,early.id].join(','));
+ assert.equal(f.calls.length,n);assert.ok(!Object.keys(f.db).some(p=>p.startsWith('sales_jobs/')));
+});
+test('only the author can move or complete a personal reminder, and completion records the communication atomically',()=>{
+ const f=communicationFixture(),owner='pp@markatus.de';f.props.SALES_ALLOWED_EMAILS=owner+',synthetic@example.invalid';
+ const original=reminder('atomic'),row=f.ctx.saveSalesReminder(original).reminder,reply=capture('complete',{reminderId:row.id,reminderRevision:row.revision});
+ f.setEmail('synthetic@example.invalid');assert.equal(f.ctx.listSalesReminders().length,0);
+ assert.throws(()=>f.ctx.saveSalesReminder({...original,id:row.id,revision:row.revision,requestId:'foreign-move'}),/inzwischen/);
+ assert.throws(()=>f.ctx.saveSalesCommunication(reply),/inzwischen/);
+ f.setEmail(owner);const write=f.ctx.salesWrite_,n=f.calls.length;
+ f.ctx.salesWrite_=(p,v)=>{if(p.startsWith('sales_reminders/'))throw Error('Synthetic atomic interruption');return write(p,v);};
+ assert.throws(()=>f.ctx.saveSalesCommunication(reply),/atomic interruption/);
+ assert.equal(f.ctx.listSalesReminders().length,1);assert.equal(f.db['sales_communication/101'],undefined);
+ f.ctx.salesWrite_=write;
+ assert.equal(f.ctx.saveSalesCommunication(reply).closedReminderId,row.id);assert.equal(f.ctx.saveSalesCommunication(reply).closedReminderId,row.id);
+ assert.equal(f.ctx.saveSalesReminder(original).closedReminderId,row.id);assert.equal(f.ctx.listSalesReminders().length,0);
+ assert.equal(f.db['sales_communication/101'].histories.length,1);assert.equal(f.calls.length,n);
+ f.ctx.salesSyncWrite_({id:'comm_complete'});assert.equal(f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length,1);
+});
+test('reminders work for unsynced drafts and hide confirmed deleted customers',()=>{
+ const f=communicationFixture(),created=f.ctx.saveSalesCompany({...f.input,name:'Synthetic local reminder'}),ref='draft_'+created.id;
+ const row=f.ctx.saveSalesReminder(reminder('draft-reminder',{companyRef:ref,contactRef:ref+'_contact'})).reminder;
+ assert.equal(f.ctx.listSalesReminders()[0].companyRef,ref);assert.equal(row.contactRef,ref+'_contact');
+ f.ctx.saveSalesReminder(reminder('import-reminder'));f.db['sales_meta/deleted_companies']={ids:['101']};
+ assert.equal(f.ctx.listSalesReminders().length,1);
+ f.db['sales_drafts/'+created.id].deletedAt='2026-10-26T12:00:00Z';assert.equal(f.ctx.listSalesReminders().length,0);
 });
 console.log(count+' customer communication checks passed.');
 }
