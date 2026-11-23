@@ -1238,7 +1238,12 @@ function salesSyncWrite_(task,run){
   if(job.draftDependency&&salesRead_('sales_jobs/'+salesKey_(job.draftDependency))?.state!=='synced')return;
   if(job.formPrevious&&!['synced','canceled'].includes(salesRead_('sales_jobs/'+salesKey_(job.formPrevious))?.state))return;
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
-  if(job.business===1){salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);if(after.kind==='deleteCompany'&&after.state==='synced'&&run)salesDeleteApplyCounts_(run,after);if(!['synced','canceled'].includes(after.state)&&!salesReviewWaiting_(after))throw new Error(after.message);return;}
+  if(job.business===1){
+    salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);
+    if(after.kind==='deleteCompany'&&after.state==='synced'&&run)salesDeleteApplyCounts_(run,after);
+    if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw new Error(after.message);
+    return;
+  }
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
   if(!draft?.company||draft.id!==job.draftId)throw new Error('Kein freigegebenes eigenes Firmenziel. Auftrag nicht übertragen.');
   if(!['createCompany','history','companyChange','contactEmail','cleanupMarker'].includes(job.kind)||job.history?.contactHistoryChannel==='Task')throw new Error('Auftragsart nicht für den HQ-Sync freigegeben.');
