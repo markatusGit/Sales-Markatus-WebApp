@@ -2,6 +2,7 @@
 
 ## [v0.35.0]
 
+- Abschluss: veröffentlicht als Google62 und GitHub-Tagv0.35.0; alle27 Prüfdateien bestanden. Öffentliche Loginhülle mit HTTP200 und neuer Kennung live bestätigt. Echte HQ-Metadaten-/Neukundenübertragung weiterhin gesondert zu prüfen; kein Sync gestartet.
 - Kundenherkunft bei neuen App-Kunden serverseitig fest „Medienhaus“, mit bestätigtem HQ-Feldtyp. Vorhandene Kunden und alte Anlageaufträge bleiben unverändert; Bearbeitung erhält die Herkunft auch bei veralteten Clientangaben. Herkunft aus Formularen, Kundenakten und technischer Auftragsvorschau ausgeblendet.
 - „Grund der Adressanlage“ verwendet das gleichnamige eigene HQ-Firmenfeld mit seinem tatsächlichen Typ und seinen bestätigten Auswahlwerten. Alte lokale Adressherkunftsdaten werden erhalten und nicht automatisch übertragen. Ohne geladene Definition zeigt das Formular einen schreibgeschützten Hinweis bis zum nächsten zentralen Abgleich.
 - Benötigte Felddefinitionen mit Namensfilter abfragen. Kein breiter v1-Abruf aller Definitionen und Optionen mehr; nur bei Bedarf gezielte Optionen für Grund der Adressanlage. Kein zusätzlicher Firmen-/Kontaktimport zur Stammlistenaktualisierung. Formulare bleiben HQ-frei, bestehende Konflikt-/Schreibschutzprüfungen erhalten.
