@@ -1,10 +1,10 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
-## r38: Wiedervorlagen prüfen
+## r38.1: Wiedervorlagen prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen. Für die Bedienabnahme eine geeignete Test-Kundenakte verwenden.
 
-- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-23-r38“. Bei anderer Kennung diese melden.
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-23-r38.1“. Bei anderer Kennung diese melden.
 - Eine Test-Kundenakte öffnen.
 - In „Gespräch / Notiz“ einen kurzen Testtext eintragen.
 - „Wiedervorlage“ anklicken. Erwartet wird ein Datumsfenster mit dem Datum in sieben Tagen. Bei einer Abweichung das angezeigte Datum melden.
@@ -13,8 +13,10 @@ Keine neuen Script Properties oder Bereitstellungseinstellungen. Für die Bedien
 - Beim Testtermin „Verschieben“ anklicken.
 - Im Datumsfenster einen anderen Tag auswählen.
 - Im Datumsfenster „Speichern“ anklicken. Erwartet wird der neue Termin mit derselben Notiz. Bei einer anderen Anzeige den angezeigten Hinweis melden.
-- Beim Testtermin „Erfassen“ anklicken. Erwartet wird das Kommunikationsfenster mit „Ansprechpartner“, „Datum / Uhrzeit“, „Gespräch / Notiz“, „Speichern“, „Nicht erreicht“ und „Wiedervorlage“.
-- Im Kommunikationsfenster „Nicht erreicht“ anklicken. Erwartet wird der Abschluss der Wiedervorlage samt neuem Historieneintrag. Bei einer Abweichung den angezeigten Hinweis melden.
+- Beim Testtermin „Erfassen“ anklicken. Erwartet wird das Kommunikationsfenster mit „Ansprechpartner“, „Datum / Uhrzeit“, „Gespräch / Notiz“, „Speichern“ und „Wiedervorlage“. Erscheint zusätzlich „Nicht erreicht“, die Kennung melden.
+- Im Kommunikationsfenster einen Ansprechpartner auswählen.
+- In „Gespräch / Notiz“ einen kurzen Testtext eintragen.
+- Im Kommunikationsfenster „Speichern“ anklicken. Erwartet wird der Abschluss der Wiedervorlage samt neuem Historieneintrag. Bei einer Abweichung den angezeigten Hinweis melden.
 
 ## r37: Änderungsanträge in der App prüfen
 

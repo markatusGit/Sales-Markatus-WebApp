@@ -90,10 +90,10 @@
       });return;
     }
     if(!d.model.pending){
-      const notReached=e.submitter?.name==='notReached';form.elements.communicationText.required=!notReached;
+      form.elements.communicationText.required=true;
       if(!form.reportValidity())return;
       const date=new Date(form.elements.communicationTime.value);if(!Number.isFinite(date.getTime()))return;
-      d.model.pending={companyRef:d.row.companyRef,reminderId:d.row.id,reminderRevision:d.row.revision,requestId:communicationId(),contactRef:form.elements.communicationContact.value,contactOn:date.toISOString(),content:form.elements.communicationText.value,notReached};
+      d.model.pending={companyRef:d.row.companyRef,reminderId:d.row.id,reminderRevision:d.row.revision,requestId:communicationId(),contactRef:form.elements.communicationContact.value,contactOn:date.toISOString(),content:form.elements.communicationText.value,notReached:false};
     }
     act(async()=>{
       const result=await rpc('saveSalesCommunication',d.model.pending);reminderAccept(result);

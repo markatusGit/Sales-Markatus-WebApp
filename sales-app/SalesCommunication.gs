@@ -44,7 +44,10 @@ function salesCommunicationInput_(input,kind){
     if(typeof input.notReached!=='boolean')throw new Error('Ungültiges Kontaktergebnis.');
     out.notReached=input.notReached;out.content=salesText_(input.content,10000,!input.notReached);
     out.contactRef=salesKey_(String(input.contactRef));out.contactOn=salesHistoryDate_(input.contactOn);
-    if(input.reminderId!==undefined){out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;}
+    if(input.reminderId!==undefined){
+      if(out.notReached)throw Error('Bitte eine Kommunikation erfassen oder die Wiedervorlage verschieben.');
+      out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;
+    }
   }
   return out;
 }

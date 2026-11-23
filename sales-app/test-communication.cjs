@@ -109,6 +109,8 @@ test('personal reminders sort by date and preserve their note on a confirmed mov
 test('only the author can move or complete a personal reminder, and completion records the communication atomically',()=>{
  const f=communicationFixture(),owner='pp@markatus.de';f.props.SALES_ALLOWED_EMAILS=owner+',synthetic@example.invalid';
  const original=reminder('atomic'),row=f.ctx.saveSalesReminder(original).reminder,reply=capture('complete',{reminderId:row.id,reminderRevision:row.revision});
+ assert.throws(()=>f.ctx.saveSalesCommunication({...reply,content:'',notReached:true}),/Kommunikation erfassen oder die Wiedervorlage verschieben/);
+ assert.equal(f.ctx.listSalesReminders().length,1);assert.equal(f.db['sales_communication/101'],undefined);
  f.setEmail('synthetic@example.invalid');assert.equal(f.ctx.listSalesReminders().length,0);
  assert.throws(()=>f.ctx.saveSalesReminder({...original,id:row.id,revision:row.revision,requestId:'foreign-move'}),/inzwischen/);
  assert.throws(()=>f.ctx.saveSalesCommunication(reply),/inzwischen/);

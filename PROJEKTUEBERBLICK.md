@@ -1,5 +1,9 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – r38.1: Wiedervorlage erfassen oder erneut planen
+
+„Erfassen“ bietet „Speichern“ für eine neue Kommunikation und „Wiedervorlage“ für einen neuen Termin. In der normalen Kundenkommunikation ist „Nicht erreicht“ weiterhin verfügbar. Der Server lehnt dieses Ergebnis beim Abschluss einer Wiedervorlage ab. Diese Entscheidung ersetzt den entsprechenden Teil von r38.
+
 ### 23.11.2026 – r38: Wiedervorlagen in „Mein Tag“ und in der Kundenakte
 
 Persönliche Wiedervorlagen werden in der Kundenkommunikation mit „Wiedervorlage“ angelegt. Der Dialog übernimmt den Text aus „Gespräch / Notiz“ und schlägt in Berliner Zeit heute plus sieben Kalendertage vor. „Mein Tag“ zeigt die offenen Termine in einer eigenen Spalte von früh nach spät. Die Kundenakte zeigt ihre offenen Wiedervorlagen über der normalen Kontakthistorie.

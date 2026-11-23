@@ -1,5 +1,10 @@
 # Änderungsprotokoll
 
+## [v0.38.1]
+
+- „Erfassen“ einer Wiedervorlage erlaubt das Speichern einer Kommunikation oder erneutes Terminieren. „Nicht erreicht“ bleibt in der normalen Kundenkommunikation verfügbar. Der Server verhindert den Abschluss einer Wiedervorlage mit diesem Ergebnis.
+- Kennung `2026-11-23-r38.1`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ## [v0.38.0]
 
 - Persönliche Wiedervorlagen mit Datum und Gesprächsnotiz aus der Kundenkommunikation. Datumsvorschlag heute plus sieben Kalendertage in Berliner Zeit.

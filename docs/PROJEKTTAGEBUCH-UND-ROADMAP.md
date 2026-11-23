@@ -1,5 +1,9 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 23.11.2026 – r38.1: „Nicht erreicht“ aus der Wiedervorlage entfernen
+
+Der Nutzer korrigiert den Ablauf unter „Erfassen“. „Speichern“ protokolliert eine Kommunikation und schließt den Termin. „Wiedervorlage“ öffnet den Datumsdialog zum erneuten Planen. Die gemeinsame Formularvorlage zeigt „Nicht erreicht“ ausschließlich in der normalen Kundenkommunikation. Der Server prüft diese Regel vor dem Speichern. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r38: Wiedervorlagen aus der Kundenkommunikation
 
 Nutzerwunsch: Eigene Datumsspalte in „Mein Tag“ mit alten und bald fälligen Terminen zuerst. „Wiedervorlage“ neben „Speichern“ und „Nicht erreicht“ in der Kundenkommunikation. Der kurze Datumsdialog schlägt heute plus sieben Tage vor und speichert die vorhandene Gesprächsnotiz als Kontext. In der Kontakthistorie stehen offene Termine als eigener Block ganz oben. In beiden Ansichten gibt es „Verschieben“ und „Erfassen“ mit der bekannten Kommunikationsmaske.

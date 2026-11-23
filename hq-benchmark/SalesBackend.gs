@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r38';
+const SALES_RELEASE = '2026-11-23-r38.1';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -3195,7 +3195,10 @@ function salesCommunicationInput_(input,kind){
     if(typeof input.notReached!=='boolean')throw new Error('Ungültiges Kontaktergebnis.');
     out.notReached=input.notReached;out.content=salesText_(input.content,10000,!input.notReached);
     out.contactRef=salesKey_(String(input.contactRef));out.contactOn=salesHistoryDate_(input.contactOn);
-    if(input.reminderId!==undefined){out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;}
+    if(input.reminderId!==undefined){
+      if(out.notReached)throw Error('Bitte eine Kommunikation erfassen oder die Wiedervorlage verschieben.');
+      out.reminderId=salesKey_(input.reminderId);out.reminderRevision=input.reminderRevision;
+    }
   }
   return out;
 }
