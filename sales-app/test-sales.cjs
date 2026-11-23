@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 // Legacy regression suite deliberately exercises the private pre-migration mode.
 const source=['Sales.gs','SalesFields.gs','SalesBusiness.gs','SalesCommunication.gs','SalesReminders.gs','SalesDelete.gs','SalesAuth.gs','SalesAuthorization.gs','SalesPermissions.js'].map(n=>fs.readFileSync(__dirname+'/'+n,'utf8')).join('\n').replace('const SALES_AUTH_REQUIRE_FIREBASE=true;','const SALES_AUTH_REQUIRE_FIREBASE=false;');
-function readUi(){return fs.readFileSync(__dirname+'/Sales.template.html','utf8').replace('// V1_FUNCTIONS',['SalesPermissions.js','SalesV1.js','SalesProjects.js','SalesLazy.js','SalesBusiness.js','SalesCommunication.js','SalesDelete.js','SalesAuth.js'].map(file=>fs.readFileSync(__dirname+'/'+file,'utf8')).join('\n'));}
+function readUi(){return fs.readFileSync(__dirname+'/../hq-benchmark/Sales.html','utf8');}
 let count=0;
 function test(name,fn){fn();console.log('PASS',name);count++;}
 function fixture(){
