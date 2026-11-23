@@ -13,6 +13,31 @@ test('unchanged baseline performs zero raw/company/project writes and no orphan 
  const f=bulkFixture();f.finishBulk();const start=f.transport.length,run=f.finishBulk();const ops=f.transport.slice(start);
  assert.equal(run.state,'completed');assert.equal(ops.filter(o=>o.op==='runQuery').length,0);assert.equal(ops.filter(o=>o.op==='commit').flatMap(o=>o.body.writes).length,0);assert.ok(Object.values(run.entities).every(m=>m.changed===0));
 });
+test('complete and incremental HQ sync only read invoices and planned revenues and refresh their Firebase copies',()=>{
+ const f=bulkFixture(),edition=f.config(70);f.doc(70,1001);
+ f.remote.Projects[700]={id:700,companyId:102,name:'Synthetic planned project',status:'InProgress'};
+ f.remote.PlannedRevenues[701]={id:701,companyId:102,projectId:700,netTotal:500,currency:'EUR',startDate:'2026-12-01'};
+ const initialCalls=f.calls.length,initial=f.finishBulk();
+ assert.equal(initial.state,'completed');assert.equal(initial.full,true);
+ assert.equal(f.db['sales_rawdocuments/1001'].row.netValue,100);
+ assert.equal(f.db['sales_rawplans/701'].row.netTotal,500);
+
+ const updatedOn=new Date().toISOString();
+ Object.assign(f.remote.Documents[1001],{netValue:140,updatedOn});
+ Object.assign(f.remote.PlannedRevenues[701],{netTotal:620,updatedOn});
+ const deltaCalls=f.calls.length,delta=f.finishBulk();
+ assert.equal(delta.state,'completed');assert.equal(delta.full,false);
+ assert.equal(f.db['sales_rawdocuments/1001'].row.netValue,140);
+ assert.equal(f.db['sales_rawplans/701'].row.netTotal,620);
+ assert.equal(f.db['sales_editions/'+edition].documents[0].cents,14000);
+ const project=f.db['sales_companies/102'].projects.find(p=>p.id==='700');
+ assert.equal(project.plannedRevenues[0].netCents,62000);
+ for(const [start,end] of [[initialCalls,deltaCalls],[deltaCalls,f.calls.length]]){
+   const calls=f.calls.slice(start,end);
+   for(const entity of ['Documents','PlannedRevenues'])assert.ok(calls.some(c=>c.path.startsWith('/v2/'+entity+'?')));
+   assert.ok(calls.every(c=>c.method==='get'));
+ }
+});
 test('new company and contact unrelated to any magazine are imported and usable',()=>{
  const f=bulkFixture();f.finishBulk();const now=new Date().toISOString();f.remote.Companies[1234]={id:1234,name:'Synthetic independent customer',updatedOn:now};f.remote.ContactPersons[9876]={id:9876,companyId:1234,firstName:'Synthetic',updatedOn:now};
  f.finishBulk();assert.equal(f.db['sales_companies/1234'].contacts[0].id,9876);assert.equal(f.db['sales_directory/1234'].company.name,'Synthetic independent customer');

@@ -12,6 +12,7 @@ Zu Beginn jeder Folgearbeit dieses Dokument und das Projekttagebuch lesen. Diese
 
 ## Weitere Projektregeln
 
+- HQ ist die führende Quelle für Belege und Planumsätze. Jeder zentrale HQ-Abgleich synchronisiert beide Datenarten ausschließlich von HQ nach Firebase. Die App darf diese Datensätze weder anlegen, bearbeiten noch löschen und keine entsprechenden Schreibaufträge nach HQ senden.
 - Bei jeder Apps-Script-Übergabe neben geänderten Dateien auch neue/geänderte Skripteigenschaften und nötige Bereitstellungseinstellungen ausdrücklich nennen; falls nichts davon geändert werden muss, dies kurz sagen. Code-Upload legt nicht automatisch Skripteigenschaften an. Bereitstellerkonto, App-Administrator und weitere Nutzer nicht gleichsetzen. Erfolgreiche Bereitstellung nicht als erfolgreiche Einrichtung oder Live-Funktionsprüfung darstellen.
 - Zu Beginn von Folgearbeiten `PROJEKTUEBERBLICK.md` und `docs/PROJEKTTAGEBUCH-UND-ROADMAP.md` lesen; bei Einrichtungsfragen zusätzlich `docs/START-HIER.md` und `docs/VEROEFFENTLICHEN.md`. Historische manuelle Übertragungsanleitungen werden durch den aktuellen Veröffentlichungsablauf ersetzt.
 - Tagebuchpflege nach dem verbindlichen Ablauf oben durchführen; wichtige Entscheidungen und neue Roadmap-Wünsche ebenfalls festhalten.

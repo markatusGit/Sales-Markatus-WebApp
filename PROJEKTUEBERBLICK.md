@@ -1,5 +1,11 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – r35.1: Belege und Planumsätze ausschließlich aus HQ
+
+Verbindliche Nutzerentscheidung: Belege und Planumsätze werden ausschließlich in HQ gepflegt. Jeder zentrale HQ-Abgleich übernimmt sie nach Firebase. Die App zeigt sie schreibgeschützt an. Der bisherige Roadmap-Wunsch R01 zur Anlage eines HQ-Planumsatzes aus einer App-Buchung bleibt als frühere Idee dokumentiert und ist aus der aktiven Planung genommen.
+
+Der Erst- und Änderungsabgleich behandeln beide Datenarten bereits als HQ-Lesedaten. „Datenabgleich“ zeigt die Richtung jetzt ausdrücklich. Änderungen greifen über den bestehenden Änderungsfilter und die begrenzte Einzelprüfung. Ausgabenmarkierungen betreffen nur die Auswertung in Firebase. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r35: Kleine Feldabfragen und Herkunft nur bei Neuanlage
 
 Abgeschlossen und veröffentlicht: Quellcommit5beb663, Releasecommitbc394ab, Tagv0.35.0, Apps-Script-Version62. Bestehende Bereitstellung, feste App-Adresse, Ausführung/Zugriff und Script Properties unverändert. Alle27 Prüfdateien sowohl lokal als auch in sauberer Veröffentlichungskopie bestanden; Google-Version/Editor und GitHub-Tag/main verglichen. Öffentliche App-Loginhülle live mit HTTP200 und neuer Kennungr35 bestätigt. Keine Anmeldung oder produktive Kundenanlage/-bearbeitung und kein neuer Sync durch diese Arbeit. Tatsächlicher neuer HQ-Metadatenabruf einschließlich Verhalten des Namensfilters sowie erste Medienhaus-Übertragung bleiben beim nächsten vorgesehenen zentralen Abgleich zu prüfen. Alte historische Syncwarnungen wurden nicht als bereits verschwunden dargestellt.

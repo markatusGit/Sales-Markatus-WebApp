@@ -44,7 +44,7 @@ Vertriebler sollen schnell erkennen, wen sie für eine Ausgabe als Nächstes ans
 | Filter | UND-verknüpfte Kriterien mit Mehrfachauswahl innerhalb eines Kriteriums, Suchtext, persönliche gespeicherte Ansichten | Freier verschachtelter UND/ODER-Editor, geteilte Teamansichten |
 | Kontakte dokumentieren | Telefon, Gespräch, manuelle E-Mail-Notiz; Zeitpunkt, Ergebnis, optionale Notiz und Wiedervorlage | Automatische E-Mail-Historie, Kalender- und Telefonintegration |
 | Wiedervorlagen | Verantwortlicher, Datum, Kontext, erledigen/verschieben, eigene und gemeinsame Liste | awork-Abgleich und Erinnerungsversand |
-| Buchungen | Ohne Angebot erfassen, Produkt wählen, Sonderpreis, Ansprechpartner optional, Paketkennung, ändern/stornieren | HQ-Planumsätze, automatisierte Paketkalkulation |
+| Buchungen | Ohne Angebot erfassen, Produkt wählen, Sonderpreis, Ansprechpartner optional, Paketkennung, ändern/stornieren | Automatisierte Paketkalkulation |
 | Redaktion | Buchungsliste je Ausgabe, Meldevorschau, bewusster Versand, Meldestatus je Buchungsstand | Produktionsstatus, Druckunterlagen, Übergabe nach awork |
 | Historie aus HQ | Projekte je Ausgabe, zugehörige Rechnungen und Positionen, zunächst drei Jahre | Weitere Leistungsbereiche und längere Historie |
 | Datenqualität | Dublettenhinweise, Prüfbereich für unklare Zuordnungen und Synchronisationskonflikte | Unterstütztes Zusammenführen und aufwendigere Bereinigung |
@@ -226,7 +226,9 @@ Import zunächst als Vorschau mit Treffern, möglichen Dubletten und unklaren Ze
 | 3 – Alltagstauglicher Pilot | Drei-Jahres-Historie, Preislisten, Redaktionsmeldung, Excel-Erstimport, nächtlicher Abgleich, Konfliktanzeige, Sicherung und dokumentierter Betrieb |
 | 4 – Erweiterter Vertrieb | Externe Konten nach Rechteentscheidung, mehr Nutzer und erneuter Test mit zehn gleichzeitigen Nutzern; Betreuung und Funktionen anhand echten Feedbacks verbessern |
 
-Roadmap, zunächst ohne verbindliche Termine: **(1)** HQ-Planumsätze aus Buchungen nach API-Prüfung; **(2)** automatische Gmail-Historie mit bekannten Kontakten, Klärung mehrdeutiger Zuordnungen und Sichtbarkeit; **(3)** awork-Verbindung; **(4)** Mitarbeiterbezogene Aktivitäten, Abschlüsse, Abschlussquoten und Zielerreichung mit vorher vereinbarten Definitionen/Rechten; **(5)** Paket-/Rabattberechnung, Reservierungen und Produktionsabläufe; **(6)** Knolle, Schoen.frau, iTV und weitere Agenturleistungen; **(7)** feinere Priorisierung, Teamansichten und weitere Auswertungen. E-Mail-Versand an Redaktion und automatische Übernahme persönlicher Gmail-Nachrichten sind unterschiedliche Funktionen; nur Ersteres gehört in den Pilot.
+Roadmap, zunächst ohne verbindliche Termine: **(1)** HQ-Planumsätze aus Buchungen (historischer Wunsch, seit dem 23.11.2026 aus der aktiven Planung genommen); **(2)** automatische Gmail-Historie mit bekannten Kontakten, Klärung mehrdeutiger Zuordnungen und Sichtbarkeit; **(3)** awork-Verbindung; **(4)** Mitarbeiterbezogene Aktivitäten, Abschlüsse, Abschlussquoten und Zielerreichung mit vorher vereinbarten Definitionen/Rechten; **(5)** Paket-/Rabattberechnung, Reservierungen und Produktionsabläufe; **(6)** Knolle, Schoen.frau, iTV und weitere Agenturleistungen; **(7)** feinere Priorisierung, Teamansichten und weitere Auswertungen. E-Mail-Versand an Redaktion und automatische Übernahme persönlicher Gmail-Nachrichten sind unterschiedliche Funktionen; nur Ersteres gehört in den Pilot.
+
+Belege und Planumsätze werden in HQ gepflegt. Der zentrale HQ-Abgleich übernimmt beide Datenarten bei jedem Lauf nach Firebase. In der App sind sie schreibgeschützt.
 
 ## 9. Abnahme und noch benötigte Informationen
 

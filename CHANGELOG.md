@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.35.1]
+
+- „Datenabgleich“ zeigt, dass Belege und Planumsätze schreibgeschützt sind und jeder zentrale HQ-Abgleich sie ausschließlich von HQ nach Firebase synchronisiert. Der vorhandene Importweg bleibt bestehen.
+- Projektregeln, Fachkonzept und Roadmap halten die Datenrichtung fest. Die frühere Idee zur Anlage von HQ-Planumsätzen aus Buchungen ist aus der aktiven Planung genommen.
+- Kennung `2026-11-23-r35.1`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ## [v0.35.0]
 
 - Abschluss: veröffentlicht als Google62 und GitHub-Tagv0.35.0; alle27 Prüfdateien bestanden. Öffentliche Loginhülle mit HTTP200 und neuer Kennung live bestätigt. Echte HQ-Metadaten-/Neukundenübertragung weiterhin gesondert zu prüfen; kein Sync gestartet.

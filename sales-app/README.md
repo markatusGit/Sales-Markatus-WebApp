@@ -47,6 +47,7 @@ Nachweis mit 3.202 synthetischen Firmen: 65 Directory-Seitenwrites, keine indivi
 ## Datenabgleich
 
 - **HQ synchronisieren** ist die gemeinsame reguläre Aktion. Firebase-Aufträge zuerst: Firmen anlegen und zurücklesen, anschließend Ansprechpartner in getrennten Aufrufen, danach weitere gespeicherte Änderungen. Anschließend HQ → Firebase lesen. Firmen- und Kontakt-ID bleiben serverseitig gebunden; bestätigte Aufträge werden nicht erneut angelegt.
+- Belege und Planumsätze werden ausschließlich in HQ gepflegt. Jeder zentrale HQ-Abgleich synchronisiert beide Datenarten von HQ nach Firebase. In der App sind sie schreibgeschützt.
 - Bestehende TEST-Zielprüfung bleibt wirksam. Der Sammellauf nimmt nur gespeicherte Aufträge mit eigenem serverseitigem Testentwurf, TEST-Namen und erlaubter Auftragsart an. Zielbindung und exakte Schreibpfade prüft zusätzlich der bisherige zentrale Writer. Reale Importfirmen sowie Projekte/Rechnungen sind keine Schreibziele. Unklare/running/conflicted Aufträge werden angezeigt, nicht automatisch wiederholt; Rückprüfung und Konfliktentscheidung bleiben verfügbar.
 - Alle über die HQ-API verfügbaren Unternehmen, Kontakte und Kontakthistorien werden unabhängig von Magazinbuchungen gelesen. Firmenimport in Abschnitten: Stammdaten, Kontakte, Belege, Projekte, Historie, einzelne Projektbelege/-Planumsätze und historische Textzuordnung. Listen seitenweise à 50, Ausgabenbelege wie bisher à 200.
 - Nur bewusst zugeordnete, ausgewählte HQ-Projekte werden als Magazinausgaben ausgewertet. **Auswahl für HQ-Sync speichern** ändert Firebase-Konfiguration, startet keinen Import. Abwählen beendet künftige Aktualisierung, löscht keine historischen Daten. Bisherige Zuordnungen bleiben beim Umstieg ausgewählt; andere Suchergebnisse werden beim Speichern nicht abgewählt.
@@ -81,7 +82,7 @@ Nur [SalesBackend.gs](../hq-benchmark/SalesBackend.gs) und [Sales.html](../hq-be
 
 Gesamtimport noch nicht gegen den gesamten realen Mandanten geprüft. HQ-Token muss vollständiges Lesen erlauben. Finale Zusammenführung großer Firmen und Gesamtübersicht erfolgen weiterhin im Arbeitsspeicher; Laufzeit, Kontingente und Browsergröße bleiben praktische Grenzen. Ausgabe maximal 50 Seiten à 200 Belege; Firebase-Auflistung maximal 1.000 Seiten à 100 Dokumente, danach expliziter Fehler. Gelöschte HQ-Firmen werden nicht automatisch aus alten App-Daten gelöscht; Archivierungs-/Löschregeln offen. Abschlusszahlen beziehen sich ausdrücklich auf den aktuellen Lauf.
 
-Bereitstellung zuletzt **Nur ich**. Nächste Nutzerfolge: 4 Google-Zugang, 5 Gespräche/Wiedervorlagen/Stammdatenbearbeitung, 6 Buchungen/Redaktionsübergabe, 7 Teamtest einer aktuellen Ausgabe. Adressherkunft vorerst Firebase; Gmail, awork, Nachtlauf, HQ-Planumsatzerzeugung und weitere Roadmap-Wünsche bleiben zurückgestellt.
+Bereitstellung zuletzt **Nur ich**. Nächste Nutzerfolge: 4 Google-Zugang, 5 Gespräche/Wiedervorlagen/Stammdatenbearbeitung, 6 Buchungen/Redaktionsübergabe, 7 Teamtest einer aktuellen Ausgabe. Adressherkunft vorerst Firebase; Gmail, awork, Nachtlauf und weitere Roadmap-Wünsche bleiben zurückgestellt. Die frühere Idee zur HQ-Planumsatzerzeugung ist seit dem 23.11.2026 aus der aktiven Planung genommen.
 
 ## Quellen und Prüfung
 

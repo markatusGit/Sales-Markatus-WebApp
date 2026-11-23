@@ -43,6 +43,7 @@ const {chromium}=require('playwright'),{setup}=require('./test-sales-v1.cjs');
   await page.getByText('Auswahl in Firebase gespeichert.',{exact:false}).waitFor();
   assert.ok(!calls.includes('startSalesSync'));assert.ok(!calls.includes('startSalesImport'));
   await page.getByRole('button',{name:'Datenabgleich',exact:true}).click();
+  await page.getByText('Belege und Planumsätze sind in der App schreibgeschützt. Jeder HQ-Abgleich synchronisiert sie ausschließlich von HQ nach Firebase.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'HQ synchronisieren',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#magazin-vertrieb[aria-busy=true]')&&document.body.innerText.includes('Aktueller Abschnitt'));
   // Wait for the first queued RPC to reach the synthetic server, then interrupt the client loop.

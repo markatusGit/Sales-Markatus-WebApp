@@ -1,5 +1,13 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 23.11.2026 – r35.1: Einseitiger Abgleich von Belegen und Planumsätzen
+
+Nutzerentscheidung: Belege und Planumsätze werden in HQ gepflegt und bei jedem zentralen HQ-Abgleich ausschließlich von HQ nach Firebase übernommen. Die App darf sie weder anlegen, ändern noch löschen. Der ältere Wunsch R01 zur Anlage in HQ bleibt historisch dokumentiert und ist aus der aktiven Planung genommen.
+
+Codeprüfung: Der zentrale Erst- und Änderungsabgleich liest beide Datenarten per GET und speichert sie in Firebase. Die vorhandenen HQ-Schreibpfade erlauben ausschließlich andere Datenarten. Die Anzeige unter „Datenabgleich“ nennt jetzt beide schreibgeschützten Datenarten und die Richtung. Das Markieren eines Belegs für die Ausgabenstatistik betrifft die lokale Auswertung. Die bestehenden Änderungsfilter, begrenzten Einzelprüfungen und die Klärung bei Mengenabweichungen bleiben bestehen.
+
+Der Regressionstest speichert beide Datenarten beim Erstimport und übernimmt geänderte Beträge beim nächsten Abgleich in die Firebase-Rohdaten, die Ausgabenstatistik und die Kundenakte. Die HQ-Aufrufe beider Testläufe waren lesend. Der Browsertest bestätigt den Hinweis im Datenabgleich. Die Prüfungen verwenden synthetische Daten. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r35: Herkunftsentscheidung und begrenzte Feldabfragen
 
 Abschlussnachweis: Quellcommit5beb6630b0b6bc617fc6a583c392fe8d42765550, Releasecommitbc394ab, GitHub-Tagv0.35.0, Apps-Script-Version62. Geprüfte Veröffentlichungskopie ausschließlich mit zugehörigen Commits aktualisiert; alle27 Prüfdateien dort erneut erfolgreich. Bestehende feste Bereitstellung aus deployment.json aktualisiert, Codefingerabdrücke mit Editor und Version verglichen und main/Tag nach GitHub übertragen. Release ohne zusätzliche Bereitstellung oder Wiederholungsupload abgeschlossen. Im Originalprojekt Release-Metadaten per Fast-forward übernommen; fremde lokale Dokumentationsdateien nicht veröffentlicht. Rein lesender öffentlicher App-Aufruf bestätigt HTTP200, App-Titel und Kennung2026-11-23-r35 in der Loginhülle. Dies bestätigt weder eine Anmeldung noch eine echte Kundenübertragung. Kein Kunden-Sync, keine Änderung produktiver Kunden und keine Kontingentänderung. Metadaten-/Optionenabruf und erster neuer Medienhaus-Kunde bleiben gesonderte Live-Prüfungen beim nächsten vorgesehenen Sync. Script Properties, Trigger, Ausführungsidentität und Zugriffsgruppe unverändert.
@@ -141,7 +149,7 @@ Keine der folgenden späteren Funktionen erhält durch diesen Eintrag bereits ei
 
 | ID | Funktion | Herkunft und Status | Nächster Klärungspunkt |
 | --- | --- | --- | --- |
-| R01 | HQ-Planumsatz direkt aus einer Buchung vorbereiten/anlegen | Ausdrücklicher späterer Nutzerwunsch; noch nicht umgesetzt | Passende HQ-Funktion und notwendige Inhalte prüfen |
+| R01 | HQ-Planumsatz direkt aus einer Buchung vorbereiten/anlegen | Früherer Nutzerwunsch; am 23.11.2026 aus der aktiven Planung genommen | Planumsätze werden in HQ gepflegt und im zentralen Abgleich nach Firebase übernommen |
 | R02 | Weitere Abläufe nach dem Verkauf und Redaktionsübergabe ausbauen | Nutzer möchte über die erste E-Mail hinausgehende Schritte auf der Roadmap behalten | Bisherige Liste des Chefredakteurs und gewünschte Folgeschritte ansehen |
 | R03 | Automatische Gmail-Kontakthistorie | Früherer Wunsch; am 22.10.2026 nach bestätigtem Brainstorming aus der aktiven Planung genommen | Historisch erhalten; manuelle Gesprächs-/Angebotsnotizen verwenden |
 | R04 | awork-Anbindung | Als spätere Integration im Konzept dokumentiert | Konkrete Aufgaben und Auslöser definieren |
