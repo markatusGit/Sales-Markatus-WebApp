@@ -25,7 +25,7 @@
   function salesForgetLogin(text='',reauthenticate=false){
     salesReauthentication=reauthenticate;
     salesLoginSession=null;salesLoginPending?.popup?.close();salesLoginPending=null;
-    state=null;detail=null;preview=null;audit=null;businessEditor=null;customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
+    state=null;detail=null;preview=null;audit=null;businessEditor=null;ownReviews=[];customerFormDrafts.clear();customerNewIndustries.clear();customerBranchDialog=null;contactDialog=null;formDraft=null;salesUserRows=[];salesUserCursor=null;salesInvitationLink='';
     projectResults=null;companyResults=null;unassignedData=null;storageInventory=null;projectChoices={};projectSearchTerm='';projectSearchError='';selected=null;selectedEditionId='';search='';message='';
     customerListObserver?.disconnect();customerListObserver=null;
     for(const cache of [companyCache,editionCache,viewCache,communicationDrafts,contactDialogDrafts])cache.clear();loadedViews.clear();error=text;view='home';

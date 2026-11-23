@@ -1,5 +1,11 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – r37: CRM-Änderungen begründen und Überschreibungen freigeben
+
+Nutzerentscheidung: Firmen, Ansprechpartner und Kontakthistorie bei Neuanlage zwischen Firebase und HQ spiegeln. Ergänzungen an bestehenden Kunden gezielt übertragen. App-Änderungen brauchen einen Grund, auch beim Ausfüllen eines leeren Feldes. Einen vorhandenen Wert erst nach Freigabe durch den Admin überschreiben. Bei einer zwischenzeitlichen Änderung desselben Feldes gilt HQ.
+
+Der zentrale Abgleich verarbeitet weiterhin Neuanlagen und Ergänzungen. Unter „Datenabgleich“ → „Aufträge und Konflikte ansehen“ sieht der Admin bei Änderungsanträgen den bisherigen Wert, den Vorschlag und den Grund. Er kann den neuen Wert freigeben, den alten behalten oder im Antrag nachfragen. Mitarbeitende antworten unter „Meine Änderungen“. Belege und Planumsätze bleiben HQ-Lesedaten. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r36: In HQ gelöschte Firmen und Ansprechpartner auch lokal entfernen
 
 Veröffentlicht und technisch bestätigt: Quellcommit25057ec, Releasecommit6e18fb5, GitHub-Tagv0.36.0, Apps-Script-Version64. Alle27 Prüfdateien in sauberer Veröffentlichungskopie bestanden, darunter34 Deltafälle und der erweiterte Browserfall. Feste Google-Version und Editor entsprechen dem GitHub-Tag; main bestätigt. Öffentliche Loginhülle live HTTP200 mit Kennungr36. Bestehende App-Adresse, Script Properties, Trigger, Ausführung/Zugriff und Kontingent unverändert. Kein produktiver Sync oder Kundenlöschung durch diese Arbeit; echte Löschübernahme und Kennungsabruf im Mandanten erst beim nächsten vorgesehenen zentralen Abgleich. Fremde lokale Dokumentation nicht veröffentlicht.

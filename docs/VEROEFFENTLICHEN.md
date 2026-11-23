@@ -1,5 +1,26 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r37: Änderungsanträge in der App prüfen
+
+Keine neuen Script Properties oder Bereitstellungseinstellungen. Die folgenden Schritte betreffen einen bewusst gewählten Testfall.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird die Kennung „2026-11-23-r37“.
+- Eine geeignete Test-Kundenakte öffnen.
+- „Ansprechpartner bearbeiten“ anklicken.
+- Einen bereits gefüllten Wert ändern.
+- Eine kurze Begründung in „Änderungsgrund“ eintragen.
+- „Änderungen in Firebase speichern“ anklicken. Erwartet werden der Freigabehinweis und der bisherige Wert in der Kundenakte. Bei einer anderen Anzeige den Wortlaut melden.
+- Als Admin „Datenabgleich“ öffnen.
+- „Aufträge und Konflikte ansehen“ anklicken.
+- Beim Testauftrag „Auftrag ansehen“ anklicken. Erwartet werden der bisherige und der vorgeschlagene Wert sowie der Grund.
+- Für eine Nachfrage den Text in „Rückfrage an den Mitarbeiter“ eintragen.
+- „Rückfrage stellen“ anklicken. Der Auftrag zeigt „Rückfrage offen“.
+- Als einreichender Mitarbeiter „Meine Änderungen“ öffnen. Erwartet wird die gespeicherte Rückfrage. Bei fehlendem Eintrag „Ansicht aktualisieren“ anklicken.
+- Die Antwort in „Deine Antwort“ eintragen.
+- „Antwort speichern“ anklicken. Der Auftrag wartet wieder auf die Admin-Freigabe.
+- Als Admin im Auftrag „Neuen Wert übernehmen“ anklicken. Erwartet wird der Status „Freigegeben“.
+- Beim vorgesehenen Sync „HQ synchronisieren“ anklicken. Erwartet wird die Übernahme des Vorschlags, sofern HQ denselben Wert inzwischen unverändert liefert. Bei einer Abweichung den Auftragshinweis prüfen.
+
 ## r36: In HQ gelöschte Unternehmen und Ansprechpartner übernehmen
 
 Keine Script Properties oder Bereitstellungseinstellungen ändern. Der neue Abgleich schreibt oder löscht nichts in HQ. Er entfernt ausschließlich bestätigte fehlende HQ-Importkopien aus der App. Offene Neuanlagen ohne bestätigte HQ-Zuordnung bleiben erhalten. Bestehende offene Änderungen an einem in HQ gelöschten Ziel werden mit Hinweis beendet und nicht wieder übertragen. Belege und Planumsätze unverändert. Keine zusätzliche Adminfreigabe erforderlich, wenn HQ die Löschung bereits bestätigt; der separate Löschantrag aus der App nach HQ bleibt unverändert.

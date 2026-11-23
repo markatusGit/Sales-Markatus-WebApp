@@ -8,6 +8,7 @@
     if(patch.editions){const id=selectedEditionId;state.editions=patch.editions;state.edition=patch.editions.find(e=>e.id===id)||patch.editions[0]||null;selectedEditionId=state.edition?.id||'';patch.editions.forEach(e=>{if(!e.summaryOnly)editionCache.set(e.id,e);});}
   }
   async function ensureView(name,force=false){
+    if(name==='reviews'){ownReviews=await rpc('listSalesChangeReviews');return;}
     if(name==='import'||name==='new')force=true;
     if(!force&&loadedViews.has(name)){mergeLean(viewCache.get(name));return;}
     if(['home','customers','magazine','contacts','invoices','admin','new','change','test','import'].includes(name)){const patch=await rpc('getSalesLeanView',name,selectedEditionId);viewCache.set(name,patch);mergeLean(patch);}

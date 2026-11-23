@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r36';
+const SALES_RELEASE = '2026-11-23-r37';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -459,8 +459,10 @@ function saveSalesTestCompany(input) {
     salesWrite_('sales_jobs/'+id,job);return {id,message:'Firma und Ansprechpartner sind in Firebase gespeichert und sofort in der Kundenansicht sichtbar. HQ wurde noch nicht verändert.'};});
 }
 function getSalesJobPreview(id) {
-  salesUser_();const job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');if(job.business===1)return {job:salesJobSummary_(job),change:job.change,contact:job.contact,companyRef:job.companyRef,history:job.history||(job.kind==='communication'?{reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',content:job.capture.content||'Nicht erreicht',contactOn:job.capture.contactOn,contactHistoryChannel:job.capture.notReached?'Call':'Note',contactPersonId:job.capture.contactRef}:null),note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
-  return {job:salesJobSummary_(job),company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Firma. Kein Projekt-/Rechnungsschreibzugriff.'};
+  const user=salesUser_(),job=salesRead_('sales_jobs/'+salesKey_(id));if(!job) throw new Error('Auftrag fehlt.');
+  const review=user.admin&&job.review?{review:job.review,changeReason:job.changeReason,previousValue:job.base,changeAuthor:job.actor}:{};
+  if(job.business===1)return {job:salesJobSummary_(job),...review,change:job.change,contact:job.contact,companyRef:job.companyRef,history:job.history||(job.kind==='communication'?{reason:job.capture.notReached?'Nicht erreicht':'Gespräch / Notiz',content:job.capture.content||'Nicht erreicht',contactOn:job.capture.contactOn,contactHistoryChannel:job.capture.notReached?'Call':'Note',contactPersonId:job.capture.contactRef}:null),note:'Kundenstammdaten und Kommunikation. HQ-Projekte und Rechnungen bleiben nur lesbar.'};const d=salesRead_('sales_drafts/'+job.draftId);
+  return {job:salesJobSummary_(job),...review,company:d.company,contact:d.contact,addressOrigin:d.addressOrigin,addressOriginOther:d.addressOriginOther,history:job.history||null,change:job.kind==='cleanupMarker'?{description:d.company.description,operation:'Technische Kennzeichnung nach Prüfung entfernen'}:job.change||null,note:'HQ-Ziel ausschließlich eigene Firma. Kein Projekt-/Rechnungsschreibzugriff.'};
 }
 function getSalesTestAudit(id) {
   salesUser_(true);const d=salesRead_('sales_drafts/'+salesKey_(id));
@@ -492,7 +494,7 @@ function salesContactDifferences_(actual,expected) {
 }
 function salesContactEmail_(contact) {return String(contact?.eMail||contact?.defaultAddress?.email||'');}
 function salesContactView_(contact) {
-  return Object.assign(salesPick_(contact,['id','companyId','firstName','lastName','position','salutation','salutationForm','phoneMobile','phoneLandline','updatedOn']),{eMail:salesContactEmail_(contact)});
+  return {...salesPick_(contact,['id','companyId','firstName','lastName','position','salutation','salutationForm','phoneMobile','phoneLandline','language','birthdate','note','customFields','defaultAddressId','defaultAddress','updatedOn']),eMail:salesContactEmail_(contact)};
 }
 function salesContactWithAddress_(id) {
   const contact=salesOne_('ContactPersons',id);
@@ -939,7 +941,7 @@ function saveSalesCompanyChange(input) {
     const industry=salesText_(input.industrialSector,150,false),known=salesRead_('sales_meta/catalog')?.industries||[];
     if(industry&&!known.includes(industry)&&industry!==data.company.industrialSector) throw new Error('Bitte eine Branche aus der aktuellen HQ-Auswahlliste wählen.');
     const change={industrialSector:industry,homepage:salesWebsiteInput_(input.homepage)};
-    const base=salesPick_(data.company,Object.keys(change)),baseAddressWebsite=data.company.defaultAddress?.website||'',id=Utilities.getUuid();const job={id,kind:'companyChange',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',change,base,baseAddressWebsite,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Änderung in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
+    const reason=salesReviewReason_(input.changeReason),base=salesPick_(data.company,Object.keys(change)),baseAddressWebsite=data.company.defaultAddress?.website||'',id=Utilities.getUuid();const job={id,kind:'companyChange',draftId:d.id,hqId:d.hqId,name:d.company.name,state:'pending',change,base,baseAddressWebsite,changeReason:reason,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Änderung in Firebase gespeichert; HQ-Abgleich offen.'};if(salesReviewOverwrite_({...base,addressWebsite:baseAddressWebsite},{...change,addressWebsite:change.homepage}))salesReviewHold_(job);salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
 function salesAddressForWrite_(actual) {
   const address=actual.defaultAddress;if(!address?.id) throw new Error('HQ hat keine eindeutige Standardadress-ID geliefert. Keine Änderung.');
@@ -955,7 +957,8 @@ function salesRunChange_(job) {
   const actual=salesOne_('Companies',job.hqId),draft=salesRead_('sales_drafts/'+job.draftId);
   if(!draft?.company||actual.name!==draft.company.name) throw new Error('Ziel ist keine eigene Firma mehr.');
   const website=actual.defaultAddress?.website||'',companyCompatible=Object.keys(job.change).every(k=>[String(job.base[k]??''),String(job.change[k]??'')].includes(String(actual[k]??''))),addressCompatible=[job.baseAddressWebsite||'',job.change.homepage].includes(website);
-  if(!companyCompatible||!addressCompatible) {job.state='conflict';job.conflict={before:{...job.base,addressWebsite:job.baseAddressWebsite||''},app:{...job.change,addressWebsite:job.change.homepage},hq:{...salesPick_(actual,Object.keys(job.change)),addressWebsite:website}};job.message='HQ und App unterscheiden sich. Bitte entscheiden.';return;}
+  if(!companyCompatible||!addressCompatible) {if(job.changeReason){job.state='canceled';job.message='HQ hat diese Daten inzwischen geändert. Der zentrale Abgleich übernimmt den HQ-Stand.';if(job.review)job.review.status='superseded';return;}job.state='conflict';job.conflict={before:{...job.base,addressWebsite:job.baseAddressWebsite||''},app:{...job.change,addressWebsite:job.change.homepage},hq:{...salesPick_(actual,Object.keys(job.change)),addressWebsite:website}};job.message='HQ und App unterscheiden sich. Bitte entscheiden.';return;}
+  if((!salesEqualFields_(actual,job.change)||website!==job.change.homepage)&&!salesReviewAllowed_(job,{...actual,addressWebsite:website},{...job.change,addressWebsite:job.change.homepage}))return;
   const addressNeedsWrite=website!==job.change.homepage;
   const address=addressNeedsWrite?salesAddressForWrite_(actual):null;
   if(address) {job.addressId=salesId_(address.id);salesWrite_('sales_jobs/'+job.id,job);}
@@ -970,6 +973,7 @@ function salesRunChange_(job) {
 function salesHomepageConfirmed_(actual,expected) {return String(actual.homepage||'')===expected||!!expected&&!actual.homepage&&String(actual.defaultAddress?.website||'')===expected;}
 function resolveSalesConflict(id,choice) {
   salesUser_(true);return salesLock_(()=>{const j=salesRead_('sales_jobs/'+salesKey_(id));if(j?.state!=='conflict') throw new Error('Kein offener Konflikt.');
+    if(choice==='app'&&['entityChange','companyChange'].includes(j.kind))throw Error('Der aktuelle HQ-Stand hat Vorrang. Bitte die Daten neu laden und bei Bedarf einen neuen Änderungsantrag stellen.');
     if(j.business===1){
       if(choice==='hq'){j.state='canceled';const actual=salesBusinessTarget_(j.hqId,j.entity,j.targetId);salesBusinessFinish_(j,actual);j.message='HQ-Werte behalten.';}
       else if(choice==='app'){j.base=j.conflict.hq;j.state='pending';j.writeAttempted=false;j.message='App-Werte ausgewählt. HQ wird vor dem Schreiben erneut geprüft.';}

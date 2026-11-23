@@ -52,7 +52,7 @@ function salesLeanNames_(){
     const repaired=salesRead_(path);if(repaired){salesWrite_(path,{...repaired,deletionVisibilityVersion:1});return repaired.rows;}
     // Once, on the first explicit Customers click: migrate the existing directory to names only.
     const map=new Map(salesV1Index_().entries.map(e=>[String(e.company.id),{id:String(e.company.id),name:e.company.name}]));
-    for(const d of salesList_('sales_drafts'))if(d.company&&!d.deletedAt&&d.deletion?.state!=='approved')map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:(d.pendingChanges||[]).find(p=>p.change.name!==undefined)?.change.name||map.get(String(d.hqId))?.name||d.company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
+    for(const d of salesList_('sales_drafts'))if(d.company&&!d.deletedAt&&d.deletion?.state!=='approved')map.set(String(d.hqId||'draft_'+d.id),{id:'draft_'+d.id,name:map.get(String(d.hqId))?.name||salesBusinessVisibleDraft_(d).company.name,...(d.hqId?{hqId:String(d.hqId)}:{})});
     const rows=Array.from(map.values());salesWrite_(path,{rows,deletionVisibilityVersion:1});return rows;
   });
 }
@@ -62,7 +62,7 @@ function salesLeanNamesUpdate_(entries){
   if(!changes.length)return;const path='sales_meta/lean_names',old=salesRead_(path);if(!old)return;
   const gone=salesLeanGone_(entries),kept=changes.filter(c=>!gone.has(c.id)&&!(c.hqId&&gone.has(c.hqId)));if(!kept.length)return;changes.length=0;changes.push(...kept);
   const map=new Map(old.rows.map(c=>[c.hqId||c.id,c]));let changed=false;
-  for(const c of changes)if(c.hqId&&map.has(c.hqId)&&!entries.some(e=>e.path==='sales_drafts/'+c.id.slice(6)&&(e.value.pendingChanges||[]).some(p=>p.change.name!==undefined)))c.name=map.get(c.hqId).name;
+  for(const c of changes)if(c.hqId&&map.has(c.hqId))c.name=map.get(c.hqId).name;
   for(let c of changes){const key=c.hqId||c.id;if(c.hqId&&map.delete(c.id))changed=true;const prior=map.get(key);if(!c.id.startsWith('draft_')&&prior?.id.startsWith('draft_'))c={...prior,name:c.name};if(JSON.stringify(prior)!==JSON.stringify(c)){map.set(key,c);changed=true;}}
   if(changed)salesWrite_(path,{...old,rows:Array.from(map.values())});
 }

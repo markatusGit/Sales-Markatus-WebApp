@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.37.0]
+
+- App-Stammdatenänderungen verlangen einen Änderungsgrund. Ergänzungen leerer Felder gehen über den zentralen HQ-Abgleich. Änderungen und das Leeren vorhandener Werte brauchen eine Admin-Freigabe.
+- Admin-Entscheidungen und Rückfragen im Änderungsauftrag. Mitarbeitende antworten unter „Meine Änderungen“. Aktuelle HQ-Werte haben bei einer konkurrierenden Änderung Vorrang, auch nach einer zuvor erteilten Freigabe.
+- Kennung `2026-11-23-r37`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ## [v0.36.0]
 
 - Abschlussnachweis: Google64, Editor und GitHub-Tag/main bestätigt; alle27 Prüfdateien einschließlich34 Deltafällen und erweiterter Löschanzeige im Browser bestanden. Öffentliche Loginseite live mit HTTP200 und Kennungr36 bestätigt. Produktiver Löschabgleich noch nicht gestartet.

@@ -1,4 +1,26 @@
-  let businessEditor=null;
+  let businessEditor=null,ownReviews=[];
+  const reviewLabels={awaitingApproval:'Wartet auf Admin-Freigabe',awaitingAnswer:'Rückfrage offen',pending:'Freigegeben · wartet auf HQ-Abgleich',synced:'In HQ bestätigt',canceled:'Abgeschlossen'};
+  function reviewText(label,name,value=''){
+    return '<label class="m-field m-full">'+esc(label)+'<textarea name="'+name+'" maxlength="1000" required>'+esc(value)+'</textarea></label>';
+  }
+  function reviewConversation(review){
+    return review.conversation.map(item=>'<p><strong>'+esc(item.kind==='ask'?'Rückfrage des Admins':'Antwort des Mitarbeiters')+'</strong><br><span>'+esc(item.text)+'</span></p>').join('');
+  }
+  function reviewInput(id,review){return '<input type="hidden" name="reviewId" value="'+esc(id)+'"><input type="hidden" name="revision" value="'+esc(review.revision)+'">';}
+  function reviewListPage(){
+    return head('Meine Änderungen','Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
+      '<section class="m-panel">'+(ownReviews.map(item=>'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+(item.state==='awaitingAnswer'?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
+  }
+  function reviewValues(values){
+    const clean=businessPreviewValue(values||{});
+    return Object.entries(clean).map(([name,value])=>'<dt>'+esc(businessLabels[name]||name)+'</dt><dd>'+esc(Array.isArray(value)?value.map(v=>v&&typeof v==='object'?JSON.stringify(v):v).join(', '):value&&typeof value==='object'?JSON.stringify(value):value??'Leer')+'</dd>').join('');
+  }
+  function reviewAdminPanel(p){
+    if(!p.review||!state.user.admin)return '';
+    const waiting=p.job.state==='awaitingApproval',answer=p.job.state==='awaitingAnswer';
+    const controls=waiting||answer?'<form data-form="change-review" class="m-form">'+reviewInput(p.job.id,p.review)+(waiting?reviewText(p.changeReason?'Rückfrage an den Mitarbeiter':'Rückfrage oder Grund für den älteren Auftrag','note'):'' )+'<div class="m-full m-test-actions">'+(waiting?'<button class="m-button m-primary" name="decision" value="approve" '+(p.changeReason?'formnovalidate':'')+'>Neuen Wert übernehmen</button>':'')+'<button class="m-button" name="decision" value="keep" formnovalidate>Alten Wert behalten</button>'+(waiting?'<button class="m-button" name="decision" value="ask">Rückfrage stellen</button>':'')+'</div></form>':'';
+    return '<section class="m-section"><h3>Änderungsantrag</h3><p>'+esc(reviewLabels[p.job.state]||p.job.message)+'</p>'+(p.changeAuthor?'<p>Eingereicht von '+esc(p.changeAuthor)+'</p>':'')+(p.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(p.changeReason)+'</p>':'')+'<h4>Bisheriger Wert</h4><dl class="m-dl">'+reviewValues(p.previousValue)+'</dl><h4>Vorgeschlagener Wert</h4><dl class="m-dl">'+reviewValues(p.change)+'</dl>'+reviewConversation(p.review)+controls+'</section>';
+  }
   const customerFormDrafts=new Map(),customerNewIndustries=new Set();let customerBranchDialog=null;
   const customerToday=()=>localContactTime().slice(0,10);
   function customerFormValues(key,base,catalog){if(!customerFormDrafts.has(key)){const markatus=(catalog.subsystems||[]).filter(x=>x.name.trim().toLowerCase()==='markatus');customerFormDrafts.set(key,{...base,subsystemId:base.subsystemId||(markatus.length===1?String(markatus[0].id):''),country:base.country||'DE',erstelldatum:base.erstelldatum||customerToday()});}return customerFormDrafts.get(key);}
@@ -118,7 +140,7 @@
       return field(label,name,v??'',s.type==='integer'||s.type==='number'?'number':'text',!path&&schema.required?.includes(key)&&!s.nullable);
     }).join('');
   }
-  function businessPage(){const customer=businessEditor.entity==='customer',key='edit_'+businessEditor.companyId;return head('Stammdaten bearbeiten',businessEditor.companyName,button('Zur Firma','company',selected))+'<section class="m-panel"><div class="m-panel-body"><p>'+(businessEditor.deferred?'Die ursprüngliche HQ-Anlage ist noch offen. Änderungen werden separat in Firebase vorgemerkt und erst nach deren Abschluss übertragen. ':'')+'Speicherung in der App; Übertragung beim gemeinsamen HQ-Abgleich.</p>'+(customer?customerCatalogTools(businessEditor.catalog):'')+'<form data-form="business" '+(customer?'data-customer-form="'+esc(key)+'"':'')+' class="m-form">'+(customer?customerFields(businessEditor.catalog,customerFormValues(key,businessEditor.base,businessEditor.catalog),key):businessFields(businessEditor.schema,businessEditor.base))+'<div class="m-full"><button class="m-button m-primary">Änderungen in Firebase speichern</button></div></form></div></section>'+customerBranchHtml();}
+  function businessPage(){const customer=businessEditor.entity==='customer',key='edit_'+businessEditor.companyId,values=customer?customerFormValues(key,businessEditor.base,businessEditor.catalog):businessEditor.base;return head('Stammdaten bearbeiten',businessEditor.companyName,button('Zur Firma','company',selected))+'<section class="m-panel"><div class="m-panel-body"><p>'+(businessEditor.deferred?'Die ursprüngliche HQ-Anlage ist noch offen. Änderungen werden separat vorgemerkt. ':'')+'Ergänzungen gehen beim nächsten HQ-Abgleich nach HQ. Änderungen vorhandener Werte brauchen eine Admin-Freigabe.</p>'+(customer?customerCatalogTools(businessEditor.catalog):'')+'<form data-form="business" '+(customer?'data-customer-form="'+esc(key)+'"':'')+' class="m-form">'+(customer?customerFields(businessEditor.catalog,values,key):businessFields(businessEditor.schema,values))+reviewText('Änderungsgrund','changeReason',values.changeReason)+'<div class="m-full"><button class="m-button m-primary">Änderungen in Firebase speichern</button></div></form></div></section>'+customerBranchHtml();}
   function businessChanges(schema,base,input,path=''){
     const out={};for(const [key,s] of Object.entries(schema.properties)){
       const name=path?path+'.'+key:key,old=base?.[key];
@@ -140,6 +162,15 @@
     let [entity,targetId]=b.dataset.id.split(':');act(async()=>{const companyEntity=['company','types'].includes(entity),current=!companyEntity||[detail?.company?.id,detail?.company?.hqId].map(String).includes(String(targetId)),local=current&&detail?.company?.localDraftId&&detail.company.syncState!=='synced';const companyId=local?detail.company.id:companyEntity?targetId:detail.company.hqId||detail.company.id;if(local)targetId=companyEntity?companyId:companyId+'_'+entity;if(String(local?detail?.company?.id:detail?.company?.hqId||detail?.company?.id)!==String(companyId)){detail=await loadCompany(companyId);selected=detail.company.id;}businessEditor=await rpc('getSalesEditor',{companyId,entity:entity==='company'?'customer':entity,targetId});customerFormDrafts.delete('edit_'+companyId);view='business';});
   });
   root.addEventListener('submit',e=>{
+    if(e.target.dataset.form==='change-review'){
+      e.preventDefault();e.stopImmediatePropagation();if(busy||!e.submitter)return;
+      const input=Object.fromEntries(new FormData(e.target)),decision=e.submitter.value;
+      act(async()=>{const result=await rpc('respondSalesChangeReview',{id:input.reviewId,revision:Number(input.revision),decision,note:input.note});
+        if(view==='reviews')ownReviews=await rpc('listSalesChangeReviews');
+        else {preview=await rpc('getSalesJobPreview',input.reviewId);loadedViews.delete('test');viewCache.delete('test');companyCache.clear();}
+        return result;
+      },{preserve:true});return;
+    }
     if(e.target.dataset.form==='bind-customer-contact'){
       e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
       const hqId=e.target.elements.hqId.value;act(async()=>{const r=await rpc('bindSalesCustomerContact',preview.job.id,hqId);preview=await rpc('getSalesJobPreview',preview.job.id);return r;});return;
@@ -149,10 +180,10 @@
       const hqId=e.target.elements.hqId.value;act(async()=>{const r=await rpc('bindSalesCompanyResult',preview.job.id,hqId);preview=await rpc('getSalesJobPreview',preview.job.id);return r;});return;
     }
     if(e.target.dataset.form!=='business')return;e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;
-    const input=Object.fromEntries(new FormData(e.target));act(async()=>{
+    const {changeReason,...input}=Object.fromEntries(new FormData(e.target));act(async()=>{
       const change=businessEditor.entity==='customer'?input:businessChanges(businessEditor.schema,businessEditor.base,input);if(!Object.keys(change).length)return {message:'Keine Änderungen eingegeben.'};
-      const signature=JSON.stringify(change);if(businessEditor.pending?.signature!==signature)businessEditor.pending={signature,requestId:communicationId()};
-      const r=await rpc('saveSalesEntityChange',{companyId:businessEditor.companyId,entity:businessEditor.entity,targetId:businessEditor.targetId,base:businessEditor.base,revision:businessEditor.revision,requestId:businessEditor.pending.requestId,change});
+      const signature=JSON.stringify({change,changeReason});if(businessEditor.pending?.signature!==signature)businessEditor.pending={signature,requestId:communicationId()};
+      const r=await rpc('saveSalesEntityChange',{companyId:businessEditor.companyId,entity:businessEditor.entity,targetId:businessEditor.targetId,base:businessEditor.base,revision:businessEditor.revision,requestId:businessEditor.pending.requestId,changeReason,change});
       for(const p of r.entityPatches||[r.entityPatch])if(p)businessAcceptPatch(p,r.patch);if(r.catalog){state.catalog=r.catalog;const cache=viewCache.get('new');if(cache)cache.catalog=r.catalog;}view='company';return r;
     },{preserve:true});
   });

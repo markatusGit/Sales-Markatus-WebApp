@@ -1,7 +1,7 @@
 /** Global HQ pages, independent change cursors, Firebase-only joins. No HQ writes here. */
 const SALES_BULK_ENTITIES=['Companies','ContactPersons','Projects','Documents','PlannedRevenues','ContactHistories'];
 const SALES_BULK_LABELS={Companies:'Unternehmen',ContactPersons:'Ansprechpartner',Projects:'Projekte',Documents:'Belege',PlannedRevenues:'Planumsätze',ContactHistories:'Kontakthistorie'};
-const SALES_BULK_EXPAND={Companies:'Addresses,DefaultAddress,CompanyTypes,ResponsibleUsers,CustomFields,Subsystems',ContactPersons:'DefaultAddress',Projects:'ProjectStatus',Documents:'DocumentStatusEntity',PlannedRevenues:'Estimations'};
+const SALES_BULK_EXPAND={Companies:'Addresses,DefaultAddress,CompanyTypes,ResponsibleUsers,CustomFields,Subsystems',ContactPersons:'DefaultAddress,CustomFields',Projects:'ProjectStatus',Documents:'DocumentStatusEntity',PlannedRevenues:'Estimations'};
 function salesBulkSelect_(entity,raw){
   const keys={Companies:['name','industrialSector','description','homepage','debitorNumber','subsystems','companyTypes','responsibleUsers','defaultAddress','addresses','customFields'],ContactPersons:['companyId','firstName','lastName','position','phoneLandline','phoneMobile','eMail','salutation','salutationForm','defaultAddress','defaultAddressId'],Projects:['companyId','number','name','status','projectStatus','actualFinishDate','plannedFinishDate'],Documents:['companyId','projectId','number','date','currency','documentType','documentStatusEntity','netValue','createdFromId'],PlannedRevenues:['companyId','projectId','description','interval','startDate','endDate','dueMonth','dueDay','invoiceDate','currency','status','netTotal','estimations'],ContactHistories:['companyId','projectId','contactPersonId','userId','reason','content','contactOn','nextContactDate','contactHistoryChannel','contactHistoryStatus','syncId','responsibleUserIds','isReminder','recipientEmailAddress']};
   const row=salesPick_(raw,['id','updatedOn',...keys[entity]]);
@@ -9,7 +9,11 @@ function salesBulkSelect_(entity,raw){
     const address=a=>a?salesPick_(a,['id','updatedOn','street','houseNumber','zipCode','city','country','description','standardForDocumentType','website']):null;
     row.defaultAddress=address(raw.defaultAddress);row.addresses=(raw.addresses||[]).map(address);row.customFields=salesCompanyCustomSelected_(raw.customFields);
   }
-  if(entity==='ContactPersons'&&raw.defaultAddress)row.defaultAddress=salesPick_(raw.defaultAddress,['id','email']);return row;
+  if(entity==='ContactPersons'){
+    Object.assign(row,salesPick_(raw,['language','birthdate','note','customFields']));
+    if(raw.defaultAddress)row.defaultAddress={id:raw.defaultAddress.id,...salesContactAddressFields_(raw.defaultAddress)};
+  }
+  return row;
 }
 function salesBulkSummary_(run){
   const task=run.tasks[run.cursor],e=run.entities.Companies;
