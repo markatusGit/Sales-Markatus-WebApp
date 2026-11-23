@@ -5,20 +5,26 @@
   function customerBeforeRender(){const f=root.querySelector('[data-customer-form]');if(f)customerFormDrafts.set(f.dataset.customerForm,Object.fromEntries(new FormData(f)));}
   function customerOptions(rows,value,fallback){return [{id:'',name:'Bitte auswählen'},...rows,...(value&&!rows.some(x=>String(x.id)===String(value))?[{id:value,name:fallback}]:[])];}
   function customerFields(catalog,v,key){
-    const origin=(catalog.fields||[]).find(f=>f.name.trim().toLowerCase()==='kundenherkunft');let selectedOrigins=[];try{selectedOrigins=JSON.parse(v.Kundenherkunft||'[]');}catch(_){}
-    const options=[...new Set([...(origin?.options||[]),...selectedOrigins])];
     return '<div class="m-full m-form" data-customer-fields>'+field('Unternehmensname','name',v.name||'','text',true)+select('Firmenart','companyTypeId',customerOptions(catalog.types,v.companyTypeId,'Bisherige Firmenart'),v.companyTypeId||'')+
       select('Branche','industrialSector',[{id:'',name:'Bitte auswählen'},...[...new Set([...(catalog.industries||[]),...customerNewIndustries,...(v.industrialSector?[v.industrialSector]:[])])].map(name=>({id:name,name})),{id:'__new__',name:'+ Neue Branche anlegen'}],v.industrialSector||'')+'<input type="hidden" name="newIndustry" value="'+(customerNewIndustries.has(v.industrialSector)?'true':'false')+'">'+
       select('HQ-Unternehmensbereich','subsystemId',customerOptions(catalog.subsystems,v.subsystemId,'Bisheriger Unternehmensbereich'),v.subsystemId||'')+select('Verantwortlicher Benutzer','responsibleUserId',customerOptions(catalog.users,v.responsibleUserId,'Bisheriger Benutzer'),v.responsibleUserId||'')+
       field('Homepage','homepage',v.homepage||'','text')+'<label class="m-field m-full">Beschreibung<textarea name="description" maxlength="20000">'+esc(v.description||'')+'</textarea></label>'+
       '<fieldset class="m-full m-form"><legend>Adresse</legend>'+field('Straße','street',v.street||'','text',true)+field('Hausnummer','houseNumber',v.houseNumber||'')+field('Postleitzahl','zipCode',v.zipCode||'','text',true)+field('Ort','city',v.city||'','text',true)+field('Land (Code)','country',v.country||'DE','text',true)+'</fieldset>'+
-      field('Erstelldatum','erstelldatum',v.erstelldatum||customerToday(),'date')+'<div class="m-field"><span>Kundenherkunft</span><input type="hidden" name="Kundenherkunft" value="'+esc(JSON.stringify(selectedOrigins))+'"><details class="m-origin-select"><summary aria-label="Kundenherkunft auswählen">'+esc(selectedOrigins.join(', ')||'Bitte auswählen')+'</summary><div role="group" aria-label="Kundenherkunft">'+options.map(value=>'<label><input type="checkbox" data-customer-origin value="'+esc(value)+'" '+(selectedOrigins.includes(value)?'checked':'')+'> '+esc(value)+'</label>').join('')+(options.length?'':'<p class="m-muted">Keine HQ-Auswahlwerte geladen. Bitte die Auswahllisten aktualisieren.</p>')+'</div></details></div></div>';
+      field('Erstelldatum','erstelldatum',v.erstelldatum||customerToday(),'date')+customerReasonField(catalog,v.addressCreationReason||'')+'</div>';
+  }
+  function customerReasonField(catalog,value){
+    const f=(catalog.fields||[]).find(x=>x.name.trim().toLowerCase()==='grund der adressanlage');
+    if(!f)return '<label class="m-field">Grund der Adressanlage<input name="addressCreationReason" value="'+esc(value)+'" readonly><small>HQ-Feld noch nicht geladen. Wird beim nächsten zentralen Datenabgleich geprüft.</small></label>';
+    const selected=value?value.split('\n'):[],options=[...new Set([...(f.options||[]),...selected])];
+    if(f.type==='Dropdown')return select('Grund der Adressanlage','addressCreationReason',[{id:'',name:'Nicht hinterlegt'},...options.map(name=>({id:name,name}))],value);
+    if(f.type==='DropdownCheckbox')return '<div class="m-field"><span>Grund der Adressanlage</span><input type="hidden" name="addressCreationReason" value="'+esc(value)+'"><details class="m-origin-select"><summary aria-label="Grund der Adressanlage auswählen">'+esc(selected.join(', ')||'Bitte auswählen')+'</summary><div role="group" aria-label="Grund der Adressanlage">'+options.map(option=>'<label><input type="checkbox" data-customer-reason value="'+esc(option)+'" '+(selected.includes(option)?'checked':'')+'> '+esc(option)+'</label>').join('')+'</div></details></div>';
+    return businessCustomInput({...f,value},'addressCreationReason');
   }
   function customerCatalogTools(){return '<p class="m-muted">Auswahllisten aus Firebase · Aktualisierung beim zentralen Datenabgleich.</p>';}
   function customerBranchHtml(){return customerBranchDialog?'<dialog class="m-contact-dialog m-branch-dialog"><form data-form="customer-branch"><h2>Neue Branche</h2>'+field('Bezeichnung','branch',customerBranchDialog.value||'','text',true)+'<p class="m-muted">Wird mit dem Kunden gespeichert und beim HQ-Abgleich übertragen.</p><div class="m-test-actions"><button class="m-button m-primary">Anlegen</button>'+button('Abbrechen','customer-branch-cancel')+'</div></form></dialog>':'';}
   function customerAfterRender(){for(const f of root.querySelectorAll('[data-customer-form]'))for(const name of ['companyTypeId','subsystemId','responsibleUserId'])f.elements[name].required=true;const dialog=root.querySelector('.m-branch-dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();customerBranchDialog=null;render();});dialog.querySelector('input').maxLength=150;dialog.querySelector('input').pattern='.*\\S.*';dialog.querySelector('input').focus();}}
   root.addEventListener('change',e=>{const f=e.target.closest('[data-customer-form]');if(!f)return;
-    if(e.target.matches('[data-customer-origin]')){const values=[...f.querySelectorAll('[data-customer-origin]:checked')].map(x=>x.value);f.elements.Kundenherkunft.value=JSON.stringify(values);f.querySelector('.m-origin-select summary').textContent=values.join(', ')||'Bitte auswählen';}
+    if(e.target.matches('[data-customer-reason]')){const values=[...f.querySelectorAll('[data-customer-reason]:checked')].map(x=>x.value);f.elements.addressCreationReason.value=values.join('\n');f.querySelector('.m-origin-select summary').textContent=values.join(', ')||'Bitte auswählen';}
     if(e.target.name==='industrialSector'){if(e.target.value==='__new__'){e.target.value=customerFormDrafts.get(f.dataset.customerForm)?.industrialSector||'';customerBeforeRender();customerBranchDialog={key:f.dataset.customerForm,value:''};render();return;}f.elements.newIndustry.value=String(customerNewIndustries.has(e.target.value));const draft=customerFormDrafts.get(f.dataset.customerForm);draft.industrialSector=e.target.value;draft.newIndustry=f.elements.newIndustry.value;}
   });
   root.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||busy)return;
@@ -81,8 +87,12 @@
     if(f.type==='Boolean')return select(f.name,name,[{id:'',name:'Nicht hinterlegt'},{id:'true',name:'Ja'},{id:'false',name:'Nein'}],value);
     return field(f.name,name,value,f.type==='Date'?'date':'text');
   }
-  function businessNewCompanyFields(catalog){return ['erstelldatum','Kundenherkunft'].map(name=>{const f=(catalog.fields||[]).find(x=>x.name.trim().toLowerCase()===name.toLowerCase());return f?businessCustomInput({...f,value:null},name):'<p class="m-muted">HQ-Feld „'+esc(name)+'“ ist noch nicht als Firmenfeld bestätigt.</p>';}).join('');}
-  function businessCompanyCustomDetails(c){return ['erstelldatum','Kundenklassifizierung','Kundenherkunft','Adressherkunft'].map(name=>{const f=(c.customFields||[]).find(x=>x.name.trim().toLowerCase()===name.toLowerCase()),v=f?.type==='Date'?dateLabel(f.value):Array.isArray(f?.value)?f.value.join(', '):f?.value;return '<dt>'+esc(f?.name||name)+'</dt><dd>'+esc(v===undefined||v===null||v===''?'Nicht hinterlegt':v)+'</dd>';}).join('');}
+  function businessCompanyCustomDetails(c){return ['Erstelldatum','Kundenklassifizierung','Grund der Adressanlage'].map(name=>{const f=(c.customFields||[]).find(x=>x.name.trim().toLowerCase()===name.toLowerCase()),v=f?.type==='Date'?dateLabel(f.value):Array.isArray(f?.value)?f.value.join(', '):f?.value;return '<dt>'+esc(name)+'</dt><dd>'+esc(v===undefined||v===null||v===''?'Nicht hinterlegt':v)+'</dd>';}).join('');}
+  function businessPreviewValue(value){
+    if(Array.isArray(value))return value.map(businessPreviewValue);
+    if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,v])=>[key,businessPreviewValue(key==='customFields'&&Array.isArray(v)?v.filter(f=>f.name.trim().toLowerCase()!=='kundenherkunft'):v)]));
+    return value;
+  }
   function businessCustomValue(f,text){
     if(text==='')return null;
     if(f.type==='Date')return text+'T00:00:00Z';
@@ -99,7 +109,7 @@
       if(s.type==='object')return '<fieldset class="m-full"><legend>'+esc(label)+'</legend>'+businessFields(s,v||{},name)+'</fieldset>';
       if(s.type==='array'){
         if(key==='companyTypes')return '<fieldset class="m-full"><legend>Firmenarten und Kundennummern</legend>'+(businessEditor.types||[]).map(t=>{const old=(v||[]).find(x=>Number(x.companyTypeId)===Number(t.id));return '<label class="m-field"><span><input type="checkbox" name="type.'+esc(t.id)+'" '+(old?'checked':'')+'> '+esc(t.name)+'</span></label>'+field('Nummer · '+t.name,'number.'+t.id,old?.number||'');}).join('')+'</fieldset>';
-        if(key==='customFields')return '<fieldset class="m-full"><legend>'+esc(label)+'</legend>'+businessCustomFields(v).map((f,i)=>businessCustomInput(f,'custom.'+i)).join('')+'</fieldset>';
+        if(key==='customFields')return '<fieldset class="m-full"><legend>'+esc(label)+'</legend>'+businessCustomFields(v).map((f,i)=>['kundenherkunft','adressherkunft'].includes(f.name.trim().toLowerCase())?'':businessCustomInput(f,'custom.'+i)).join('')+'</fieldset>';
         return '';
       }
       if(s.enum)return select(label,name,[...(s.nullable||v===undefined||v===null?[{id:'',name:'Nicht hinterlegt'}]:[]),...s.enum.map(x=>({id:x,name:({Formal:'Formell',Informal:'Informell',Neutral:'Neutral',None:'Keine',XRechnung:'XRechnung'})[x]||x}))],v??'');

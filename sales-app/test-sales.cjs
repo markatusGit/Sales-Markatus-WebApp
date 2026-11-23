@@ -41,7 +41,7 @@ function fixture(){
     else throw new Error('Unexpected external mutation '+path);
     return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(result)};
   }};
-  db['sales_meta/catalog']={customerFormVersion:1,customerFormCheckedAt:new Date().toISOString(),companyFieldsVersion:1,users:[{id:1,name:'Test User'}],types:[{id:2,name:'Interessent'},{id:3,name:'Kunde'}],subsystems:[{id:4,name:'Testbereich'}],fields:[],industries:['App','Medien','New','Technik'],salutations:['Frau','Herr']};
+  db['sales_meta/catalog']={customerFormVersion:1,customerFormCheckedAt:new Date().toISOString(),companyFieldsVersion:1,users:[{id:1,name:'Test User'}],types:[{id:2,name:'Interessent'},{id:3,name:'Kunde'}],subsystems:[{id:4,name:'Testbereich'}],fields:[{name:'Kundenherkunft',type:'DropdownCheckbox'}],industries:['App','Medien','New','Technik'],salutations:['Frau','Herr']};
   const input={name:'TEST Integration',kind:'Interessent',responsibleUserId:'1',subsystemId:'4',street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE',firstName:'Test',lastName:'Kontakt',addressOrigin:'Sonstige',addressOriginOther:'Manueller Test'};
   return {ctx,db,props,remote,calls,input,setEmail:x=>email=x,loseResponse:()=>failAfterCreate=true};
 }
@@ -389,10 +389,10 @@ test('lost company update response resumes the address update without duplicatin
 test('lost address update response is reconciled from the confirmed HQ address',()=>{const f=fixture(),r=f.ctx.saveSalesTestCompany(f.input);finishCreate(f,r.id);const j=f.ctx.saveSalesCompanyChange({draftId:r.id,industrialSector:'',homepage:'test.invalid'}),fetch=f.ctx.UrlFetchApp.fetch;f.ctx.UrlFetchApp.fetch=(url,opt)=>{const out=fetch(url,opt);if(url.endsWith('/v2/Companies/101/Addresses/501')&&opt.method==='put')throw Error('Lost response');return out;};assert.equal(f.ctx.runSalesJob(j.id).state,'uncertain');assert.equal(f.ctx.reconcileSalesJob(j.id).state,'synced');assert.equal(f.remote.Companies[101].defaultAddress.website,'https://test.invalid');});
 test('net revenue includes unpaid sent invoices and subtracts credit notes once',()=>{const f=fixture();const base={companyId:1,projectId:10,currency:'EUR',date:'2026-01-01',documentStatusEntity:{documentStatusType:'Sent'},documentType:'Invoice',netValue:100};const r=f.ctx.salesBelegs_([{...base,id:1},{...base,id:2,documentType:'CreditNote',netValue:-20},{...base,id:3,documentStatusEntity:{documentStatusType:'Draft'}}]);assert.equal(r.accepted.reduce((n,d)=>n+d.cents,0),8000);assert.equal(r.ignored.draft,1);assert.equal(r.complete,true);});
 test('unknown status, foreign currency and canceled credit link flag incomplete data',()=>{const f=fixture(),base={id:1,companyId:1,currency:'EUR',date:'2026-01-01',documentType:'Invoice',netValue:100,documentStatusEntity:{documentStatusType:'Canceled'}};const r=f.ctx.salesBelegs_([base,{...base,id:2,documentType:'CreditNote',createdFromId:1,documentStatusEntity:{documentStatusType:'Sent'}},{...base,id:3,documentStatusEntity:{documentStatusType:'Delivered'}}]);assert.equal(r.complete,false);assert.equal(r.issues.length,2);});
-test('HQ catalog derives only distinct industry and salutation labels, without storing contacts',()=>{
+test('HQ catalog keeps cached industry and salutation labels without reimporting company or contact lists',()=>{
   const f=fixture();f.remote.Companies={1:{id:1,name:'Synthetic A',industrialSector:'Technik'},2:{id:2,name:'Synthetic B',industrialSector:'Technik'},3:{id:3,name:'Synthetic C',industrialSector:'Medien'}};
   f.remote.ContactPersons={5:{id:5,companyId:1,firstName:'Test',salutation:'Frau'},6:{id:6,companyId:2,salutation:'Herr'}};
-  f.ctx.syncSalesCatalog();const c=f.db['sales_meta/catalog'];assert.deepEqual(Array.from(c.industries),['Medien','Technik']);assert.deepEqual(Array.from(c.salutations),['Frau','Herr']);assert.equal(JSON.stringify(c).includes('Synthetic A'),false);assert.equal(JSON.stringify(c).includes('firstName'),false);
+  f.ctx.syncSalesCatalog();const c=f.db['sales_meta/catalog'];assert.deepEqual(Array.from(c.industries),['App','Medien','New','Technik']);assert.deepEqual(Array.from(c.salutations),['Frau','Herr']);assert.equal(JSON.stringify(c).includes('Synthetic A'),false);assert.equal(JSON.stringify(c).includes('firstName'),false);assert.equal(f.calls.some(x=>/^\/v2\/(Companies|ContactPersons)\?/.test(x.path)),false);
 });
 test('homepage input normalizes missing scheme and writes matching firm and address websites',()=>{
   const f=fixture();let d=f.ctx.salesDraftInput_({...f.input,homepage:'www.test.invalid',industrialSector:'Technik',salutation:'Frau'},f.db['sales_meta/catalog']);
@@ -514,7 +514,7 @@ test('UI shows a new Firebase company and its contact before HQ has assigned an 
   const preboot=script.slice(0,script.lastIndexOf("  act(async()=>{state=await rpc('getSalesLeanState');loadedViews.add('home');});"));
   const root={dataset:{},innerHTML:'',addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null},company={id:'draft_test-1',localDraftId:'test-1',hqId:null,name:'TEST Lokal',industrialSector:'Technik',description:'',homepageDisplay:'https://test.invalid',companyTypes:[{name:'Interessent'}],responsibleUsers:[{firstName:'Test'}],defaultAddress:{street:'Testweg',houseNumber:'1',zipCode:'00000',city:'Testort',country:'DE'},customFields:[],syncState:'pending'};
   const contact={firstName:'Ada',lastName:'Test',salutation:'Frau',eMail:'ada@example.invalid'};
-  const state={release:'2026-11-20-r34.6',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
+  const state={release:'2026-11-23-r35',user:{email:'test@example.invalid',admin:true},edition:null,catalog:{},drafts:[{id:'test-1',company:{name:company.name},contact}],localCompanies:[company],jobs:[{id:'test-1',kind:'createCompany',state:'pending',name:company.name,createdAt:'2026-09-26'}]};
   const sandbox={document:{getElementById:()=>root},localStorage:{getItem:()=>null},setInterval(){}};
   vm.runInNewContext(preboot+`state=${JSON.stringify(state)};view='customers';render();globalThis.customers=root.innerHTML;view='contacts';render();globalThis.contacts=root.innerHTML;selected='draft_test-1';detail={company:${JSON.stringify(company)},contacts:[${JSON.stringify(contact)}]};view='company';render();globalThis.companyView=root.innerHTML;})();`,sandbox);
   assert.ok(sandbox.customers.includes('TEST Lokal'));assert.ok(sandbox.customers.includes('Nach Namen suchen'));assert.ok(!sandbox.customers.includes('v1History'));
@@ -575,7 +575,7 @@ test('startup guard replaces a stalled static screen with a useful release hint'
   assert.equal(timers.length,1);
   timers[0]();
   assert.ok(root.innerHTML.includes('App-Start fehlgeschlagen'));
-  assert.ok(root.innerHTML.includes('2026-11-20-r34.6'));
+  assert.ok(root.innerHTML.includes('2026-11-23-r35'));
   window.__salesStarted=true;root.innerHTML='App läuft';timers[0]();
   assert.equal(root.innerHTML,'App läuft');
 });

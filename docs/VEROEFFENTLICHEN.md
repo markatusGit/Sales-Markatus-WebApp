@@ -1,5 +1,18 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r35: Herkunft nur für neue App-Kunden
+
+Keine Script Properties oder Bereitstellungseinstellungen ändern. Bestehende Kunden werden nicht auf Medienhaus umgestellt. Das Feld Kundenherkunft ist ausgeblendet; nur neue App-Anlagen enthalten den festen Wert im ersten HQ-Auftrag. „Grund der Adressanlage“ verwendet das gleichnamige eigene HQ-Firmenfeld. Alte lokale Adressherkunft bleibt gespeichert und wird nicht automatisch übertragen. Der bisherige Produktivkatalog enthält noch keine Definition für das neue Feld; bis zum nächsten zentralen Abgleich ist es schreibgeschützt.
+
+- Die App neu laden; Kennung „2026-11-23-r35“ erwarten. Bei anderer Kennung diese melden.
+- Einen bestehenden Kunden öffnen; „Grund der Adressanlage“ unter „Allgemein“ und keine Kundenherkunft erwarten. Bei anderer Anzeige den Namen des sichtbaren Feldes melden.
+- „Firmendaten bearbeiten“ anklicken; keine Kundenherkunft und bei noch nicht importiertem Grund-Feld den Hinweis „HQ-Feld noch nicht geladen“ erwarten. Bei einem anderen Fehler den Wortlaut melden.
+- Beim nächsten vorgesehenen Sync „Datenabgleich“ öffnen.
+- „HQ synchronisieren“ anklicken; Felddefinitionen werden im zentralen Abgleich geprüft. Bei einem fehlenden Grund-Feld oder HQ-Fehler die genaue Meldung melden; keinen zusätzlichen Gesamtimport auslösen.
+- Nach abgeschlossenem Abgleich die App neu laden; „Grund der Adressanlage“ muss den tatsächlichen HQ-Feldtyp und bei Auswahlfeldern dessen Werte verwenden. Bleibt das Feld schreibgeschützt, den Hinweis melden; die HQ-Felddefinition wird dann gezielt geprüft.
+
+Die produktive Übertragung des festen Neuanlagewerts bleibt ein gesonderter Live-Funktionstest bei der nächsten tatsächlich benötigten neuen Kundenanlage. Für die Änderung wurde kein Testkunde angelegt und kein Bestandskunde bearbeitet.
+
 ## r34.6: Eigene offene Änderungen und Planumsatz-Klärung
 
 Keine Script Properties oder Bereitstellungseinstellungen ändern. Die Auftragsverwerfung erfolgt erst bei der endgültigen Adminfreigabe. Kontingent und gespeicherter Fortschritt bleiben erhalten.

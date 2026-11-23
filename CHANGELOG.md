@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## [v0.35.0]
+
+- Kundenherkunft bei neuen App-Kunden serverseitig fest „Medienhaus“, mit bestätigtem HQ-Feldtyp. Vorhandene Kunden und alte Anlageaufträge bleiben unverändert; Bearbeitung erhält die Herkunft auch bei veralteten Clientangaben. Herkunft aus Formularen, Kundenakten und technischer Auftragsvorschau ausgeblendet.
+- „Grund der Adressanlage“ verwendet das gleichnamige eigene HQ-Firmenfeld mit seinem tatsächlichen Typ und seinen bestätigten Auswahlwerten. Alte lokale Adressherkunftsdaten werden erhalten und nicht automatisch übertragen. Ohne geladene Definition zeigt das Formular einen schreibgeschützten Hinweis bis zum nächsten zentralen Abgleich.
+- Benötigte Felddefinitionen mit Namensfilter abfragen. Kein breiter v1-Abruf aller Definitionen und Optionen mehr; nur bei Bedarf gezielte Optionen für Grund der Adressanlage. Kein zusätzlicher Firmen-/Kontaktimport zur Stammlistenaktualisierung. Formulare bleiben HQ-frei, bestehende Konflikt-/Schreibschutzprüfungen erhalten.
+- Kennung `2026-11-23-r35`. Keine neuen Script Properties oder Bereitstellungseinstellungen. Tatsächlicher neuer HQ-Metadatenabruf und Schreiben eines Neukunden gesondert live prüfen; keine bestehenden Kunden umgestellt.
+
 ## Dokumentation nach v0.34.6 – 23.11.2026
 
 - Vom Nutzer gemeldete Hinweise nach abgeschlossenem Sync eingeordnet: HQ500 bei Herkunftsoptionen, offene Ausgabenzuordnungen und Firebase/HQ-Mengendifferenzen+1 Firma,+1 Kontakt,+19 Belege,+23 Planumsätze. Konkrete betroffene Kennungen und Ursachen noch nicht live ermittelt. Nur Dokumentation, keine App-/Datenänderung oder neue Google-Veröffentlichung.

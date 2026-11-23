@@ -3,7 +3,7 @@ const cases=[];function test(name,fn){cases.push({name,fn});}
 function finish(f){let run=f.db['sales_meta/sync'];for(let i=0;i<1000&&run.state==='running';i++)run=f.step();assert.notEqual(run.state,'running');return run;}
 test('completed r18 count mismatch recovers baseline without reading any whole entity again',()=>{
  const f=bulkFixture();f.finishBulk();const old=f.db['sales_meta/sync'];delete old.policy;old.state='completedWithErrors';old.errors=[{label:'Vollständigkeitsprüfung',message:'Old mismatch'}];f.db['sales_meta/bulk']={needsFull:true};
- const start=f.calls.length;const run=f.finishBulk();assert.equal(run.full,false);assert.ok(Object.values(run.entities).every(e=>e.seen===0));assert.equal(f.db['sales_meta/bulk'].needsFull,false);assert.ok(f.calls.slice(start).filter(c=>/\?/.test(c.path)&&!c.path.includes('$top=1&')&&!/^\/v2\/(Users|CompanyTypes|Subsystems)\?/.test(c.path)).every(c=>decodeURIComponent(c.path).includes('updatedOn ge')||/\/\d+\?expand/.test(c.path)));
+ const start=f.calls.length;const run=f.finishBulk();assert.equal(run.full,false);assert.ok(Object.values(run.entities).every(e=>e.seen===0));assert.equal(f.db['sales_meta/bulk'].needsFull,false);assert.ok(f.calls.slice(start).filter(c=>/\?/.test(c.path)&&!c.path.includes('$top=1&')&&!/^\/v2\/(Users|CompanyTypes|Subsystems)\?/.test(c.path)&&!c.path.includes('/CustomFieldDefinitions?')).every(c=>decodeURIComponent(c.path).includes('updatedOn ge')||/\/\d+\?expand/.test(c.path)));
 });
 test('old baseline and count mismatch never trigger weekly or automatic full reload',()=>{
  const f=bulkFixture();f.finishBulk();f.db['sales_meta/bulk'].fullAt='2020-01-01';f.db['sales_meta/bulk'].needsFull=true;

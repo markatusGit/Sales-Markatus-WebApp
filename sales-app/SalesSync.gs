@@ -131,12 +131,8 @@ function salesSyncAudit_(run){
 }
 function salesSyncCatalog_(run,task){
   const started=Date.now(),lists={};for(const entity of ['Users','CompanyTypes','Subsystems'])lists[entity]=salesCustomerList_(entity,'',started);
-  const old=salesRead_('sales_meta/catalog')||{},defs=salesHqGet_('/v2/Companies/CustomFieldDefinitions').data;
-  const fields=salesCompanyCustomSelected_(salesHqRows_(defs)).map(f=>({...f,options:(old.fields||[]).find(o=>o.name===f.name&&o.type===f.type)?.options||[]}));
-  if(fields.some(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft'&&/^Dropdown/.test(f.type))){
-    try{const legacy=salesHqRows_(salesCustomerGet_('/v1/CustomFieldDefinitions?$expand=Options').data);for(const f of fields){if(salesCompanyCustomKey_(f.name)!=='kundenherkunft')continue;const matches=legacy.filter(d=>String(d.Category).toLowerCase()==='company'&&salesCompanyCustomKey_(d.Name)===salesCompanyCustomKey_(f.name));if(matches.length!==1||!Array.isArray(matches[0].Options))throw Error('HQ-Herkunftsoptionen unvollständig.');f.options=matches[0].Options.map(o=>String(o.OptionValue||'')).filter(Boolean);}}
-    catch(error){run.errors.push({label:'HQ-Auswahllisten · Kundenherkunft',message:String(error.message)});}
-  }
+  const old=salesRead_('sales_meta/catalog')||{},fields=salesCompanyDefinitions_().map(f=>({...f,...((old.fields||[]).find(o=>o.name===f.name&&o.type===f.type)?.options?{options:(old.fields||[]).find(o=>o.name===f.name&&o.type===f.type).options}:{})}));
+  try{salesCompanyReasonOptions_(fields);}catch(error){run.errors.push({label:'HQ-Auswahllisten · Grund der Adressanlage',message:String(error.message)});}
   const industries=Array.from(new Set([...(old.industries||[]),...run.catalogIndustries||[]])).sort((a,b)=>a.localeCompare(b,'de'));
   salesWrite_('sales_meta/catalog',{...old,customerFormWarning:null,industries,users:lists.Users.filter(u=>!u.isDeactivated).map(u=>({id:u.id,name:[u.firstName,u.lastName].filter(Boolean).join(' ')})),types:lists.CompanyTypes.map(t=>({id:t.id,name:t.name})),subsystems:lists.Subsystems.map(t=>({id:t.id,name:t.name})),fields,companyFieldsVersion:1,updatedAt:salesNow_()});return true;
 }

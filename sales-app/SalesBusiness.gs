@@ -5,9 +5,9 @@ function salesCustomerIds_(raw,catalog){
   return {responsibleUserIds,subsystemIds};
 }
 function salesCustomerValues_(raw,catalog){
-  const ids=salesCustomerIds_(raw,catalog),address=raw.defaultAddress||{},fields=raw.customFields||[],date=fields.find(f=>salesCompanyCustomKey_(f.name)==='erstelldatum'),origin=fields.find(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft');
+  const ids=salesCustomerIds_(raw,catalog),address=raw.defaultAddress||{},fields=raw.customFields||[],date=fields.find(f=>salesCompanyCustomKey_(f.name)==='erstelldatum'),origin=fields.find(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft'),reason=fields.find(f=>salesCompanyCustomKey_(f.name)==='grund der adressanlage');
   const origins=Array.isArray(origin?.value)?origin.value:origin?.value?[String(origin.value)]:[];
-  return {name:raw.name||'',companyTypeId:String(raw.companyTypes?.length?salesCompanyTypeId_(raw.companyTypes[0]):''),industrialSector:raw.industrialSector||'',subsystemId:String(ids.subsystemIds[0]||''),responsibleUserId:String(ids.responsibleUserIds[0]||''),homepage:raw.homepage||address.website||'',description:raw.description||'',...Object.fromEntries(['street','houseNumber','zipCode','city','country'].map(k=>[k,address[k]||''])),erstelldatum:String(date?.value||'').slice(0,10),Kundenherkunft:JSON.stringify(origins)};
+  return {name:raw.name||'',companyTypeId:String(raw.companyTypes?.length?salesCompanyTypeId_(raw.companyTypes[0]):''),industrialSector:raw.industrialSector||'',subsystemId:String(ids.subsystemIds[0]||''),responsibleUserId:String(ids.responsibleUserIds[0]||''),homepage:raw.homepage||address.website||'',description:raw.description||'',...Object.fromEntries(['street','houseNumber','zipCode','city','country'].map(k=>[k,address[k]||''])),erstelldatum:String(date?.value||'').slice(0,10),Kundenherkunft:JSON.stringify(origins),addressCreationReason:Array.isArray(reason?.value)?reason.value.join('\n'):String(reason?.value||'')};
 }
 function salesCustomerSource_(companyId){
   if(String(companyId).startsWith('draft_')){const d=salesBusinessDraft_({companyId,entity:'company',targetId:companyId});if((d.draft.pendingChanges||[]).length)throw Error('Für diesen Kunden sind Änderungen vorgemerkt. Bitte zuerst den offenen HQ-Abgleich klären.');return {...d,raw:d.draft.company};}
@@ -26,22 +26,20 @@ function salesCustomerValidate_(value,base,catalog){
   for(const [key,list] of [['companyTypeId','types'],['subsystemId','subsystems'],['responsibleUserId','users']]){out[key]=String(salesId_(value[key]));if(!(catalog[list]||[]).some(x=>String(x.id)===out[key])&&out[key]!==String(base[key]||''))throw Error('Bitte eine gültige HQ-Auswahl treffen: '+key);}
   const industry=(catalog.industries||[]).find(x=>x.toLocaleLowerCase('de')===out.industrialSector.toLocaleLowerCase('de'));
   if(out.industrialSector&&!industry&&out.industrialSector!==base.industrialSector&&value.newIndustry!==true&&value.newIndustry!=='true')throw Error('Neue Branche bitte über „Neue Branche anlegen“ hinzufügen.');out.industrialSector=industry||out.industrialSector;
-  let origins;try{origins=JSON.parse(value.Kundenherkunft||'[]');}catch(_){throw Error('Ungültige Kundenherkunft.');}
-  if(!Array.isArray(origins)||origins.length>100||origins.some(x=>typeof x!=='string'||x.length>200))throw Error('Ungültige Kundenherkunft.');
-  const def=(catalog.fields||[]).find(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft'),old=JSON.parse(base.Kundenherkunft||'[]');
-  if(origins.some(x=>!(def?.options||[]).includes(x)&&!old.includes(x)))throw Error('Kundenherkunft ist kein bestätigter HQ-Auswahlwert. Bitte Auswahllisten aktualisieren.');
-  if(def?.type==='Dropdown'&&origins.length>1)throw Error('Für Kundenherkunft ist nur eine Auswahl zulässig.');out.Kundenherkunft=JSON.stringify([...new Set(origins)]);
+  // Hidden creation default must never overwrite an existing customer's origin.
+  out.Kundenherkunft=base.Kundenherkunft||'[]';
+  out.addressCreationReason=salesCompanyReason_(value.addressCreationReason===undefined?base.addressCreationReason:value.addressCreationReason,base.addressCreationReason,catalog);
   if(out.erstelldatum)salesCompanyCustomInput_(out.erstelldatum,{name:'Erstelldatum',type:'Date'});return out;
 }
 function salesCustomerParts_(raw,values,base,catalog){
   const current=salesCustomerValues_(raw,catalog),parts=[],company={},address={};
   for(const k of Object.keys(values))if(String(values[k])!==String(base[k]??'')&&String(current[k])!==String(base[k]??'')&&String(current[k])!==String(values[k]))throw Error('Das Kundenfeld wurde inzwischen geändert: '+k+'. Bitte neu laden und vergleichen.');
   for(const k of ['name','industrialSector','homepage','description'])if(values[k]!==String(base[k]??''))company[k]=values[k]||null;
-  if(values.erstelldatum!==String(base.erstelldatum||'')||values.Kundenherkunft!==String(base.Kundenherkunft||'[]')){
-    const fields=JSON.parse(JSON.stringify(raw.customFields||[]));for(const [key,input] of [['erstelldatum',values.erstelldatum],['Kundenherkunft',JSON.parse(values.Kundenherkunft)]]){
-      if(String(values[key])===String(base[key]??(key==='Kundenherkunft'?'[]':'')))continue;
-      const def=(catalog.fields||[]).find(f=>salesCompanyCustomKey_(f.name)===salesCompanyCustomKey_(key));if(!def)throw Error('HQ-Felddefinition fehlt: '+key);
-      const next={name:def.name,type:def.type,value:key==='erstelldatum'?(input?salesCompanyCustomInput_(input,def):null):def.type==='Dropdown'?(input[0]||null):input};
+  if(values.erstelldatum!==String(base.erstelldatum||'')||values.addressCreationReason!==String(base.addressCreationReason||'')){
+    const fields=JSON.parse(JSON.stringify(raw.customFields||[]));for(const [key,name] of [['erstelldatum','Erstelldatum'],['addressCreationReason','Grund der Adressanlage']]){
+      if(String(values[key])===String(base[key]||''))continue;
+      const def=(catalog.fields||[]).find(f=>salesCompanyCustomKey_(f.name)===salesCompanyCustomKey_(name));if(!def)throw Error('HQ-Felddefinition fehlt: '+name);
+      const next={name:def.name,type:def.type,value:values[key]?salesCompanyCustomInput_(values[key],def):null};
       const index=fields.findIndex(f=>f.name===def.name);if(index<0)fields.push(next);else fields[index]=next;
     }company.customFields=fields;
   }
@@ -214,6 +212,11 @@ function salesBusinessCustom_(change,base,definitions){
     if(f.type==='Boolean'?typeof v!=='boolean':f.type==='Integer'?!Number.isInteger(v):f.type==='Float'?typeof v!=='number'||!Number.isFinite(v):['Text','TextMultiline','Date','Dropdown','Link','NumericText'].includes(f.type)?typeof v!=='string':false)throw Error('Ungültiger Wert für HQ-Feld: '+f.name);
   }
 }
+function salesBusinessOriginPreserved_(change,base){
+  if(!change.customFields)return;
+  const origin=rows=>(rows||[]).filter(f=>salesCompanyCustomKey_(f.name)==='kundenherkunft');
+  if(JSON.stringify(salesBusinessCanonical_(origin(change.customFields)))!==JSON.stringify(salesBusinessCanonical_(origin(base.customFields))))throw Error('Kundenherkunft bleibt beim Bearbeiten unverändert.');
+}
 function salesBusinessDraftResult_(d,entity){
   const catalog=salesRead_('sales_meta/catalog'),company=salesLocalCompany_(d.draft,catalog,d.job),visible=salesBusinessVisibleDraft_(d.draft);
   return {id:d.job.id,message:d.deferred?'Änderung in Firebase vorgemerkt. Übertragung erst nach Klärung und Abschluss der ursprünglichen HQ-Anlage.':'Kundendaten in Firebase gespeichert; werden bei der ersten HQ-Übertragung verwendet.',entityPatch:{companyId:d.ref,entity,localCompany:company,contact:{...visible.contact,id:d.job.contactId||d.ref+'_contact'}},patch:{draft:d.draft,...(!d.deferred?{job:salesJobSummary_(d.job)}:{}),localCompany:company}};
@@ -237,6 +240,7 @@ function salesBusinessSaveDraft_(input,user){
   salesBusinessValidate_(salesBusinessPick_(merged,schema),schema,input.entity);
   if(input.entity==='company'&&!String(merged.name||'').trim()||input.entity==='contact'&&(!String(merged.firstName||'').trim()||!String(merged.lastName||'').trim()))throw Error('Name bleibt ein Pflichtfeld.');
   if(input.entity==='address'&&!/^[A-Z]{2}$/.test(merged.country||''))throw Error('Land bitte als zweistelliges ISO-Kürzel eingeben.');
+  if(input.entity==='company')salesBusinessOriginPreserved_(change,d.raw);
   salesBusinessCustom_(change,d.raw,input.entity==='company'?catalog?.fields:[]);
   if(d.deferred){
     const typeNames=input.entity==='types'?salesBusinessTypes_(merged,catalog):{},base=Object.fromEntries(Object.keys(change).map(k=>[k,d.raw[k]??null]));
@@ -317,7 +321,7 @@ function saveSalesEntityChange(input){
     const typeNames={};if(entity==='types'){
       Object.assign(typeNames,salesBusinessTypes_(change,salesRead_('sales_meta/catalog')));
     }
-    if(entity==='company'&&change.customFields)salesBusinessCustom_(change,input.base||{},salesRead_('sales_meta/catalog')?.fields);
+    if(entity==='company'&&change.customFields){salesBusinessOriginPreserved_(change,data.company);salesBusinessCustom_(change,input.base||{},salesRead_('sales_meta/catalog')?.fields);}
     // Base values are expected values, never a destination or a complete PUT body.
     const id=Utilities.getUuid(),job={id,kind:'entityChange',business:1,hqId,targetId,entity,name:data.company.name,change,base,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid}:{}),createdAt:salesNow_(),updatedAt:salesNow_(),message:'Stammdatenänderung in Firebase gespeichert; HQ-Abgleich offen.'};
     data.pendingChanges=[...(data.pendingChanges||[]),{jobId:id,entity,targetId,change,...(entity==='types'?{typeNames}:{})}];
