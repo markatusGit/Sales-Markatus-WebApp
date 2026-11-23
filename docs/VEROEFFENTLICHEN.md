@@ -1,5 +1,19 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r39: HQ-Abgleich mit automatischer Wiederholung prüfen
+
+Keine neuen Script Properties oder Bereitstellungseinstellungen. Ein vorhandener, wegen „Tagesbudget“ angehaltener Lauf kann sofort fortgesetzt werden.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-23-r39“. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen.
+- „HQ-Sync fortsetzen“ beziehungsweise „HQ synchronisieren“ anklicken. Erwartet wird „Hintergrundlauf geplant“ bzw. „Läuft bei Google“.
+- Browser offen lassen oder schließen; der Lauf geht bei Google weiter.
+- Nach einigen Minuten „Fortschritt aktualisieren“ anklicken.
+- Steht dort „Automatische Wiederholung … nächster Versuch in etwa … Min.“, nichts tun. Der Lauf setzt selbst fort. Zum sofortigen Versuch „Jetzt sofort erneut versuchen“ anklicken.
+- Nach Abschluss unten „Offene Punkte für den Admin“ und „Automatisch behoben“ lesen. Offene Punkte mit genauem Wortlaut melden.
+- Bei einem unklaren Historieneintrag nichts neu anlegen. Erwartet wird nach etwa 5 bis 15 Minuten entweder „Automatisch behoben“ oder ein offener Punkt „nicht erneut anlegen“.
+
+
 ## r38.1: Wiedervorlagen prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen. Für die Bedienabnahme eine geeignete Test-Kundenakte verwenden.

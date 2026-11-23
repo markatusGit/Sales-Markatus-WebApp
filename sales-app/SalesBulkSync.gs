@@ -17,7 +17,7 @@ function salesBulkSelect_(entity,raw){
 }
 function salesBulkSummary_(run){
   const task=run.tasks[run.cursor],e=run.entities.Companies;
-  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,removed:run.entities[entity]?.removed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
+  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],notices:run.notices||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,removed:run.entities[entity]?.removed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
 }
 function salesBulkPrepare_(old){
   return salesDeltaPrepare_(old);
@@ -42,9 +42,11 @@ function salesBulkRead_(run,task){
   if(m.complete)return true;
   if(task.pendingPage)return salesBulkCommitPage_(run,task);
   const clauses=[];if(m.lastId)clauses.push('id gt '+m.lastId);if(m.since)clauses.push(salesDeltaFilter_(entity,m.since));
+  // A broken HQ filter/order contract affects every data type alike: stop the run instead of skipping section after section.
+  const contract=message=>Object.assign(new Error(message),{salesStop:true});
   let page;try{page=salesBulkPage_(entity,clauses.join(' and '));}
-  catch(e){if(m.since&&/HTTP 400/.test(e.message))throw new Error(SALES_BULK_LABELS[entity]+': HQ hat den Änderungsfilter abgelehnt. Kein Gesamtimport als Ersatz. Gespeicherter Änderungsstand bleibt erhalten; technischen Filter prüfen.');throw e;}
-  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw new Error('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&!salesDeltaRecent_(entity,row,m.since))throw new Error('HQ-Änderungsfilter wurde nicht eingehalten. Kein Gesamtimport gestartet.');}
+  catch(e){if(m.since&&/HTTP 400/.test(e.message))throw contract(SALES_BULK_LABELS[entity]+': HQ hat den Änderungsfilter abgelehnt. Kein Gesamtimport als Ersatz. Gespeicherter Änderungsstand bleibt erhalten; technischen Filter prüfen.');throw e;}
+  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw contract('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&!salesDeltaRecent_(entity,row,m.since))throw contract('HQ-Änderungsfilter wurde nicht eingehalten. Kein Gesamtimport gestartet.');}
   page.rows=page.rows.map(row=>salesBulkSelect_(entity,row));
   const paths=page.rows.map(r=>collection+'/'+r.id),old=salesBulkGet_(paths),entries=[];
   for(const row of page.rows){
@@ -138,7 +140,7 @@ function salesBulkStep_(run){
 function salesBulkStepWork_(run){
   if(run.planCleanupPending)salesDeltaResolvePlan_(run);
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
-  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
+  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
   else if(task.kind==='deltaMissing')done=salesDeltaMissing_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
@@ -150,8 +152,10 @@ function salesBulkStepWork_(run){
     run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
     if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    if(run.verifyJobs?.length)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
+  else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);
   else if(task.kind==='bulkCompany')done=salesBulkCompany_(run,task);
   else if(task.kind==='bulkEdition')done=salesBulkEdition_(run,task);
   else if(task.kind==='deltaUnassigned')done=salesDeltaUnassigned_(run);

@@ -64,8 +64,26 @@ test('unchanged parent timestamp still picks up contact address changes and move
 test('lost cache commit response replays immutable page without losing counts or old associations',()=>{
  const f=bulkFixture();f.ctx.startSalesSync();f.failCommit='after';f.worker();let run=f.db['sales_meta/sync'];assert.ok(run.paused);assert.ok(run.tasks[run.cursor].pendingPage);assert.equal(f.db['sales_meta/bulk'],undefined);f.ctx.startSalesSync();run=f.finishBulk();assert.equal(run.stats.companies,2);assert.equal(run.entities.Companies.seen,2);assert.equal(run.state,'completed');
 });
-test('read failure preserves published records and change cursors, then resumes the same task',()=>{
- const f=bulkFixture();f.finishBulk();const snapshot=JSON.stringify(f.db['sales_companies/102']),watermark=JSON.stringify(f.db['sales_meta/bulk']);f.remote.Companies[102].name='Changed';const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/ContactHistories?'))throw Error('Synthetic HTTP 503');return get(p);};f.ctx.startSalesSync();f.worker();assert.ok(f.db['sales_meta/sync'].paused);assert.equal(JSON.stringify(f.db['sales_companies/102']),snapshot);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),watermark);const id=f.db['sales_meta/sync'].id;f.ctx.salesHqGet_=get;f.finishBulk();assert.equal(f.db['sales_meta/sync'].id,id);assert.equal(f.db['sales_companies/102'].company.name,'Changed');
+test('temporary HQ fault waits on a minute timer, retries the same section and records the recovery',()=>{
+ const f=bulkFixture();f.finishBulk();const watermark=JSON.stringify(f.db['sales_meta/bulk']);f.remote.Companies[102].name='Changed';f.remote.Companies[102].updatedOn=new Date().toISOString();
+ const get=f.ctx.salesHqGet_;let failures=2;f.ctx.salesHqGet_=p=>{if(failures&&p.startsWith('/v2/ContactHistories?')){failures--;throw Object.assign(Error('HQ-Lesetest: HTTP 503'),{hqHttpStatus:503});}return get(p);};
+ f.ctx.startSalesSync();f.worker();let run=f.db['sales_meta/sync'];assert.equal(run.state,'running');assert.ok(!run.paused);assert.equal(f.triggers.length,1);assert.equal(JSON.stringify(f.db['sales_meta/bulk']),watermark);
+ let retry=JSON.parse(f.props.SALES_SYNC_RETRY);assert.equal(retry.attempts,1);assert.equal(retry.minutes,2);assert.ok(retry.until>Date.now()+60000);
+ const status=f.ctx.getSalesSyncStatus();assert.equal(status.retry.attempt,1);assert.match(status.retry.message,/HTTP 503/);
+ const calls=f.calls.length,transport=f.transport.length;f.worker();assert.equal(f.calls.length,calls);assert.equal(f.transport.length,transport);
+ const expire=()=>{const r=JSON.parse(f.props.SALES_SYNC_RETRY);r.until=Date.now()-1;f.props.SALES_SYNC_RETRY=JSON.stringify(r);};
+ expire();f.worker();retry=JSON.parse(f.props.SALES_SYNC_RETRY);assert.equal(retry.attempts,2);assert.equal(retry.minutes,5);
+ expire();f.worker();run=f.db['sales_meta/sync'];assert.notEqual(run.state,'running');assert.equal(f.props.SALES_SYNC_RETRY,'');assert.equal(f.triggers.length,0);
+ assert.equal(f.db['sales_companies/102'].company.name,'Changed');assert.ok(run.notices.some(n=>/Nach 2 automatischen Wiederholungen/.test(n.message)));assert.ok(!run.errors.some(e=>/HTTP 503/.test(e.message)));
+});
+test('a section that keeps failing is recorded and skipped; its changes are read again by the next sync',()=>{
+ const f=bulkFixture();f.finishBulk();const before=f.db['sales_meta/bulk'].entities.ContactHistories.watermark;
+ f.remote.Companies[102].name='Changed';f.remote.Companies[102].updatedOn=new Date().toISOString();f.remote.ContactHistories[1]={id:1,companyId:102,reason:'Later',updatedOn:new Date().toISOString()};
+ const get=f.ctx.salesHqGet_;let broken=true;f.ctx.salesHqGet_=p=>{if(broken&&p.startsWith('/v2/ContactHistories?'))throw Error('Synthetic unexpected HQ answer');return get(p);};
+ f.ctx.startSalesSync();f.worker();const run=f.db['sales_meta/sync'];assert.notEqual(run.state,'running');assert.ok(!run.paused);
+ assert.equal(f.db['sales_companies/102'].company.name,'Changed');assert.ok(run.errors.some(e=>e.kind==='bulkRead'&&e.id==='ContactHistories'&&/erneut gelesen/.test(e.message)));
+ assert.equal(f.db['sales_meta/bulk'].entities.ContactHistories.watermark,before);assert.notEqual(f.db['sales_meta/bulk'].entities.Companies.watermark,before);
+ broken=false;f.finishBulk();assert.equal(f.db['sales_companies/102'].histories.find(h=>h.id===1).reason,'Later');
 });
 test('legacy migration keeps prior write errors and never requeues completed write phases',()=>{
  const f=bulkFixture();f.db['sales_meta/sync']={id:'legacy',state:'running',paused:true,revision:10,cursor:2,tasks:[{kind:'write',id:'old',step:'company'},{kind:'write',id:'old',step:'contact'},{kind:'company',id:'102'}],errors:[{kind:'write',id:'old',message:'Uncertain'}]};const run=f.ctx.startSalesSync();assert.equal(run.id,'legacy');assert.equal(run.errors.length,1);assert.ok(f.db['sales_meta/sync'].tasks.every(t=>t.kind!=='write'));assert.equal(f.calls.filter(c=>c.method==='post').length,2);
@@ -110,35 +128,47 @@ test('fresh HQ imports preserve the pending request while projecting the HQ name
  const f=bulkFixture();f.ctx.salesWrite_('sales_companies/102',{company:{id:'102',name:'Synthetic old'},contacts:[],pendingChanges:[{jobId:'synthetic-pending',entity:'company',targetId:102,change:{name:'Synthetic pending name'}}]});
  f.finishBulk();const saved=f.ctx.salesRead_('sales_companies/102');assert.equal(saved.company.name,'Synthetic prospect');assert.equal(saved.pendingChanges.length,1);assert.equal(f.ctx.getSalesLeanCompany(102).company.name,'Synthetic prospect');assert.equal(f.ctx.salesRead_('sales_directory/102').company.name,'Synthetic prospect');
 });
-if(require.main===module){let count=0;test('quota on initial worker read stops triggers without touching the durable checkpoint',()=>{
- const f=bulkFixture();f.ctx.startSalesSync();const before=JSON.stringify(f.db);f.ctx.salesRead_=()=>{throw Error('Firestore-Lesezugriff HTTP 429.');};f.worker();assert.equal(f.triggers.length,0);assert.equal(JSON.stringify(f.db),before);assert.equal(JSON.parse(f.props.SALES_SYNC_HOLD).reason,'quota');
+if(require.main===module){let count=0;test('Firebase quota before the run can be read waits on a minute timer without touching the checkpoint',()=>{
+ const f=bulkFixture();f.ctx.startSalesSync();const before=JSON.stringify(f.db),read=f.ctx.salesRead_;f.ctx.salesRead_=()=>{throw Error('Firestore-Lesezugriff HTTP 429.');};f.worker();
+ assert.equal(f.triggers.length,1);assert.equal(JSON.stringify(f.db),before);const retry=JSON.parse(f.props.SALES_SYNC_RETRY);assert.equal(retry.key,'worker');assert.equal(retry.limit,30);assert.equal(retry.minutes,2);
+ f.ctx.salesRead_=read;f.ctx.startSalesSync();assert.equal(JSON.parse(f.props.SALES_SYNC_RETRY).until,0);f.worker();assert.equal(f.props.SALES_SYNC_RETRY,'');assert.notEqual(f.db['sales_meta/sync'].state,'running');
 });
-test('quota during worker principal verification is also stopped before any business read',()=>{
- const f=bulkFixture();f.ctx.startSalesSync();f.ctx.salesAuthEnabled_=()=>true;f.ctx.salesAuthConfig_=()=>({ownerUid:'owner',ownerEmail:'owner@example.invalid'});f.ctx.salesAuthPrincipal_=()=>{const e=Error('Quota');e.salesQuota=true;throw e;};const before=JSON.stringify(f.db);f.worker();assert.equal(f.triggers.length,0);assert.equal(JSON.stringify(f.db),before);
+test('quota during worker principal verification also waits before any business read',()=>{
+ const f=bulkFixture();f.ctx.startSalesSync();f.ctx.salesAuthEnabled_=()=>true;f.ctx.salesAuthConfig_=()=>({ownerUid:'owner',ownerEmail:'owner@example.invalid'});f.ctx.salesAuthPrincipal_=()=>{const e=Error('Quota');e.salesQuota=true;throw e;};const before=JSON.stringify(f.db);f.worker();assert.equal(f.triggers.length,1);assert.equal(JSON.stringify(f.db),before);assert.equal(JSON.parse(f.props.SALES_SYNC_RETRY).key,'worker');
 });
-test('import budget is enforced before reads, stops durably outside Firestore and resumes only manually next day',()=>{
- const f=bulkFixture(),run=f.ctx.startSalesSync(),read=f.ctx.salesRead_;f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:20000,writes:0});let reached=false;
- f.ctx.salesRead_=p=>{f.ctx.salesWorkerBudget_(1,0);reached=true;return read(p);};f.worker();assert.equal(reached,false);assert.equal(f.triggers.length,0);assert.equal(JSON.parse(f.props.SALES_SYNC_HOLD).reason,'budget');
- f.ctx.salesRead_=read;const before=JSON.stringify(f.db),summary=f.ctx.getSalesSyncStatus();assert.equal(summary.paused,true);assert.equal(summary.background,false);assert.equal(JSON.stringify(f.db),before);assert.throws(()=>f.ctx.startSalesSync(),/Tagesbudget/);
- f.ctx.salesWorkerDay_=()=> 'synthetic-next-day';assert.equal(f.ctx.startSalesSync().id,run.id);assert.equal(f.props.SALES_SYNC_HOLD,'');assert.equal(f.triggers.length,1);
+test('no app-side daily import budget: old hold and budget state is cleared and Firestore transports are not metered',()=>{
+ const f=bulkFixture();f.props.SALES_SYNC_HOLD=JSON.stringify({day:'synthetic',reason:'budget',message:'Tagesbudget des HQ-Imports erreicht.'});f.props.SALES_SYNC_BUDGET=JSON.stringify({day:'synthetic',reads:20000,writes:12000});
+ f.ctx.startSalesSync();assert.equal(f.props.SALES_SYNC_HOLD,'');assert.equal(f.props.SALES_SYNC_BUDGET,'');assert.equal(f.triggers.length,1);
+ for(const name of ['salesWorkerBudget_','salesWorkerReserve_','salesWorkerRequestBudget_','salesWorkerHoldState_'])assert.equal(typeof f.ctx[name],'undefined');
+ const core=fs.readFileSync(__dirname+'/../hq-benchmark/FirebaseSync.gs','utf8');assert.ok(!/salesWorker(Budget|RequestBudget)_/.test(core));vm.runInContext(core.slice(core.indexOf('function pilotCall_('),core.indexOf('function pilotWriteDocument_(')),f.ctx);
+ const base='https://firestore.googleapis.com/v1/projects/synthetic-project/databases/(default)/documents';f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({writeResults:[]})});
+ for(let i=0;i<5;i++)f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{update:{name:'synthetic'}}]})});assert.equal(f.props.SALES_SYNC_BUDGET,'');
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>429,getContentText:()=>''});assert.throws(()=>f.ctx.pilotCall_(base+':commit',{method:'post',payload:'{}'}),e=>f.ctx.salesWorkerTransient_(e)&&f.ctx.salesWorkerLimited_(e));
 });
-test('F-1 a write task without enough remaining budget holds the run before touching the job or HQ',()=>{
-  const f=bulkFixture();f.db['sales_meta/sync']={id:'legacy',state:'running',paused:true,revision:10,cursor:0,tasks:[{kind:'write',id:'old',step:'company'}],errors:[]};
-  vm.runInContext('salesWorkerBudgetActive_=true;',f.ctx);f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:19900,writes:0});
-  assert.throws(()=>f.ctx.salesWorkerReserve_(400,80),e=>e.salesBudget===true);
-  f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:100,writes:100});f.ctx.salesWorkerReserve_(400,80);
-  f.props.SALES_SYNC_BUDGET=JSON.stringify({day:'other-day',reads:20000,writes:12000});f.ctx.salesWorkerReserve_(400,80);vm.runInContext('salesWorkerBudgetActive_=false;',f.ctx);
-  const run={tasks:[{kind:'write',id:'missing',label:'Synthetic'}],cursor:0,done:0,errors:[],stats:{writes:0},revision:0};
-  f.ctx.salesWorkerReserve_=()=>{const e=Error('Tagesbudget');e.salesBudget=true;throw e;};assert.throws(()=>f.ctx.salesBulkStep_(run),/Tagesbudget/);assert.equal(run.errors.length,0);assert.equal(run.cursor,0);
+test('a write that failed before reaching HQ may be retried; a sent but unclear write is never treated as temporary',()=>{
+ const f=bulkFixture();
+ const before=f.ctx.salesSyncJobError_({state:'pending',message:'HQ-Lesetest: HTTP 503. Kein unvollständiger Import wird freigegeben.'});assert.equal(before.salesTransient,true);assert.ok(f.ctx.salesWorkerTransient_(before));
+ const sent=f.ctx.salesSyncJobError_({state:'uncertain',message:'Übertragung oder Rückprüfung nicht vollständig bestätigt: POST /v2/ContactHistories: HTTP 503. Nicht erneut anlegen.'});assert.equal(sent.salesJobOutcome,true);assert.equal(f.ctx.salesWorkerTransient_(sent),false);
+ assert.equal(f.ctx.salesWorkerTransient_(f.ctx.salesSyncJobError_({state:'companyCreated',phaseWriteAttempted:true,message:'HTTP 503'})),false);
+ assert.equal(f.ctx.salesWorkerTransient_(f.ctx.salesSyncJobError_({state:'pending',message:'Bitte einen Ansprechpartner dieses Kunden auswählen.'})),false);
 });
-test('real Firestore transports meter actual query documents, missing lookups and commit verification without metering idle UI',()=>{
- const f=bulkFixture(),core=fs.readFileSync(__dirname+'/../hq-benchmark/FirebaseSync.gs','utf8');vm.runInContext(core.slice(core.indexOf('function pilotCall_('),core.indexOf('function pilotWriteDocument_(')),f.ctx);
- const base='https://firestore.googleapis.com/v1/projects/synthetic-project/databases/(default)/documents',reply={getResponseCode:()=>200,getContentText:()=>JSON.stringify([{document:{name:'synthetic-a'}},{document:{name:'synthetic-b'}}])};let requests=0;f.ctx.UrlFetchApp.fetch=()=>{requests++;return reply;};
- const query={method:'post',payload:JSON.stringify({structuredQuery:{limit:250}})};f.ctx.pilotCall_(base+':runQuery',query);assert.equal(f.props.SALES_SYNC_BUDGET,undefined);
- vm.runInContext('salesWorkerBudgetActive_=true;',f.ctx);f.ctx.pilotCall_(base+':runQuery',query);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,2);
- f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>404,getContentText:()=>''});assert.equal(f.ctx.pilotReadDocument_('synthetic-project','sales_test/missing','synthetic'),null);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,3);
- f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({writeResults:[]})});f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{verify:'synthetic'},{update:{name:'synthetic'}}]})});assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).reads,4);assert.equal(JSON.parse(f.props.SALES_SYNC_BUDGET).writes,1);
- f.props.SALES_SYNC_BUDGET=JSON.stringify({day:f.ctx.salesWorkerDay_(),reads:4,writes:12000});assert.throws(()=>f.ctx.pilotCall_(base+':commit',{method:'post',payload:JSON.stringify({writes:[{update:{name:'synthetic'}}]})}),/Tagesbudget/);
+test('unclear history entries are only looked up again after minute delays and then reported to the admin',()=>{
+ const f=bulkFixture();for(const id of ['h1','h2'])f.ctx.salesWrite_('sales_jobs/'+id,{id,kind:'history',state:'uncertain',writeAttempted:true,name:'Synthetic '+id});
+ const run={engine:2,errors:[],notices:[]},task={kind:'verifyJobs',label:'Synthetic verify'};
+ f.ctx.salesSyncQueueVerify_(run,{id:'h1',name:'Synthetic h1'},0);f.ctx.salesSyncQueueVerify_(run,{id:'h2',name:'Synthetic h2'},0);f.ctx.salesSyncQueueVerify_(run,{id:'h1'},0);assert.equal(run.verifyJobs.length,2);
+ const checked=[];f.ctx.salesSyncVerifyJob_=job=>{checked.push(job.id);if(job.id==='h2')throw Error('Historieneintrag noch nicht eindeutig bestätigt.');f.ctx.salesWrite_('sales_jobs/'+job.id,{...job,state:'synced'});};
+ assert.equal(f.ctx.salesSyncVerifyStep_(run,task),false);assert.equal(run.notices.length,1);assert.equal(run.verifyJobs.length,1);assert.ok(Date.parse(task.waitUntil)>Date.now()+4*60000);
+ assert.equal(f.ctx.salesSyncVerifyStep_(run,task),false);assert.deepEqual(checked,['h1','h2']);
+ let done=false;for(let i=0;i<2;i++){run.verifyJobs[0].notBefore=new Date(Date.now()-1).toISOString();done=f.ctx.salesSyncVerifyStep_(run,task);}
+ assert.equal(done,true);assert.equal(run.verifyJobs.length,0);assert.equal(task.waitUntil,undefined);assert.equal(run.errors.length,1);assert.match(run.errors[0].message,/nicht erneut anlegen/);assert.equal(checked.length,4);
+ assert.equal(f.ctx.salesSyncVerifiable_({state:'uncertain',kind:'history',writeAttempted:true},{engine:2}),true);
+ assert.equal(f.ctx.salesSyncVerifiable_({state:'uncertain',kind:'createCompany',writeAttempted:true},{engine:2}),false);
+ assert.equal(f.ctx.salesSyncVerifiable_({state:'uncertain',kind:'history',writeAttempted:false},{engine:2}),false);
+});
+test('a planned verification wait costs no request and is shown as a minute timer',()=>{
+ const f=bulkFixture();f.finishBulk();const run=f.ctx.startSalesSync(),saved=f.db['sales_meta/sync'];saved.tasks.splice(saved.cursor,0,{kind:'verifyJobs',label:'Synthetic verify',waitUntil:new Date(Date.now()+5*60000).toISOString()});saved.verifyJobs=[{id:'h1',label:'Synthetic',attempts:0,notBefore:new Date(Date.now()+5*60000).toISOString()}];f.ctx.salesWrite_('sales_meta/sync',saved);
+ const calls=f.calls.length;f.worker();assert.equal(f.calls.length,calls);const wait=JSON.parse(f.props.SALES_SYNC_RETRY);assert.equal(wait.wait,true);assert.equal(wait.runId,run.id);
+ const transport=f.transport.length;f.worker();assert.equal(f.transport.length,transport);assert.equal(f.ctx.getSalesSyncStatus().retry.wait,true);assert.equal(f.triggers.length,1);
 });
 
 test('edition linking permits only zero-padding of the same immutable project and issue',()=>{

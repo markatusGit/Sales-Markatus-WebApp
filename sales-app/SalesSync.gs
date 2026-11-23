@@ -47,10 +47,13 @@ function salesSyncWrite_(task,run){
   if(job.draftDependency&&salesRead_('sales_jobs/'+salesKey_(job.draftDependency))?.state!=='synced')return;
   if(job.formPrevious&&!['synced','canceled'].includes(salesRead_('sales_jobs/'+salesKey_(job.formPrevious))?.state))return;
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
+  // An unclear history entry from an earlier run is only looked up in HQ, never created again.
+  if(salesSyncVerifiable_(job,run)){salesSyncQueueVerify_(run,job,0);return;}
   if(job.business===1){
     salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);
     if(after.kind==='deleteCompany'&&after.state==='synced'&&run)salesDeleteApplyCounts_(run,after);
-    if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw new Error(after.message);
+    if(salesSyncVerifiable_(after,run)){salesSyncQueueVerify_(run,after,SALES_SYNC_VERIFY_MINUTES);return;}
+    if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw salesSyncJobError_(after);
     return;
   }
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
@@ -62,7 +65,54 @@ function salesSyncWrite_(task,run){
   salesRunJobLocked_(job.id,task.step);
   const after=salesRead_('sales_jobs/'+job.id);
   if(salesReviewWaiting_(after)||after.state==='canceled')return;
-  if(task.step==='company'?(!after.companyConfirmedAt||!after.steps?.company):after.state!=='synced')throw new Error(after.message||'HQ-Rückprüfung noch offen.');
+  if(salesSyncVerifiable_(after,run)){salesSyncQueueVerify_(run,after,SALES_SYNC_VERIFY_MINUTES);return;}
+  if(task.step==='company'?(!after.companyConfirmedAt||!after.steps?.company):after.state!=='synced')throw salesSyncJobError_(after);
+}
+/** HQ may list a new history entry only shortly after the write. Such entries are re-checked read-only later. */
+const SALES_SYNC_VERIFY_MINUTES=5,SALES_SYNC_VERIFY_ATTEMPTS=3;
+function salesSyncVerifiable_(job,run){
+  return !!run&&run.engine===2&&job?.state==='uncertain'&&['history','communication'].includes(job.kind)&&job.writeAttempted===true;
+}
+function salesSyncQueueVerify_(run,job,minutes){
+  run.verifyJobs=run.verifyJobs||[];if(run.verifyJobs.some(v=>v.id===job.id))return;
+  run.verifyJobs.push({id:job.id,label:'App → HQ: '+(job.name?job.name+' · ':'')+'Historieneintrag nur prüfen',attempts:0,notBefore:new Date(Date.now()+minutes*60000).toISOString()});
+}
+// The job state decides: a job that was not written yet may simply be retried; any other outcome is final for this run.
+function salesSyncJobError_(job){
+  const e=new Error(job.message||'HQ-Rückprüfung noch offen.');
+  if(['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!job.phaseWriteAttempted&&/HTTP (408|429|500|502|503|504)\b|Firestore[^\n]*HTTP (429|5\d\d)|timed out|Timeout|Address unavailable/i.test(job.message||''))e.salesTransient=true;
+  else e.salesJobOutcome=true;
+  return e;
+}
+function salesSyncVerifyJob_(job){
+  if(job.business===1)salesBusinessRun_(job,true);
+  else{const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));if(!draft?.company)throw new Error('Firma fehlt.');salesHistoryTarget_(job,draft);salesConfirmHistory_(job);}
+  if(job.state==='conflict')throw new Error(job.message||'HQ-Ergebnis weicht ab.');
+  job.state='synced';job.message='Historieneintrag in HQ automatisch nur lesend bestätigt. Kein weiterer Schreibversuch.';job.updatedAt=salesNow_();
+  salesWrite_('sales_jobs/'+job.id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);
+}
+function salesSyncVerifyStep_(run,task){
+  const now=Date.now(),queue=run.verifyJobs||[];
+  for(const item of queue){
+    if(Date.parse(item.notBefore)>now)continue;
+    const job=salesRead_('sales_jobs/'+salesKey_(item.id));
+    if(!job||job.state!=='uncertain'){item.done=true;continue;}
+    try{
+      salesSyncVerifyJob_(job);item.done=true;
+      run.notices=(run.notices||[]).concat({label:item.label,message:'Der zunächst unklare Historieneintrag wurde nachträglich in HQ gefunden und bestätigt. Nichts wurde doppelt angelegt.'}).slice(-50);
+    }catch(e){
+      if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;
+      item.attempts++;
+      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){item.done=true;run.errors.push({kind:'write',id:item.id,label:item.label,message:'Auch nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen im Abstand von '+SALES_SYNC_VERIFY_MINUTES+' Minuten nicht eindeutig in HQ gefunden: '+e.message+' Bitte in HQ nachsehen; nicht erneut anlegen.'});}
+      else item.notBefore=new Date(now+SALES_SYNC_VERIFY_MINUTES*60000).toISOString();
+    }
+  }
+  run.verifyJobs=queue.filter(item=>!item.done);
+  if(!run.verifyJobs.length){delete task.waitUntil;delete task.waitMessage;return true;}
+  task.waitUntil=new Date(Math.min(...run.verifyJobs.map(item=>Date.parse(item.notBefore)))).toISOString();
+  task.stage=run.verifyJobs.length+(run.verifyJobs.length===1?' Eintrag wartet':' Einträge warten')+' auf die nächste Prüfung';
+  task.waitMessage='Unklare Historieneinträge werden in wenigen Minuten erneut nur lesend in HQ geprüft.';
+  return false;
 }
 function salesSyncPage_(run,task,key,entity,filter,expand){
   task.collections=task.collections||{};const meta=task.collections[key]||(task.collections[key]={pages:0,skip:0});

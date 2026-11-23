@@ -30,5 +30,13 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('n
    }
    await page.getByRole('button',{name:'Ausgaben aus Firebase verknüpfen',exact:true}).click();await page.getByText('Ausgaben aus Firebase verknüpfen',{exact:true}).waitFor();assert.equal(f.db['sales_meta/sync'].kind,'editions');f.worker();await page.getByRole('button',{name:'Fortschritt aktualisieren',exact:true}).click();await page.getByText('Ausgabenverknüpfung abgeschlossen.',{exact:true}).waitFor();assert.equal(f.calls.length,before);assert.equal(f.db['sales_editions/project-571'].documents.length,1);assert.deepEqual(errors,[]);
    assert.ok(!calls.includes('startSalesEditionRefresh'));await page.screenshot({path:path.join(os.tmpdir(),'sales-r19.1-edition-cache-qa.png'),fullPage:true});console.log('PASS cache-only gateway without direct export, legacy/missing-server guards, navigation and background completion without HQ');
+   // A temporary HQ fault is shown as a minute timer; "try now" resumes at once; the recovery is listed afterwards.
+   const hqGet=f.ctx.salesHqGet_;let failures=1;f.ctx.salesHqGet_=p=>{if(failures&&p.startsWith('/v2/ContactHistories?')){failures--;throw Object.assign(Error('HQ-Lesetest: HTTP 503'),{hqHttpStatus:503});}return hqGet(p);};
+   page=await open();await page.getByRole('button',{name:'HQ synchronisieren',exact:true}).click();await page.getByText('Änderungsabgleich',{exact:true}).waitFor();f.worker();
+   await page.getByRole('button',{name:'Fortschritt aktualisieren',exact:true}).click();await page.getByText('Vorübergehender Fehler · wird automatisch wiederholt',{exact:true}).waitFor();await page.getByText(/^Automatische Wiederholung 1 von 8 · nächster Versuch in etwa 2 Min\./).waitFor();
+   assert.equal(await page.getByRole('button',{name:'HQ synchronisieren',exact:true}).count(),0);
+   await page.getByRole('button',{name:'Jetzt sofort erneut versuchen',exact:true}).click();await page.getByText('HQ-Sync bei Google gestartet. Der Browser muss nicht geöffnet bleiben.',{exact:true}).waitFor();assert.equal(JSON.parse(f.props.SALES_SYNC_RETRY).until,0);
+   f.worker();await page.getByRole('button',{name:'Fortschritt aktualisieren',exact:true}).click();await page.getByRole('heading',{name:'Automatisch behoben',exact:true}).waitFor();assert.notEqual(f.db['sales_meta/sync'].state,'running');assert.deepEqual(errors,[]);
+   await page.screenshot({path:path.join(os.tmpdir(),'sales-retry-recovered-qa.png'),fullPage:true});f.ctx.salesHqGet_=hqGet;console.log('PASS temporary HQ fault shown as minute timer, immediate manual retry and recovery notice');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

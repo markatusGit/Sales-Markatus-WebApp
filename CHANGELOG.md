@@ -1,5 +1,15 @@
 # Änderungsprotokoll
 
+## [v0.39.0]
+
+- Der HQ-Abgleich verhält sich nach einem manuellen Start wie ein unbeaufsichtigter Lauf. Vorübergehende Fehler von HQ oder Firebase (HTTP 5xx/429, Zeitüberschreitung, Kontingent) halten den Lauf nicht mehr an. Derselbe Abschnitt wird mit Minuten-Timern (2, 5, 10, 15, 30, dann 60 Minuten) erneut versucht. Feste Uhrzeiten und ein Nachtlauf sind nicht eingerichtet.
+- Das app-eigene Tagesbudget (20.000 Lese- und 12.000 Schreibvorgänge) und die Sperre bis zum nächsten Tag sind entfernt. Firebase begrenzt selbst. Eine Firebase-Kontingentmeldung wird jetzt ebenfalls auf dem Minuten-Timer wiederholt.
+- Ein Abschnitt, der auch nach den Wiederholungen scheitert, wird als offener Punkt notiert und übersprungen, wo das sicher ist: Schreibaufträge (Auftrag bleibt für den nächsten Abgleich), Einzel- und Löschprüfungen, Auswahllisten, Ausgabenverknüpfung sowie Änderungsabrufe und Aktenaufbau im Änderungsabgleich. Bei übersprungenen Änderungsabrufen bleibt der bisherige Änderungsstand erhalten, damit der nächste Abgleich dieselben Änderungen erneut liest. Erstimport, Abschlussprüfung, abgelehnte HQ-Filter und gespeicherte Sammelseiten halten weiterhin an.
+- Unklare Historieneinträge (gesendet, aber nicht sofort in HQ gefunden) werden nie erneut angelegt. Sie werden nach 5 Minuten bis zu dreimal nur lesend in HQ gesucht und bei Erfolg bestätigt. Gelingt das nicht, erscheinen sie als offener Punkt für den Admin.
+- „Datenabgleich“ zeigt geplante Wiederholungen mit Minuten-Countdown, „Jetzt sofort erneut versuchen“, „Offene Punkte für den Admin“ und „Automatisch behoben“.
+- Kennung `2026-11-23-r39`. Keine neuen Script Properties oder Bereitstellungseinstellungen. Die bisherigen Eigenschaften `SALES_SYNC_HOLD` und `SALES_SYNC_BUDGET` werden beim nächsten Start geleert. Neu verwendet wird die automatisch gepflegte Eigenschaft `SALES_SYNC_RETRY`.
+
+
 ## [v0.38.2]
 
 - Veröffentlichung nachgewiesen: bestehende Google-Bereitstellung auf Version 68, alle 27 Prüfdateien und Codevergleich bestanden. Öffentliche Loginhülle mit Kennung `2026-11-23-r38.2` erreicht.

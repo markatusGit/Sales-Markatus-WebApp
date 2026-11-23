@@ -1,5 +1,16 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 23.11.2026 – r39: HQ-Abgleich wiederholt vorübergehende Fehler selbst
+
+Nutzerwunsch vom 23.11.2026: Der HQ-Abgleich soll später einmal nachts allein laufen. Vermeidbare Fehler sollen ihn nicht mehr anhalten. Bei Bedarf läuft er ein paar Minuten später erneut an. Nur schwerwiegende Fehler sollen gemeldet werden, der restliche Abgleich soll durchlaufen. Entscheidungen des Nutzers: noch kein Nachtlauf, sondern weiter manueller Start mit demselben Verhalten wie unbeaufsichtigt. Verzögerungen nur als Minuten-Timer, keine festen Uhrzeiten. Das app-eigene Tagesbudget entfernen, Firebase begrenzt selbst. Keine E-Mail an den Admin, Meldung vorerst nur unten im „Datenabgleich“.
+
+Ursachenanalyse der gemeldeten Abbrüche: Das „Tagesbudget des HQ-Imports“ war ein app-eigenes Firebase-Limit (Tag nach kalifornischer Zeit, also ab 9 Uhr deutscher Zeit). Danach war die Fortsetzung erst am Folgetag und nur manuell möglich. Ein einzelner HQ-Serverfehler hielt jeden Abschnitt außer der Löschprüfung an. Das HQ-Abruflimit (HTTP 429) wurde nicht erkannt. Historieneinträge wurden direkt nach dem Senden geprüft und bei verzögerter HQ-Anzeige dauerhaft als „unklar“ gesperrt.
+
+Umsetzung lokal: Minuten-Timer mit Wiederholung desselben Abschnitts (2, 5, 10, 15, 30, 60 Minuten). Pro Abschnitt bis zu 8 Versuche, für Prüfabschnitte 3, bei Firebase-Kontingent 30. Das Warten kostet keine Firebase- oder HQ-Abrufe. Dauerhaft scheiternde Abschnitte werden als offener Punkt übersprungen, wo die übrigen Daten konsistent bleiben. Bei übersprungenen Änderungsabrufen bleibt der alte Änderungsstand erhalten. Unklare Historieneinträge werden nach 5 Minuten bis zu dreimal nur lesend nachgeprüft. Neue Anzeige im „Datenabgleich“. Kennung `2026-11-23-r39`.
+
+**Lokal vorbereitet und geprüft:** alle Prüfdateien einschließlich neuer Worker-, Delta- und Browserfälle bestanden. Noch nicht nach Google veröffentlicht, nicht live getestet. Offen: Ob HQ das Feld `syncId` beim Lesen eines Historieneintrags zuverlässig zurückgibt, zeigt erst der nächste echte Abgleich. Falls nicht, bleiben solche Einträge trotz Nachprüfung offen. Roadmap-Wunsch bleibt: späterer automatischer Nachtlauf und Admin-Benachrichtigung am Folgetag (zurückgestellt am 23.11.2026).
+
+
 ### 23.11.2026 – r38.2: HTTP 500 beim HQ-Löschabgleich
 
 Nutzer meldet einen angehaltenen HQ-Abgleich. Die lesende Firebase-Prüfung bestätigt einen pausierten Änderungsabgleich bei 14 von 17 Abschnitten, zusätzliche Löschprüfung für Unternehmen. Die erste Mengenprüfung und erste Kennungsseite liegen im selben Abschnitt. Der gespeicherte Stand zeigt noch keine Kennungsseite und erlaubt keine sichere Zuordnung des HTTP 500 zu einem der beiden Abrufe.

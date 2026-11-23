@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r38.2';
+const SALES_RELEASE = '2026-11-23-r39';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -1239,10 +1239,13 @@ function salesSyncWrite_(task,run){
   if(job.draftDependency&&salesRead_('sales_jobs/'+salesKey_(job.draftDependency))?.state!=='synced')return;
   if(job.formPrevious&&!['synced','canceled'].includes(salesRead_('sales_jobs/'+salesKey_(job.formPrevious))?.state))return;
   if(job.state==='synced'||job.state==='canceled'){if(job.state==='synced')salesCommunicationAfterJob_(job);return;}
+  // An unclear history entry from an earlier run is only looked up in HQ, never created again.
+  if(salesSyncVerifiable_(job,run)){salesSyncQueueVerify_(run,job,0);return;}
   if(job.business===1){
     salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);
     if(after.kind==='deleteCompany'&&after.state==='synced'&&run)salesDeleteApplyCounts_(run,after);
-    if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw new Error(after.message);
+    if(salesSyncVerifiable_(after,run)){salesSyncQueueVerify_(run,after,SALES_SYNC_VERIFY_MINUTES);return;}
+    if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw salesSyncJobError_(after);
     return;
   }
   const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));
@@ -1254,7 +1257,54 @@ function salesSyncWrite_(task,run){
   salesRunJobLocked_(job.id,task.step);
   const after=salesRead_('sales_jobs/'+job.id);
   if(salesReviewWaiting_(after)||after.state==='canceled')return;
-  if(task.step==='company'?(!after.companyConfirmedAt||!after.steps?.company):after.state!=='synced')throw new Error(after.message||'HQ-Rückprüfung noch offen.');
+  if(salesSyncVerifiable_(after,run)){salesSyncQueueVerify_(run,after,SALES_SYNC_VERIFY_MINUTES);return;}
+  if(task.step==='company'?(!after.companyConfirmedAt||!after.steps?.company):after.state!=='synced')throw salesSyncJobError_(after);
+}
+/** HQ may list a new history entry only shortly after the write. Such entries are re-checked read-only later. */
+const SALES_SYNC_VERIFY_MINUTES=5,SALES_SYNC_VERIFY_ATTEMPTS=3;
+function salesSyncVerifiable_(job,run){
+  return !!run&&run.engine===2&&job?.state==='uncertain'&&['history','communication'].includes(job.kind)&&job.writeAttempted===true;
+}
+function salesSyncQueueVerify_(run,job,minutes){
+  run.verifyJobs=run.verifyJobs||[];if(run.verifyJobs.some(v=>v.id===job.id))return;
+  run.verifyJobs.push({id:job.id,label:'App → HQ: '+(job.name?job.name+' · ':'')+'Historieneintrag nur prüfen',attempts:0,notBefore:new Date(Date.now()+minutes*60000).toISOString()});
+}
+// The job state decides: a job that was not written yet may simply be retried; any other outcome is final for this run.
+function salesSyncJobError_(job){
+  const e=new Error(job.message||'HQ-Rückprüfung noch offen.');
+  if(['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!job.phaseWriteAttempted&&/HTTP (408|429|500|502|503|504)\b|Firestore[^\n]*HTTP (429|5\d\d)|timed out|Timeout|Address unavailable/i.test(job.message||''))e.salesTransient=true;
+  else e.salesJobOutcome=true;
+  return e;
+}
+function salesSyncVerifyJob_(job){
+  if(job.business===1)salesBusinessRun_(job,true);
+  else{const draft=salesRead_('sales_drafts/'+salesKey_(job.draftId));if(!draft?.company)throw new Error('Firma fehlt.');salesHistoryTarget_(job,draft);salesConfirmHistory_(job);}
+  if(job.state==='conflict')throw new Error(job.message||'HQ-Ergebnis weicht ab.');
+  job.state='synced';job.message='Historieneintrag in HQ automatisch nur lesend bestätigt. Kein weiterer Schreibversuch.';job.updatedAt=salesNow_();
+  salesWrite_('sales_jobs/'+job.id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);
+}
+function salesSyncVerifyStep_(run,task){
+  const now=Date.now(),queue=run.verifyJobs||[];
+  for(const item of queue){
+    if(Date.parse(item.notBefore)>now)continue;
+    const job=salesRead_('sales_jobs/'+salesKey_(item.id));
+    if(!job||job.state!=='uncertain'){item.done=true;continue;}
+    try{
+      salesSyncVerifyJob_(job);item.done=true;
+      run.notices=(run.notices||[]).concat({label:item.label,message:'Der zunächst unklare Historieneintrag wurde nachträglich in HQ gefunden und bestätigt. Nichts wurde doppelt angelegt.'}).slice(-50);
+    }catch(e){
+      if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;
+      item.attempts++;
+      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){item.done=true;run.errors.push({kind:'write',id:item.id,label:item.label,message:'Auch nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen im Abstand von '+SALES_SYNC_VERIFY_MINUTES+' Minuten nicht eindeutig in HQ gefunden: '+e.message+' Bitte in HQ nachsehen; nicht erneut anlegen.'});}
+      else item.notBefore=new Date(now+SALES_SYNC_VERIFY_MINUTES*60000).toISOString();
+    }
+  }
+  run.verifyJobs=queue.filter(item=>!item.done);
+  if(!run.verifyJobs.length){delete task.waitUntil;delete task.waitMessage;return true;}
+  task.waitUntil=new Date(Math.min(...run.verifyJobs.map(item=>Date.parse(item.notBefore)))).toISOString();
+  task.stage=run.verifyJobs.length+(run.verifyJobs.length===1?' Eintrag wartet':' Einträge warten')+' auf die nächste Prüfung';
+  task.waitMessage='Unklare Historieneinträge werden in wenigen Minuten erneut nur lesend in HQ geprüft.';
+  return false;
 }
 function salesSyncPage_(run,task,key,entity,filter,expand){
   task.collections=task.collections||{};const meta=task.collections[key]||(task.collections[key]={pages:0,skip:0});
@@ -1452,7 +1502,7 @@ function salesBulkSelect_(entity,raw){
 }
 function salesBulkSummary_(run){
   const task=run.tasks[run.cursor],e=run.entities.Companies;
-  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,removed:run.entities[entity]?.removed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
+  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],notices:run.notices||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,removed:run.entities[entity]?.removed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
 }
 function salesBulkPrepare_(old){
   return salesDeltaPrepare_(old);
@@ -1477,9 +1527,11 @@ function salesBulkRead_(run,task){
   if(m.complete)return true;
   if(task.pendingPage)return salesBulkCommitPage_(run,task);
   const clauses=[];if(m.lastId)clauses.push('id gt '+m.lastId);if(m.since)clauses.push(salesDeltaFilter_(entity,m.since));
+  // A broken HQ filter/order contract affects every data type alike: stop the run instead of skipping section after section.
+  const contract=message=>Object.assign(new Error(message),{salesStop:true});
   let page;try{page=salesBulkPage_(entity,clauses.join(' and '));}
-  catch(e){if(m.since&&/HTTP 400/.test(e.message))throw new Error(SALES_BULK_LABELS[entity]+': HQ hat den Änderungsfilter abgelehnt. Kein Gesamtimport als Ersatz. Gespeicherter Änderungsstand bleibt erhalten; technischen Filter prüfen.');throw e;}
-  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw new Error('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&!salesDeltaRecent_(entity,row,m.since))throw new Error('HQ-Änderungsfilter wurde nicht eingehalten. Kein Gesamtimport gestartet.');}
+  catch(e){if(m.since&&/HTTP 400/.test(e.message))throw contract(SALES_BULK_LABELS[entity]+': HQ hat den Änderungsfilter abgelehnt. Kein Gesamtimport als Ersatz. Gespeicherter Änderungsstand bleibt erhalten; technischen Filter prüfen.');throw e;}
+  let last=m.lastId;for(const row of page.rows){const id=salesId_(row.id);if(id<=last)throw contract('HQ-ID-Reihenfolge oder Fortsetzungsfilter verletzt.');last=id;if(m.since&&!salesDeltaRecent_(entity,row,m.since))throw contract('HQ-Änderungsfilter wurde nicht eingehalten. Kein Gesamtimport gestartet.');}
   page.rows=page.rows.map(row=>salesBulkSelect_(entity,row));
   const paths=page.rows.map(r=>collection+'/'+r.id),old=salesBulkGet_(paths),entries=[];
   for(const row of page.rows){
@@ -1573,7 +1625,7 @@ function salesBulkStep_(run){
 function salesBulkStepWork_(run){
   if(run.planCleanupPending)salesDeltaResolvePlan_(run);
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
-  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
+  if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
   else if(task.kind==='deltaMissing')done=salesDeltaMissing_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
@@ -1585,8 +1637,10 @@ function salesBulkStepWork_(run){
     run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
     if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    if(run.verifyJobs?.length)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
+  else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);
   else if(task.kind==='bulkCompany')done=salesBulkCompany_(run,task);
   else if(task.kind==='bulkEdition')done=salesBulkEdition_(run,task);
   else if(task.kind==='deltaUnassigned')done=salesDeltaUnassigned_(run);
@@ -1628,7 +1682,7 @@ function salesDeltaPrepare_(old){
     errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
     stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
   for(const e of SALES_BULK_ENTITIES){const prev=cache.entities?.[e];
-    run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
+    run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),previousWatermark:full?null:prev.watermark,lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
     tasks.push({kind:'bulkRead',id:e,label:'HQ → Firebase: '+SALES_BULK_LABELS[e]+(full?' erstmals lesen':' · Änderungen lesen')});
   }
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
@@ -1711,13 +1765,20 @@ function salesDeltaMissing_(run,task){
   if(task.ids)return salesDeltaProbe_(run,task);
   try{return salesDeltaMissingIds_(run,task);}
   catch(e){
-    if(!salesDeltaHqServerError_(e))throw e;
+    // The background worker first retries a temporary HQ fault on a minute timer; only the last attempt keeps the check open.
+    if(!salesDeltaHqServerError_(e)||salesDeltaRetriesLeft_())throw e;
     const read=task.expected===undefined?'HQ-Gesamtzahl':task.hqIds.length===task.expected?'Rückprüfung der HQ-Gesamtzahl':'HQ-Kennungsliste';
     run.errors.push({label:'HQ-Löschabgleich · '+SALES_BULK_LABELS[task.id],message:read+' vorübergehend nicht verfügbar (HTTP '+e.hqHttpStatus+'). Die Prüfung bleibt offen und wird beim nächsten HQ-Abgleich erneut versucht.'});
     delete task.hqIds;task.stage='Löschprüfung offen';return true;
   }
 }
 function salesDeltaHqServerError_(e){return [500,502,503,504].includes(e.hqHttpStatus);}
+function salesDeltaRetriesLeft_(){return typeof salesWorkerRetriesLeft_==='function'&&salesWorkerRetriesLeft_()>0;}
+// A skipped change read keeps the earlier change marker so the next sync reads the same changes again.
+function salesDeltaWatermark_(run,m){
+  if(m.full||!(run.retainWatermarks||m.retainWatermark))return run.startedAt;
+  return m.previousWatermark||new Date(Date.parse(m.since)+120000).toISOString();
+}
 function salesDeltaMissingIds_(run,task){
   const m=run.entities[task.id];
   if(task.expected===undefined){
@@ -1809,7 +1870,6 @@ function salesDeltaMirrorMissing_(run,task,id){
 }
 /** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
 function salesDeltaResolvePlan_(run){
-  if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(20,10);
   const path='sales_meta/plan_cleanup_'+salesKey_(run.id),request=salesRead_(path);
   if(!request||request.approved!==true||request.runId!==run.id||request.state!=='approved')throw Error('Planumsatz-Klärung nicht freigegeben.');
   const id=String(salesId_(request.id)),rawPath=salesBulkCollection_('PlannedRevenues')+'/'+id,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk'),m=run.entities.PlannedRevenues,cm=cache?.entities?.PlannedRevenues;
@@ -1869,15 +1929,17 @@ function salesDeltaUnassigned_(run){
 function salesDeltaAudit_(run){
   const warnings=[];for(const e of SALES_BULK_ENTITIES){
     let total;try{total=salesV1Page_(e,'',0,1).total;}catch(err){
-      if(!salesDeltaHqServerError_(err))throw err;
-      total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen (HTTP '+err.hqHttpStatus+'). Der gelesene Änderungsstand ist gespeichert.'});
+      // Totals are diagnostics only: a temporary fault is retried first, then any HQ fault just leaves the total unconfirmed.
+      const temporary=typeof salesWorkerTransient_==='function'?salesWorkerTransient_(err):salesDeltaHqServerError_(err);
+      if(temporary&&salesDeltaRetriesLeft_())throw err;
+      total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen ('+(err.hqHttpStatus?'HTTP '+err.hqHttpStatus:String(err.message||'unbekannter Fehler').slice(0,200))+'). Der gelesene Änderungsstand ist gespeichert.'});
     }
     const m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
     if(key)run.stats[key]=total;m.confirmedTotal=total;
     if(total===null||total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+(total===null?'nicht bestätigt':total)+'. Mengenabweichung bleibt zur Prüfung offen. Änderungsstand gespeichert; kein erneuter Gesamtimport.'});
   }
   salesDeltaCoverage_(run);run.errors.push(...warnings);
-  const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:run.startedAt,ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
+  const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:salesDeltaWatermark_(run,m),ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
   // Each stream was fully read and all affected projections published. Counts are diagnostics, not reset switches.
   run.stats.companies=run.entities.Companies.count;run.stats.contacts=run.entities.ContactPersons.count;run.stats.histories=run.entities.ContactHistories.count;
   // Cache totals include unassigned rows; UI must not add them a second time.
@@ -1886,46 +1948,83 @@ function salesDeltaAudit_(run){
   salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings});return true;
 }
 
-/** Temporary Apps Script continuation trigger. Never starts a new/nightly business sync. */
-let salesWorkerBudgetActive_=false;
-function salesWorkerDay_(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
-function salesWorkerHoldState_(){try{return JSON.parse(salesWorkerProps_().getProperty('SALES_SYNC_HOLD')||'null');}catch{throw Error('Gespeicherte Kontingentpause ungültig. Bitte administrativ prüfen.');}}
-function salesWorkerBudget_(reads,writes){
-  if(!salesWorkerBudgetActive_)return;
-  const p=salesWorkerProps_(),day=salesWorkerDay_();let meter;try{meter=JSON.parse(p.getProperty('SALES_SYNC_BUDGET')||'null');}catch{throw Error('Gespeichertes Importbudget ungültig.');}
-  if(!meter||meter.day!==day)meter={day,reads:0,writes:0};
-  if(!Number.isSafeInteger(meter.reads)||meter.reads<0||!Number.isSafeInteger(meter.writes)||meter.writes<0||!Number.isSafeInteger(reads)||!Number.isSafeInteger(writes))throw Error('Gespeichertes Importbudget ungültig.');
-  const next={day,reads:Math.max(0,meter.reads+reads),writes:Math.max(0,meter.writes+writes)};
-  if(next.reads>20000||next.writes>12000){const e=Error('Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
-  p.setProperty('SALES_SYNC_BUDGET',JSON.stringify(next));
-}
-// Before an HQ write task: stop cleanly unless enough budget remains to finish the job and store its state.
-function salesWorkerReserve_(reads,writes){
-  if(!salesWorkerBudgetActive_)return;
-  const day=salesWorkerDay_();let meter;try{meter=JSON.parse(salesWorkerProps_().getProperty('SALES_SYNC_BUDGET')||'null');}catch{throw Error('Gespeichertes Importbudget ungültig.');}
-  if(!meter||meter.day!==day)return;
-  if(meter.reads+reads>20000||meter.writes+writes>12000){const e=Error('Tagesbudget des HQ-Imports reicht nicht mehr sicher für einen Schreibauftrag. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.');e.salesBudget=true;throw e;}
-}
-function salesWorkerRequestBudget_(url,options){
-  if(!salesWorkerBudgetActive_||!/^https:\/\/firestore\.googleapis\.com\//.test(url))return null;
-  const method=String(options?.method||'get').toLowerCase();let body;try{body=JSON.parse(options?.payload||'{}');}catch{throw Error('Importanfrage ohne prüfbares Budget.');}
-  let reads=0,writes=0,query=false;
-  if(url.endsWith(':batchGet'))reads=body.documents.length;
-  else if(url.endsWith(':runQuery')){reads=body.structuredQuery.limit;query=true;}
-  else if(url.endsWith(':commit')){reads=body.writes.filter(w=>w.verify).length;writes=body.writes.filter(w=>w.update||w.delete||w.transform).length;}
-  else if(method==='get'){reads=Number(/[?&]pageSize=(\d+)/.exec(url)?.[1]||1);query=/[?&]pageSize=/.test(url);}
-  else if(['patch','delete'].includes(method))writes=1;
-  else throw Error('Importanfrage ohne prüfbares Budget.');
-  if(!Number.isSafeInteger(reads)||reads<0)throw Error('Import-Lesemenge nicht begrenzt.');
-  salesWorkerBudget_(reads,writes);return {reads,query};
-}
-function salesWorkerLimited_(e){return e.salesQuota||e.salesBudget||/Firestore[^\n]*HTTP 429/.test(e.message||'');}
-function salesWorkerHold_(e){
-  const message=e.salesBudget?'Tagesbudget des HQ-Imports erreicht. Gespeicherten Lauf am nächsten Tag manuell fortsetzen.':'Firebase-Kontingent ausgeschöpft. Hintergrundlauf gestoppt; nach Erneuerung des Kontingents manuell fortsetzen.';
-  salesWorkerProps_().setProperty('SALES_SYNC_HOLD',JSON.stringify({day:salesWorkerDay_(),at:salesNow_(),reason:e.salesBudget?'budget':'quota',message}));salesWorkerStop_();
-}
-function salesWorkerStatus_(summary){const hold=salesWorkerHoldState_();return summary?.state==='running'&&hold?{...summary,paused:true,background:false,errors:summary.errors.concat({label:'HQ-Abgleich angehalten · Kontingentschutz',message:hold.message})}:summary;}
+/** Temporary Apps Script continuation trigger. Never starts a new/nightly business sync.
+ * A manually started run then behaves like an unattended run: temporary HQ/Firebase faults wait a few
+ * minutes (minute timers only, no fixed clock times) and retry the same section; a section that keeps
+ * failing is recorded and skipped where that is safe, so the rest of the sync still finishes. */
+const SALES_SYNC_RETRY_MINUTES=[2,5,10,15,30,60];
+// Optional checks give up sooner; their open work is simply repeated by the next sync.
+const SALES_SYNC_OPTIONAL_TASKS=['deltaProbe','deltaMissing','catalog','verifyJobs','deltaEditions'];
+var salesWorkerRetriesLeftValue_=0;
+function salesWorkerRetriesLeft_(){return salesWorkerRetriesLeftValue_;}
 function salesWorkerProps_(){return PropertiesService.getScriptProperties();}
+function salesWorkerLimited_(e){return !!e&&(e.salesQuota===true||/Firestore[^\n]*HTTP 429/.test(e.message||''));}
+function salesWorkerTransient_(e){
+  if(!e||e.salesFatal)return false;
+  if(e.salesTransient||salesWorkerLimited_(e))return true;
+  if([408,429,500,502,503,504].includes(e.hqHttpStatus))return true;
+  if(e.salesJobOutcome)return false;
+  return /(Firestore|Firebase)[^\n]*HTTP (408|429|5\d\d)|HQ-Lesetest: HTTP (408|429|500|502|503|504)\b|timed out|Timeout|Zeitüberschreitung|Address unavailable|DNS error|Service invoked too many times|Service unavailable|Dienst nicht verfügbar|Serverfehler|Bandwidth quota|Ein Speichervorgang läuft/i.test(String(e.message||''));
+}
+function salesWorkerSafeMessage_(e){
+  return String(e?.message||'Unbekannter Fehler').replace(/https?:\/\/\S+/g,'[Adresse entfernt]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g,'[E-Mail entfernt]').replace(/[\x00-\x1F\x7F]/g,' ').slice(0,400);
+}
+function salesWorkerRetryState_(){
+  const raw=salesWorkerProps_().getProperty('SALES_SYNC_RETRY');if(!raw)return null;
+  try{const value=JSON.parse(raw);return value&&Number.isFinite(value.until)?value:null;}catch{return null;}
+}
+function salesWorkerRetryLimit_(task,e){
+  if(e&&salesWorkerLimited_(e))return 30;
+  return task&&SALES_SYNC_OPTIONAL_TASKS.includes(task.kind)?3:8;
+}
+/** Schedules the next attempt of the same section after a minute delay. False once the section's attempts are used up. */
+function salesWorkerRetry_(key,runId,task,e){
+  const old=salesWorkerRetryState_(),attempts=old?.key===key&&!old.wait?old.attempts+1:1,limit=salesWorkerRetryLimit_(task,e);
+  if(attempts>limit){e.salesRetried=attempts-1;return false;}
+  const minutes=SALES_SYNC_RETRY_MINUTES[Math.min(attempts,SALES_SYNC_RETRY_MINUTES.length)-1];
+  salesWorkerProps_().setProperty('SALES_SYNC_RETRY',JSON.stringify({key,runId:runId||null,attempts,limit,minutes,until:Date.now()+minutes*60000,at:salesNow_(),label:task?.label||'HQ-Abgleich',message:salesWorkerSafeMessage_(e)}));
+  return true;
+}
+function salesWorkerWait_(run,task,key){
+  salesWorkerProps_().setProperty('SALES_SYNC_RETRY',JSON.stringify({key,runId:run.id,wait:true,attempts:0,until:Date.parse(task.waitUntil),at:salesNow_(),label:task.label||'HQ-Abgleich',message:task.waitMessage||'Wartet bis zur nächsten geplanten Prüfung.'}));
+}
+function salesWorkerRecovered_(run,previous,key){
+  salesWorkerProps_().setProperty('SALES_SYNC_RETRY','');
+  if(previous.wait||previous.key!==key)return;
+  run.notices=(run.notices||[]).concat({label:previous.label||'HQ-Abgleich',message:'Nach '+previous.attempts+(previous.attempts===1?' automatischen Wiederholung':' automatischen Wiederholungen')+' erfolgreich fortgesetzt. Ursache war: '+previous.message}).slice(-50);
+  run.revision++;run.updatedAt=salesNow_();salesWrite_('sales_meta/sync',run);
+}
+/** A section that cannot be finished is recorded and skipped where the rest of the run stays consistent.
+ * Skipped change reads keep the previous change marker, so the next sync reads those changes again. */
+function salesWorkerSkip_(run,e){
+  // An approved plan cleanup runs before the current section; its failure must not skip that unrelated section.
+  // A journaled page must be replayed, never dropped.
+  const task=run.tasks[run.cursor];if(!task||run.planCleanupPending||e.salesStop||task.pendingPage)return false;
+  const message=salesWorkerSafeMessage_(e)+(e.salesRetried?' (nach '+e.salesRetried+' automatischen Wiederholungen)':'');
+  const record=note=>run.errors.push({kind:task.kind==='write'?'write':task.kind,id:task.id,label:task.label||'HQ-Abgleich',stage:task.stage||'',message:message+' · '+note});
+  if(task.kind==='write')record('Auftrag bleibt gespeichert und wird beim nächsten HQ-Abgleich erneut geprüft. Der restliche Abgleich läuft weiter.');
+  else if(SALES_SYNC_OPTIONAL_TASKS.includes(task.kind)){
+    if(task.kind==='deltaMissing')for(const key of ['expected','hqIds','lastId','ids','index','pageSize'])delete task[key];
+    if(task.kind==='deltaEditions')for(const id of task.editionIds||[]){const edition=salesRead_('sales_editions/'+salesKey_(id));if(edition&&!edition.cacheLinkPending)salesWrite_('sales_editions/'+edition.id,{...edition,cacheLinkPending:true});}
+    if(task.kind==='verifyJobs')run.verifyJobs=[];
+    record('Prüfung übersprungen; sie wird beim nächsten HQ-Abgleich erneut versucht. Der restliche Abgleich läuft weiter.');
+  }
+  else if(!run.full&&['bulkRead','bulkProject','bulkCompany','deltaUnassigned'].includes(task.kind)){
+    if(task.kind==='bulkRead')run.entities[task.id].retainWatermark=true;else run.retainWatermarks=true;
+    record('Abschnitt übersprungen; diese Änderungen werden beim nächsten HQ-Abgleich erneut gelesen. Der restliche Abgleich läuft weiter.');
+  }
+  else return false;
+  task.skipped=true;task.finished=true;run.done++;run.cursor++;run.inFlight=null;run.revision++;run.updatedAt=salesNow_();
+  if(run.cursor>=run.tasks.length)run.state=run.errors.length?'completedWithErrors':'completed';
+  return true;
+}
+function salesWorkerStatus_(summary){
+  const retry=salesWorkerRetryState_();
+  if(summary?.state!=='running'||!retry||retry.runId&&retry.runId!==summary.id)return summary;
+  if(retry.exhausted)return {...summary,background:false,errors:summary.errors.concat({label:'Automatische Wiederholung beendet · '+retry.label,message:retry.message+' · Nach '+retry.attempts+' Versuchen angehalten. Über „HQ-Sync fortsetzen“ erneut starten.'})};
+  if(retry.until<=Date.now())return summary;
+  return {...summary,retry:{until:new Date(retry.until).toISOString(),attempt:retry.attempts,limit:retry.limit||null,wait:!!retry.wait,label:retry.label,message:retry.message}};
+}
 function setupSalesSyncWorker(){
   const user=salesUser_(true),email=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();
   if(!email)throw new Error('Google-Ausführungskonto nicht erkennbar. Im Apps-Script-Editor freigeben.');
@@ -1934,16 +2033,19 @@ function setupSalesSyncWorker(){
   return {message:'Hintergrundfortsetzung freigegeben. Der nächste manuelle HQ-Sync darf ohne offenen Browser weiterlaufen. Kein Nachtlauf eingerichtet.'};
 }
 function salesWorkerEnsure_(){
-  const hold=salesWorkerHoldState_();if(hold?.day===salesWorkerDay_())throw Error(hold.message);
   const p=salesWorkerProps_(),email=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase(),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase();
   if(!email||p.getProperty('SALES_SYNC_EXECUTOR')!==email||p.getProperty('SALES_SYNC_ADMIN')!==admin)throw new Error('Hintergrundlauf noch nicht freigegeben. In Apps Script einmal setupSalesSyncWorker ausführen und Google-Berechtigung bestätigen.');
-  if(hold)p.setProperty('SALES_SYNC_HOLD','');
+  // A manual start/continue means "try now": the minute timer ends at once (attempt count kept for the recovery note).
+  // The removed daily-budget state of older versions is cleared.
+  for(const key of ['SALES_SYNC_HOLD','SALES_SYNC_BUDGET'])if(p.getProperty(key))p.setProperty(key,'');
+  const retry=salesWorkerRetryState_();if(retry)p.setProperty('SALES_SYNC_RETRY',retry.exhausted?'':JSON.stringify({...retry,until:0}));else if(p.getProperty('SALES_SYNC_RETRY'))p.setProperty('SALES_SYNC_RETRY','');
   const existing=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='salesSyncWorker_'),saved=p.getProperty('SALES_SYNC_TRIGGER');
   const keep=existing.find(t=>t.getUniqueId()===saved);existing.filter(t=>t!==keep).forEach(t=>ScriptApp.deleteTrigger(t));
   if(!keep){const trigger=ScriptApp.newTrigger('salesSyncWorker_').timeBased().everyMinutes(1).create();p.setProperty('SALES_SYNC_TRIGGER',trigger.getUniqueId());}
 }
 function salesWorkerStop_(){
-  const p=salesWorkerProps_();p.setProperty('SALES_SYNC_TRIGGER','');ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='salesSyncWorker_').forEach(t=>ScriptApp.deleteTrigger(t));
+  const p=salesWorkerProps_();p.setProperty('SALES_SYNC_TRIGGER','');if(p.getProperty('SALES_SYNC_RETRY'))p.setProperty('SALES_SYNC_RETRY','');
+  ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='salesSyncWorker_').forEach(t=>ScriptApp.deleteTrigger(t));
 }
 function salesBulkStart_(){
   salesUser_(true);return salesLock_(()=>{
@@ -1967,29 +2069,36 @@ function salesSyncWorker_(event){
   const p=salesWorkerProps_(),owner=p.getProperty('SALES_SYNC_EXECUTOR'),admin=String(p.getProperty('SALES_ADMIN_EMAIL')||SALES.admin).trim().toLowerCase(),allowed=String(p.getProperty('SALES_ALLOWED_EMAILS')||admin).split(',').map(x=>x.trim().toLowerCase());
   if(!event?.triggerUid||String(event.triggerUid)!==p.getProperty('SALES_SYNC_TRIGGER')||String(Session.getEffectiveUser().getEmail()||'').toLowerCase()!==owner||p.getProperty('SALES_SYNC_ADMIN')!==admin||!allowed.includes(admin))throw new Error('Hintergrundauftrag nicht autorisiert.');
   try{
-  if(salesWorkerHoldState_()){salesWorkerStop_();return;}
+  // A waiting minute timer costs no Firebase or HQ request.
+  const waiting=salesWorkerRetryState_();if(waiting&&!waiting.exhausted&&waiting.until>Date.now())return;
   // Only a validated installable trigger may establish this server-only context.
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){const cfg=salesAuthConfig_();salesAuthRequest_={user:salesAuthPrincipal_({uid:cfg.ownerUid,email:cfg.ownerEmail}),worker:true};}
   const until=Date.now()+180000;let checked=false;
   while(Date.now()<until){
     const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
     try{
-      salesWorkerBudgetActive_=true;
       let run=salesRead_('sales_meta/sync');if(!run||run.engine!==2||run.state!=='running'||run.paused){if(run?.engine===2)salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
       if(p.getProperty('SALES_SYNC_PAUSE')===run.id){run.paused=true;run.revision++;run.updatedAt=salesNow_();salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;}
+      const task=run.tasks[run.cursor],key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':'),retryKey=run.id+'|'+key;
+      if(task.waitUntil&&Date.parse(task.waitUntil)>Date.now()){salesWorkerWait_(run,task,retryKey);return;}
+      // A caught, scheduled retry is not an unfinished (killed) execution.
+      const previous=salesWorkerRetryState_(),caught=previous?.key===retryKey,tried=caught&&!previous.wait?previous.attempts:0;
       let writeBoundary=false;try{
-        const task=run.tasks[run.cursor],key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':');
-        const attempts=run.inFlight?.key===key?run.inFlight.attempts+1:1;
-        if(attempts>3)throw new Error('Derselbe Abschnitt wurde dreimal ohne Abschluss beendet, möglicherweise durch Googles Laufzeitgrenze. Lauf angehalten; bitte den Fehler unter Apps Script → Ausführungen prüfen. Keine Schreibaufträge neu anlegen.');
+        const attempts=!caught&&run.inFlight?.key===key?run.inFlight.attempts+1:1;
+        if(attempts>3){const e=new Error('Derselbe Abschnitt wurde dreimal ohne Abschluss beendet, möglicherweise durch Googles Laufzeitgrenze. Bitte den Fehler unter Apps Script → Ausführungen prüfen. Keine Schreibaufträge neu anlegen.');e.salesFatal=true;throw e;}
         run.inFlight={key,attempts};run.heartbeat=salesNow_();salesWrite_('sales_meta/sync',run);
         if(!checked){salesAssertPrivate_();salesWorkerPrivate_();checked=true;}
-        writeBoundary=salesBulkStep_(run);
+        salesWorkerRetriesLeftValue_=Math.max(0,salesWorkerRetryLimit_(task,null)-tried);
+        writeBoundary=salesBulkStep_(run);salesWorkerRetriesLeftValue_=0;
+        if(previous)salesWorkerRecovered_(run,previous,retryKey);
       }catch(e){
-        if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}
+        salesWorkerRetriesLeftValue_=0;
+        if(salesWorkerTransient_(e)&&salesWorkerRetry_(retryKey,run.id,task,e))return;
         // Reload the durable checkpoint: an interrupted page may already have an immutable replay journal.
-        run=salesRead_('sales_meta/sync');
+        run=salesRead_('sales_meta/sync');p.setProperty('SALES_SYNC_RETRY','');
         if(run&&run.state!=='running'){salesWrite_('sales_meta/lean_sync',salesBulkSummary_(run));salesWorkerStop_();return;}
-        run.paused=true;run.blockedMessage=e.message||'Hintergrundabschnitt fehlgeschlagen.';run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
+        if(salesWorkerSkip_(run,e)){salesWrite_('sales_meta/sync',run);if(run.state!=='running'){salesWorkerStop_();return;}continue;}
+        run.paused=true;run.blockedMessage=salesWorkerSafeMessage_(e)+(e.salesRetried?' (nach '+e.salesRetried+' automatischen Wiederholungen)':'');run.updatedAt=salesNow_();run.revision++;salesWrite_('sales_meta/sync',run);salesWorkerStop_();return;
       }
       if(run.state!=='running'){salesWorkerStop_();return;}
       // Each company/contact write is followed by a separate trigger execution, not just another function call.
@@ -1998,7 +2107,14 @@ function salesSyncWorker_(event){
     // Give waiting user saves a chance to take the lock before the next section; if one does, the next trigger continues.
     if(typeof Utilities!=='undefined'&&Utilities.sleep)Utilities.sleep(1500);
   }
-  }catch(e){if(salesWorkerLimited_(e)){salesWorkerHold_(e);return;}throw e;}finally{salesWorkerBudgetActive_=false;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
+  }catch(e){
+    // Failures before the run could be read (e.g. Firebase quota) wait on a minute timer as well.
+    if(salesWorkerTransient_(e)){
+      if(!salesWorkerRetry_('worker',null,null,e)){salesWorkerStop_();p.setProperty('SALES_SYNC_RETRY',JSON.stringify({key:'worker',runId:null,exhausted:true,attempts:e.salesRetried||0,until:0,at:salesNow_(),label:'HQ-Abgleich',message:salesWorkerSafeMessage_(e)}));}
+      return;
+    }
+    throw e;
+  }finally{salesWorkerRetriesLeftValue_=0;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
 function salesWorkerPrivate_(){
   const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}

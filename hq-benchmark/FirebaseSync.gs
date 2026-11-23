@@ -142,16 +142,13 @@ function pilotAssertNoPublicReads_(projectId) {
   }
 }
 function pilotCall_(url,options) {
-  const budget=typeof salesWorkerRequestBudget_==='function'?salesWorkerRequestBudget_(url,options):null;
   const response=UrlFetchApp.fetch(url,Object.assign({muteHttpExceptions:true},options));
   const status=response.getResponseCode();
   if (status<200 || status>=300) throw new Error('Firestore HTTP '+status+' bei HQ-Abgleich.');
   const result=response.getContentText() ? JSON.parse(response.getContentText()) : null;
-  if(budget?.query){const count=Array.isArray(result)?result.filter(r=>r.document).length:(result?.documents||[]).length;salesWorkerBudget_(Math.max(1,count)-budget.reads,0);}
   return result;
 }
 function pilotReadDocument_(projectId,path,token) {
-  if(typeof salesWorkerBudget_==='function')salesWorkerBudget_(1,0);
   const response=UrlFetchApp.fetch(pilotUrl_(projectId,path),{method:'get',headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
   if (response.getResponseCode()===404) return null;
   if (response.getResponseCode()!==200) throw new Error('Firestore-Lesezugriff HTTP '+response.getResponseCode()+'.');

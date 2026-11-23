@@ -28,7 +28,7 @@ function salesDeltaPrepare_(old){
     errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
     stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
   for(const e of SALES_BULK_ENTITIES){const prev=cache.entities?.[e];
-    run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
+    run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),previousWatermark:full?null:prev.watermark,lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
     tasks.push({kind:'bulkRead',id:e,label:'HQ → Firebase: '+SALES_BULK_LABELS[e]+(full?' erstmals lesen':' · Änderungen lesen')});
   }
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
@@ -111,13 +111,20 @@ function salesDeltaMissing_(run,task){
   if(task.ids)return salesDeltaProbe_(run,task);
   try{return salesDeltaMissingIds_(run,task);}
   catch(e){
-    if(!salesDeltaHqServerError_(e))throw e;
+    // The background worker first retries a temporary HQ fault on a minute timer; only the last attempt keeps the check open.
+    if(!salesDeltaHqServerError_(e)||salesDeltaRetriesLeft_())throw e;
     const read=task.expected===undefined?'HQ-Gesamtzahl':task.hqIds.length===task.expected?'Rückprüfung der HQ-Gesamtzahl':'HQ-Kennungsliste';
     run.errors.push({label:'HQ-Löschabgleich · '+SALES_BULK_LABELS[task.id],message:read+' vorübergehend nicht verfügbar (HTTP '+e.hqHttpStatus+'). Die Prüfung bleibt offen und wird beim nächsten HQ-Abgleich erneut versucht.'});
     delete task.hqIds;task.stage='Löschprüfung offen';return true;
   }
 }
 function salesDeltaHqServerError_(e){return [500,502,503,504].includes(e.hqHttpStatus);}
+function salesDeltaRetriesLeft_(){return typeof salesWorkerRetriesLeft_==='function'&&salesWorkerRetriesLeft_()>0;}
+// A skipped change read keeps the earlier change marker so the next sync reads the same changes again.
+function salesDeltaWatermark_(run,m){
+  if(m.full||!(run.retainWatermarks||m.retainWatermark))return run.startedAt;
+  return m.previousWatermark||new Date(Date.parse(m.since)+120000).toISOString();
+}
 function salesDeltaMissingIds_(run,task){
   const m=run.entities[task.id];
   if(task.expected===undefined){
@@ -209,7 +216,6 @@ function salesDeltaMirrorMissing_(run,task,id){
 }
 /** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
 function salesDeltaResolvePlan_(run){
-  if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(20,10);
   const path='sales_meta/plan_cleanup_'+salesKey_(run.id),request=salesRead_(path);
   if(!request||request.approved!==true||request.runId!==run.id||request.state!=='approved')throw Error('Planumsatz-Klärung nicht freigegeben.');
   const id=String(salesId_(request.id)),rawPath=salesBulkCollection_('PlannedRevenues')+'/'+id,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk'),m=run.entities.PlannedRevenues,cm=cache?.entities?.PlannedRevenues;
@@ -269,15 +275,17 @@ function salesDeltaUnassigned_(run){
 function salesDeltaAudit_(run){
   const warnings=[];for(const e of SALES_BULK_ENTITIES){
     let total;try{total=salesV1Page_(e,'',0,1).total;}catch(err){
-      if(!salesDeltaHqServerError_(err))throw err;
-      total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen (HTTP '+err.hqHttpStatus+'). Der gelesene Änderungsstand ist gespeichert.'});
+      // Totals are diagnostics only: a temporary fault is retried first, then any HQ fault just leaves the total unconfirmed.
+      const temporary=typeof salesWorkerTransient_==='function'?salesWorkerTransient_(err):salesDeltaHqServerError_(err);
+      if(temporary&&salesDeltaRetriesLeft_())throw err;
+      total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen ('+(err.hqHttpStatus?'HTTP '+err.hqHttpStatus:String(err.message||'unbekannter Fehler').slice(0,200))+'). Der gelesene Änderungsstand ist gespeichert.'});
     }
     const m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
     if(key)run.stats[key]=total;m.confirmedTotal=total;
     if(total===null||total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+(total===null?'nicht bestätigt':total)+'. Mengenabweichung bleibt zur Prüfung offen. Änderungsstand gespeichert; kein erneuter Gesamtimport.'});
   }
   salesDeltaCoverage_(run);run.errors.push(...warnings);
-  const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:run.startedAt,ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
+  const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:salesDeltaWatermark_(run,m),ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
   // Each stream was fully read and all affected projections published. Counts are diagnostics, not reset switches.
   run.stats.companies=run.entities.Companies.count;run.stats.contacts=run.entities.ContactPersons.count;run.stats.histories=run.entities.ContactHistories.count;
   // Cache totals include unassigned rows; UI must not add them a second time.
