@@ -26,6 +26,7 @@ function bulkFixture(){
  const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=path=>{
    const single=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\/(\d+)(?:\?|$)/.exec(path);
    if(single){f.calls.push({method:'get',path});const row=f.remote[single[1]]?.[single[2]];if(!row)throw Error('HQ-Lesetest: HTTP 404');return {data:clone(row),headers:{}};}
+   const identifiers=/^\/v1\/(Companies|ContactPersons)\?\$select=Id/.exec(path);if(identifiers){f.calls.push({method:'get',path});const q=new URL('https://fixture'+path).searchParams,rows=Object.values(f.remote[identifiers[1]]||{}).sort((a,b)=>a.id-b.id);return {data:rows.slice(Number(q.get('$skip')),Number(q.get('$skip'))+Number(q.get('$top'))).map(r=>({Id:r.id})),headers:{}};}
    const m=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\?/.exec(path);if(!m)return get(path);
    f.calls.push({method:'get',path});const q=new URL('https://fixture'+path).searchParams,filter=q.get('$filter')||'';let rows=Object.values(f.remote[m[1]]||{}).map(clone).sort((a,b)=>a.id-b.id);
    const id=/id gt (\d+)/.exec(filter),exact=/^id eq (\d+)$/.exec(filter),since=/updatedOn ge datetime'([^']+)'/.exec(filter);if(id)rows=rows.filter(r=>r.id>Number(id[1]));if(exact)rows=rows.filter(r=>r.id===Number(exact[1]));if(since)rows=rows.filter(r=>[r.updatedOn,r.createdOn,...(filter.includes('defaultAddress/updatedOn')?[r.defaultAddress?.updatedOn,...(r.addresses||[]).map(a=>a.updatedOn)]:[])].some(d=>Date.parse(d)>=Date.parse(since[1])));
@@ -58,7 +59,7 @@ test('second run uses independent history/document/project change filters; uncha
 test('unchanged parent timestamp still picks up contact address changes and moved/deleted contacts',()=>{
  const f=bulkFixture();f.remote.ContactPersons[300]={id:300,companyId:102,firstName:'Synthetic',defaultAddress:{email:'one@example.invalid'},updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();
  f.remote.ContactPersons[300].companyId=101;f.remote.ContactPersons[300].defaultAddress.email='two@example.invalid';f.finishBulk();assert.ok(!f.db['sales_companies/102'].contacts.some(c=>String(c.id)==='300'));assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'&&c.eMail==='two@example.invalid'));
- delete f.remote.ContactPersons[300];const run=f.finishBulk();assert.equal(run.full,false);assert.ok(run.errors.some(e=>/nicht mehr gefunden/.test(e.message)));assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'));
+ delete f.remote.ContactPersons[300];const run=f.finishBulk();assert.equal(run.full,false);assert.ok(!run.errors.some(e=>/nicht mehr gefunden/.test(e.message)));assert.ok(!f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='300'));assert.equal(f.db['sales_rawcontacts/300'],undefined);
 });
 test('lost cache commit response replays immutable page without losing counts or old associations',()=>{
  const f=bulkFixture();f.ctx.startSalesSync();f.failCommit='after';f.worker();let run=f.db['sales_meta/sync'];assert.ok(run.paused);assert.ok(run.tasks[run.cursor].pendingPage);assert.equal(f.db['sales_meta/bulk'],undefined);f.ctx.startSalesSync();run=f.finishBulk();assert.equal(run.stats.companies,2);assert.equal(run.entities.Companies.seen,2);assert.equal(run.state,'completed');

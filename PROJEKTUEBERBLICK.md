@@ -1,5 +1,13 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – r36: In HQ gelöschte Firmen und Ansprechpartner auch lokal entfernen
+
+Lokaler Prüfabschluss:34 Deltafälle, erweiterter Browserablauf und Syntax/Dateiabgleich bestanden; Tabelle zeigt im synthetischen Fall korrekt1 entfernte Firma und1 entfernten Ansprechpartner. Kleinere HQ-Seiten und erneuter Vergleich nach geänderten Mengen geprüft. Veröffentlichungsnachweis folgt; noch kein produktiver Löschabgleich gestartet.
+
+Nutzerentscheidung: Eine in HQ gelöschte Firma soll beim zentralen Abgleich auch aus Firebase entfernt werden; Ansprechpartner im selben Abgleich entsprechend behandeln. Keine automatische HQ-Wiederanlage aus bloßen Mengenunterschieden. Die frühere pauschale Bewahrung fehlender importierter CRM-Datensätze wird für diese beiden Datenarten ersetzt. Belege, Planumsätze und andere Datenarten unverändert.
+
+Lokal umgesetzt: bestehende begrenzte Einzelprüfungen erkennen Löschungen; zusätzlich bei größerem lokalem CRM-Bestand ausschließlich HQ-Kennungen seitenweise vergleichen. Nur vollständige, geordnete, mengenbestätigte Kennungslisten verwenden. Vor jeder lokalen Entfernung HQ404 im Einzelabruf und exakte gefilterte Liste mit bestätigter Anzahl0 verlangen. Rohkopie, Kundenakte/Verzeichnis, Namens-/Filterlisten, zugehörige bestätigte App-Verweise, Zähler und Prüfpunkt gemeinsam aktualisieren. Offene Änderungen am gelöschten Ziel werden mit Begründung beendet und nicht erneut übertragen; Aufträge bleiben als Nachweis gespeichert. Noch unbestätigte App-Neuanlagen werden nicht aus HQ-Listen abgeleitet gelöscht. In HQ verbleibende Kontakte/Historie einer entfernten Firma bleiben erhalten und erscheinen ohne Firmenzuordnung. Keine HQ-Schreiboperation durch diese Spiegelung. „Datenabgleich“ zeigt „In Firebase entfernt“. Gezielte Regression und vollständiger Prüflauf erfolgreich; letzte ergänzte Fälle, Veröffentlichung und GitHub-Nachweis werden separat bestätigt. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
 ### 23.11.2026 – r35.1: Belege und Planumsätze ausschließlich aus HQ
 
 Verbindliche Nutzerentscheidung: Belege und Planumsätze werden ausschließlich in HQ gepflegt. Jeder zentrale HQ-Abgleich übernimmt sie nach Firebase. Die App zeigt sie schreibgeschützt an. Der bisherige Roadmap-Wunsch R01 zur Anlage eines HQ-Planumsatzes aus einer App-Buchung bleibt als frühere Idee dokumentiert und ist aus der aktiven Planung genommen.

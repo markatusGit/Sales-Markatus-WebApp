@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## [v0.36.0]
+
+- Bestätigte HQ-Löschungen von Unternehmen und Ansprechpartnern werden im zentralen Änderungsabgleich nach Firebase übernommen. Kein neues Anlegen in HQ aufgrund von Mengenabweichungen. Nicht übertragene App-Kunden bleiben erhalten.
+- Bei größerem lokalem Bestand Kennungen mit `$select=Id` in begrenzten Seiten vergleichen; keine vollständigen Firmen-/Kontaktimporte als Ersatz. Unvollständige oder widersprüchliche Listen und HTTP-Fehler stoppen die Prüfung. Vor jeder Entfernung Einzel-404 plus exakte leere HQ-Liste mit Gesamtzahl0 bestätigen.
+- Lokale Rohkopien, Akten, Verzeichnisse, Listen, Zähler und Prüfpunkt atomar bereinigen. Offene Schreibaufträge am gelöschten Ziel werden mit Hinweis beendet und nicht erneut übertragen; vorhandene Auftragsinhalte bleiben zur Nachvollziehbarkeit erhalten. Verlorene Antworten führen nicht zu doppelten Zählerkorrekturen. Gelöschte erste App-Ansprechpartner erscheinen nicht erneut aus dem ursprünglichen Anlageentwurf.
+- Noch in HQ vorhandene Kontakte/Historie einer gelöschten Firma bleiben erhalten und werden ohne bekannte Firma angezeigt. Belege und Planumsätze unverändert. Kein HQ-DELETE/POST/PUT durch diese Löschübernahme.
+- „Datenabgleich“ zeigt die Zahl „In Firebase entfernt“. Kennung `2026-11-23-r36`; keine neuen Script Properties oder Bereitstellungseinstellungen. Produktive Datenbereinigung erst beim nächsten zentralen HQ-Abgleich.
+
 ## [v0.35.1]
 
 - Veröffentlichung nachgewiesen: bestehende Google-Bereitstellung auf Version 63, alle 27 Prüfdateien und Codevergleich bestanden. Öffentliche Loginhülle mit Kennung `2026-11-23-r35.1` erreicht.

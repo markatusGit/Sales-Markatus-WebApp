@@ -120,7 +120,7 @@ function salesLeanCompanyBase_(id){
   if(String(id).startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company||draft.deletedAt)throw new Error(draft?.deletedAt?'Dieser Kunde wurde gelöscht.':'Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog'),local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
-    const contacts=draft.contact?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
+    const contacts=draft.contact&&!draft.contactDeletedAt?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
     const pending=(draft.pendingChanges||[]).map(p=>({...p,targetId:p.entity==='contact'?job?.contactId:p.entity==='address'?stored?.company?.defaultAddress?.id:draft.hqId}));
     const visible=stored?salesBusinessView_({...stored,pendingChanges:[...(stored.pendingChanges||[]),...pending]}):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state,pendingEditCount:pending.length}:local;
     return {...(visible||{}),...(draft.deletion?{deletion:draft.deletion}:{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};

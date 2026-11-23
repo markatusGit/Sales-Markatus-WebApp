@@ -3,7 +3,7 @@ function salesCommunicationCompany_(ref){
   ref=salesKey_(String(ref));
   if(ref.startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+ref.slice(6));
-    if(!draft?.company)throw new Error('Kunde nicht im App-Bestand.');
+    if(!draft?.company||draft.deletedAt)throw new Error('Kunde nicht im App-Bestand.');
     const stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     return {ref,draft,hqId:draft.hqId||null,company:stored?.company||draft.company,contacts:stored?.contacts||[],name:draft.company.name};
   }
@@ -52,7 +52,7 @@ function salesCommunicationContact_(ctx,data,ref){
   if(local)return {ref:local.id,hqId:local.syncState==='synced'?local.hqId||null:null};
   const contact=ctx.contacts.find(c=>String(c.id)===ref&&Number(c.companyId)===Number(ctx.hqId));
   if(contact)return {ref,hqId:salesId_(contact.id)};
-  if(ctx.draft?.contact){
+  if(ctx.draft?.contact&&!ctx.draft.contactDeletedAt){
     const creation=salesRead_('sales_jobs/'+ctx.draft.id);
     if(ref==='draft_'+ctx.draft.id+'_contact'||creation?.contactId&&String(creation.contactId)===ref)return {ref:'draft_'+ctx.draft.id+'_contact',hqId:creation?.steps?.contact?creation.contactId:null};
   }

@@ -1,5 +1,17 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r36: In HQ gelöschte Unternehmen und Ansprechpartner übernehmen
+
+Keine Script Properties oder Bereitstellungseinstellungen ändern. Der neue Abgleich schreibt oder löscht nichts in HQ. Er entfernt ausschließlich bestätigte fehlende HQ-Importkopien aus der App. Offene Neuanlagen ohne bestätigte HQ-Zuordnung bleiben erhalten. Bestehende offene Änderungen an einem in HQ gelöschten Ziel werden mit Hinweis beendet und nicht wieder übertragen. Belege und Planumsätze unverändert. Keine zusätzliche Adminfreigabe erforderlich, wenn HQ die Löschung bereits bestätigt; der separate Löschantrag aus der App nach HQ bleibt unverändert.
+
+- Die App neu laden; Kennung „2026-11-23-r36“ erwarten. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen.
+- Beim nächsten vorgesehenen Abgleich „HQ synchronisieren“ anklicken; den gespeicherten Hintergrundlauf erwarten. Bei einer Kontingentpause den bestehenden Lauf später fortsetzen.
+- Nach Abschluss „Fortschritt aktualisieren“ anklicken; in der Tabelle die Spalte „In Firebase entfernt“ erwarten. Bei Prüfproblemen den genauen Wortlaut melden; keinen Gesamtimport erzwingen.
+- „Kunden“ öffnen; eine in HQ nachweislich gelöschte Firma darf nach erfolgreichem Abgleich nicht mehr erscheinen. Bei abweichender Anzeige die angezeigte Kennung und den Syncstatus melden; die Firma nicht erneut anlegen.
+
+Die produktive Löschübernahme wurde durch einen Codevergleich oder synthetische Tests nicht ersetzt. Der nächste zentrale Abgleich prüft die tatsächlichen HQ-Datensätze und die Unterstützung des Kennungsabrufs im Mandanten.
+
 ## r35: Herkunft nur für neue App-Kunden
 
 Keine Script Properties oder Bereitstellungseinstellungen ändern. Bestehende Kunden werden nicht auf Medienhaus umgestellt. Das Feld Kundenherkunft ist ausgeblendet; nur neue App-Anlagen enthalten den festen Wert im ersten HQ-Auftrag. „Grund der Adressanlage“ verwendet das gleichnamige eigene HQ-Firmenfeld. Alte lokale Adressherkunft bleibt gespeichert und wird nicht automatisch übertragen. Der bisherige Produktivkatalog enthält noch keine Definition für das neue Feld; bis zum nächsten zentralen Abgleich ist es schreibgeschützt.

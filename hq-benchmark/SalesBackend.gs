@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r35.1';
+const SALES_RELEASE = '2026-11-23-r36';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -147,7 +147,7 @@ function salesText_(value,max,required) {if (typeof value!=='string') value='';v
 function salesKey_(value) {if (!/^[a-zA-Z0-9_-]{1,100}$/.test(value||'')) throw new Error('Ungültige Datensatzkennung.');return value;}
 function salesPick_(value,keys) {const out={};keys.forEach(k=>{if(value&&value[k]!==undefined) out[k]=value[k];});return out;}
 function salesHqGet_(path) {
-  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)&&!/^\/v1\/(CustomFieldDefinitions|Companies\(\d+\))(\?[^#\r\n]*)?$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
+  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)&&!/^\/v1\/(CustomFieldDefinitions|Companies\(\d+\))(\?[^#\r\n]*)?$/.test(path)&&!/^\/v1\/(Companies|ContactPersons)\?\$select=Id&\$orderby=Id&\$top=200&\$skip=\d+$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method:'get',headers:{Authorization:'Bearer '+revenueToken_(),Accept:'application/json'},followRedirects:false,muteHttpExceptions:true});
   if(r.getResponseCode()!==200) throw new Error('HQ-Lesetest: HTTP '+r.getResponseCode()+'. Kein unvollständiger Import wird freigegeben.');
   let data;try{data=JSON.parse(r.getContentText());}catch(_){throw new Error('HQ liefert kein gültiges JSON.');}
@@ -313,10 +313,10 @@ function getSalesCompany(id) {
   salesUser_();
   if(typeof id==='string'&&id.startsWith('draft_')) {
     const draft=salesRead_('sales_drafts/'+salesKey_(id.slice(6)));
-    if(!draft?.company) throw new Error('Firebase-Firma fehlt.');
+    if(!draft?.company||draft.deletedAt) throw new Error(draft?.deletedAt?'Dieser Kunde wurde gelöscht.':'Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog');
     const local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
-    const contacts=draft.contact?[{...draft.contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
+    const contacts=draft.contact&&!draft.contactDeletedAt?[{...draft.contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
     return {...(stored||{}),company:job?.state==='synced'&&stored?{...stored.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state}:local,
       contacts:stored?.contacts?.length?stored.contacts:contacts,histories:draft.hqId?salesVisibleHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase'};
   }
@@ -1436,7 +1436,7 @@ function salesBulkSelect_(entity,raw){
 }
 function salesBulkSummary_(run){
   const task=run.tasks[run.cursor],e=run.entities.Companies;
-  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
+  return {id:run.id,engine:2,kind:run.kind||'sync',revision:run.revision,state:run.state,paused:!!run.paused,background:!run.paused&&run.state==='running',pauseRequested:salesWorkerProps_().getProperty('SALES_SYNC_PAUSE')===run.id,mode:run.kind==='editions'?'Ausgaben aus Firebase verknüpfen':run.full?'Einmaliger Erstimport':'Änderungsabgleich',done:run.done,total:run.tasks.length,current:task?.label||'',stage:task?.stage||'',updatedAt:run.updatedAt,heartbeat:run.heartbeat||null,stats:run.stats,errors:run.errors.concat(run.blockedMessage?[{label:'Lauf angehalten · Abschnitt wird beim Fortsetzen erneut gelesen',message:run.blockedMessage}]:[]),coverage:run.coverage||[],note:run.note||'',discovery:{count:run.companyIds.length,total:run.stats.hqCompanies??null,pages:e?.pages||0,complete:!!e?.complete},reads:SALES_BULK_ENTITIES.map(entity=>({label:SALES_BULK_LABELS[entity],count:run.entities[entity]?.seen||0,changed:run.entities[entity]?.changed||0,removed:run.entities[entity]?.removed||0,complete:!!run.entities[entity]?.complete,mode:run.kind==='editions'?'Vorhandener Firebase-Bestand':run.entities[entity]?.full?'Einmaliger Erstimport':'Änderungen seit letztem Abgleich'}))};
 }
 function salesBulkPrepare_(old){
   return salesDeltaPrepare_(old);
@@ -1559,6 +1559,7 @@ function salesBulkStepWork_(run){
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{if(typeof salesWorkerReserve_==='function')salesWorkerReserve_(400,80);salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerLimited_==='function'&&salesWorkerLimited_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
   else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
+  else if(task.kind==='deltaMissing')done=salesDeltaMissing_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
   else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}
   else if(task.kind==='bulkRead')done=salesBulkRead_(run,task);
@@ -1615,6 +1616,7 @@ function salesDeltaPrepare_(old){
     tasks.push({kind:'bulkRead',id:e,label:'HQ → Firebase: '+SALES_BULK_LABELS[e]+(full?' erstmals lesen':' · Änderungen lesen')});
   }
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
+  if(!full)for(const e of ['Companies','ContactPersons'])tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · HQ-Löschungen abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
@@ -1673,19 +1675,107 @@ function salesDeltaRecord_(run,entity,row,prior,entries){
 }
 function salesDeltaProbe_(run,task){
   // Bounded round-robin checks cover silent nested changes without scanning the whole database.
-  // A 404 is reported, never treated as permission to delete CRM data.
+  // CRM deletions require a second exact empty list; other entity types remain read-only preserved copies.
   const m=run.entities[task.id];if(task.pendingPage){salesBulkPut_(salesRead_(task.pendingPage).entries);delete task.pendingPage;task.index++;return task.index>=task.ids.length;}
   if(!task.ids){const ids=m.knownIds||[],n=Math.min(10,ids.length);task.ids=Array.from({length:n},(_,i)=>ids[(m.checkOffset+i)%ids.length]);m.checkOffset=ids.length?(m.checkOffset+n)%ids.length:0;task.index=0;}
   if(task.index>=task.ids.length)return true;
   const id=task.ids[task.index];let raw;
   try{raw=salesHqGet_('/v2/'+task.id+'/'+salesId_(id)+(SALES_BULK_EXPAND[task.id]?'?expand='+encodeURIComponent(SALES_BULK_EXPAND[task.id]):'')).data;}
-  catch(e){if(!/HTTP 404/.test(e.message))throw e;run.errors.push({label:'HQ-Einzelprüfung · '+SALES_BULK_LABELS[task.id],message:'Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'});task.index++;return task.index>=task.ids.length;}
+  catch(e){if(!/HTTP 404/.test(e.message))throw e;if(['Companies','ContactPersons'].includes(task.id)){salesDeltaMirrorMissing_(run,task,id);return task.index>=task.ids.length;}run.errors.push({label:'HQ-Einzelprüfung · '+SALES_BULK_LABELS[task.id],message:'Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'});task.index++;return task.index>=task.ids.length;}
   if(String(raw.id)!==id)throw new Error('HQ-Einzelprüfung liefert eine andere Kennung.');
   const row=salesBulkSelect_(task.id,raw),path=salesBulkCollection_(task.id)+'/'+id,prior=salesBulkGet_([path])[path],entries=[];
   salesDeltaRecord_(run,task.id,row,prior,entries);m.checked=(m.checked||0)+1;
   if(!entries.length){task.index++;return task.index>=task.ids.length;}
   task.pendingPage='sales_imports/'+run.id+'-probe-'+task.id+'-'+task.index;salesWrite_(task.pendingPage,{entries});salesWrite_('sales_meta/sync',run);
   return salesDeltaProbe_(run,task);
+}
+/** Compare identifiers only when the CRM cache has more rows than HQ. Never imports full entities as a fallback. */
+function salesDeltaMissing_(run,task){
+  if(!['Companies','ContactPersons'].includes(task.id))throw Error('HQ-Löschabgleich ist nur für Unternehmen und Ansprechpartner freigegeben.');
+  const m=run.entities[task.id];
+  if(task.expected===undefined){
+    const total=salesV1Page_(task.id,'',0,1).total;
+    if(total===null)throw Error('HQ-Gesamtzahl für den Löschabgleich nicht bestätigt.');
+    if(total>=m.count)return true;
+    task.expected=total;task.hqIds=[];task.lastId=0;
+  }
+  if(!task.ids){
+    const invalid=message=>{for(const key of ['expected','hqIds','lastId','ids','index'])delete task[key];task.stage='Kennungsvergleich nach Prüffehler erneut beginnen';salesWrite_('sales_meta/sync',run);throw Error(message);};
+    const rows=salesHqRows_(salesHqGet_('/v1/'+task.id+'?$select=Id&$orderby=Id&$top=200&$skip='+task.hqIds.length).data);
+    if(rows.length>200)invalid('HQ-Kennungsseite überschreitet die angeforderte Größe.');
+    for(const row of rows){
+      if(Object.keys(row).some(k=>k!=='Id'&&!k.startsWith('@odata.')))invalid('HQ hat die reine Kennungsabfrage nicht eingehalten. Kein Gesamtabruf als Ersatz.');
+      const id=salesId_(row.Id);if(id<=task.lastId)invalid('HQ-Kennungsseiten enthalten doppelte oder ungeordnete Kennungen.');
+      task.lastId=id;task.hqIds.push(String(id));
+    }
+    if(task.hqIds.length>task.expected||task.hqIds.length>100000)invalid('HQ-Kennungsbestand hat sich während der Prüfung geändert. Bitte erneut abgleichen.');
+    task.stage=task.hqIds.length+' von '+task.expected+' HQ-Kennungen geprüft';
+    if(rows.length&&task.hqIds.length<task.expected)return false;
+    if(task.hqIds.length!==task.expected||salesV1Page_(task.id,'',0,1).total!==task.expected)invalid('HQ-Kennungsliste ist unvollständig oder inzwischen geändert. Es wird nichts daraus gelöscht.');
+    const present=new Set(task.hqIds);task.ids=(m.knownIds||[]).filter(id=>!present.has(String(id)));task.index=0;delete task.hqIds;
+  }
+  return salesDeltaProbe_(run,task);
+}
+/** A GET 404 plus an exact empty list confirms an upstream CRM deletion. One atomic checkpoint removes its app copies. */
+function salesDeltaMirrorMissing_(run,task,id){
+  const entity=task.id,key=String(salesId_(id));if(!['Companies','ContactPersons'].includes(entity))throw Error('HQ-Löschziel nicht freigegeben.');
+  const page=salesV1Page_(entity,'id eq '+key,0,2);
+  if(page.total!==0||page.rows.length||!page.done)throw Error('HQ bestätigt die Löschung nicht eindeutig. Firebase-Datensatz bleibt erhalten.');
+  const rawPath=salesBulkCollection_(entity)+'/'+key,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk');
+  if(!raw||raw.generation!==run.entities[entity].generation||raw.generation!==cache?.entities?.[entity]?.generation)throw Error('Gespeicherter HQ-Datensatz oder Generation nicht prüfbar. Keine Löschung.');
+  const next=JSON.parse(JSON.stringify(run)),nextCache=JSON.parse(JSON.stringify(cache)),nextTask=next.tasks[next.cursor],now=salesNow_();
+  if(nextTask.id!==entity||String(nextTask.ids?.[nextTask.index])!==key)throw Error('Löschprüfpunkt passt nicht zum laufenden Abgleich.');
+  for(const target of [next,nextCache]){
+    const meta=target.entities[entity];if(!Number.isSafeInteger(meta.count)||meta.count<1)throw Error('Gespeicherter Bestandszähler nicht prüfbar. Keine Löschung.');
+    meta.count--;for(const list of ['ids','knownIds','touchedIds'])if(Array.isArray(meta[list]))meta[list]=meta[list].filter(x=>String(x)!==key);
+    if(entity==='Companies')for(const list of ['companyIds','loadedCompanyIds'])if(Array.isArray(target[list]))target[list]=target[list].filter(x=>String(x)!==key);
+  }
+  const stat=entity==='Companies'?'companies':'contacts';if(Number.isSafeInteger(nextCache.stats?.[stat]))nextCache.stats[stat]=Math.max(0,nextCache.stats[stat]-1);
+  // Keep removed IDs as touched so the orphan views also drop deleted contacts.
+  const touched=next.entities[entity].touchedIds||(next.entities[entity].touchedIds=[]);if(!touched.includes(key))touched.push(key);
+  salesBulkDirty_(next,entity,raw.row);next.entities[entity].removed=(next.entities[entity].removed||0)+1;nextTask.index++;nextTask.stage=nextTask.index+' fehlende Kennungen geprüft';next.revision++;next.updatedAt=now;
+  const entries=new Map(),deleted=new Set([rawPath]),put=(path,value)=>entries.set(path,value),drop=path=>{entries.delete(path);deleted.add(path);};
+  const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),companyId=entity==='Companies'?key:String(raw.row.companyId||''),related=new Set([companyId].filter(Boolean));
+  if(entity==='ContactPersons')for(const job of jobs)if(String(job.contactId)===key){if(job.companyRef)related.add(String(job.companyRef));if(job.hqId)related.add(String(job.hqId));}
+  const own=drafts.filter(d=>d.hqId&&related.has(String(d.hqId))||related.has('draft_'+d.id)),refs=new Set([...related,...own.map(d=>'draft_'+d.id)]),canceled=new Set();
+  const aliases=new Set([key]);for(const job of jobs)if(entity==='ContactPersons'&&String(job.contactId)===key){aliases.add('local_'+job.id);aliases.add('draft_'+job.id+'_contact');}
+  for(const job of jobs){
+    const companyMatch=refs.has(String(job.hqId))||refs.has(String(job.companyRef))||own.some(d=>job.id===d.id||job.draftId===d.id||job.draftDependency===d.id);
+    const contactMatch=String(job.contactId)===key||job.entity==='contact'&&(aliases.has(String(job.targetId))||aliases.has(String(job.targetRef)))||aliases.has(String(job.capture?.contactRef))||aliases.has(String(job.history?.contactPersonId));
+    if((entity==='Companies'?!companyMatch:!contactMatch)||['synced','canceled'].includes(job.state))continue;
+    put('sales_jobs/'+job.id,{...job,state:'canceled',updatedAt:now,message:'In HQ gelöscht; offener App-Auftrag wird nicht mehr übertragen.'});canceled.add(job.id);
+  }
+  for(const draft of own){
+    const value={...draft,pendingChanges:(draft.pendingChanges||[]).filter(p=>!canceled.has(p.jobId))};
+    if(entity==='Companies')value.deletedAt=now;
+    else if(jobs.some(j=>j.id===draft.id&&String(j.contactId)===key))value.contactDeletedAt=now;
+    if(JSON.stringify(value)!==JSON.stringify(draft))put('sales_drafts/'+draft.id,value);
+  }
+  if(entity==='Companies'){
+    // A remaining HQ contact/history becomes unassigned; do not invent a cascading HQ deletion.
+    for(const relatedEntity of ['ContactPersons','ContactHistories']){
+      const ids=next.entities[relatedEntity].touchedIds||(next.entities[relatedEntity].touchedIds=[]);
+      for(const row of salesBulkRows_(run,relatedEntity,'companyBucket',salesBulkBucket_(key)))if(String(row.companyId)===key&&!ids.includes(String(row.id)))ids.push(String(row.id));
+    }
+    for(const path of ['sales_companies/'+key,'sales_directory/'+key,...[...refs].map(ref=>'sales_communication/'+ref)])drop(path);
+    for(const path of ['sales_meta/lean_names','sales_meta/lean_filters']){const old=salesRead_(path);if(old)put(path,{...old,rows:old.rows.filter(c=>!refs.has(String(c.id))&&String(c.hqId||'')!==key)});}
+    const legacy=salesRead_('sales_meta/directory');if(legacy)put('sales_meta/directory',{...legacy,entries:legacy.entries.filter(e=>String(e.company?.id)!==key)});
+    const owners=salesRead_('sales_meta/lean_testowners');if(owners?.rows?.[key]){delete owners.rows[key];put('sales_meta/lean_testowners',owners);}
+    const tomb=salesRead_('sales_meta/deleted_companies')||{ids:[]};put('sales_meta/deleted_companies',{...tomb,ids:[...new Set([...tomb.ids,key])]});
+    const request=salesRead_('sales_deletions/'+key);if(request&&request.state!=='done')put('sales_deletions/'+key,{...request,state:'done',completedAt:now,message:'Bereits in HQ gelöscht; lokale Kopie im HQ-Abgleich entfernt.',revision:(request.revision||0)+1});
+  }else{
+    for(const ref of refs)if(/^\d+$/.test(ref))for(const path of ['sales_companies/'+ref,'sales_directory/'+ref]){const old=salesRead_(path);if(old)put(path,{...old,contacts:(old.contacts||[]).filter(c=>String(c.id)!==key),pendingChanges:(old.pendingChanges||[]).filter(p=>!canceled.has(p.jobId))});}
+    const legacy=salesRead_('sales_meta/directory');if(legacy)put('sales_meta/directory',{...legacy,entries:legacy.entries.map(e=>({...e,contacts:(e.contacts||[]).filter(c=>String(c.id)!==key)}))});
+    for(const ref of refs){const old=salesRead_('sales_communication/'+ref);if(old)put('sales_communication/'+ref,{...old,contacts:(old.contacts||[]).filter(c=>!aliases.has(String(c.hqId||c.id))&&!canceled.has(c.jobId)),histories:(old.histories||[]).filter(h=>!canceled.has(h.jobId))});}
+    const orphan=salesRead_('sales_meta/unassignedcontacts');if(orphan){const rows=orphan.rows.filter(c=>String(c.id)!==key);put('sales_meta/unassignedcontacts',{...orphan,rows});const summary=salesRead_('sales_meta/unassignedsummary');if(summary)put('sales_meta/unassignedsummary',{...summary,contacts:rows.length,updatedAt:now});}
+  }
+  next.errors=next.errors.filter(e=>!canceled.has(e.id));
+  put('sales_meta/mirror_'+entity+'_'+key,{entity,id:key,runId:run.id,removedAt:now,verification:'single-404-and-filtered-empty-list',canceledJobIds:[...canceled]});
+  put('sales_meta/bulk',nextCache);put('sales_meta/sync',next);put('sales_meta/lean_sync',salesSyncSummary_(next));
+  if(entries.size+deleted.size>450)throw Error('Zu viele zugehörige App-Aufträge für einen atomaren Löschabgleich. Gezielte Klärung erforderlich.');
+  const writes=[...[...deleted].map(path=>({delete:salesBulkName_(path)})),...[...entries].map(([path,value])=>({update:{name:salesBulkName_(path),fields:{payload:{stringValue:salesBulkPayload_(path,value)}}}}))];
+  salesBulkRest_('commit',{writes});if(salesBulkStepCache_){salesBulkStepCache_.documents.clear();salesBulkStepCache_.rows.clear();}
+  Object.assign(task,nextTask);next.tasks[next.cursor]=task;Object.assign(run,next);
 }
 /** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
 function salesDeltaResolvePlan_(run){
@@ -2001,7 +2091,7 @@ function salesLeanCompanyBase_(id){
   if(String(id).startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+salesKey_(String(id).slice(6)));if(!draft?.company||draft.deletedAt)throw new Error(draft?.deletedAt?'Dieser Kunde wurde gelöscht.':'Firebase-Firma fehlt.');
     const job=salesRead_('sales_jobs/'+draft.id),catalog=salesRead_('sales_meta/catalog'),local=salesLocalCompany_(draft,catalog,job),stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
-    const contacts=draft.contact?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
+    const contacts=draft.contact&&!draft.contactDeletedAt?[{...salesBusinessVisibleDraft_(draft).contact,id:job?.contactId||'draft_'+draft.id+'_contact',localDraftId:draft.id,syncState:job?.steps?.contact?'confirmed':'pending'}]:[];
     const pending=(draft.pendingChanges||[]).map(p=>({...p,targetId:p.entity==='contact'?job?.contactId:p.entity==='address'?stored?.company?.defaultAddress?.id:draft.hqId}));
     const visible=stored?salesBusinessView_({...stored,pendingChanges:[...(stored.pendingChanges||[]),...pending]}):stored,displayed=job?.state==='synced'&&stored?{...visible.company,id:local.id,localDraftId:draft.id,hqId:String(draft.hqId),syncState:job.state,pendingEditCount:pending.length}:local;
     return {...(visible||{}),...(draft.deletion?{deletion:draft.deletion}:{}),company:displayed,contacts:visible?.contacts?.length?visible.contacts:contacts,histories:draft.hqId?salesLeanHistories_(draft.hqId,stored?.histories):[],projects:stored?.projects||[],detailVersion:3,source:'firebase',patch:{draft,job:job?salesJobSummary_(job):null,localCompany:displayed}};
@@ -2949,7 +3039,7 @@ function salesCommunicationCompany_(ref){
   ref=salesKey_(String(ref));
   if(ref.startsWith('draft_')){
     const draft=salesRead_('sales_drafts/'+ref.slice(6));
-    if(!draft?.company)throw new Error('Kunde nicht im App-Bestand.');
+    if(!draft?.company||draft.deletedAt)throw new Error('Kunde nicht im App-Bestand.');
     const stored=draft.hqId?salesRead_('sales_companies/'+draft.hqId):null;
     return {ref,draft,hqId:draft.hqId||null,company:stored?.company||draft.company,contacts:stored?.contacts||[],name:draft.company.name};
   }
@@ -2998,7 +3088,7 @@ function salesCommunicationContact_(ctx,data,ref){
   if(local)return {ref:local.id,hqId:local.syncState==='synced'?local.hqId||null:null};
   const contact=ctx.contacts.find(c=>String(c.id)===ref&&Number(c.companyId)===Number(ctx.hqId));
   if(contact)return {ref,hqId:salesId_(contact.id)};
-  if(ctx.draft?.contact){
+  if(ctx.draft?.contact&&!ctx.draft.contactDeletedAt){
     const creation=salesRead_('sales_jobs/'+ctx.draft.id);
     if(ref==='draft_'+ctx.draft.id+'_contact'||creation?.contactId&&String(creation.contactId)===ref)return {ref:'draft_'+ctx.draft.id+'_contact',hqId:creation?.steps?.contact?creation.contactId:null};
   }
