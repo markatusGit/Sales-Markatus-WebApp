@@ -2,6 +2,8 @@
 
 ### 23.11.2026 – r36: In HQ gelöschte Firmen und Ansprechpartner auch lokal entfernen
 
+Veröffentlicht und technisch bestätigt: Quellcommit25057ec, Releasecommit6e18fb5, GitHub-Tagv0.36.0, Apps-Script-Version64. Alle27 Prüfdateien in sauberer Veröffentlichungskopie bestanden, darunter34 Deltafälle und der erweiterte Browserfall. Feste Google-Version und Editor entsprechen dem GitHub-Tag; main bestätigt. Öffentliche Loginhülle live HTTP200 mit Kennungr36. Bestehende App-Adresse, Script Properties, Trigger, Ausführung/Zugriff und Kontingent unverändert. Kein produktiver Sync oder Kundenlöschung durch diese Arbeit; echte Löschübernahme und Kennungsabruf im Mandanten erst beim nächsten vorgesehenen zentralen Abgleich. Fremde lokale Dokumentation nicht veröffentlicht.
+
 Lokaler Prüfabschluss:34 Deltafälle, erweiterter Browserablauf und Syntax/Dateiabgleich bestanden; Tabelle zeigt im synthetischen Fall korrekt1 entfernte Firma und1 entfernten Ansprechpartner. Kleinere HQ-Seiten und erneuter Vergleich nach geänderten Mengen geprüft. Veröffentlichungsnachweis folgt; noch kein produktiver Löschabgleich gestartet.
 
 Nutzerentscheidung: Eine in HQ gelöschte Firma soll beim zentralen Abgleich auch aus Firebase entfernt werden; Ansprechpartner im selben Abgleich entsprechend behandeln. Keine automatische HQ-Wiederanlage aus bloßen Mengenunterschieden. Die frühere pauschale Bewahrung fehlender importierter CRM-Datensätze wird für diese beiden Datenarten ersetzt. Belege, Planumsätze und andere Datenarten unverändert.

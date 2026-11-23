@@ -2,6 +2,7 @@
 
 ## [v0.36.0]
 
+- Abschlussnachweis: Google64, Editor und GitHub-Tag/main bestätigt; alle27 Prüfdateien einschließlich34 Deltafällen und erweiterter Löschanzeige im Browser bestanden. Öffentliche Loginseite live mit HTTP200 und Kennungr36 bestätigt. Produktiver Löschabgleich noch nicht gestartet.
 - Bestätigte HQ-Löschungen von Unternehmen und Ansprechpartnern werden im zentralen Änderungsabgleich nach Firebase übernommen. Kein neues Anlegen in HQ aufgrund von Mengenabweichungen. Nicht übertragene App-Kunden bleiben erhalten.
 - Bei größerem lokalem Bestand Kennungen mit `$select=Id` in begrenzten Seiten vergleichen; keine vollständigen Firmen-/Kontaktimporte als Ersatz. Unvollständige oder widersprüchliche Listen und HTTP-Fehler stoppen die Prüfung. Vor jeder Entfernung Einzel-404 plus exakte leere HQ-Liste mit Gesamtzahl0 bestätigen.
 - Lokale Rohkopien, Akten, Verzeichnisse, Listen, Zähler und Prüfpunkt atomar bereinigen. Offene Schreibaufträge am gelöschten Ziel werden mit Hinweis beendet und nicht erneut übertragen; vorhandene Auftragsinhalte bleiben zur Nachvollziehbarkeit erhalten. Verlorene Antworten führen nicht zu doppelten Zählerkorrekturen. Gelöschte erste App-Ansprechpartner erscheinen nicht erneut aus dem ursprünglichen Anlageentwurf.
