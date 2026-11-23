@@ -1,5 +1,9 @@
 # Änderungsprotokoll
 
+## Dokumentation nach v0.34.6 – 23.11.2026
+
+- Vom Nutzer gemeldete Hinweise nach abgeschlossenem Sync eingeordnet: HQ500 bei Herkunftsoptionen, offene Ausgabenzuordnungen und Firebase/HQ-Mengendifferenzen+1 Firma,+1 Kontakt,+19 Belege,+23 Planumsätze. Konkrete betroffene Kennungen und Ursachen noch nicht live ermittelt. Nur Dokumentation, keine App-/Datenänderung oder neue Google-Veröffentlichung.
+
 ## [v0.34.6]
 
 - Löschanträge für eigene App-Anlagen können ausdrücklich vormerken, deren offene nichtfinanzielle Kontakt-/Stammdatenänderungen erst bei der späteren Adminfreigabe zu verwerfen. Ohne Auswahl bleibt die Auftragsperre erhalten. Die Verwaltung zeigt die Zahl; die Kennungen sind beim Antrag festgeschrieben. Fremde, finanzielle, unbekannte oder neue Aufträge bleiben gesperrt.

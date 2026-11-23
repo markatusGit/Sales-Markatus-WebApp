@@ -1,5 +1,9 @@
 # Projektüberblick – Sales Markatus
 
+### 23.11.2026 – Nutzer meldet abgeschlossenen Sync mit verbleibenden Prüfhinweisen
+
+Vom Nutzer gemeldeter Stand, keine neue Live-Prüfung: Kundenherkunft-Auswahl über /v1/CustomFieldDefinitions mit HTTP500 fehlgeschlagen; Ausgabenprüfung meldet offene Zuordnungen. Firebase/HQ: Unternehmen3208/3207, Ansprechpartner4018/4017, Belege6401/6382, Planumsätze3347/3324 (Differenzen+1/+1/+19/+23). Nach Codeprüfung: Herkunftsoptionen bleiben beim Fehler auf dem bisherigen gespeicherten Stand; die Meldung betrifft diesen Einzelabruf. Ausgabenwarnung kann fehlenden Ausgabenstand, unbekannte Firmenkennungen oder unvollständige Belegprüfung bedeuten. Mengenvergleich identifiziert keine konkreten veralteten/doppelten/fehlenden Datensätze; dafür gezielte Kennungsprüfung nötig. Vorhandene Daten werden bei bloßer Mengenabweichung erhalten, kein Gesamtimport ausgelöst. Nutzer fragt nach Bedeutung; keine zusätzlichen Bereinigungen oder Codeänderungen beauftragt/ausgeführt. Keine neue Google-Version nötig.
+
 ### 20.11.2026 – r34.6 veröffentlicht; Vormerkungen produktiv bestätigt
 
 Google61/Editor/GitHub-Tagv0.34.6 bestätigt; Quellcommitc46cb56, Releasecommit8a6e54f. Alle27 Prüfdateien einschließlich20 Lösch-,24 Delta- und erweitertem Browserfall bestanden. Kurz verzögerte Google-Versionsanzeige lesend geklärt und vorhandenen Release per release:recover abgeschlossen; keine zusätzliche Version/Bereitstellung erzeugt. Anschließend im Originalprojekt release:verify erfolgreich.
