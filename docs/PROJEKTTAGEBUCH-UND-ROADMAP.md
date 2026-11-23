@@ -4,6 +4,8 @@
 
 Der Nutzer korrigiert den Ablauf unter „Erfassen“. „Speichern“ protokolliert eine Kommunikation und schließt den Termin. „Wiedervorlage“ öffnet den Datumsdialog zum erneuten Planen. Die gemeinsame Formularvorlage zeigt „Nicht erreicht“ ausschließlich in der normalen Kundenkommunikation. Der Server prüft diese Regel vor dem Speichern. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
 
+**Veröffentlicht als v0.38.1 und Apps-Script-Version 67.** Alle 27 Prüfdateien bestanden. Google-Version, Google-Editor und GitHub-Tag wurden verglichen. Die öffentliche Anmeldeseite lieferte HTTP 200 mit Kennung `2026-11-23-r38.1`. Der Erfassungsdialog wurde aus „Mein Tag“ und der Kundenakte mit synthetischen Daten geprüft. Keine Änderungen an Script Properties oder Bereitstellungseinstellungen.
+
 ### 23.11.2026 – r38: Wiedervorlagen aus der Kundenkommunikation
 
 Nutzerwunsch: Eigene Datumsspalte in „Mein Tag“ mit alten und bald fälligen Terminen zuerst. „Wiedervorlage“ neben „Speichern“ und „Nicht erreicht“ in der Kundenkommunikation. Der kurze Datumsdialog schlägt heute plus sieben Tage vor und speichert die vorhandene Gesprächsnotiz als Kontext. In der Kontakthistorie stehen offene Termine als eigener Block ganz oben. In beiden Ansichten gibt es „Verschieben“ und „Erfassen“ mit der bekannten Kommunikationsmaske.
