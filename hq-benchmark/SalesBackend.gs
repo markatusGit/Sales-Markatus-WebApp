@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r38.1';
+const SALES_RELEASE = '2026-11-23-r38.2';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -147,9 +147,10 @@ function salesText_(value,max,required) {if (typeof value!=='string') value='';v
 function salesKey_(value) {if (!/^[a-zA-Z0-9_-]{1,100}$/.test(value||'')) throw new Error('Ungültige Datensatzkennung.');return value;}
 function salesPick_(value,keys) {const out={};keys.forEach(k=>{if(value&&value[k]!==undefined) out[k]=value[k];});return out;}
 function salesHqGet_(path) {
-  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)&&!/^\/v1\/(CustomFieldDefinitions|Companies\(\d+\))(\?[^#\r\n]*)?$/.test(path)&&!/^\/v1\/(Companies|ContactPersons)\?\$select=Id&\$orderby=Id&\$top=200&\$skip=\d+$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
+  if (!/^\/v2\/(Companies|CompanyTypes|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues|Users|Subsystems)(\/\d+|\/CustomFieldDefinitions)?(\?[^#\r\n]*)?$/.test(path)&&!/^\/v2\/Companies\/\d+\/Addresses$/.test(path)&&!/^\/v1\/(CustomFieldDefinitions|Companies\(\d+\))(\?[^#\r\n]*)?$/.test(path)&&!/^\/v1\/(Companies|ContactPersons)\?\$select=Id&\$orderby=Id&\$top=(200|50)&\$skip=\d+$/.test(path)) throw new Error('HQ-Lesepfad nicht freigegeben.');
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method:'get',headers:{Authorization:'Bearer '+revenueToken_(),Accept:'application/json'},followRedirects:false,muteHttpExceptions:true});
-  if(r.getResponseCode()!==200) throw new Error('HQ-Lesetest: HTTP '+r.getResponseCode()+'. Kein unvollständiger Import wird freigegeben.');
+  const status=r.getResponseCode();
+  if(status!==200){const error=new Error('HQ-Lesetest: HTTP '+status+'. Kein unvollständiger Import wird freigegeben.');error.hqHttpStatus=status;throw error;}
   let data;try{data=JSON.parse(r.getContentText());}catch(_){throw new Error('HQ liefert kein gültiges JSON.');}
   return {data,headers:r.getAllHeaders()};
 }
@@ -1707,6 +1708,17 @@ function salesDeltaProbe_(run,task){
 /** Compare identifiers only when the CRM cache has more rows than HQ. Never imports full entities as a fallback. */
 function salesDeltaMissing_(run,task){
   if(!['Companies','ContactPersons'].includes(task.id))throw Error('HQ-Löschabgleich ist nur für Unternehmen und Ansprechpartner freigegeben.');
+  if(task.ids)return salesDeltaProbe_(run,task);
+  try{return salesDeltaMissingIds_(run,task);}
+  catch(e){
+    if(!salesDeltaHqServerError_(e))throw e;
+    const read=task.expected===undefined?'HQ-Gesamtzahl':task.hqIds.length===task.expected?'Rückprüfung der HQ-Gesamtzahl':'HQ-Kennungsliste';
+    run.errors.push({label:'HQ-Löschabgleich · '+SALES_BULK_LABELS[task.id],message:read+' vorübergehend nicht verfügbar (HTTP '+e.hqHttpStatus+'). Die Prüfung bleibt offen und wird beim nächsten HQ-Abgleich erneut versucht.'});
+    delete task.hqIds;task.stage='Löschprüfung offen';return true;
+  }
+}
+function salesDeltaHqServerError_(e){return [500,502,503,504].includes(e.hqHttpStatus);}
+function salesDeltaMissingIds_(run,task){
   const m=run.entities[task.id];
   if(task.expected===undefined){
     const total=salesV1Page_(task.id,'',0,1).total;
@@ -1714,10 +1726,14 @@ function salesDeltaMissing_(run,task){
     if(total>=m.count)return true;
     task.expected=total;task.hqIds=[];task.lastId=0;
   }
-  if(!task.ids){
-    const invalid=message=>{for(const key of ['expected','hqIds','lastId','ids','index'])delete task[key];task.stage='Kennungsvergleich nach Prüffehler erneut beginnen';salesWrite_('sales_meta/sync',run);throw Error(message);};
-    const rows=salesHqRows_(salesHqGet_('/v1/'+task.id+'?$select=Id&$orderby=Id&$top=200&$skip='+task.hqIds.length).data);
-    if(rows.length>200)invalid('HQ-Kennungsseite überschreitet die angeforderte Größe.');
+    const invalid=message=>{for(const key of ['expected','hqIds','lastId','ids','index','pageSize'])delete task[key];task.stage='Kennungsvergleich nach Prüffehler erneut beginnen';salesWrite_('sales_meta/sync',run);throw Error(message);};
+    const read=size=>salesHqRows_(salesHqGet_('/v1/'+task.id+'?$select=Id&$orderby=Id&$top='+size+'&$skip='+task.hqIds.length).data);
+    let rows;
+    try{rows=read(task.pageSize||200);}catch(e){
+      if(task.pageSize||!salesDeltaHqServerError_(e))throw e;
+      task.pageSize=50;rows=read(task.pageSize);
+    }
+    if(rows.length>(task.pageSize||200))invalid('HQ-Kennungsseite überschreitet die angeforderte Größe.');
     for(const row of rows){
       if(Object.keys(row).some(k=>k!=='Id'&&!k.startsWith('@odata.')))invalid('HQ hat die reine Kennungsabfrage nicht eingehalten. Kein Gesamtabruf als Ersatz.');
       const id=salesId_(row.Id);if(id<=task.lastId)invalid('HQ-Kennungsseiten enthalten doppelte oder ungeordnete Kennungen.');
@@ -1728,8 +1744,7 @@ function salesDeltaMissing_(run,task){
     if(rows.length&&task.hqIds.length<task.expected)return false;
     if(task.hqIds.length!==task.expected||salesV1Page_(task.id,'',0,1).total!==task.expected)invalid('HQ-Kennungsliste ist unvollständig oder inzwischen geändert. Es wird nichts daraus gelöscht.');
     const present=new Set(task.hqIds);task.ids=(m.knownIds||[]).filter(id=>!present.has(String(id)));task.index=0;delete task.hqIds;
-  }
-  return salesDeltaProbe_(run,task);
+    return task.ids.length===0;
 }
 /** A GET 404 plus an exact empty list confirms an upstream CRM deletion. One atomic checkpoint removes its app copies. */
 function salesDeltaMirrorMissing_(run,task,id){
@@ -1852,7 +1867,12 @@ function salesDeltaUnassigned_(run){
   if(changed)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts??run.previousStats.unassignedContacts??0,histories:run.stats.unassignedHistories??run.previousStats.unassignedHistories??0,updatedAt:salesNow_()});return true;
 }
 function salesDeltaAudit_(run){
-  const warnings=[];for(const e of SALES_BULK_ENTITIES){const total=salesV1Page_(e,'',0,1).total,m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
+  const warnings=[];for(const e of SALES_BULK_ENTITIES){
+    let total;try{total=salesV1Page_(e,'',0,1).total;}catch(err){
+      if(!salesDeltaHqServerError_(err))throw err;
+      total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen (HTTP '+err.hqHttpStatus+'). Der gelesene Änderungsstand ist gespeichert.'});
+    }
+    const m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
     if(key)run.stats[key]=total;m.confirmedTotal=total;
     if(total===null||total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+(total===null?'nicht bestätigt':total)+'. Mengenabweichung bleibt zur Prüfung offen. Änderungsstand gespeichert; kein erneuter Gesamtimport.'});
   }

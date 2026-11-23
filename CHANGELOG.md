@@ -1,5 +1,10 @@
 # Änderungsprotokoll
 
+## [v0.38.2]
+
+- Der HQ-Löschabgleich versucht bei Serverfehlern der Kennungsliste kleinere Seiten. Fällt die zusätzliche Kennungssuche oder Mengenprüfung aus, bleibt der Prüfpunkt sichtbar und der übrige Lauf kann abschließen. Eine lokale Löschung verlangt weiterhin beide bestätigenden HQ-Abrufe.
+- Kennung `2026-11-23-r38.2`. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ## [v0.38.1]
 
 - „Erfassen“ einer Wiedervorlage erlaubt das Speichern einer Kommunikation oder erneutes Terminieren. „Nicht erreicht“ bleibt in der normalen Kundenkommunikation verfügbar. Der Server verhindert den Abschluss einer Wiedervorlage mit diesem Ergebnis.

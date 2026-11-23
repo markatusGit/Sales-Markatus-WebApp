@@ -172,6 +172,29 @@ test('incomplete, duplicate, expanded or changing ID lists never become authorit
 test('identifier reconciliation follows actual row counts when HQ supplies smaller pages',()=>{
  const f=mirrorFixture(),get=f.ctx.salesHqGet_,skips=[];delete f.remote.Companies[1229];f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v1/Companies?')){skips.push(Number(new URL('https://fixture'+p).searchParams.get('$skip')));r.data=r.data.slice(0,80);}return r;};f.finishBulk();assert.deepEqual(skips,[0,80,160]);assert.equal(f.db['sales_rawcompanies/1229'],undefined);
 });
+test('HQ HTTP 500 on a 200-ID page retries with 50 IDs at the same offset and confirmed deletions still mirror',()=>{
+ const f=mirrorFixture(),get=f.ctx.salesHqGet_,pages=[];delete f.remote.Companies[1229];
+ f.ctx.salesHqGet_=p=>{
+  if(!p.startsWith('/v1/Companies?'))return get(p);
+  const params=new URL('https://fixture'+p).searchParams,top=Number(params.get('$top')),skip=Number(params.get('$skip'));
+  pages.push([top,skip]);if(top===200&&skip===200)throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});
+  const r=get(p.replace('$top=50','$top=200'));return {...r,data:r.data.slice(0,top)};
+ };
+ f.finishBulk();assert.deepEqual(pages,[[200,0],[200,200],[50,200]]);assert.equal(f.db['sales_rawcompanies/1229'],undefined);
+});
+test('a failing optional HQ deletion scan reports an open point while other sections finish safely',()=>{
+ for(const failure of ['ids','count']){
+  const f=mirrorFixture(),get=f.ctx.salesHqGet_,attempts=[];delete f.remote.Companies[1229];delete f.remote.ContactPersons[2229];
+  f.ctx.salesHqGet_=p=>{
+   if(failure==='ids'&&p.startsWith('/v1/Companies?')||failure==='count'&&p.startsWith('/v2/Companies?$top=1&')){attempts.push(p);throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});}
+   return get(p);
+  };
+  const run=f.finishBulk();assert.equal(attempts.length,2);assert.equal(run.state,'completedWithErrors');assert.ok(!run.paused);
+  assert.ok(run.errors.some(e=>e.label==='HQ-Löschabgleich · Unternehmen'&&/HTTP 500/.test(e.message)));
+  assert.ok(f.db['sales_rawcompanies/1229']);assert.equal(f.db['sales_rawcontacts/2229'],undefined);
+  f.ctx.salesHqGet_=get;f.finishBulk();assert.equal(f.db['sales_rawcompanies/1229'],undefined);
+ }
+});
 test('a company reappearing after the identifier scan is refreshed rather than removed',()=>{
  const f=mirrorFixture(),row=f.remote.Companies[1229],get=f.ctx.salesHqGet_;delete f.remote.Companies[1229];f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies/1229?'))f.remote.Companies[1229]={...row,name:'Synthetic reappeared'};return get(p);};f.ctx.startSalesSync();
  finish(f);assert.equal(f.db['sales_companies/1229'].company.name,'Synthetic reappeared');assert.equal(f.db['sales_meta/mirror_Companies_1229'],undefined);

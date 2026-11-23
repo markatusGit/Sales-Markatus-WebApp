@@ -1,5 +1,11 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 23.11.2026 – r38.2: HTTP 500 beim HQ-Löschabgleich
+
+Nutzer meldet einen angehaltenen HQ-Abgleich. Die lesende Firebase-Prüfung bestätigt einen pausierten Änderungsabgleich bei 14 von 17 Abschnitten, zusätzliche Löschprüfung für Unternehmen. Die erste Mengenprüfung und erste Kennungsseite liegen im selben Abschnitt. Der gespeicherte Stand zeigt noch keine Kennungsseite und erlaubt keine sichere Zuordnung des HTTP 500 zu einem der beiden Abrufe.
+
+Korrektur: Die Kennungsabfrage wiederholt eine mit HQ HTTP 500, 502, 503 oder 504 fehlgeschlagene 200er-Seite einmal mit 50 Kennungen am selben Offset. Bleibt ein Serverfehler bei der Kandidatensuche, wird diese Prüfung mit sichtbarem Hinweis auf den nächsten Abgleich verschoben. Fehlende Gesamtzahlen beim abschließenden Vergleich bleiben ebenfalls sichtbar. Normale Datenabrufe und konkrete Löschbestätigungen behalten ihre bestehenden Schutzprüfungen. Die Wiederaufnahme verwendet denselben Lauf. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
+
 ### 23.11.2026 – r38.1: „Nicht erreicht“ aus der Wiedervorlage entfernen
 
 Der Nutzer korrigiert den Ablauf unter „Erfassen“. „Speichern“ protokolliert eine Kommunikation und schließt den Termin. „Wiedervorlage“ öffnet den Datumsdialog zum erneuten Planen. Die gemeinsame Formularvorlage zeigt „Nicht erreicht“ ausschließlich in der normalen Kundenkommunikation. Der Server prüft diese Regel vor dem Speichern. Keine neuen Script Properties oder Bereitstellungseinstellungen erforderlich.
