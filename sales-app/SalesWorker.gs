@@ -4,7 +4,7 @@
  * failing is recorded and skipped where that is safe, so the rest of the sync still finishes. */
 const SALES_SYNC_RETRY_MINUTES=[2,5,10,15,30,60];
 // Optional checks give up sooner; their open work is simply repeated by the next sync.
-const SALES_SYNC_OPTIONAL_TASKS=['deltaProbe','deltaMissing','catalog','verifyJobs','deltaEditions'];
+const SALES_SYNC_OPTIONAL_TASKS=['deltaProbe','deltaMissing','catalog','verifyJobs','deltaEditions','bulkKeys'];
 var salesWorkerRetriesLeftValue_=0;
 function salesWorkerRetriesLeft_(){return salesWorkerRetriesLeftValue_;}
 function salesWorkerProps_(){return PropertiesService.getScriptProperties();}

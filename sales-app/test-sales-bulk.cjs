@@ -15,13 +15,16 @@ function bulkFixture(){
    if(op==='batchGet')return body.documents.map(n=>{const path=n.split('/documents/')[1];return fields[path]?{found:document(path)}:{missing:n};}).reverse();
    if(op==='commit'){
      if(f.failCommit==='before'){f.failCommit=null;throw Error('Synthetic commit failed');}
-     for(const w of body.writes){if(w.delete){const path=w.delete.split('/documents/')[1];delete fields[path];delete f.db[path];continue;}const path=w.update.name.split('/documents/')[1];fields[path]=clone(w.update.fields);f.db[path]=f.ctx.salesBulkDecode_(document(path));}
+     for(const w of body.writes){if(w.verify)continue;if(w.delete){const path=w.delete.split('/documents/')[1];delete fields[path];delete f.db[path];continue;}const path=w.update.name.split('/documents/')[1];if(w.currentDocument?.exists===true&&!fields[path])throw Error('Synthetic precondition failed');fields[path]=w.updateMask?{...(fields[path]||{}),...clone(w.update.fields)}:clone(w.update.fields);if(fields[path].payload)f.db[path]=f.ctx.salesBulkDecode_(document(path));}
      if(f.failCommit==='after'){f.failCommit=null;throw Error('Synthetic response lost');}return {writeResults:body.writes.map(()=>({updateTime:'2026-01-01'}))};
    }
    if(op==='runQuery'){
      const q=body.structuredQuery,filter=q.where.fieldFilter;
-     return Object.keys(fields).filter(p=>p.startsWith(q.from[0].collectionId+'/')&&fields[p][filter.field.fieldPath]?.stringValue===filter.value.stringValue).sort().filter(p=>!q.startAt||name(p)>q.startAt.values[0].referenceValue).slice(0,q.limit).map(p=>({document:document(p)}));
-   }throw Error('Unexpected Firebase operation '+op);
+     const match=v=>filter.op==='IN'?filter.value.arrayValue.values.some(x=>x.stringValue===v):v===filter.value.stringValue;
+     return Object.keys(fields).filter(p=>p.startsWith(q.from[0].collectionId+'/')&&match(fields[p][filter.field.fieldPath]?.stringValue)).sort().filter(p=>!q.startAt||name(p)>q.startAt.values[0].referenceValue).slice(0,q.limit).map(p=>({document:document(p)}));
+   }
+   if(op==='runAggregationQuery'){const col=body.structuredAggregationQuery.structuredQuery.from[0].collectionId;return [{result:{aggregateFields:{n:{integerValue:String(Object.keys(fields).filter(p=>p.startsWith(col+'/')).length)}}}}];}
+   throw Error('Unexpected Firebase operation '+op);
  };
  const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=path=>{
    const single=/^\/v2\/(Companies|ContactPersons|ContactHistories|Projects|Documents|PlannedRevenues)\/(\d+)(?:\?|$)/.exec(path);

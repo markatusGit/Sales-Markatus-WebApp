@@ -20,7 +20,7 @@ function startSalesSync(request){
       if(old.paused){old.paused=false;old.revision++;salesWrite_('sales_meta/sync',old);}
       return salesSyncSummary_(old);
     }
-    const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
+    const jobs=salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
     // Separate executions for company and contact, with all companies scheduled first.
     for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:step==='company'?'App → HQ: Firma anlegen/bestätigen':'App → HQ: Ansprechpartner anlegen/bestätigen'}));
     salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));

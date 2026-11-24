@@ -4,6 +4,8 @@ function salesBulkCollection_(entity){
   if(!names[entity])throw new Error('Unbekannte HQ-Datenart.');return 'sales_raw'+names[entity];
 }
 function salesBulkRest_(operation,body){
+  // Every job write carries its searchable activity flag, so lists of open jobs never scan finished ones.
+  if(operation==='commit'&&typeof salesJobWriteFields_==='function')body={...body,writes:body.writes.map(salesJobWriteFields_)};
   if(operation==='commit'&&typeof salesAuthProtectWrites_==='function')body={...body,writes:salesAuthProtectWrites_(body.writes)};
   const c=salesContext_();return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':'+operation,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify(body)});
 }
@@ -31,7 +33,7 @@ function salesBulkPut_(entries){
   let writes=[],bytes=0;const flush=()=>{if(writes.length){salesBulkRest_('commit',{writes});writes=[];bytes=0;}};
   for(const e of entries){
     const fields={payload:{stringValue:salesBulkPayload_(e.path,e.value)}};
-    Object.entries(e.index||{}).forEach(([k,v])=>{fields[k]={stringValue:String(v)};});
+    Object.entries({...(e.index||{}),...(salesBulkRawKeys_(e.path,e.value?.row)||{})}).forEach(([k,v])=>{fields[k]={stringValue:String(v)};});
     const write={update:{name:salesBulkName_(e.path),fields}},size=Utilities.newBlob(JSON.stringify(write)).getBytes().length;
     if(writes.length>=100||bytes+size>4000000)flush();writes.push(write);bytes+=size;
   }flush();
@@ -39,21 +41,67 @@ function salesBulkPut_(entries){
   if(typeof salesLeanNamesUpdate_==='function')salesLeanNamesUpdate_(entries);
   if(typeof salesLeanFiltersUpdate_==='function')salesLeanFiltersUpdate_(entries);
 }
-function salesBulkQuery_(collection,field,value){
-  if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!['companyBucket','projectBucket'].includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
-  const out=[];let last='';
-  for(let page=0;page<100;page++){
-    const query={from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
-    if(last)query.startAt={values:[{referenceValue:last}],before:false};
-    const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
-    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const value=salesBulkDecode_(doc);out.push(value);if(salesBulkStepCache_)salesBulkStepCache_.documents.set(doc.name.split('/documents/')[1],value);}if(docs.length<250)return out;last=docs[docs.length-1].name;
-  }throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
+const SALES_BULK_QUERY_FIELDS=['companyBucket','projectBucket','companyKey','projectKey'];
+/** Raw query result with paths and stored index fields. An array value asks for up to 30 keys per request (IN). */
+function salesBulkQueryDocs_(collection,field,value){
+  if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!SALES_BULK_QUERY_FIELDS.includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
+  const values=Array.isArray(value)?Array.from(new Set(value.map(String))):null,out=[];
+  if(values&&!values.length)return out;
+  for(let i=0;i<(values?values.length:1);i+=30){
+    const where=values?{fieldFilter:{field:{fieldPath:field},op:'IN',value:{arrayValue:{values:values.slice(i,i+30).map(v=>({stringValue:v}))}}}}:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}};
+    let last='',page=0;
+    for(;page<100;page++){
+      const query={from:[{collectionId:collection}],where,orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
+      if(last)query.startAt={values:[{referenceValue:last}],before:false};
+      const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
+      const docs=result.filter(r=>r.document).map(r=>r.document);
+      for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const path=doc.name.split('/documents/')[1],stored=salesBulkDecode_(doc);out.push({path,value:stored,fields:doc.fields});if(salesBulkStepCache_)salesBulkStepCache_.documents.set(path,stored);}
+      if(docs.length<250)break;last=docs[docs.length-1].name;
+    }
+    if(page>=100)throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
+  }
+  return out;
 }
+function salesBulkQuery_(collection,field,value){return salesBulkQueryDocs_(collection,field,value).map(d=>d.value);}
 function salesBulkBucket_(id){return Number(id)>0?String(Number(id)%64):'none';}
 let salesBulkStepCache_=null;
-function salesBulkRows_(run,entity,field,bucket){
-  const generation=run.entities[entity].generation;
-  const key=[generation,entity,field,bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
-  const rows=salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+/** Firm and project keys on every raw record let a sync read only the firms and projects that changed instead of
+ * the whole 1/64 group. Records stored before r41 receive them once, group by group (bulkKeys / salesBulkTag_). */
+const SALES_RAW_ENTITY={sales_rawcompanies:'Companies',sales_rawcontacts:'ContactPersons',sales_rawhistories:'ContactHistories',sales_rawprojects:'Projects',sales_rawdocuments:'Documents',sales_rawplans:'PlannedRevenues'};
+function salesBulkKey_(id){return Number(id)>0?String(Number(id)):'none';}
+function salesBulkRawKeys_(path,row){
+  const entity=SALES_RAW_ENTITY[String(path).split('/')[0]];if(!entity||!row)return null;
+  return {companyKey:salesBulkKey_(entity==='Companies'?row.id:row.companyId),projectKey:salesBulkKey_(entity==='Projects'?row.id:row.projectId)};
+}
+const SALES_KEY_GROUPS=[...Array.from({length:64},(_,i)=>String(i)),'none'];
+// A firm-key query is complete once every record of that firm group carries keys; a project-key query needs the whole collection.
+function salesBulkKeyed_(tags,entity,field,bucket){
+  const t=tags?.collections?.[salesBulkCollection_(entity)];if(!t)return false;
+  return !!t.complete||field==='companyBucket'&&(t.done||[]).includes(String(bucket));
+}
+/** Rows of one group. With keys and a fully keyed group, only the records of those firms/projects are read. */
+function salesBulkRows_(run,entity,field,bucket,keys){
+  const generation=run.entities[entity].generation,keyed=Array.isArray(keys)&&salesBulkKeyed_(run.keyTags,entity,field,bucket);
+  const keyField=field==='companyBucket'?'companyKey':'projectKey',wanted=keyed?Array.from(new Set(keys.map(salesBulkKey_))).sort():null;
+  const key=[generation,entity,keyed?keyField:field,keyed?wanted.join(','):bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
+  let docs;
+  if(keyed)docs=salesBulkQueryDocs_(salesBulkCollection_(entity),keyField,wanted);
+  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field==='companyBucket'?String(bucket):null);}
+  const rows=docs.map(d=>d.value).filter(v=>v.generation===generation).map(v=>v.row);
   if(cache)cache.set(key,rows);return rows;
+}
+/** Adds missing keys to records that were read anyway. Only the two key fields are written (no payload), within the
+ * run's remaining budget. A firm group counts as done only when every current record of it carries keys. */
+function salesBulkTag_(run,entity,docs,group){
+  const tags=run.keyTags;if(!tags?.collections||run.full||!run.entities?.[entity])return;
+  const collection=salesBulkCollection_(entity),generation=run.entities[entity].generation,t=tags.collections[collection]||(tags.collections[collection]={done:[],complete:false});
+  if(t.complete||group!==null&&t.done.includes(group))return;
+  const missing=docs.filter(d=>{if(d.value?.generation!==generation||!d.value.row)return false;const k=salesBulkRawKeys_(d.path,d.value.row);return d.fields?.companyKey?.stringValue!==k.companyKey||d.fields?.projectKey?.stringValue!==k.projectKey;});
+  const allowed=missing.slice(0,Math.max(0,tags.budget||0));
+  for(let i=0;i<allowed.length;i+=100){
+    const writes=allowed.slice(i,i+100).map(d=>{const k=salesBulkRawKeys_(d.path,d.value.row);return {update:{name:salesBulkName_(d.path),fields:{companyKey:{stringValue:k.companyKey},projectKey:{stringValue:k.projectKey}}},updateMask:{fieldPaths:['companyKey','projectKey']},currentDocument:{exists:true}};});
+    salesBulkRest_('commit',{writes});
+  }
+  tags.budget=(tags.budget||0)-allowed.length;tags.written=(tags.written||0)+allowed.length;tags.runWritten=(tags.runWritten||0)+allowed.length;
+  if(group!==null&&allowed.length===missing.length){t.done.push(group);if(SALES_KEY_GROUPS.every(g=>t.done.includes(g)))t.complete=true;}
 }

@@ -81,7 +81,8 @@ function salesBulkFinishPage_(run,task,done){
   m.complete=true;delete m.previousIds;delete task.pendingPage;return true;
 }
 function salesBulkProject_(run,task){
-  const bucket=task.id,projects=salesBulkRows_(run,'Projects','projectBucket',bucket),docs=salesBulkRows_(run,'Documents','projectBucket',bucket),plans=salesBulkRows_(run,'PlannedRevenues','projectBucket',bucket),entries=[];
+  // A change run reads only the changed projects once their records carry project keys (r42); before that, the whole group.
+  const bucket=task.id,keys=salesBulkChangedKeys_(run,run.changedProjectIds,bucket),projects=salesBulkRows_(run,'Projects','projectBucket',bucket,keys),docs=salesBulkRows_(run,'Documents','projectBucket',bucket,keys),plans=salesBulkRows_(run,'PlannedRevenues','projectBucket',bucket,keys),entries=[];
   for(const p of projects){
     if(!run.full&&run.changedProjectIds&&!run.changedProjectIds.includes(String(p.id)))continue;
     const actualFinishDate=salesDate_(p.actualFinishDate),status=p.status||p.projectStatus?.name||'',completed=!!actualFinishDate||/^(abgeschlossen|completed|finished)$/i.test(status.trim()),b=salesBelegs_(docs.filter(d=>Number(d.projectId)===Number(p.id)));
@@ -91,8 +92,11 @@ function salesBulkProject_(run,task){
   // Project changes also affect invoice recipients and dispatch history outside the project-owning company.
   docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesBulkPut_(entries);return true;
 }
+function salesBulkChangedKeys_(run,ids,bucket){return run.full||!Array.isArray(ids)?null:ids.filter(id=>salesBulkBucket_(id)===String(bucket));}
 function salesBulkCompany_(run,task){
-  const bucket=task.id,companies=salesBulkRows_(run,'Companies','companyBucket',bucket),contacts=salesBulkRows_(run,'ContactPersons','companyBucket',bucket),histories=salesBulkRows_(run,'ContactHistories','companyBucket',bucket),docs=salesBulkRows_(run,'Documents','companyBucket',bucket),projects=salesBulkRows_(run,'Projects','companyBucket',bucket);
+  // A change run reads only the changed firms once their group carries firm keys (r42); before that, the whole group.
+  const bucket=task.id,keys=salesBulkChangedKeys_(run,run.changedCompanyIds,bucket),rows=entity=>salesBulkRows_(run,entity,'companyBucket',bucket,keys);
+  const companies=rows('Companies'),contacts=rows('ContactPersons'),histories=rows('ContactHistories'),docs=rows('Documents'),projects=rows('Projects');
   const ids=Array.from(new Set([...docs,...histories].map(r=>r.projectId).filter(Boolean).concat(projects.map(p=>p.id)))).map(String);
   const rawProjects=salesBulkGet_(ids.map(id=>salesBulkCollection_('Projects')+'/'+id)),views=salesBulkGet_(projects.map(p=>'sales_projectviews/'+p.id)),byId={};
   Object.values(rawProjects).filter(v=>v&&v.generation===run.entities.Projects.generation).forEach(v=>{byId[v.row.id]=v.row;});
@@ -115,7 +119,7 @@ function salesEditionProjectName_(edition,name){
 function salesBulkEdition_(run,task,cached){
   const e=cached?.edition||salesRead_('sales_editions/'+salesKey_(task.id)),p=cached?cached.project:salesBulkGet_([salesBulkCollection_('Projects')+'/'+e.projectId])[salesBulkCollection_('Projects')+'/'+e.projectId];
   if(!p||p.generation!==run.entities.Projects.generation||Number(p.row.id)!==Number(e.projectId)||!salesEditionProjectName_(e,p.row.name)||String(p.row.number)!==String(e.projectNumber))throw new Error('HQ-Projektzuordnung der Ausgabe wurde geändert oder nicht geliefert. In der Verwaltung prüfen.');
-  const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId))).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
+  const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId),[e.projectId])).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
   const excludedDocuments=docs.filter(d=>excluded.has(String(d.id))).map(d=>({id:String(d.id),number:d.number||''}));excludedDocuments.forEach(d=>b.issues.push({id:d.id,reason:'Mehrere Ausgaben / Zuordnung ungeklärt: aus Summe ausgeschlossen'}));
   const companyIds=Array.from(new Set(docs.filter(d=>['Invoice','CreditNote'].includes(d.documentType)&&d.companyId).map(d=>String(d.companyId))));
   salesWrite_('sales_editions/'+e.id,{...e,projectName:p.row.name,cacheLinkPending:false,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
@@ -128,6 +132,32 @@ function salesBulkUnassigned_(run,task){
   task.parts=task.parts||[];if(rows.length){const path='sales_imports/'+run.id+'-orphan-'+task.id+'-'+task.bucket;salesWrite_(path,{rows});if(!task.parts.includes(path))task.parts.push(path);}task.bucket++;if(task.bucket<=64)return false;
   const all=[];for(const path of task.parts)all.push(...salesRead_(path).rows);
   salesWrite_('sales_meta/unassigned'+task.id,{rows:all,loadedAt:salesNow_()});run.stats[task.id==='contacts'?'unassignedContacts':'unassignedHistories']=all.length;return true;
+}
+const SALES_KEY_TAG_BUDGET=4000,SALES_KEY_STEP_READS=2000;
+function salesKeyTagBudget_(){return SALES_KEY_TAG_BUDGET;}
+function salesBulkKeysOpen_(run){return !run.full&&!!run.keyTags?.collections&&(run.keyTags.budget||0)>0&&SALES_BULK_ENTITIES.some(e=>!run.keyTags.collections[salesBulkCollection_(e)]?.complete);}
+/** One-time tagging of records stored before r42, firm group by firm group, at most SALES_KEY_TAG_BUDGET writes per sync.
+ * The first call counts the raw records (count query, about one read per 1,000 records) so the total cost is known up front. */
+function salesBulkKeys_(run,task){
+  const tags=run.keyTags;
+  if(!tags.measured){
+    const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
+    tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};task.stage='Rohdaten gezählt';return false;
+  }
+  let read=0;
+  for(const e of SALES_BULK_ENTITIES){
+    const t=tags.collections[salesBulkCollection_(e)]||(tags.collections[salesBulkCollection_(e)]={done:[],complete:false});
+    for(const group of SALES_KEY_GROUPS){
+      if(t.complete||(tags.budget||0)<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
+      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group);read+=docs.length;salesBulkTag_(run,e,docs,group);
+    }
+  }
+  task.stage=(tags.runWritten||0)+' Rohdaten in diesem Abgleich gekennzeichnet';
+  if(read>=SALES_KEY_STEP_READS&&salesBulkKeysOpen_(run))return false;
+  const done=SALES_BULK_ENTITIES.filter(e=>tags.collections[salesBulkCollection_(e)]?.complete).length,total=tags.measured.total;
+  const left=Math.max(0,total-(tags.written||0)),runs=Math.ceil(left/SALES_KEY_TAG_BUDGET);
+  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:done===SALES_BULK_ENTITIES.length?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':'Gezählt: '+total+' Rohdaten in Firebase. Bisher gekennzeichnet: '+(tags.written||0)+' (in diesem Abgleich '+(tags.runWritten||0)+', höchstens '+SALES_KEY_TAG_BUDGET+' Schreibvorgänge je Abgleich). Fertig gekennzeichnete Datenarten: '+done+' von '+SALES_BULK_ENTITIES.length+'. Voraussichtlich noch etwa '+runs+(runs===1?' Abgleich':' Abgleiche')+'. Es ist nichts zu tun.'}).slice(-50);
+  return true;
 }
 function salesBulkAudit_(run){
   return salesDeltaAudit_(run);
@@ -155,6 +185,7 @@ function salesBulkStepWork_(run){
     else if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
     if(run.verifyJobs?.length&&!run.auditRepeated)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
+    if(salesBulkKeysOpen_(run))run.tasks.push({kind:'bulkKeys',label:'Rohdaten einmalig nach Firma und Projekt kennzeichnen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);
@@ -163,6 +194,7 @@ function salesBulkStepWork_(run){
   else if(task.kind==='deltaUnassigned')done=salesDeltaUnassigned_(run);
   else if(task.kind==='bulkUnassigned')done=salesBulkUnassigned_(run,task);
   else if(task.kind==='catalog')done=salesSyncCatalog_(run,task);
+  else if(task.kind==='bulkKeys')done=salesBulkKeys_(run,task);
   else if(task.kind==='bulkAudit')done=salesBulkAudit_(run);
   else throw new Error('Unbekannter Sammelabschnitt.');
   if(done){task.finished=true;run.done++;run.cursor++;}run.revision++;run.updatedAt=salesNow_();

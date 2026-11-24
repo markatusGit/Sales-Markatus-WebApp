@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-24-r41';
+const SALES_RELEASE = '2026-11-24-r42';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -130,8 +130,10 @@ function salesWrite_(path,value) {
   if(status)salesStorePayload_('sales_meta/lean_sync',status);
   if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
-function salesList_(collection) {
+function salesList_(collection,options) {
   if (!/^sales_(jobs|drafts|editions|directory|deletions)$/.test(collection)) throw new Error('Ungültige Sammlung.');
+  // Open jobs and change requests only (r41): reads grow with open work, not with every job ever saved.
+  if (options?.active) {if (collection!=='sales_jobs') throw new Error('Ungültige Sammlung.');return salesJobsActiveList_();}
   const c=salesContext_(), result=[];let next='';
   for (let i=0;i<1000;i++) {
     const page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=100'+(next?'&pageToken='+encodeURIComponent(next):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});
@@ -1018,7 +1020,43 @@ function salesStoreRoot_(path,payload,c){
   if(typeof salesAuthRequest_!=='undefined'&&salesAuthRequest_?.user&&!salesAuthRequest_.worker&&typeof salesBulkRest_==='function'){
     salesBulkRest_('commit',{writes:[{update:{name:salesBulkName_(path),fields:{payload:{stringValue:payload}}}}]});return;
   }
-  pilotWriteDocument_(c.project,path,{payload},c.token);
+  pilotWriteDocument_(c.project,path,{payload,...salesJobFields_(path,payload)},c.token);
+}
+/** App jobs carry a searchable flag "jobActive": 1 while a job is open (not synced/canceled) or is a change request
+ * shown under "Meine Änderungen". Lists of open jobs then query only flagged jobs instead of every job ever saved.
+ * The flag is written together with the job itself; nothing is ever deleted. */
+function salesJobActive_(job){return !!job&&(!['synced','canceled'].includes(job.state)||!!job.review);}
+function salesJobFields_(path,payload){
+  if(!/^sales_jobs\/[^/]+$/.test(path))return {};
+  let value=null;try{value=JSON.parse(payload);}catch(_){}
+  // A split payload cannot be judged from its pointer: keep it listed, the reader checks the state anyway.
+  return {jobActive:value?.storageFormat==='sales-parts-v1'||salesJobActive_(value)?'1':'0'};
+}
+function salesJobWriteFields_(write){
+  const path=String(write?.update?.name||'').split('/documents/')[1]||'';
+  if(write.updateMask||!write.update?.fields?.payload||!/^sales_jobs\/[^/]+$/.test(path))return write;
+  return {...write,update:{...write.update,fields:{...write.update.fields,jobActive:{stringValue:salesJobFields_(path,write.update.fields.payload.stringValue).jobActive}}}};
+}
+const SALES_JOBS_ACTIVE_PROPERTY='SALES_JOBS_ACTIVE_INDEX';
+/** Open jobs and change requests only. Once per installation, jobs saved before r41 are flagged: one full list,
+ * then only the open ones get the flag (field-only write, the job content stays untouched). */
+function salesJobsActiveList_(){
+  const props=PropertiesService.getScriptProperties();
+  if(props.getProperty(SALES_JOBS_ACTIVE_PROPERTY)!=='1'){
+    const active=salesList_('sales_jobs').filter(salesJobActive_);
+    for(let i=0;i<active.length;i+=100)salesBulkRest_('commit',{writes:active.slice(i,i+100).map(j=>({update:{name:salesBulkName_('sales_jobs/'+salesKey_(j.id)),fields:{jobActive:{stringValue:'1'}}},updateMask:{fieldPaths:['jobActive']},currentDocument:{exists:true}}))});
+    props.setProperty(SALES_JOBS_ACTIVE_PROPERTY,'1');return active;
+  }
+  const c=salesContext_(),out=[];let last='';
+  for(let page=0;page<200;page++){
+    const query={from:[{collectionId:'sales_jobs'}],where:{fieldFilter:{field:{fieldPath:'jobActive'},op:'EQUAL',value:{stringValue:'1'}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
+    if(last)query.startAt={values:[{referenceValue:last}],before:false};
+    const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
+    const docs=result.filter(r=>r.document).map(r=>r.document);
+    for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const path=doc.name.split('/documents/')[1];out.push(salesDecodeStored_(path,doc.fields.payload.stringValue,c));}
+    if(docs.length<250)return out.filter(salesJobActive_);last=docs[docs.length-1].name;
+  }
+  throw new Error('Zu viele offene Aufträge für einen Abruf.');
 }
 function salesStorePayload_(path,value){
   path=salesPath_(path);const c=salesContext_(),payload=JSON.stringify(value);
@@ -1224,7 +1262,7 @@ function startSalesSync(request){
       if(old.paused){old.paused=false;old.revision++;salesWrite_('sales_meta/sync',old);}
       return salesSyncSummary_(old);
     }
-    const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
+    const jobs=salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled'].includes(j.state)),tasks=[];
     // Separate executions for company and contact, with all companies scheduled first.
     for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:step==='company'?'App → HQ: Firma anlegen/bestätigen':'App → HQ: Ansprechpartner anlegen/bestätigen'}));
     salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));
@@ -1449,6 +1487,8 @@ function salesBulkCollection_(entity){
   if(!names[entity])throw new Error('Unbekannte HQ-Datenart.');return 'sales_raw'+names[entity];
 }
 function salesBulkRest_(operation,body){
+  // Every job write carries its searchable activity flag, so lists of open jobs never scan finished ones.
+  if(operation==='commit'&&typeof salesJobWriteFields_==='function')body={...body,writes:body.writes.map(salesJobWriteFields_)};
   if(operation==='commit'&&typeof salesAuthProtectWrites_==='function')body={...body,writes:salesAuthProtectWrites_(body.writes)};
   const c=salesContext_();return pilotCall_(pilotUrl_(c.project,'').replace(/\/$/,'')+':'+operation,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.token},payload:JSON.stringify(body)});
 }
@@ -1476,7 +1516,7 @@ function salesBulkPut_(entries){
   let writes=[],bytes=0;const flush=()=>{if(writes.length){salesBulkRest_('commit',{writes});writes=[];bytes=0;}};
   for(const e of entries){
     const fields={payload:{stringValue:salesBulkPayload_(e.path,e.value)}};
-    Object.entries(e.index||{}).forEach(([k,v])=>{fields[k]={stringValue:String(v)};});
+    Object.entries({...(e.index||{}),...(salesBulkRawKeys_(e.path,e.value?.row)||{})}).forEach(([k,v])=>{fields[k]={stringValue:String(v)};});
     const write={update:{name:salesBulkName_(e.path),fields}},size=Utilities.newBlob(JSON.stringify(write)).getBytes().length;
     if(writes.length>=100||bytes+size>4000000)flush();writes.push(write);bytes+=size;
   }flush();
@@ -1484,23 +1524,69 @@ function salesBulkPut_(entries){
   if(typeof salesLeanNamesUpdate_==='function')salesLeanNamesUpdate_(entries);
   if(typeof salesLeanFiltersUpdate_==='function')salesLeanFiltersUpdate_(entries);
 }
-function salesBulkQuery_(collection,field,value){
-  if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!['companyBucket','projectBucket'].includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
-  const out=[];let last='';
-  for(let page=0;page<100;page++){
-    const query={from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
-    if(last)query.startAt={values:[{referenceValue:last}],before:false};
-    const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
-    const docs=result.filter(r=>r.document).map(r=>r.document);for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const value=salesBulkDecode_(doc);out.push(value);if(salesBulkStepCache_)salesBulkStepCache_.documents.set(doc.name.split('/documents/')[1],value);}if(docs.length<250)return out;last=docs[docs.length-1].name;
-  }throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
+const SALES_BULK_QUERY_FIELDS=['companyBucket','projectBucket','companyKey','projectKey'];
+/** Raw query result with paths and stored index fields. An array value asks for up to 30 keys per request (IN). */
+function salesBulkQueryDocs_(collection,field,value){
+  if(!/^sales_(raw(companies|contacts|histories|projects|documents|plans)|projectviews)$/.test(collection)||!SALES_BULK_QUERY_FIELDS.includes(field))throw new Error('Firebase-Sammelabfrage nicht freigegeben.');
+  const values=Array.isArray(value)?Array.from(new Set(value.map(String))):null,out=[];
+  if(values&&!values.length)return out;
+  for(let i=0;i<(values?values.length:1);i+=30){
+    const where=values?{fieldFilter:{field:{fieldPath:field},op:'IN',value:{arrayValue:{values:values.slice(i,i+30).map(v=>({stringValue:v}))}}}}:{fieldFilter:{field:{fieldPath:field},op:'EQUAL',value:{stringValue:String(value)}}};
+    let last='',page=0;
+    for(;page<100;page++){
+      const query={from:[{collectionId:collection}],where,orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
+      if(last)query.startAt={values:[{referenceValue:last}],before:false};
+      const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
+      const docs=result.filter(r=>r.document).map(r=>r.document);
+      for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const path=doc.name.split('/documents/')[1],stored=salesBulkDecode_(doc);out.push({path,value:stored,fields:doc.fields});if(salesBulkStepCache_)salesBulkStepCache_.documents.set(path,stored);}
+      if(docs.length<250)break;last=docs[docs.length-1].name;
+    }
+    if(page>=100)throw new Error('Datenpartition überschreitet 25.000 Einträge; weitere Aufteilung erforderlich. Bisherige Kundenansicht bleibt erhalten.');
+  }
+  return out;
 }
+function salesBulkQuery_(collection,field,value){return salesBulkQueryDocs_(collection,field,value).map(d=>d.value);}
 function salesBulkBucket_(id){return Number(id)>0?String(Number(id)%64):'none';}
 let salesBulkStepCache_=null;
-function salesBulkRows_(run,entity,field,bucket){
-  const generation=run.entities[entity].generation;
-  const key=[generation,entity,field,bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
-  const rows=salesBulkQuery_(salesBulkCollection_(entity),field,bucket).filter(v=>v.generation===generation).map(v=>v.row);
+/** Firm and project keys on every raw record let a sync read only the firms and projects that changed instead of
+ * the whole 1/64 group. Records stored before r41 receive them once, group by group (bulkKeys / salesBulkTag_). */
+const SALES_RAW_ENTITY={sales_rawcompanies:'Companies',sales_rawcontacts:'ContactPersons',sales_rawhistories:'ContactHistories',sales_rawprojects:'Projects',sales_rawdocuments:'Documents',sales_rawplans:'PlannedRevenues'};
+function salesBulkKey_(id){return Number(id)>0?String(Number(id)):'none';}
+function salesBulkRawKeys_(path,row){
+  const entity=SALES_RAW_ENTITY[String(path).split('/')[0]];if(!entity||!row)return null;
+  return {companyKey:salesBulkKey_(entity==='Companies'?row.id:row.companyId),projectKey:salesBulkKey_(entity==='Projects'?row.id:row.projectId)};
+}
+const SALES_KEY_GROUPS=[...Array.from({length:64},(_,i)=>String(i)),'none'];
+// A firm-key query is complete once every record of that firm group carries keys; a project-key query needs the whole collection.
+function salesBulkKeyed_(tags,entity,field,bucket){
+  const t=tags?.collections?.[salesBulkCollection_(entity)];if(!t)return false;
+  return !!t.complete||field==='companyBucket'&&(t.done||[]).includes(String(bucket));
+}
+/** Rows of one group. With keys and a fully keyed group, only the records of those firms/projects are read. */
+function salesBulkRows_(run,entity,field,bucket,keys){
+  const generation=run.entities[entity].generation,keyed=Array.isArray(keys)&&salesBulkKeyed_(run.keyTags,entity,field,bucket);
+  const keyField=field==='companyBucket'?'companyKey':'projectKey',wanted=keyed?Array.from(new Set(keys.map(salesBulkKey_))).sort():null;
+  const key=[generation,entity,keyed?keyField:field,keyed?wanted.join(','):bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
+  let docs;
+  if(keyed)docs=salesBulkQueryDocs_(salesBulkCollection_(entity),keyField,wanted);
+  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field==='companyBucket'?String(bucket):null);}
+  const rows=docs.map(d=>d.value).filter(v=>v.generation===generation).map(v=>v.row);
   if(cache)cache.set(key,rows);return rows;
+}
+/** Adds missing keys to records that were read anyway. Only the two key fields are written (no payload), within the
+ * run's remaining budget. A firm group counts as done only when every current record of it carries keys. */
+function salesBulkTag_(run,entity,docs,group){
+  const tags=run.keyTags;if(!tags?.collections||run.full||!run.entities?.[entity])return;
+  const collection=salesBulkCollection_(entity),generation=run.entities[entity].generation,t=tags.collections[collection]||(tags.collections[collection]={done:[],complete:false});
+  if(t.complete||group!==null&&t.done.includes(group))return;
+  const missing=docs.filter(d=>{if(d.value?.generation!==generation||!d.value.row)return false;const k=salesBulkRawKeys_(d.path,d.value.row);return d.fields?.companyKey?.stringValue!==k.companyKey||d.fields?.projectKey?.stringValue!==k.projectKey;});
+  const allowed=missing.slice(0,Math.max(0,tags.budget||0));
+  for(let i=0;i<allowed.length;i+=100){
+    const writes=allowed.slice(i,i+100).map(d=>{const k=salesBulkRawKeys_(d.path,d.value.row);return {update:{name:salesBulkName_(d.path),fields:{companyKey:{stringValue:k.companyKey},projectKey:{stringValue:k.projectKey}}},updateMask:{fieldPaths:['companyKey','projectKey']},currentDocument:{exists:true}};});
+    salesBulkRest_('commit',{writes});
+  }
+  tags.budget=(tags.budget||0)-allowed.length;tags.written=(tags.written||0)+allowed.length;tags.runWritten=(tags.runWritten||0)+allowed.length;
+  if(group!==null&&allowed.length===missing.length){t.done.push(group);if(SALES_KEY_GROUPS.every(g=>t.done.includes(g)))t.complete=true;}
 }
 
 /** Global HQ pages, independent change cursors, Firebase-only joins. No HQ writes here. */
@@ -1586,7 +1672,8 @@ function salesBulkFinishPage_(run,task,done){
   m.complete=true;delete m.previousIds;delete task.pendingPage;return true;
 }
 function salesBulkProject_(run,task){
-  const bucket=task.id,projects=salesBulkRows_(run,'Projects','projectBucket',bucket),docs=salesBulkRows_(run,'Documents','projectBucket',bucket),plans=salesBulkRows_(run,'PlannedRevenues','projectBucket',bucket),entries=[];
+  // A change run reads only the changed projects once their records carry project keys (r42); before that, the whole group.
+  const bucket=task.id,keys=salesBulkChangedKeys_(run,run.changedProjectIds,bucket),projects=salesBulkRows_(run,'Projects','projectBucket',bucket,keys),docs=salesBulkRows_(run,'Documents','projectBucket',bucket,keys),plans=salesBulkRows_(run,'PlannedRevenues','projectBucket',bucket,keys),entries=[];
   for(const p of projects){
     if(!run.full&&run.changedProjectIds&&!run.changedProjectIds.includes(String(p.id)))continue;
     const actualFinishDate=salesDate_(p.actualFinishDate),status=p.status||p.projectStatus?.name||'',completed=!!actualFinishDate||/^(abgeschlossen|completed|finished)$/i.test(status.trim()),b=salesBelegs_(docs.filter(d=>Number(d.projectId)===Number(p.id)));
@@ -1596,8 +1683,11 @@ function salesBulkProject_(run,task){
   // Project changes also affect invoice recipients and dispatch history outside the project-owning company.
   docs.filter(d=>run.full||!run.changedProjectIds||run.changedProjectIds.includes(String(d.projectId))).forEach(d=>salesBulkDirty_(run,'ContactHistories',d));salesBulkPut_(entries);return true;
 }
+function salesBulkChangedKeys_(run,ids,bucket){return run.full||!Array.isArray(ids)?null:ids.filter(id=>salesBulkBucket_(id)===String(bucket));}
 function salesBulkCompany_(run,task){
-  const bucket=task.id,companies=salesBulkRows_(run,'Companies','companyBucket',bucket),contacts=salesBulkRows_(run,'ContactPersons','companyBucket',bucket),histories=salesBulkRows_(run,'ContactHistories','companyBucket',bucket),docs=salesBulkRows_(run,'Documents','companyBucket',bucket),projects=salesBulkRows_(run,'Projects','companyBucket',bucket);
+  // A change run reads only the changed firms once their group carries firm keys (r42); before that, the whole group.
+  const bucket=task.id,keys=salesBulkChangedKeys_(run,run.changedCompanyIds,bucket),rows=entity=>salesBulkRows_(run,entity,'companyBucket',bucket,keys);
+  const companies=rows('Companies'),contacts=rows('ContactPersons'),histories=rows('ContactHistories'),docs=rows('Documents'),projects=rows('Projects');
   const ids=Array.from(new Set([...docs,...histories].map(r=>r.projectId).filter(Boolean).concat(projects.map(p=>p.id)))).map(String);
   const rawProjects=salesBulkGet_(ids.map(id=>salesBulkCollection_('Projects')+'/'+id)),views=salesBulkGet_(projects.map(p=>'sales_projectviews/'+p.id)),byId={};
   Object.values(rawProjects).filter(v=>v&&v.generation===run.entities.Projects.generation).forEach(v=>{byId[v.row.id]=v.row;});
@@ -1620,7 +1710,7 @@ function salesEditionProjectName_(edition,name){
 function salesBulkEdition_(run,task,cached){
   const e=cached?.edition||salesRead_('sales_editions/'+salesKey_(task.id)),p=cached?cached.project:salesBulkGet_([salesBulkCollection_('Projects')+'/'+e.projectId])[salesBulkCollection_('Projects')+'/'+e.projectId];
   if(!p||p.generation!==run.entities.Projects.generation||Number(p.row.id)!==Number(e.projectId)||!salesEditionProjectName_(e,p.row.name)||String(p.row.number)!==String(e.projectNumber))throw new Error('HQ-Projektzuordnung der Ausgabe wurde geändert oder nicht geliefert. In der Verwaltung prüfen.');
-  const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId))).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
+  const docs=(cached?cached.docs:salesBulkRows_(run,'Documents','projectBucket',salesBulkBucket_(e.projectId),[e.projectId])).filter(d=>String(d.projectId)===String(e.projectId)),excluded=new Set(e.excludedDocumentIds||[]),b=salesBelegs_(docs.filter(d=>!excluded.has(String(d.id))));
   const excludedDocuments=docs.filter(d=>excluded.has(String(d.id))).map(d=>({id:String(d.id),number:d.number||''}));excludedDocuments.forEach(d=>b.issues.push({id:d.id,reason:'Mehrere Ausgaben / Zuordnung ungeklärt: aus Summe ausgeschlossen'}));
   const companyIds=Array.from(new Set(docs.filter(d=>['Invoice','CreditNote'].includes(d.documentType)&&d.companyId).map(d=>String(d.companyId))));
   salesWrite_('sales_editions/'+e.id,{...e,projectName:p.row.name,cacheLinkPending:false,documents:b.accepted,excludedDocuments,ignored:b.ignored,issues:b.issues,complete:b.issues.length===0,companyIds,loadedAt:salesNow_()});run.stats.editions++;return true;
@@ -1633,6 +1723,32 @@ function salesBulkUnassigned_(run,task){
   task.parts=task.parts||[];if(rows.length){const path='sales_imports/'+run.id+'-orphan-'+task.id+'-'+task.bucket;salesWrite_(path,{rows});if(!task.parts.includes(path))task.parts.push(path);}task.bucket++;if(task.bucket<=64)return false;
   const all=[];for(const path of task.parts)all.push(...salesRead_(path).rows);
   salesWrite_('sales_meta/unassigned'+task.id,{rows:all,loadedAt:salesNow_()});run.stats[task.id==='contacts'?'unassignedContacts':'unassignedHistories']=all.length;return true;
+}
+const SALES_KEY_TAG_BUDGET=4000,SALES_KEY_STEP_READS=2000;
+function salesKeyTagBudget_(){return SALES_KEY_TAG_BUDGET;}
+function salesBulkKeysOpen_(run){return !run.full&&!!run.keyTags?.collections&&(run.keyTags.budget||0)>0&&SALES_BULK_ENTITIES.some(e=>!run.keyTags.collections[salesBulkCollection_(e)]?.complete);}
+/** One-time tagging of records stored before r42, firm group by firm group, at most SALES_KEY_TAG_BUDGET writes per sync.
+ * The first call counts the raw records (count query, about one read per 1,000 records) so the total cost is known up front. */
+function salesBulkKeys_(run,task){
+  const tags=run.keyTags;
+  if(!tags.measured){
+    const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
+    tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};task.stage='Rohdaten gezählt';return false;
+  }
+  let read=0;
+  for(const e of SALES_BULK_ENTITIES){
+    const t=tags.collections[salesBulkCollection_(e)]||(tags.collections[salesBulkCollection_(e)]={done:[],complete:false});
+    for(const group of SALES_KEY_GROUPS){
+      if(t.complete||(tags.budget||0)<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
+      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group);read+=docs.length;salesBulkTag_(run,e,docs,group);
+    }
+  }
+  task.stage=(tags.runWritten||0)+' Rohdaten in diesem Abgleich gekennzeichnet';
+  if(read>=SALES_KEY_STEP_READS&&salesBulkKeysOpen_(run))return false;
+  const done=SALES_BULK_ENTITIES.filter(e=>tags.collections[salesBulkCollection_(e)]?.complete).length,total=tags.measured.total;
+  const left=Math.max(0,total-(tags.written||0)),runs=Math.ceil(left/SALES_KEY_TAG_BUDGET);
+  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:done===SALES_BULK_ENTITIES.length?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':'Gezählt: '+total+' Rohdaten in Firebase. Bisher gekennzeichnet: '+(tags.written||0)+' (in diesem Abgleich '+(tags.runWritten||0)+', höchstens '+SALES_KEY_TAG_BUDGET+' Schreibvorgänge je Abgleich). Fertig gekennzeichnete Datenarten: '+done+' von '+SALES_BULK_ENTITIES.length+'. Voraussichtlich noch etwa '+runs+(runs===1?' Abgleich':' Abgleiche')+'. Es ist nichts zu tun.'}).slice(-50);
+  return true;
 }
 function salesBulkAudit_(run){
   return salesDeltaAudit_(run);
@@ -1660,6 +1776,7 @@ function salesBulkStepWork_(run){
     else if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
     if(run.verifyJobs?.length&&!run.auditRepeated)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
+    if(salesBulkKeysOpen_(run))run.tasks.push({kind:'bulkKeys',label:'Rohdaten einmalig nach Firma und Projekt kennzeichnen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);
@@ -1668,6 +1785,7 @@ function salesBulkStepWork_(run){
   else if(task.kind==='deltaUnassigned')done=salesDeltaUnassigned_(run);
   else if(task.kind==='bulkUnassigned')done=salesBulkUnassigned_(run,task);
   else if(task.kind==='catalog')done=salesSyncCatalog_(run,task);
+  else if(task.kind==='bulkKeys')done=salesBulkKeys_(run,task);
   else if(task.kind==='bulkAudit')done=salesBulkAudit_(run);
   else throw new Error('Unbekannter Sammelabschnitt.');
   if(done){task.finished=true;run.done++;run.cursor++;}run.revision++;run.updatedAt=salesNow_();
@@ -1700,7 +1818,7 @@ function salesDeltaPrepare_(old){
   if(full&&old?.engine===2&&old.state!=='running')throw new Error('Vorhandener Abgleich hat keine wiederherstellbare Ausgangsbasis. Kein erneuter Gesamtimport gestartet. Gespeicherten Lauf prüfen.');
   let tasks=[];
   if(old?.state==='running')tasks=old.tasks.slice(old.cursor).filter(t=>t.kind==='write');
-  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled','awaitingApproval','awaitingAnswer'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
+  else {const jobs=salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled','awaitingApproval','awaitingAnswer'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
   const run={id:old?.state==='running'?old.id:Utilities.getUuid(),engine:2,policy:3,revision:(old?.revision||0)+1,state:'running',paused:false,cursor:0,done:0,tasks,
     errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
     stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
@@ -1713,10 +1831,25 @@ function salesDeltaPrepare_(old){
   // Every HQ data type is reconciled by identifiers, but only when Firebase and HQ report different totals.
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand mit HQ abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
+  // Firm/project keys (r42): progress is kept in sales_meta/bulk; an unfinished earlier run may already have tagged more groups.
+  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0};
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
 }
 // HQ accepts whole UTC seconds. Floor the request boundary; keep durable watermarks unchanged.
+function salesDeltaKeyTags_(...sources){
+  const out={version:1,collections:{},written:0};
+  for(const t of sources.filter(x=>x?.collections)){
+    out.written=Math.max(out.written,t.written||0);if(t.measured&&!out.measured)out.measured=t.measured;
+    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.complete=o.complete||!!v.complete;}
+  }
+  return out;
+}
+function salesDeltaKeyTagsStored_(run){
+  // A full import writes every raw record with keys: all collections are then completely keyed.
+  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),complete:true}]))};
+  if(!run.keyTags)return undefined;const {budget,runWritten,...stored}=run.keyTags;return stored;
+}
 function salesDeltaSince_(since){return new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');}
 function salesDeltaFilter_(entity,since){
   const date="datetime'"+salesDeltaSince_(since)+"'",parts=['updatedOn ge '+date,'createdOn ge '+date];
@@ -1903,7 +2036,7 @@ function salesDeltaMirrorMissing_(run,task,id){
     // A remaining HQ contact/history becomes unassigned; do not invent a cascading HQ deletion.
     for(const relatedEntity of ['ContactPersons','ContactHistories']){
       const ids=next.entities[relatedEntity].touchedIds||(next.entities[relatedEntity].touchedIds=[]);
-      for(const row of salesBulkRows_(run,relatedEntity,'companyBucket',salesBulkBucket_(key)))if(String(row.companyId)===key&&!ids.includes(String(row.id)))ids.push(String(row.id));
+      for(const row of salesBulkRows_(run,relatedEntity,'companyBucket',salesBulkBucket_(key),[key]))if(String(row.companyId)===key&&!ids.includes(String(row.id)))ids.push(String(row.id));
     }
     for(const path of ['sales_companies/'+key,'sales_directory/'+key,...[...refs].map(ref=>'sales_communication/'+ref)])drop(path);
     for(const path of ['sales_meta/lean_names','sales_meta/lean_filters']){const old=salesRead_(path);if(old)put(path,{...old,rows:old.rows.filter(c=>!refs.has(String(c.id))&&String(c.hqId||'')!==key)});}
@@ -1958,7 +2091,7 @@ function salesDeltaResolvePlan_(run){
   nextRun.planCleanupPending=false;nextRun.revision++;nextRun.updatedAt=salesNow_();nextRun.errors=(nextRun.errors||[]).filter(e=>!(e.label==='HQ-Einzelprüfung · Planumsätze'&&e.message==='Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'));
   const update=(p,value)=>({update:{name:salesBulkName_(p),fields:{payload:{stringValue:salesBulkPayload_(p,value)}}}});
   const rawWrite=actual?update(rawPath,{...raw,row:actual}):{delete:salesBulkName_(rawPath)};
-  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};}
+  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};const keys=salesBulkRawKeys_(rawPath,actual);rawWrite.update.fields.companyKey={stringValue:keys.companyKey};rawWrite.update.fields.projectKey={stringValue:keys.projectKey};}
   salesBulkRest_('commit',{writes:[rawWrite,update(path,nextRequest),update('sales_meta/bulk',nextCache),update('sales_meta/sync',nextRun),update('sales_meta/lean_sync',salesSyncSummary_(nextRun))]});
   Object.assign(run,nextRun);
 }
@@ -1973,14 +2106,14 @@ function salesDeltaEditionTasks_(run,onlyPending){
 function salesDeltaEditions_(run,task){
   const editions=task.editionIds.map(id=>salesRead_('sales_editions/'+salesKey_(id)));
   if(editions.some(e=>!e))throw new Error('Ausgabenzuordnung fehlt.');
-  const paths=editions.map(e=>salesBulkCollection_('Projects')+'/'+e.projectId),projects=salesBulkGet_(paths),docs=salesBulkRows_(run,'Documents','projectBucket',task.id);
+  const paths=editions.map(e=>salesBulkCollection_('Projects')+'/'+e.projectId),projects=salesBulkGet_(paths),docs=salesBulkRows_(run,'Documents','projectBucket',task.id,editions.map(e=>e.projectId));
   for(const e of editions){salesBulkEdition_(run,{id:e.id}, {edition:e,project:projects[salesBulkCollection_('Projects')+'/'+e.projectId],docs});}return true;
 }
 function startSalesEditionRefresh(){
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running')throw new Error('Zuerst den gespeicherten Abgleich fortsetzen oder abschließen.');
     const cache=salesDeltaCache_(old);if(!cache.completedAt)throw new Error('Es fehlt ein abgeschlossener Erstimport. Vorhandenen HQ-Abgleich zuerst abschließen.');
-    const now=salesNow_(),run={id:Utilities.getUuid(),engine:2,policy:3,kind:'editions',revision:0,state:'running',cursor:0,done:0,tasks:[],errors:(cache.warnings||[]).slice(),entities:cache.entities,companyIds:cache.companyIds||cache.entities.Companies.ids||[],startedAt:now,updatedAt:now,full:false,stats:{...cache.stats,editions:0,writes:0},note:'Nur neue oder zur Aktualisierung markierte Ausgaben aus Firebase. Kein HQ-Abruf und keine HQ-Schreibaufträge. Der Stand entspricht dem letzten HQ-Abgleich; bestehende Bestandswarnungen bleiben offen.'};
+    const now=salesNow_(),run={id:Utilities.getUuid(),engine:2,policy:3,kind:'editions',revision:0,state:'running',cursor:0,done:0,tasks:[],errors:(cache.warnings||[]).slice(),entities:cache.entities,companyIds:cache.companyIds||cache.entities.Companies.ids||[],startedAt:now,updatedAt:now,full:false,stats:{...cache.stats,editions:0,writes:0},keyTags:{...salesDeltaKeyTags_(cache.keyTags),budget:0},note:'Nur neue oder zur Aktualisierung markierte Ausgaben aus Firebase. Kein HQ-Abruf und keine HQ-Schreibaufträge. Der Stand entspricht dem letzten HQ-Abgleich; bestehende Bestandswarnungen bleiben offen.'};
     run.tasks=salesDeltaEditionTasks_(run,true);if(!run.tasks.length)throw new Error('Keine neuen oder geänderten Ausgabenzuordnungen vorhanden.');
     run.tasks.push({kind:'deltaEditionAudit',label:'Ausgabenzuordnungen prüfen'});salesWorkerEnsure_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');salesWrite_('sales_meta/sync',run);return salesBulkSummary_(run);
   });
@@ -2049,7 +2182,8 @@ function salesDeltaAudit_(run){
   // Cache totals include unassigned rows; UI must not add them a second time.
   run.stats.totalsIncludeUnassigned=true;
   if(run.full)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});
-  salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings});return true;
+  const keyTags=salesDeltaKeyTagsStored_(run);
+  salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings,...(keyTags?{keyTags}:{})});return true;
 }
 
 /** Temporary Apps Script continuation trigger. Never starts a new/nightly business sync.
@@ -2058,7 +2192,7 @@ function salesDeltaAudit_(run){
  * failing is recorded and skipped where that is safe, so the rest of the sync still finishes. */
 const SALES_SYNC_RETRY_MINUTES=[2,5,10,15,30,60];
 // Optional checks give up sooner; their open work is simply repeated by the next sync.
-const SALES_SYNC_OPTIONAL_TASKS=['deltaProbe','deltaMissing','catalog','verifyJobs','deltaEditions'];
+const SALES_SYNC_OPTIONAL_TASKS=['deltaProbe','deltaMissing','catalog','verifyJobs','deltaEditions','bulkKeys'];
 var salesWorkerRetriesLeftValue_=0;
 function salesWorkerRetriesLeft_(){return salesWorkerRetriesLeftValue_;}
 function salesWorkerProps_(){return PropertiesService.getScriptProperties();}
@@ -2356,18 +2490,24 @@ function salesLeanCompanyBase_(id){
   if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
   const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true,...(entry.deletion?{deletion:entry.deletion}:{})}:null;
 }
+/** Open jobs plus each app company's own creation job (the views need its HQ contact ID), not every job ever saved. */
+function salesLeanJobs_(drafts){
+  const jobs=salesList_('sales_jobs',{active:true}),known=new Set(jobs.map(j=>j.id));
+  for(const d of drafts||[])if(d?.id&&!known.has(d.id)){const job=salesRead_('sales_jobs/'+salesKey_(d.id));if(job){jobs.push(job);known.add(job.id);}}
+  return jobs;
+}
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
   if(name==='customers')return {companies:salesLeanNames_()};
   if(name==='magazine')return {companies:salesLeanFilters_(),editions:salesLeanBookings_()};
-  if(name==='contacts')return {directory:salesV1Index_().entries,drafts:salesList_('sales_drafts'),jobs:salesList_('sales_jobs').map(salesJobSummary_)};
+  if(name==='contacts')return (()=>{const drafts=salesList_('sales_drafts');return {directory:salesV1Index_().entries,drafts,jobs:salesLeanJobs_(drafts).map(salesJobSummary_)};})();
   if(name==='invoices')return {editions:salesV1Editions_(),companies:salesLeanNames_()};
   if(name==='admin')return {editions:salesLeanRoster_(),access:user.admin?salesAccess_():null};
   if(name==='new')return {catalog:salesCustomerCatalog_(false)};
   if(name==='change')return {catalog:salesRead_('sales_meta/catalog')};
   if(name==='import')return {syncRun:salesLeanSyncStatus_(),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
   if(name==='test'){
-    const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),catalog=salesRead_('sales_meta/catalog');
+    const drafts=salesList_('sales_drafts'),jobs=salesLeanJobs_(drafts),catalog=salesRead_('sales_meta/catalog');
     return {drafts,jobs:jobs.map(salesJobSummary_),catalog,localCompanies:drafts.map(d=>salesLocalCompany_(d,catalog,jobs.find(j=>j.id===d.id))),...(name==='import'?{syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')}: {})};
   }
   if(name==='home')return getSalesLeanState(selectedId);
@@ -2985,7 +3125,7 @@ function salesReviewOverlay_(pending,current){
 function salesReviewOwn_(job,user){return job.actorUid?job.actorUid===user.uid:job.actor===user.email;}
 function listSalesChangeReviews(){
   const user=salesUser_();
-  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
     .map(j=>salesUnclearHistory_(j)?{...salesPick_(j,['id','name','state','message','updatedAt','verifyResult']),unclear:true,content:salesHistoryText_(j.history?.content||j.capture?.content||'').slice(0,300),contactOn:j.history?.contactOn||j.capture?.contactOn||'',review:{conversation:[]}}:salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
     .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
@@ -3642,7 +3782,7 @@ function salesDeleteRef_(companyId){
 }
 function salesDeleteUnsent_(job){return !!job&&['pending','ready'].includes(job.state)&&!job.writeAttempted&&!job.phaseWriteAttempted&&!job.contactAttempted;}
 function salesDeleteLocalJobs_(draftId){
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(j.id===draftId||j.draftId===draftId||j.draftDependency===draftId||j.companyRef==='draft_'+draftId));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(j.id===draftId||j.draftId===draftId||j.draftDependency===draftId||j.companyRef==='draft_'+draftId));
 }
 function salesDeleteDiscardable_(job){
   if(!['createContact','communication','history','entityChange','companyChange','contactEmail','cleanupMarker'].includes(job.kind))return false;
@@ -3653,11 +3793,13 @@ function salesDeleteDiscardable_(job){
 function salesDeleteRawRows_(entity,hqId){
   const cache=salesRead_('sales_meta/bulk'),generation=cache?.entities?.[entity]?.generation;
   if(!generation)throw Error('Der gespeicherte HQ-Bestand ist unvollständig. Bitte zuerst den HQ-Abgleich abschließen.');
-  return salesBulkQuery_(salesBulkCollection_(entity),'companyBucket',salesBulkBucket_(hqId)).filter(v=>v.generation===generation&&Number(v.row?.companyId)===Number(hqId)).map(v=>v.row);
+  // Firm keys (r42) read only this firm's records once its group is keyed; otherwise the whole group as before.
+  const keyed=salesBulkKeyed_(cache.keyTags,entity,'companyBucket',salesBulkBucket_(hqId));
+  return (keyed?salesBulkQuery_(salesBulkCollection_(entity),'companyKey',[salesBulkKey_(hqId)]):salesBulkQuery_(salesBulkCollection_(entity),'companyBucket',salesBulkBucket_(hqId))).filter(v=>v.generation===generation&&Number(v.row?.companyId)===Number(hqId)).map(v=>v.row);
 }
 function salesDeleteOpenJobs_(ref){
   const draftRef=ref.draftId?'draft_'+ref.draftId:null;
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(Number(j.hqId)===ref.hqId||String(j.companyRef)===String(ref.hqId)||draftRef&&(j.draftId===ref.draftId||j.draftDependency===ref.draftId||j.companyRef===draftRef)));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(Number(j.hqId)===ref.hqId||String(j.companyRef)===String(ref.hqId)||draftRef&&(j.draftId===ref.draftId||j.draftDependency===ref.draftId||j.companyRef===draftRef)));
 }
 /** Firebase-only check. HQ is read again before the actual deletion in the central sync. */
 function salesDeleteBlockers_(ref){
@@ -3866,7 +4008,7 @@ function salesContactDeleteStored_(hqId,contactId){
 }
 function salesContactDeleteOpenJobs_(contactId){
   const key=String(contactId);
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteContact'&&!['synced','canceled'].includes(j.state)&&(String(j.contactId)===key||j.entity==='contact'&&String(j.targetId)===key||String(j.capture?.contactRef)===key||String(j.history?.contactPersonId)===key));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteContact'&&!['synced','canceled'].includes(j.state)&&(String(j.contactId)===key||j.entity==='contact'&&String(j.targetId)===key||String(j.capture?.contactRef)===key||String(j.history?.contactPersonId)===key));
 }
 function salesContactDeleteBlockers_(stored,contactId){
   if(stored.deletion&&['requested','approved'].includes(stored.deletion.state))return 'Für diesen Kunden liegt bereits ein Löschantrag vor. Seine Ansprechpartner werden mit ihm gelöscht.';

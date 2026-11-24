@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-24-r41';
+const SALES_RELEASE = '2026-11-24-r42';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -130,8 +130,10 @@ function salesWrite_(path,value) {
   if(status)salesStorePayload_('sales_meta/lean_sync',status);
   if(typeof salesLeanAfterWrite_==='function')salesLeanAfterWrite_(path,value);
 }
-function salesList_(collection) {
+function salesList_(collection,options) {
   if (!/^sales_(jobs|drafts|editions|directory|deletions)$/.test(collection)) throw new Error('Ungültige Sammlung.');
+  // Open jobs and change requests only (r41): reads grow with open work, not with every job ever saved.
+  if (options?.active) {if (collection!=='sales_jobs') throw new Error('Ungültige Sammlung.');return salesJobsActiveList_();}
   const c=salesContext_(), result=[];let next='';
   for (let i=0;i<1000;i++) {
     const page=pilotCall_(pilotUrl_(c.project,collection)+'?pageSize=100'+(next?'&pageToken='+encodeURIComponent(next):''),{method:'get',headers:{Authorization:'Bearer '+c.token}});

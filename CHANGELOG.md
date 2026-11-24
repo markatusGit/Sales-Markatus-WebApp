@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## [v0.42.0]
+
+- Datensparender HQ-Abgleich: Rohdaten tragen Firmen- und Projektkennung. Ein Änderungsabgleich liest nur noch die geänderten Firmen und Projekte statt ganzer Gruppen. Bestehende Rohdaten werden einmalig Gruppe für Gruppe nachgekennzeichnet (höchstens 4.000 Schreibvorgänge je Abgleich, vorher gezählt und unter „Automatisch behoben“ angezeigt).
+- App-Aufträge tragen das Suchfeld „jobActive“. „Meine Änderungen“, der Abgleichstart, die Löschprüfungen und die Ansichten „Kontakte“/„Test“ lesen nur noch offene Aufträge und Änderungsanträge. Abgeschlossene Aufträge bleiben als Nachweis gespeichert.
+- Gemessen (synthetisch): 30 geänderte Firmen in 30 Gruppen 2.378 → 518 Lesevorgänge je Abgleich; offene Aufträge 305 → 4 Lesevorgänge.
+- Kennung `2026-11-24-r42`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.41.0]
 
 - Einzelne Ansprechpartner löschen: In der Kundenakte hat jeder bereits in HQ vorhandene Ansprechpartner die Schaltfläche „Ansprechpartner löschen“. Jeder Benutzer mit Kundenzugriff stellt einen Löschantrag mit Grund; ein Admin gibt ihn unter „Verwaltung“ → „Löschanträge für Kunden und Ansprechpartner“ mit zweitem Bestätigungsklick frei.

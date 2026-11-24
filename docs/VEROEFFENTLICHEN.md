@@ -1,5 +1,18 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r42: Datensparenden Abgleich prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen. Die App legt `SALES_JOBS_ACTIVE_INDEX` beim ersten Aufruf selbst an.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-24-r42“. Bei anderer Kennung diese melden.
+- „Meine Änderungen“ öffnen. Erwartet wird dieselbe Liste wie vorher. Fehlt ein Antrag, dessen Namen melden.
+- „Datenabgleich“ öffnen.
+- „HQ synchronisieren“ anklicken. Erwartet wird „Hintergrundlauf geplant“ bzw. „Läuft bei Google“.
+- Nach einigen Minuten „Fortschritt aktualisieren“ anklicken, bis der Lauf abgeschlossen ist.
+- Unten unter „Automatisch behoben“ den Eintrag „Einmalige Nachkennzeichnung der Rohdaten“ lesen. Erwartet werden die gezählte Zahl der Rohdaten und die bisher gekennzeichnete Menge. Diese Zahl bitte melden; sie ist die gemessene Gesamtkostenzahl der einmaligen Nachkennzeichnung.
+- Bei den nächsten Abgleichen nichts weiter tun. Nach etwa 7 bis 8 Abgleichen erwartet wird „Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung“.
+- Erscheint „Firestore HTTP 429“ oder eine Kontingentmeldung, den Lauf nicht neu starten. Er setzt nach einer Wartezeit selbst fort.
+
 ## r41: Einzelnen Ansprechpartner löschen prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen. Nur mit einem Test-Ansprechpartner prüfen, der wirklich gelöscht werden darf.

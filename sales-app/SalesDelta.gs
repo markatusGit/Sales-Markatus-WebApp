@@ -24,7 +24,7 @@ function salesDeltaPrepare_(old){
   if(full&&old?.engine===2&&old.state!=='running')throw new Error('Vorhandener Abgleich hat keine wiederherstellbare Ausgangsbasis. Kein erneuter Gesamtimport gestartet. Gespeicherten Lauf prüfen.');
   let tasks=[];
   if(old?.state==='running')tasks=old.tasks.slice(old.cursor).filter(t=>t.kind==='write');
-  else {const jobs=salesList_('sales_jobs').filter(j=>!['synced','canceled','awaitingApproval','awaitingAnswer'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
+  else {const jobs=salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled','awaitingApproval','awaitingAnswer'].includes(j.state));for(const step of ['company','contact'])jobs.filter(j=>j.kind==='createCompany').forEach(j=>tasks.push({kind:'write',id:j.id,step,label:'App → HQ: '+(step==='company'?'Firma bestätigen':'Ansprechpartner übertragen')}));salesCommunicationOrder_(jobs.filter(j=>j.kind!=='createCompany')).forEach(j=>tasks.push({kind:'write',id:j.id,label:'App → HQ: gespeicherte Änderung'}));}
   const run={id:old?.state==='running'?old.id:Utilities.getUuid(),engine:2,policy:3,revision:(old?.revision||0)+1,state:'running',paused:false,cursor:0,done:0,tasks,
     errors:old?.state==='running'?(old.errors||[]).filter(e=>e.kind==='write'):[],entities:{},dirtyCompanies:[],dirtyProjects:[],changedCompanyIds:[],changedProjectIds:[],companyIds:(cache.companyIds||cache.entities?.Companies?.ids||[]).slice(),loadedCompanyIds:[],startedAt:now,updatedAt:now,full,
     stats:{companies:0,contacts:0,histories:0,editions:0,writes:0,unassignedContacts:cache.stats?.unassignedContacts||0,unassignedHistories:cache.stats?.unassignedHistories||0},previousStats:cache.stats||{}};
@@ -37,10 +37,25 @@ function salesDeltaPrepare_(old){
   // Every HQ data type is reconciled by identifiers, but only when Firebase and HQ report different totals.
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand mit HQ abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
+  // Firm/project keys (r42): progress is kept in sales_meta/bulk; an unfinished earlier run may already have tagged more groups.
+  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0};
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
 }
 // HQ accepts whole UTC seconds. Floor the request boundary; keep durable watermarks unchanged.
+function salesDeltaKeyTags_(...sources){
+  const out={version:1,collections:{},written:0};
+  for(const t of sources.filter(x=>x?.collections)){
+    out.written=Math.max(out.written,t.written||0);if(t.measured&&!out.measured)out.measured=t.measured;
+    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.complete=o.complete||!!v.complete;}
+  }
+  return out;
+}
+function salesDeltaKeyTagsStored_(run){
+  // A full import writes every raw record with keys: all collections are then completely keyed.
+  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),complete:true}]))};
+  if(!run.keyTags)return undefined;const {budget,runWritten,...stored}=run.keyTags;return stored;
+}
 function salesDeltaSince_(since){return new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');}
 function salesDeltaFilter_(entity,since){
   const date="datetime'"+salesDeltaSince_(since)+"'",parts=['updatedOn ge '+date,'createdOn ge '+date];
@@ -227,7 +242,7 @@ function salesDeltaMirrorMissing_(run,task,id){
     // A remaining HQ contact/history becomes unassigned; do not invent a cascading HQ deletion.
     for(const relatedEntity of ['ContactPersons','ContactHistories']){
       const ids=next.entities[relatedEntity].touchedIds||(next.entities[relatedEntity].touchedIds=[]);
-      for(const row of salesBulkRows_(run,relatedEntity,'companyBucket',salesBulkBucket_(key)))if(String(row.companyId)===key&&!ids.includes(String(row.id)))ids.push(String(row.id));
+      for(const row of salesBulkRows_(run,relatedEntity,'companyBucket',salesBulkBucket_(key),[key]))if(String(row.companyId)===key&&!ids.includes(String(row.id)))ids.push(String(row.id));
     }
     for(const path of ['sales_companies/'+key,'sales_directory/'+key,...[...refs].map(ref=>'sales_communication/'+ref)])drop(path);
     for(const path of ['sales_meta/lean_names','sales_meta/lean_filters']){const old=salesRead_(path);if(old)put(path,{...old,rows:old.rows.filter(c=>!refs.has(String(c.id))&&String(c.hqId||'')!==key)});}
@@ -282,7 +297,7 @@ function salesDeltaResolvePlan_(run){
   nextRun.planCleanupPending=false;nextRun.revision++;nextRun.updatedAt=salesNow_();nextRun.errors=(nextRun.errors||[]).filter(e=>!(e.label==='HQ-Einzelprüfung · Planumsätze'&&e.message==='Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'));
   const update=(p,value)=>({update:{name:salesBulkName_(p),fields:{payload:{stringValue:salesBulkPayload_(p,value)}}}});
   const rawWrite=actual?update(rawPath,{...raw,row:actual}):{delete:salesBulkName_(rawPath)};
-  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};}
+  if(actual){rawWrite.update.fields.companyBucket={stringValue:salesBulkBucket_(actual.companyId)};rawWrite.update.fields.projectBucket={stringValue:'none'};const keys=salesBulkRawKeys_(rawPath,actual);rawWrite.update.fields.companyKey={stringValue:keys.companyKey};rawWrite.update.fields.projectKey={stringValue:keys.projectKey};}
   salesBulkRest_('commit',{writes:[rawWrite,update(path,nextRequest),update('sales_meta/bulk',nextCache),update('sales_meta/sync',nextRun),update('sales_meta/lean_sync',salesSyncSummary_(nextRun))]});
   Object.assign(run,nextRun);
 }
@@ -297,14 +312,14 @@ function salesDeltaEditionTasks_(run,onlyPending){
 function salesDeltaEditions_(run,task){
   const editions=task.editionIds.map(id=>salesRead_('sales_editions/'+salesKey_(id)));
   if(editions.some(e=>!e))throw new Error('Ausgabenzuordnung fehlt.');
-  const paths=editions.map(e=>salesBulkCollection_('Projects')+'/'+e.projectId),projects=salesBulkGet_(paths),docs=salesBulkRows_(run,'Documents','projectBucket',task.id);
+  const paths=editions.map(e=>salesBulkCollection_('Projects')+'/'+e.projectId),projects=salesBulkGet_(paths),docs=salesBulkRows_(run,'Documents','projectBucket',task.id,editions.map(e=>e.projectId));
   for(const e of editions){salesBulkEdition_(run,{id:e.id}, {edition:e,project:projects[salesBulkCollection_('Projects')+'/'+e.projectId],docs});}return true;
 }
 function startSalesEditionRefresh(){
   salesUser_(true);return salesLock_(()=>{
     salesAssertPrivate_();const old=salesRead_('sales_meta/sync');if(old?.state==='running')throw new Error('Zuerst den gespeicherten Abgleich fortsetzen oder abschließen.');
     const cache=salesDeltaCache_(old);if(!cache.completedAt)throw new Error('Es fehlt ein abgeschlossener Erstimport. Vorhandenen HQ-Abgleich zuerst abschließen.');
-    const now=salesNow_(),run={id:Utilities.getUuid(),engine:2,policy:3,kind:'editions',revision:0,state:'running',cursor:0,done:0,tasks:[],errors:(cache.warnings||[]).slice(),entities:cache.entities,companyIds:cache.companyIds||cache.entities.Companies.ids||[],startedAt:now,updatedAt:now,full:false,stats:{...cache.stats,editions:0,writes:0},note:'Nur neue oder zur Aktualisierung markierte Ausgaben aus Firebase. Kein HQ-Abruf und keine HQ-Schreibaufträge. Der Stand entspricht dem letzten HQ-Abgleich; bestehende Bestandswarnungen bleiben offen.'};
+    const now=salesNow_(),run={id:Utilities.getUuid(),engine:2,policy:3,kind:'editions',revision:0,state:'running',cursor:0,done:0,tasks:[],errors:(cache.warnings||[]).slice(),entities:cache.entities,companyIds:cache.companyIds||cache.entities.Companies.ids||[],startedAt:now,updatedAt:now,full:false,stats:{...cache.stats,editions:0,writes:0},keyTags:{...salesDeltaKeyTags_(cache.keyTags),budget:0},note:'Nur neue oder zur Aktualisierung markierte Ausgaben aus Firebase. Kein HQ-Abruf und keine HQ-Schreibaufträge. Der Stand entspricht dem letzten HQ-Abgleich; bestehende Bestandswarnungen bleiben offen.'};
     run.tasks=salesDeltaEditionTasks_(run,true);if(!run.tasks.length)throw new Error('Keine neuen oder geänderten Ausgabenzuordnungen vorhanden.');
     run.tasks.push({kind:'deltaEditionAudit',label:'Ausgabenzuordnungen prüfen'});salesWorkerEnsure_();salesWorkerProps_().setProperty('SALES_SYNC_PAUSE','');salesWrite_('sales_meta/sync',run);return salesBulkSummary_(run);
   });
@@ -373,5 +388,6 @@ function salesDeltaAudit_(run){
   // Cache totals include unassigned rows; UI must not add them a second time.
   run.stats.totalsIncludeUnassigned=true;
   if(run.full)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});
-  salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings});return true;
+  const keyTags=salesDeltaKeyTagsStored_(run);
+  salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings,...(keyTags?{keyTags}:{})});return true;
 }

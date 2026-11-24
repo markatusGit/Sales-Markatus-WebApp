@@ -25,7 +25,7 @@ function salesDeleteRef_(companyId){
 }
 function salesDeleteUnsent_(job){return !!job&&['pending','ready'].includes(job.state)&&!job.writeAttempted&&!job.phaseWriteAttempted&&!job.contactAttempted;}
 function salesDeleteLocalJobs_(draftId){
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(j.id===draftId||j.draftId===draftId||j.draftDependency===draftId||j.companyRef==='draft_'+draftId));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(j.id===draftId||j.draftId===draftId||j.draftDependency===draftId||j.companyRef==='draft_'+draftId));
 }
 function salesDeleteDiscardable_(job){
   if(!['createContact','communication','history','entityChange','companyChange','contactEmail','cleanupMarker'].includes(job.kind))return false;
@@ -36,11 +36,13 @@ function salesDeleteDiscardable_(job){
 function salesDeleteRawRows_(entity,hqId){
   const cache=salesRead_('sales_meta/bulk'),generation=cache?.entities?.[entity]?.generation;
   if(!generation)throw Error('Der gespeicherte HQ-Bestand ist unvollständig. Bitte zuerst den HQ-Abgleich abschließen.');
-  return salesBulkQuery_(salesBulkCollection_(entity),'companyBucket',salesBulkBucket_(hqId)).filter(v=>v.generation===generation&&Number(v.row?.companyId)===Number(hqId)).map(v=>v.row);
+  // Firm keys (r42) read only this firm's records once its group is keyed; otherwise the whole group as before.
+  const keyed=salesBulkKeyed_(cache.keyTags,entity,'companyBucket',salesBulkBucket_(hqId));
+  return (keyed?salesBulkQuery_(salesBulkCollection_(entity),'companyKey',[salesBulkKey_(hqId)]):salesBulkQuery_(salesBulkCollection_(entity),'companyBucket',salesBulkBucket_(hqId))).filter(v=>v.generation===generation&&Number(v.row?.companyId)===Number(hqId)).map(v=>v.row);
 }
 function salesDeleteOpenJobs_(ref){
   const draftRef=ref.draftId?'draft_'+ref.draftId:null;
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(Number(j.hqId)===ref.hqId||String(j.companyRef)===String(ref.hqId)||draftRef&&(j.draftId===ref.draftId||j.draftDependency===ref.draftId||j.companyRef===draftRef)));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteCompany'&&!['synced','canceled'].includes(j.state)&&(Number(j.hqId)===ref.hqId||String(j.companyRef)===String(ref.hqId)||draftRef&&(j.draftId===ref.draftId||j.draftDependency===ref.draftId||j.companyRef===draftRef)));
 }
 /** Firebase-only check. HQ is read again before the actual deletion in the central sync. */
 function salesDeleteBlockers_(ref){
@@ -249,7 +251,7 @@ function salesContactDeleteStored_(hqId,contactId){
 }
 function salesContactDeleteOpenJobs_(contactId){
   const key=String(contactId);
-  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteContact'&&!['synced','canceled'].includes(j.state)&&(String(j.contactId)===key||j.entity==='contact'&&String(j.targetId)===key||String(j.capture?.contactRef)===key||String(j.history?.contactPersonId)===key));
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.kind!=='deleteContact'&&!['synced','canceled'].includes(j.state)&&(String(j.contactId)===key||j.entity==='contact'&&String(j.targetId)===key||String(j.capture?.contactRef)===key||String(j.history?.contactPersonId)===key));
 }
 function salesContactDeleteBlockers_(stored,contactId){
   if(stored.deletion&&['requested','approved'].includes(stored.deletion.state))return 'Für diesen Kunden liegt bereits ein Löschantrag vor. Seine Ansprechpartner werden mit ihm gelöscht.';

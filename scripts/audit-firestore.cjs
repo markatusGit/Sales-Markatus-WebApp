@@ -25,10 +25,10 @@ function instrument(f) {
     const col = key.split('/')[0]; stats.writesByCollection[col] = (stats.writesByCollection[col] || 0) + 1;
     f.fields[key] = clone(fields);
     // Keep the existing fixture's model aligned without instrumenting an extra read.
-    f.db[key] = JSON.parse(fields.payload.stringValue);
+    if (fields.payload) f.db[key] = JSON.parse(fields.payload.stringValue);
   }
   f.ctx.pilotReadDocument_ = (_, key) => { stats.firebaseRequests++; reads([key]); return f.fields[key] ? {payload: f.fields[key].payload.stringValue} : null; };
-  f.ctx.pilotWriteDocument_ = (_, key, value) => { stats.firebaseRequests++; put(key, {payload: {stringValue: value.payload}}); };
+  f.ctx.pilotWriteDocument_ = (_, key, value) => { stats.firebaseRequests++; put(key, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, {stringValue: String(v)}]))); };
   f.ctx.pilotCall_ = (url, options = {}) => {
     stats.firebaseRequests++;
     if (url.endsWith(':batchGet')) {
@@ -37,13 +37,26 @@ function instrument(f) {
     }
     if (url.endsWith(':commit')) {
       const writes = JSON.parse(options.payload).writes;
-      writes.forEach(w => put(w.update.name.split('/documents/')[1], w.update.fields));
+      for (const w of writes) {
+        if (w.verify) continue;
+        if (w.delete) { const key = w.delete.split('/documents/')[1]; delete f.fields[key]; delete f.db[key]; continue; }
+        const key = w.update.name.split('/documents/')[1];
+        if (w.currentDocument?.exists === true && !f.fields[key]) throw Error('Synthetic precondition failed');
+        put(key, w.updateMask ? {...(f.fields[key] || {}), ...w.update.fields} : w.update.fields);
+      }
       return {writeResults: writes.map(() => ({updateTime: '2026-10-16T00:00:00Z'}))};
     }
     if (url.endsWith(':runQuery')) {
       const q = JSON.parse(options.payload).structuredQuery, filter = q.where.fieldFilter;
-      const keys = Object.keys(f.fields).filter(key => key.startsWith(q.from[0].collectionId + '/') && f.fields[key][filter.field.fieldPath]?.stringValue === filter.value.stringValue).sort().filter(key => !q.startAt || name(key) > q.startAt.values[0].referenceValue).slice(0, q.limit);
+      const match = v => filter.op === 'IN' ? filter.value.arrayValue.values.some(x => x.stringValue === v) : v === filter.value.stringValue;
+      const keys = Object.keys(f.fields).filter(key => key.startsWith(q.from[0].collectionId + '/') && match(f.fields[key][filter.field.fieldPath]?.stringValue)).sort().filter(key => !q.startAt || name(key) > q.startAt.values[0].referenceValue).slice(0, q.limit);
       reads(keys, true); return keys.map(key => ({document: doc(key)}));
+    }
+    if (url.endsWith(':runAggregationQuery')) {
+      // Count queries bill one read per started 1,000 index entries.
+      const col = JSON.parse(options.payload).structuredAggregationQuery.structuredQuery.from[0].collectionId, n = Object.keys(f.fields).filter(key => key.startsWith(col + '/')).length;
+      stats.readDocumentsModel += Math.max(1, Math.ceil(n / 1000)); stats.readsByCollection[col] = (stats.readsByCollection[col] || 0) + Math.max(1, Math.ceil(n / 1000));
+      return [{result: {aggregateFields: {n: {integerValue: String(n)}}}}];
     }
     const parsed = new URL(url), col = parsed.pathname.split('/documents/')[1];
     const keys = Object.keys(f.fields).filter(key => key.startsWith(col + '/') && !key.slice(col.length + 1).includes('/')).sort();

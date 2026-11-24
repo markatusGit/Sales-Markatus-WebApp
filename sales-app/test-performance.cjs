@@ -72,4 +72,52 @@ test('inventory is read-only, bounded, strips customer contents and reports part
  const m=f.ctx.getSalesStorageInventoryPage({});assert.equal(m.documents,1);assert.equal(m.splitRoots,1);assert.equal(m.references[0],'synthetic-generation');assert.equal(m.next.pageToken,'synthetic-next');assert.equal(calls[0].opts.method,'get');assert.match(calls[0].url,/pageSize=50/);assert.ok(!JSON.stringify(m).includes('stringValue'));
  assert.throws(()=>f.ctx.getSalesStorageInventoryPage({collection:'users'}),/Inventurseite/);assert.equal(calls.length,1);
 });
+test('r42: 30 changed firms in 30 groups read only their own raw records after the one-time key tagging',()=>{
+ // Synthetic stock: 640 firms in all 64 groups, each with contact, two histories, project, document and planned revenue.
+ const f=bulkFixture(),at='2026-01-01T00:00:00Z';
+ for(let i=0;i<640;i++){const id=1000+i,p=5000+i;
+  f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:at};f.remote.ContactPersons[20000+i]={id:20000+i,companyId:id,firstName:'Synthetic',updatedOn:at};
+  for(const h of [0,1])f.remote.ContactHistories[30000+2*i+h]={id:30000+2*i+h,companyId:id,reason:'Synthetic',content:'Synthetic',contactOn:at,contactHistoryChannel:'Note',updatedOn:at};
+  f.remote.Projects[p]={id:p,companyId:id,name:'Synthetic project',number:'S'+p,status:'InProgress',updatedOn:at};
+  f.remote.Documents[40000+i]={id:40000+i,companyId:id,projectId:p,number:'RE-'+i,date:'2026-01-01',currency:'EUR',documentType:'Invoice',documentStatusEntity:{documentStatusType:'Sent'},netValue:1,updatedOn:at};
+  f.remote.PlannedRevenues[60000+i]={id:60000+i,companyId:id,projectId:p,netTotal:1,currency:'EUR',startDate:'2026-12-01',estimations:[],updatedOn:at};
+ }
+ f.finishBulk();const raw=Object.keys(f.fields).filter(k=>k.startsWith('sales_raw'));
+ assert.ok(raw.every(k=>f.fields[k].companyKey&&f.fields[k].projectKey),'every raw write carries firm and project keys');
+ // Model the stock before r42: no keys on stored records, no tagging progress.
+ for(const k of raw){delete f.fields[k].companyKey;delete f.fields[k].projectKey;}
+ const bulk=f.ctx.salesRead_('sales_meta/bulk');delete bulk.keyTags;f.ctx.salesWrite_('sales_meta/bulk',bulk);
+ const a=instrument(f),sum=(o,prefix)=>Object.entries(o).filter(([c])=>c.startsWith(prefix)).reduce((n,[,v])=>n+v,0),rawReads=m=>sum(m.readsByCollection,'sales_raw');
+ const change=from=>{for(let i=from;i<from+30;i++){f.remote.Companies[i].name='Changed '+i;f.remote.Companies[i].updatedOn=new Date().toISOString();}};
+ const sync=label=>a.measure(label,()=>{f.ctx.startSalesSync();f.worker();return f.ctx.salesRead_('sales_meta/sync');});
+ const budget=f.ctx.salesKeyTagBudget_;f.ctx.salesKeyTagBudget_=()=>0;change(1000);
+ const before=sync('before');assert.equal(before.result.state,'completed');assert.equal(new Set(before.result.dirtyCompanies).size,30);
+ assert.equal(f.ctx.salesRead_('sales_companies/1000').company.name,'Changed 1000');
+ // One-time tagging, measured: a count query first, then only the two key fields per record.
+ assert.equal(budget(),4000);f.ctx.salesKeyTagBudget_=()=>10000;const tag=sync('tagging');f.ctx.salesKeyTagBudget_=budget;const tags=f.ctx.salesRead_('sales_meta/bulk').keyTags;
+ assert.equal(tag.result.state,'completed');assert.ok(Object.values(tags.collections).every(t=>t.complete));assert.equal(tags.written,raw.length-30,'the 30 firms rewritten by the earlier sync already carry keys');assert.ok(raw.every(k=>f.fields[k].companyKey&&f.fields[k].projectKey));assert.equal(tags.measured.total,raw.length);
+ assert.ok(tag.result.notices.some(n=>/Abgeschlossen: alle Rohdaten/.test(n.message)));
+ change(1100);const after=sync('after');assert.equal(after.result.state,'completed');
+ const file=f.ctx.salesRead_('sales_companies/1100');assert.equal(file.company.name,'Changed 1100');assert.equal(file.contacts.length,1);assert.equal(file.histories.length,2);assert.equal(file.projects.length,1);
+ assert.ok(rawReads(after)*5<rawReads(before),'keyed reads must be far below the group reads');
+ console.log('MEASURE r42 30 changed firms in 30 groups: raw reads before '+rawReads(before)+' / after '+rawReads(after)+'; whole sync reads '+before.readDocumentsModel+' -> '+after.readDocumentsModel+'; one-time tagging of '+raw.length+' raw records: '+sum(tag.writesByCollection,'sales_raw')+' writes, '+rawReads(tag)+' raw reads');
+});
+test('r42: open-job lists read open jobs and change requests only; finished jobs stay stored',()=>{
+ const f=bulkFixture();const a=instrument(f),now='2026-11-24T00:00:00Z';
+ // 300 finished jobs and 3 open ones saved before r42 (no activity flag yet), one finished change request.
+ for(let i=0;i<300;i++)a.seed('sales_jobs/old-'+i,{id:'old-'+i,kind:'history',state:i%10?'synced':'canceled',hqId:102,history:{syncId:'sales-old-'+i},actor:'pp@markatus.de',createdAt:now,updatedAt:now});
+ for(let i=0;i<3;i++)a.seed('sales_jobs/open-'+i,{id:'open-'+i,kind:'history',state:'pending',hqId:102,history:{syncId:'sales-open-'+i},actor:'pp@markatus.de',createdAt:now,updatedAt:now});
+ a.seed('sales_jobs/review-1',{id:'review-1',kind:'companyChange',state:'synced',review:{status:'approved',revision:2,conversation:[]},changeReason:'Synthetic',name:'Synthetic',actor:'pp@markatus.de',createdAt:now,updatedAt:now});
+ const all=Object.keys(f.fields).filter(k=>k.startsWith('sales_jobs/')).length;
+ const before=a.measure('before',()=>f.ctx.salesList_('sales_jobs').filter(j=>!['synced','canceled'].includes(j.state)));assert.equal(before.readsByCollection.sales_jobs,all);
+ const first=a.measure('first',()=>f.ctx.listSalesChangeReviews());assert.equal(first.readsByCollection.sales_jobs,all);assert.equal(first.writesByCollection.sales_jobs,4);assert.equal(first.result.length,1);
+ const after=a.measure('after',()=>f.ctx.listSalesChangeReviews());assert.equal(after.readsByCollection.sales_jobs,4);assert.equal(after.writtenDocuments,0);assert.equal(after.result[0].id,'review-1');
+ const open=a.measure('open',()=>f.ctx.salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled'].includes(j.state)));assert.equal(open.result.map(j=>j.id).sort().join(),'open-0,open-1,open-2');assert.equal(open.readsByCollection.sales_jobs,4);
+ // New and closed jobs keep the flag in step with their state; nothing is deleted.
+ f.ctx.salesWrite_('sales_jobs/new-1',{id:'new-1',kind:'history',state:'pending',hqId:102,history:{}});f.ctx.salesWrite_('sales_jobs/open-0',{...f.ctx.salesRead_('sales_jobs/open-0'),state:'synced'});
+ f.ctx.salesBulkRest_('commit',{writes:[{update:{name:f.ctx.salesBulkName_('sales_jobs/open-1'),fields:{payload:{stringValue:JSON.stringify({...f.ctx.salesRead_('sales_jobs/open-1'),state:'canceled'})}}}}]});
+ assert.equal(f.ctx.salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled'].includes(j.state)).map(j=>j.id).sort().join(),'new-1,open-2');
+ assert.equal(Object.keys(f.fields).filter(k=>k.startsWith('sales_jobs/')).length,all+1);
+ console.log('MEASURE r42 open-job list with '+all+' saved jobs: reads before '+before.readsByCollection.sales_jobs+' / after '+after.readsByCollection.sales_jobs+' (one-time flagging: '+first.writesByCollection.sales_jobs+' writes)');
+});
 console.log(count+' performance and inventory tests passed.');

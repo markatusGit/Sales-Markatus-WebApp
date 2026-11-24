@@ -130,18 +130,24 @@ function salesLeanCompanyBase_(id){
   if(stored)return {...(typeof salesBusinessView_==='function'?salesBusinessView_(stored):stored),histories:salesLeanHistories_(id,stored.histories)};
   const entry=salesRead_('sales_directory/'+id);return entry?.company?{company:entry.company,contacts:entry.contacts||[],histories:[],projects:[],detailMissing:true,...(entry.deletion?{deletion:entry.deletion}:{})}:null;
 }
+/** Open jobs plus each app company's own creation job (the views need its HQ contact ID), not every job ever saved. */
+function salesLeanJobs_(drafts){
+  const jobs=salesList_('sales_jobs',{active:true}),known=new Set(jobs.map(j=>j.id));
+  for(const d of drafts||[])if(d?.id&&!known.has(d.id)){const job=salesRead_('sales_jobs/'+salesKey_(d.id));if(job){jobs.push(job);known.add(job.id);}}
+  return jobs;
+}
 function getSalesLeanView(name,selectedId){
   const user=salesUser_();
   if(name==='customers')return {companies:salesLeanNames_()};
   if(name==='magazine')return {companies:salesLeanFilters_(),editions:salesLeanBookings_()};
-  if(name==='contacts')return {directory:salesV1Index_().entries,drafts:salesList_('sales_drafts'),jobs:salesList_('sales_jobs').map(salesJobSummary_)};
+  if(name==='contacts')return (()=>{const drafts=salesList_('sales_drafts');return {directory:salesV1Index_().entries,drafts,jobs:salesLeanJobs_(drafts).map(salesJobSummary_)};})();
   if(name==='invoices')return {editions:salesV1Editions_(),companies:salesLeanNames_()};
   if(name==='admin')return {editions:salesLeanRoster_(),access:user.admin?salesAccess_():null};
   if(name==='new')return {catalog:salesCustomerCatalog_(false)};
   if(name==='change')return {catalog:salesRead_('sales_meta/catalog')};
   if(name==='import')return {syncRun:salesLeanSyncStatus_(),unassignedSummary:salesRead_('sales_meta/unassignedsummary')};
   if(name==='test'){
-    const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),catalog=salesRead_('sales_meta/catalog');
+    const drafts=salesList_('sales_drafts'),jobs=salesLeanJobs_(drafts),catalog=salesRead_('sales_meta/catalog');
     return {drafts,jobs:jobs.map(salesJobSummary_),catalog,localCompanies:drafts.map(d=>salesLocalCompany_(d,catalog,jobs.find(j=>j.id===d.id))),...(name==='import'?{syncRun:salesSyncSummary_(salesRead_('sales_meta/sync')),unassignedSummary:salesRead_('sales_meta/unassignedsummary')}: {})};
   }
   if(name==='home')return getSalesLeanState(selectedId);

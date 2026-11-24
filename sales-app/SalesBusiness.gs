@@ -140,7 +140,7 @@ function salesReviewOverlay_(pending,current){
 function salesReviewOwn_(job,user){return job.actorUid?job.actorUid===user.uid:job.actor===user.email;}
 function listSalesChangeReviews(){
   const user=salesUser_();
-  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
+  return salesList_('sales_jobs',{active:true}).filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
     .map(j=>salesUnclearHistory_(j)?{...salesPick_(j,['id','name','state','message','updatedAt','verifyResult']),unclear:true,content:salesHistoryText_(j.history?.content||j.capture?.content||'').slice(0,300),contactOn:j.history?.contactOn||j.capture?.contactOn||'',review:{conversation:[]}}:salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
     .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }

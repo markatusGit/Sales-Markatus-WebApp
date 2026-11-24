@@ -20,7 +20,43 @@ function salesStoreRoot_(path,payload,c){
   if(typeof salesAuthRequest_!=='undefined'&&salesAuthRequest_?.user&&!salesAuthRequest_.worker&&typeof salesBulkRest_==='function'){
     salesBulkRest_('commit',{writes:[{update:{name:salesBulkName_(path),fields:{payload:{stringValue:payload}}}}]});return;
   }
-  pilotWriteDocument_(c.project,path,{payload},c.token);
+  pilotWriteDocument_(c.project,path,{payload,...salesJobFields_(path,payload)},c.token);
+}
+/** App jobs carry a searchable flag "jobActive": 1 while a job is open (not synced/canceled) or is a change request
+ * shown under "Meine Änderungen". Lists of open jobs then query only flagged jobs instead of every job ever saved.
+ * The flag is written together with the job itself; nothing is ever deleted. */
+function salesJobActive_(job){return !!job&&(!['synced','canceled'].includes(job.state)||!!job.review);}
+function salesJobFields_(path,payload){
+  if(!/^sales_jobs\/[^/]+$/.test(path))return {};
+  let value=null;try{value=JSON.parse(payload);}catch(_){}
+  // A split payload cannot be judged from its pointer: keep it listed, the reader checks the state anyway.
+  return {jobActive:value?.storageFormat==='sales-parts-v1'||salesJobActive_(value)?'1':'0'};
+}
+function salesJobWriteFields_(write){
+  const path=String(write?.update?.name||'').split('/documents/')[1]||'';
+  if(write.updateMask||!write.update?.fields?.payload||!/^sales_jobs\/[^/]+$/.test(path))return write;
+  return {...write,update:{...write.update,fields:{...write.update.fields,jobActive:{stringValue:salesJobFields_(path,write.update.fields.payload.stringValue).jobActive}}}};
+}
+const SALES_JOBS_ACTIVE_PROPERTY='SALES_JOBS_ACTIVE_INDEX';
+/** Open jobs and change requests only. Once per installation, jobs saved before r41 are flagged: one full list,
+ * then only the open ones get the flag (field-only write, the job content stays untouched). */
+function salesJobsActiveList_(){
+  const props=PropertiesService.getScriptProperties();
+  if(props.getProperty(SALES_JOBS_ACTIVE_PROPERTY)!=='1'){
+    const active=salesList_('sales_jobs').filter(salesJobActive_);
+    for(let i=0;i<active.length;i+=100)salesBulkRest_('commit',{writes:active.slice(i,i+100).map(j=>({update:{name:salesBulkName_('sales_jobs/'+salesKey_(j.id)),fields:{jobActive:{stringValue:'1'}}},updateMask:{fieldPaths:['jobActive']},currentDocument:{exists:true}}))});
+    props.setProperty(SALES_JOBS_ACTIVE_PROPERTY,'1');return active;
+  }
+  const c=salesContext_(),out=[];let last='';
+  for(let page=0;page<200;page++){
+    const query={from:[{collectionId:'sales_jobs'}],where:{fieldFilter:{field:{fieldPath:'jobActive'},op:'EQUAL',value:{stringValue:'1'}}},orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:250};
+    if(last)query.startAt={values:[{referenceValue:last}],before:false};
+    const result=salesBulkRest_('runQuery',{structuredQuery:query});if(!Array.isArray(result))throw new Error('Firebase-Abfrage unvollständig.');
+    const docs=result.filter(r=>r.document).map(r=>r.document);
+    for(const doc of docs){if(doc.name===last)throw new Error('Firebase-Seite wiederholt sich.');const path=doc.name.split('/documents/')[1];out.push(salesDecodeStored_(path,doc.fields.payload.stringValue,c));}
+    if(docs.length<250)return out.filter(salesJobActive_);last=docs[docs.length-1].name;
+  }
+  throw new Error('Zu viele offene Aufträge für einen Abruf.');
 }
 function salesStorePayload_(path,value){
   path=salesPath_(path);const c=salesContext_(),payload=JSON.stringify(value);
