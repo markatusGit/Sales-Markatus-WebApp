@@ -1957,3 +1957,7 @@ Veröffentlichung v0.39.0: Apps-Script-Version 69, bestehende Bereitstellung bei
 ### Veröffentlichung v0.42.0
 
 Veröffentlichung v0.42.0: Apps-Script-Version 70, bestehende Bereitstellung beibehalten. Quellcommit 3d37d3b33eb4bf6f24b9f2d894beecb43808cace. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-24T10:03:08.349Z.
+
+### Veröffentlichung v0.42.1
+
+Veröffentlichung v0.42.1: Apps-Script-Version 71, bestehende Bereitstellung beibehalten. Quellcommit b8250ced5e38ddcc813d3faa2014e374c37e8152. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-24T12:15:27.821Z.
