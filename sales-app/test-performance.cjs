@@ -46,13 +46,13 @@ test('wrong-company HQ rows are rejected and unapproved callers cannot run new e
  const before=JSON.stringify(f.db['sales_companies/102']);assert.throws(()=>f.ctx.syncSalesLeanHistory('102'),/Firmenfilter/);assert.equal(JSON.stringify(f.db['sales_companies/102']),before);
  f.setEmail('outside@example.invalid');for(const fn of [()=>f.ctx.syncSalesLeanHistory('102'),()=>f.ctx.getSalesSyncStatus(),()=>f.ctx.getSalesStorageInventoryPage({})])assert.throws(fn,/Zugriff/);
 });
-test('empty delta pages need no journals and unchanged 60-probe sync beats published r20 budget',()=>{
+test('empty delta pages need no journals and unchanged 50-probe sync beats published r20 budget (histories need no probe)',()=>{
  const f=bulkFixture();f.config(70);f.doc(70,1001);
  for(const [i,entity] of ['Companies','ContactPersons','Projects','Documents','PlannedRevenues','ContactHistories'].entries())for(let j=0;Object.keys(f.remote[entity]).length<10;j++){
   const id=20000+i*1000+j;f.remote[entity][id]={id,companyId:102,projectId:570,name:'Synthetic',number:'S'+id,updatedOn:'2026-01-01',date:'2026-01-01',currency:'EUR',documentType:'Invoice',documentStatusEntity:{documentStatusType:'Sent'},netValue:1,reason:'Synthetic',content:'Synthetic',contactOn:'2026-01-01',contactHistoryChannel:'Note',estimations:[]};
  }
  f.finishBulk();const a=instrument(f),m=a.measure('unchanged sync',()=>{f.ctx.startSalesSync();f.worker();return f.ctx.salesRead_('sales_meta/sync');});
- assert.equal(m.result.state,'completed');assert.equal(Object.values(m.result.entities).reduce((n,e)=>n+(e.checked||0),0),60);
+ assert.equal(m.result.state,'completed');assert.equal(Object.values(m.result.entities).reduce((n,e)=>n+(e.checked||0),0),50);assert.equal(m.result.entities.ContactHistories.checked||0,0);
  assert.ok(m.readDocumentsModel-1<142);assert.ok(m.writtenDocuments<154);assert.equal(m.writesByCollection.sales_imports||0,0);
  console.log('MEASURE unchanged 60-probe sync: '+(m.readDocumentsModel-1)+' reads, '+m.writtenDocuments+' writes; published r20 model: 142 reads / 154 writes');
 });

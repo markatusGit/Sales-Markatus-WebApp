@@ -1,5 +1,19 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r40: Bestandsabgleich und Entscheidungen prüfen
+
+Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-24-r40“. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen.
+- „HQ synchronisieren“ anklicken (neuer Lauf, nicht nur fortsetzen). Erwartet wird „Hintergrundlauf geplant“ bzw. „Läuft bei Google“.
+- Nach einigen Minuten „Fortschritt aktualisieren“ anklicken, bis der Lauf abgeschlossen ist.
+- Unten „Automatisch behoben“ lesen. Erwartet werden Einträge „Bestandsabgleich · Unternehmen/Ansprechpartner/Belege/Planumsätze“ mit der Zahl entfernter bzw. nachgeladener Einträge.
+- In der Tabelle sollen Firebase- und HQ-Zahlen übereinstimmen. Steht noch ein Punkt „Bestandsprüfung“ oder „HQ-Bestandsabgleich“ unter „Offene Punkte für den Admin“, den genauen Wortlaut melden.
+- „Ausgabenprüfung · Hinweise zu HQ-Belegen“ lesen. Jeder Eintrag nennt Ausgabe und Belege. Diese Belege nur in HQ korrigieren.
+- „Meine Änderungen“ öffnen. Steht dort „Eintrag nicht eindeutig in HQ“, eine der Schaltflächen wählen: „Erneut an HQ senden“ (nur sichtbar, wenn HQ den Eintrag sicher nicht hat), „Ist in HQ vorhanden“ oder „Verwerfen“.
+
+
 ## r39: HQ-Abgleich mit automatischer Wiederholung prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen. Ein vorhandener, wegen „Tagesbudget“ angehaltener Lauf kann sofort fortgesetzt werden.

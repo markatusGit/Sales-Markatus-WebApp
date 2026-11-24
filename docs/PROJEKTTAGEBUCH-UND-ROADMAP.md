@@ -1,5 +1,18 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 24.11.2026 – r40: Bestand zwischen HQ und Firebase vollständig angleichen
+
+Nutzermeldung nach dem r39-Abgleich: unklarer Historieneintrag, HQ-Löschabgleich HTTP 500 für Unternehmen und Ansprechpartner, Ausgabenprüfung und Mengenabweichungen (Unternehmen +1, Ansprechpartner +1, Belege +20, Planumsätze +24 in Firebase). Ursachen: Der Historienfehler stammte noch aus dem vor r39 begonnenen und mit „HQ-Sync fortsetzen“ weitergeführten Lauf. Die HTTP-500-Fehler kamen von HQ auf die alte v1-Kennungsabfrage `$select=Id` unserer App. Die Abweichung bei Unternehmen und Ansprechpartnern folgte daraus. Für Belege und Planumsätze gab es keinen Löschabgleich, deshalb blieben in HQ gelöschte Einträge dauerhaft in Firebase. Keine der Meldungen kam von Firebase.
+
+Nutzerentscheidungen vom 24.11.2026: Möglichst keine Handarbeit; wo eine Entscheidung nötig ist, Schaltflächen unter „Meine Änderungen“. Es darf keine Mengenabweichungen geben. Unternehmen und Ansprechpartner werden in beide Richtungen synchronisiert, Löschungen und Neuanlagen jeweils auch auf der anderen Seite. Belege und Planumsätze kommen ausschließlich aus HQ und müssen exakt übereinstimmen. Ausgabenhinweise sollen Herkunft und Ausgabe nennen; eine Ausgaben-Automatisierung folgt als Nächstes. Der Abgleich soll so datensparend wie möglich sein.
+
+Umsetzung: Bestandsabgleich per Kennungsvergleich für alle HQ-Datenarten (nur bei abweichenden Gesamtzahlen), Bestätigung jeder Löschung per Einzelabruf und leerer Liste, Nachladen fehlender Einträge, automatischer zweiter Durchgang im selben Lauf, Schutz vor Massenlöschung, benannte Ausgabenhinweise, zweite Erkennung unklarer Historieneinträge und Entscheidungsschaltflächen unter „Meine Änderungen“. Kennung `2026-11-24-r40`.
+
+Datenverbrauch geprüft (Analyse, noch nicht umgesetzt): Größter Posten sind die Kundenakten- und Projektübersichten. Für jede Gruppe mit einer Änderung werden alle Firebase-Rohdaten dieser Gruppe gelesen (1/64 des Bestands, also mehrere hundert Lesevorgänge je Gruppe), auch wenn nur ein Datensatz geändert wurde. Zweitgrößter Posten: Mehrere Abläufe lesen bei jedem Aufruf alle gespeicherten App-Aufträge (`sales_jobs`), deren Zahl mit jeder Kommunikation wächst, u. a. „Meine Änderungen“ und der Abgleichstart. Vorschlag für eine Folgeversion: Rohdaten zusätzlich nach Firma bzw. Projekt kennzeichnen und gezielt nur die betroffenen Firmen lesen (einmalige Nachkennzeichnung nötig), abgeschlossene Aufträge aus der laufenden Liste in ein Archiv verschieben. Offen: Löschen einzelner Ansprechpartner aus der App nach HQ gibt es noch nicht (nur Kundenlöschung samt Ansprechpartnern).
+
+**Lokal vorbereitet und geprüft:** alle Prüfdateien bestanden, darunter neue Fälle für Beleg-, Planumsatz-, Projekt- und Historienlöschungen, Nachladen, zweiten Durchgang, verdeckte HQ-Einträge, Ausgabenhinweise und die Entscheidungsschaltflächen. Veröffentlichung und Live-Test folgen getrennt.
+
+
 ### 23.11.2026 – r39: HQ-Abgleich wiederholt vorübergehende Fehler selbst
 
 Nutzerwunsch vom 23.11.2026: Der HQ-Abgleich soll später einmal nachts allein laufen. Vermeidbare Fehler sollen ihn nicht mehr anhalten. Bei Bedarf läuft er ein paar Minuten später erneut an. Nur schwerwiegende Fehler sollen gemeldet werden, der restliche Abgleich soll durchlaufen. Entscheidungen des Nutzers: noch kein Nachtlauf, sondern weiter manueller Start mit demselben Verhalten wie unbeaufsichtigt. Verzögerungen nur als Minuten-Timer, keine festen Uhrzeiten. Das app-eigene Tagesbudget entfernen, Firebase begrenzt selbst. Keine E-Mail an den Admin, Meldung vorerst nur unten im „Datenabgleich“.

@@ -141,7 +141,7 @@ function salesBulkStepWork_(run){
   if(run.planCleanupPending)salesDeltaResolvePlan_(run);
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
-  else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
+  else if(task.kind==='deltaProbe'){done=salesDeltaProbe_(run,task);if(done&&task.removed)salesDeltaReconciled_(run,task);}
   else if(task.kind==='deltaMissing')done=salesDeltaMissing_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
   else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}
@@ -150,9 +150,11 @@ function salesBulkStepWork_(run){
   else if(task.kind==='bulkProject')done=salesBulkProject_(run,task);
   else if(task.kind==='bulkCompanyPlan'){
     run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
-    if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
+    // The second reconciliation pass rebuilds only what it changed; lists and unclear entries were already handled.
+    if(run.auditRepeated)run.tasks.push({kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    else if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
-    if(run.verifyJobs?.length)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
+    if(run.verifyJobs?.length&&!run.auditRepeated)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);

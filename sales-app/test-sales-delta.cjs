@@ -157,7 +157,7 @@ test('confirmed upstream company and contact deletions remove app copies and cou
  const before=f.calls.length;delete f.remote.Companies[1229];delete f.remote.ContactPersons[2229];const run=f.finishBulk();
  assert.equal(f.db['sales_rawcompanies/1229'],undefined);assert.equal(f.db['sales_companies/1229'],undefined);assert.equal(f.db['sales_directory/1229'],undefined);assert.equal(f.db['sales_rawcontacts/2229'],undefined);assert.equal(run.entities.Companies.count,Object.keys(f.remote.Companies).length);assert.equal(run.entities.ContactPersons.count,Object.keys(f.remote.ContactPersons).length);
  assert.ok(f.db['sales_meta/lean_names'].rows.every(c=>c.id!=='1229'));assert.ok(f.db['sales_meta/lean_filters'].rows.every(c=>c.id!=='1229'));assert.ok(f.db['sales_drafts/'+local.id]);assert.ok(f.db['sales_rawdocuments/9001']);assert.ok(f.db['sales_rawplans/9002']);
- assert.equal(f.db['sales_meta/mirror_Companies_1229'].verification,'single-404-and-filtered-empty-list');assert.ok(f.calls.slice(before).filter(c=>c.path.startsWith('/v1/')).every(c=>c.path.includes('$select=Id&$orderby=Id&$top=200&$skip=')));assert.ok(f.calls.slice(before).every(c=>c.method==='get'));assert.ok(f.calls.slice(before).some(c=>c.path.includes('$skip=200')));
+ assert.equal(f.db['sales_meta/mirror_Companies_1229'].verification,'single-404-and-filtered-empty-list');const idPages=f.calls.slice(before).filter(c=>/^\/v2\/Companies\?\$top=200&\$skip=0&orderby=id&\$filter=id%20gt%20(\d+)$/.test(c.path));assert.ok(!f.calls.slice(before).some(c=>c.path.startsWith('/v1/')));assert.ok(f.calls.slice(before).every(c=>c.method==='get'));assert.ok(idPages.length>=2);assert.ok(idPages.some(c=>!c.path.endsWith('%200')));
 });
 test('a company deletion retains still-existing HQ contacts as unassigned and cancels its open app changes without retrying HQ writes',()=>{
  const f=bulkFixture();f.remote.ContactPersons[300]={id:300,companyId:102,firstName:'Synthetic orphan',updatedOn:'2026-01-01T00:00:00Z'};f.finishBulk();const r=f.ctx.saveSalesEntityChange({companyId:102,entity:'company',targetId:102,base:{name:f.remote.Companies[102].name},changeReason:'Synthetic customer change',change:{name:'Synthetic pending deleted customer'}});
@@ -166,31 +166,28 @@ test('a company deletion retains still-existing HQ contacts as unassigned and ca
 test('HTTP errors or an ambiguous second deletion check preserve the company and all cached copies',()=>{
  for(const mode of ['http','list','count']){const f=bulkFixture();f.finishBulk();delete f.remote.Companies[102];const get=f.ctx.salesHqGet_;f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Companies/102')&&mode==='http')throw Error('HQ-Lesetest: HTTP 403');if(p.includes('/Companies?')&&decodeURIComponent(p).includes('id eq 102'))return mode==='list'?{data:[{id:102}],headers:{'helloHQ-Count':1}}:{data:[],headers:{}};return get(p);};f.ctx.startSalesSync();f.worker();{const done=f.db['sales_meta/sync'];assert.notEqual(done.state,'running');assert.ok(!done.paused);assert.ok(done.errors.some(e=>['deltaProbe','deltaMissing'].includes(e.kind)&&/übersprungen/.test(e.message)));}assert.ok(f.db['sales_rawcompanies/102']);assert.ok(f.db['sales_companies/102']);assert.equal(f.db['sales_meta/bulk'].entities.Companies.count,2);}
 });
-test('incomplete, duplicate, expanded or changing ID lists never become authority for deletion',()=>{
- for(const mode of ['short','duplicate','expanded','changed']){const f=mirrorFixture();delete f.remote.Companies[1229];const get=f.ctx.salesHqGet_;let counts=0;f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v1/Companies?')){if(mode==='short')r.data=[];if(mode==='duplicate'&&r.data.length>1)r.data[1]=r.data[0];if(mode==='expanded'&&r.data.length)r.data[0].Name='not requested';}if(mode==='changed'&&p.startsWith('/v2/Companies?')&&p.includes('$top=1&')&&++counts>1)r.headers['helloHQ-Count']=r.headers['helloHQ-Count']+1;return r;};f.ctx.startSalesSync();f.worker();{const done=f.db['sales_meta/sync'];assert.notEqual(done.state,'running');assert.ok(!done.paused);assert.ok(done.errors.some(e=>['deltaProbe','deltaMissing'].includes(e.kind)&&/übersprungen/.test(e.message)));}assert.ok(f.db['sales_rawcompanies/1229']);assert.ok(f.db['sales_companies/1229']);f.ctx.salesHqGet_=get;f.finishBulk();assert.equal(f.db['sales_rawcompanies/1229'],undefined);}
+test('incomplete, duplicate or changing ID lists never become authority for deletion',()=>{
+ const idPage=p=>/^\/v2\/Companies\?\$top=200&\$skip=0&orderby=id&\$filter=id%20gt%20(\d+)$/.test(p);
+ for(const mode of ['short','duplicate','changed']){const f=mirrorFixture();delete f.remote.Companies[1229];const get=f.ctx.salesHqGet_;let counts=0;f.ctx.salesHqGet_=p=>{const r=get(p);if(idPage(p)){if(mode==='short')r.data=[];if(mode==='duplicate'&&r.data.length>1)r.data[1]=r.data[0];}if(mode==='changed'&&p.startsWith('/v2/Companies?')&&p.includes('$top=1&')&&++counts>1)r.headers['helloHQ-Count']=r.headers['helloHQ-Count']+counts;return r;};f.ctx.startSalesSync();f.worker();{const done=f.db['sales_meta/sync'];assert.notEqual(done.state,'running');assert.ok(!done.paused);assert.equal(done.errors.filter(e=>e.kind==='deltaMissing'&&e.id==='Companies').length,1,mode);}assert.ok(f.db['sales_rawcompanies/1229']);assert.ok(f.db['sales_companies/1229']);f.ctx.salesHqGet_=get;f.finishBulk();assert.equal(f.db['sales_rawcompanies/1229'],undefined);}
 });
-test('identifier reconciliation follows actual row counts when HQ supplies smaller pages',()=>{
- const f=mirrorFixture(),get=f.ctx.salesHqGet_,skips=[];delete f.remote.Companies[1229];f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v1/Companies?')){skips.push(Number(new URL('https://fixture'+p).searchParams.get('$skip')));r.data=r.data.slice(0,80);}return r;};f.finishBulk();assert.deepEqual(skips,[0,80,160]);assert.equal(f.db['sales_rawcompanies/1229'],undefined);
+test('identifier reconciliation follows the ID cursor when HQ supplies smaller pages',()=>{
+ const f=mirrorFixture(),get=f.ctx.salesHqGet_,cursors=[];delete f.remote.Companies[1229];f.ctx.salesHqGet_=p=>{const r=get(p),m=/^\/v2\/Companies\?\$top=200&\$skip=0&orderby=id&\$filter=id%20gt%20(\d+)$/.exec(p);if(m){cursors.push(Number(m[1]));r.data=r.data.slice(0,80);}return r;};f.finishBulk();assert.deepEqual(cursors,[0,1077,1157]);assert.equal(f.db['sales_rawcompanies/1229'],undefined);
 });
-test('HQ HTTP 500 on a 200-ID page retries with 50 IDs at the same offset and confirmed deletions still mirror',()=>{
- const f=mirrorFixture(),get=f.ctx.salesHqGet_,pages=[];delete f.remote.Companies[1229];
- f.ctx.salesHqGet_=p=>{
-  if(!p.startsWith('/v1/Companies?'))return get(p);
-  const params=new URL('https://fixture'+p).searchParams,top=Number(params.get('$top')),skip=Number(params.get('$skip'));
-  pages.push([top,skip]);if(top===200&&skip===200)throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});
-  const r=get(p.replace('$top=50','$top=200'));return {...r,data:r.data.slice(0,top)};
- };
- f.finishBulk();assert.deepEqual(pages,[[200,0],[200,200],[50,200]]);assert.equal(f.db['sales_rawcompanies/1229'],undefined);
+test('an HQ server error on an identifier page waits on the minute timer and the deletion still mirrors',()=>{
+ const f=mirrorFixture(),get=f.ctx.salesHqGet_;let fail=1;delete f.remote.Companies[1229];
+ f.ctx.salesHqGet_=p=>{const m=/^\/v2\/Companies\?\$top=200&\$skip=0&orderby=id&\$filter=id%20gt%20(\d+)$/.exec(p);if(fail&&m&&m[1]!=='0'){fail--;throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});}return get(p);};
+ f.ctx.startSalesSync();f.worker();assert.ok(JSON.parse(f.props.SALES_SYNC_RETRY).until>Date.now());assert.equal(f.db['sales_meta/sync'].state,'running');
+ f.ctx.startSalesSync();f.worker();const run=f.db['sales_meta/sync'];assert.equal(run.state,'completed');assert.equal(f.db['sales_rawcompanies/1229'],undefined);assert.ok(run.notices.some(n=>/automatische/.test(n.message)));assert.ok(run.notices.some(n=>n.label==='Bestandsabgleich · Unternehmen'));
 });
-test('a failing optional HQ deletion scan reports an open point while other sections finish safely',()=>{
+test('a failing optional HQ reconciliation reports one open point while other sections finish safely',()=>{
  for(const failure of ['ids','count']){
   const f=mirrorFixture(),get=f.ctx.salesHqGet_,attempts=[];delete f.remote.Companies[1229];delete f.remote.ContactPersons[2229];
   f.ctx.salesHqGet_=p=>{
-   if(failure==='ids'&&p.startsWith('/v1/Companies?')||failure==='count'&&p.startsWith('/v2/Companies?$top=1&')){attempts.push(p);throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});}
+   if(failure==='ids'&&/^\/v2\/Companies\?\$top=200&\$skip=0&orderby=id&\$filter=id%20gt%20(\d+)$/.test(p)||failure==='count'&&p.startsWith('/v2/Companies?$top=1&')){attempts.push(p);throw Object.assign(Error('HQ-Lesetest: HTTP 500'),{hqHttpStatus:500});}
    return get(p);
   };
   const run=f.finishBulk();assert.equal(attempts.length,2);assert.equal(run.state,'completedWithErrors');assert.ok(!run.paused);
-  assert.ok(run.errors.some(e=>e.label==='HQ-Löschabgleich · Unternehmen'&&/HTTP 500/.test(e.message)));
+  assert.equal(run.errors.filter(e=>e.label==='HQ-Bestandsabgleich · Unternehmen'&&/HTTP 500/.test(e.message)).length,1);
   assert.ok(f.db['sales_rawcompanies/1229']);assert.equal(f.db['sales_rawcontacts/2229'],undefined);
   f.ctx.salesHqGet_=get;f.finishBulk();assert.equal(f.db['sales_rawcompanies/1229'],undefined);
  }
@@ -207,5 +204,39 @@ test('an unassigned HQ contact deletion is removed locally and a deleted first a
 });
 test('confirmed contact deletion clears even an unconfirmed local overlay and deferred edits to its first-contact alias',()=>{
  const f=bulkFixture();f.finishBulk();const draft=Object.values(f.db).find(d=>d.contact&&d.hqId===101);f.ctx.salesWrite_('sales_jobs/contact-overlay',{id:'contact-overlay',kind:'createContact',companyRef:'101',hqId:101,contactId:202,state:'uncertain'});f.ctx.salesWrite_('sales_jobs/deferred-edit',{id:'deferred-edit',kind:'entityChange',entity:'contact',draftDependency:draft.id,companyRef:'draft_'+draft.id,targetRef:'draft_'+draft.id+'_contact',state:'pending'});f.ctx.salesWrite_('sales_communication/101',{contacts:[{id:'local_contact-overlay',jobId:'contact-overlay',syncState:'uncertain'}],histories:[]});delete f.remote.ContactPersons[202];f.finishBulk();assert.equal(f.db['sales_communication/101'].contacts.length,0);assert.equal(f.db['sales_jobs/contact-overlay'].state,'canceled');assert.equal(f.db['sales_jobs/deferred-edit'].state,'canceled');
+});
+test('documents and planned revenues follow HQ exactly: deletions are removed, missed rows are loaded and sums rebuilt',()=>{
+ const f=bulkFixture(),edition=f.config(70);for(let id=1001;id<=1030;id++)f.doc(70,id);
+ f.remote.Projects[700]={id:700,companyId:102,name:'Synthetic planned project',status:'InProgress'};
+ for(let id=701;id<=730;id++)f.remote.PlannedRevenues[id]={id,companyId:102,projectId:700,netTotal:10,currency:'EUR',startDate:'2026-12-01'};
+ f.finishBulk();assert.equal(f.db['sales_editions/'+edition].documents.length,30);
+ delete f.remote.Documents[1025];delete f.remote.Documents[1026];delete f.remote.PlannedRevenues[725];
+ // A row the change filter never reported (old timestamp) is still found by the identifier comparison.
+ f.remote.Documents[1031]={...f.remote.Documents[1001],id:1031,number:'RE-1031',updatedOn:'2026-01-01T00:00:00Z'};
+ const before=f.calls.length,run=f.finishBulk();
+ assert.equal(run.state,'completed');assert.equal(f.db['sales_rawdocuments/1025'],undefined);assert.equal(f.db['sales_rawdocuments/1026'],undefined);assert.equal(f.db['sales_rawplans/725'],undefined);assert.ok(f.db['sales_rawdocuments/1031']);
+ assert.equal(f.db['sales_meta/bulk'].entities.Documents.count,29);assert.equal(f.db['sales_meta/bulk'].entities.PlannedRevenues.count,29);
+ const docs=f.db['sales_editions/'+edition].documents.map(d=>d.id);assert.equal(docs.length,29);assert.ok(!docs.includes('1025')&&docs.includes('1031'));
+ assert.equal(f.db['sales_companies/102'].projects.find(p=>p.id==='700').plannedRevenues.length,29);
+ assert.ok(run.notices.some(n=>n.label==='Bestandsabgleich · Belege'&&/2 in HQ gelöschte Einträge/.test(n.message)&&/1 in Firebase fehlender Eintrag/.test(n.message)));
+ assert.ok(!run.errors.some(e=>/Bestandsprüfung/.test(e.label)));assert.ok(!f.calls.slice(before).some(c=>c.path.startsWith('/v1/')));assert.ok(f.calls.slice(before).every(c=>c.method==='get'));
+});
+test('HQ changes during the run are reconciled by one automatic second pass instead of a count warning',()=>{
+ const f=bulkFixture();for(let id=1001;id<=1030;id++)f.doc(70,id);f.finishBulk();const get=f.ctx.salesHqGet_;let counts=0;
+ f.ctx.salesHqGet_=p=>{if(p.startsWith('/v2/Documents?$top=1&')&&++counts===2)delete f.remote.Documents[1020];return get(p);};
+ const run=f.finishBulk();assert.equal(run.state,'completed');assert.equal(run.auditRepeated,true);assert.equal(f.db['sales_rawdocuments/1020'],undefined);
+ assert.equal(f.db['sales_meta/bulk'].entities.Documents.count,29);assert.ok(!run.errors.length);assert.ok(run.notices.some(n=>n.label==='Bestandsabgleich · Belege'));
+ const second=f.finishBulk();assert.ok(!second.auditRepeated);assert.ok(!second.tasks.some(t=>t.kind==='deltaMissing'&&t.expected!==undefined));
+});
+test('edition findings name their source, the edition and the affected documents',()=>{
+ const f=bulkFixture();f.config(70);f.doc(70,1001);f.doc(70,1002);f.remote.Documents[1002].documentStatusEntity={documentStatusType:'Synthetic unknown'};
+ const run=f.finishBulk(),hint=run.errors.find(e=>e.kind==='editionCheck');
+ assert.equal(hint.label,'Ausgabenprüfung · Coburger #70');assert.match(hint.message,/Belegstatus noch nicht fachlich zugeordnet: 1 Beleg \(RE-1002\)/);assert.match(hint.message,/Herkunft: Ausgabenprüfung im HQ-Abgleich/);
+ assert.equal(run.errors.filter(e=>e.kind==='editionCheck').length,1);
+});
+test('a row HQ still returns individually but hides from its list is kept and named, never deleted',()=>{
+ const f=bulkFixture();for(let id=1001;id<=1030;id++)f.doc(70,id);f.finishBulk();const get=f.ctx.salesHqGet_;
+ f.ctx.salesHqGet_=p=>{const r=get(p);if(p.startsWith('/v2/Documents?')&&!p.includes('id%20eq')){const before=r.data.length;r.data=r.data.filter(x=>x.id!==1022);if(r.data.length<before&&r.headers['helloHQ-Count'])r.headers['helloHQ-Count']--;else if(p.includes('$top=1&'))r.headers['helloHQ-Count']--;}return r;};
+ const run=f.finishBulk();assert.ok(f.db['sales_rawdocuments/1022']);assert.ok(run.errors.some(e=>e.label==='HQ-Bestandsabgleich · Belege'&&/einzeln abrufbar/.test(e.message)&&/1022/.test(e.message)));
 });
 for(const c of cases){c.fn();console.log('PASS',c.name);}console.log(cases.length+' delta checks passed.');

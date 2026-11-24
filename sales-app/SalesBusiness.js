@@ -9,7 +9,16 @@
   function reviewInput(id,review){return '<input type="hidden" name="reviewId" value="'+esc(id)+'"><input type="hidden" name="revision" value="'+esc(review.revision)+'">';}
   function reviewListPage(){
     return head('Meine Änderungen','Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
-      '<section class="m-panel">'+(ownReviews.map(item=>'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+(item.state==='awaitingAnswer'?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
+      '<section class="m-panel">'+(ownReviews.map(item=>item.unclear?unclearHistoryRow(item):'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+(item.state==='awaitingAnswer'?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
+  }
+  // Unclear HQ history entries: the sync never sends them twice; the author or admin decides with one click.
+  function unclearHistoryRow(item){
+    const notFound=item.verifyResult==='notFound';
+    return '<div class="m-row" data-unclear="'+esc(item.id)+'"><h2>'+esc(item.name||'Kontakthistorie')+' · Eintrag nicht eindeutig in HQ</h2><p>'+esc(item.message)+'</p>'+(item.contactOn?'<p><strong>Kontakt vom</strong> '+esc(String(item.contactOn).slice(0,10))+'</p>':'')+(item.content?'<p><strong>Inhalt</strong><br>'+esc(item.content)+'</p>':'')+
+      '<form data-form="unclear-history" class="m-form"><input type="hidden" name="id" value="'+esc(item.id)+'"><div class="m-full m-test-actions">'+
+      (notFound?'<button class="m-button m-primary" name="decision" value="resend">Erneut an HQ senden</button>':'')+
+      '<button class="m-button" name="decision" value="exists">Ist in HQ vorhanden</button><button class="m-button" name="decision" value="discard">Verwerfen</button></div>'+
+      (notFound?'':'<p>„Erneut an HQ senden“ erscheint, sobald der HQ-Abgleich den Eintrag sicher nicht gefunden hat. Bis dahin musst du nichts tun.</p>')+'</form></div>';
   }
   function reviewValues(values){
     const clean=businessPreviewValue(values||{});
@@ -170,6 +179,11 @@
         else {preview=await rpc('getSalesJobPreview',input.reviewId);loadedViews.delete('test');viewCache.delete('test');companyCache.clear();}
         return result;
       },{preserve:true});return;
+    }
+    if(e.target.dataset.form==='unclear-history'){
+      e.preventDefault();e.stopImmediatePropagation();if(busy||!e.submitter)return;
+      const id=e.target.elements.id.value,decision=e.submitter.value;
+      act(async()=>{const result=await rpc('resolveSalesUnclearHistory',{id,decision});ownReviews=await rpc('listSalesChangeReviews');return result;},{preserve:true});return;
     }
     if(e.target.dataset.form==='bind-customer-contact'){
       e.preventDefault();e.stopImmediatePropagation();if(busy||!e.target.reportValidity())return;

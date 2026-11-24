@@ -140,9 +140,29 @@ function salesReviewOverlay_(pending,current){
 function salesReviewOwn_(job,user){return job.actorUid?job.actorUid===user.uid:job.actor===user.email;}
 function listSalesChangeReviews(){
   const user=salesUser_();
-  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user))
-    .map(j=>salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
+  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
+    .map(j=>salesUnclearHistory_(j)?{...salesPick_(j,['id','name','state','message','updatedAt','verifyResult']),unclear:true,content:salesHistoryText_(j.history?.content||j.capture?.content||'').slice(0,300),contactOn:j.history?.contactOn||j.capture?.contactOn||'',review:{conversation:[]}}:salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
     .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+}
+/** An unclear history entry is never sent twice on its own. Its author or the admin decides here. */
+function salesUnclearHistory_(job){return job?.state==='uncertain'&&['history','communication'].includes(job.kind);}
+function resolveSalesUnclearHistory(input){
+  const user=salesUser_();
+  return salesLock_(()=>{
+    salesAssertPrivate_();const id=salesKey_(input?.id),job=salesRead_('sales_jobs/'+id),decision=input?.decision;
+    if(!salesUnclearHistory_(job)||!(salesReviewOwn_(job,user)||user.admin))throw Error('Dieser Eintrag ist nicht mehr offen oder gehört nicht zu dir. Bitte neu laden.');
+    if(!['resend','discard','exists'].includes(decision))throw Error('Unbekannte Entscheidung.');
+    if(decision==='resend'&&job.verifyResult!=='notFound')throw Error('Erneut senden ist erst möglich, wenn der HQ-Abgleich den Eintrag sicher nicht gefunden hat.');
+    const now=salesNow_();job.updatedAt=now;job.decision={decision,by:user.email,at:now};
+    if(decision==='resend'){
+      // The next central sync looks once more read-only and sends only if HQ still has no such entry.
+      job.state='pending';job.resendApproved=true;delete job.writeAttempted;delete job.phaseWriteAttempted;delete job.historyId;delete job.verifyResult;
+      job.message='Erneut senden freigegeben. Der nächste HQ-Abgleich prüft vorher noch einmal, ob der Eintrag inzwischen in HQ steht.';
+    }else if(decision==='discard'){job.state='canceled';job.message='Verworfen. Der Eintrag wird nicht an HQ übertragen.';}
+    else{job.state='synced';job.message='Als in HQ vorhanden bestätigt. Kein weiterer Schreibversuch.';}
+    salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);
+    return {message:job.message};
+  });
 }
 function respondSalesChangeReview(input){
   const user=salesUser_();

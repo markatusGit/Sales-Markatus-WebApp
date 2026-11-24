@@ -113,5 +113,28 @@ test('an imported additional contact can be selected only within the own TEST co
  const again=f.ctx.saveSalesHistory(input),n=f.calls.length;f.remote.ContactPersons[203].companyId=102;assert.notEqual(f.ctx.runSalesJob(again.id).state,'synced');assert.ok(f.calls.slice(n).every(c=>c.method==='get'));
  assert.throws(()=>f.ctx.saveSalesHistory({...input,contactPersonId:999}));
 });
+test('unclear history: recognised by content when HQ drops the marker; resend or discard only after the author decides',()=>{
+ const f=setup(),draft=Object.values(f.db).find(v=>v.company&&v.contact),input={draftId:draft.id,reason:'Synthetic call',content:'<p>Synthetic  note</p>',channel:'Note',contactOn:'2026-09-28T10:00:00Z'};
+ const fetch=f.ctx.UrlFetchApp.fetch,get=f.ctx.salesHqGet_;let mode='lost';
+ f.ctx.UrlFetchApp.fetch=(url,opt)=>{if(url.endsWith('/ContactHistories')&&opt.method==='post'){if(mode==='down')throw Error('Synthetic HQ unreachable');const r=fetch(url,opt);if(mode==='lost')throw Error('Synthetic response lost');return r;}return fetch(url,opt);};
+ f.ctx.salesHqGet_=p=>{const r=get(p);if(mode==='lost'&&p.includes('ContactHistories')){const strip=x=>{const {syncId,...rest}=x;return {...rest,content:'Synthetic note'};};r.data=Array.isArray(r.data)?r.data.map(strip):strip(r.data);}return r;};
+ const posts=()=>f.calls.filter(c=>c.method==='post'&&c.path==='/v2/ContactHistories').length;
+ const a=f.ctx.saveSalesHistory(input);assert.equal(f.ctx.runSalesJob(a.id).state,'uncertain');
+ f.ctx.salesSyncVerifyJob_(f.db['sales_jobs/'+a.id]);assert.equal(f.db['sales_jobs/'+a.id].state,'synced');assert.equal(f.db['sales_jobs/'+a.id].historyMatch,'content');
+ const miss=()=>{const h=f.ctx.saveSalesHistory({...input,content:'Synthetic '+Math.random()});assert.equal(f.ctx.runSalesJob(h.id).state,'uncertain');
+  const run={engine:2,errors:[],notices:[],verifyJobs:[{id:h.id,label:'Synthetic',attempts:0,notBefore:new Date(0).toISOString()}]},task={};
+  for(let i=0;i<3;i++){run.verifyJobs.forEach(v=>v.notBefore=new Date(0).toISOString());f.ctx.salesSyncVerifyStep_(run,task);}
+  assert.equal(f.db['sales_jobs/'+h.id].verifyResult,'notFound');assert.equal(run.errors[0].decision,'reviews');return h.id;};
+ mode='down';const b=miss(),c=miss(),d=miss();mode='ok';
+ const listed=f.ctx.listSalesChangeReviews().filter(x=>x.unclear);assert.equal(JSON.stringify(listed.map(x=>x.id).sort()),JSON.stringify([b,c,d].sort()));assert.ok(listed.every(x=>x.verifyResult==='notFound'&&x.content));
+ // Resend: one more read-only look, then exactly one new transfer.
+ let n=posts();f.ctx.resolveSalesUnclearHistory({id:b,decision:'resend'});assert.equal(f.db['sales_jobs/'+b].state,'pending');assert.equal(f.ctx.runSalesJob(b).state,'synced');assert.equal(posts(),n+1);
+ // Resend when the entry turned up meanwhile: confirmed without a second transfer.
+ const job=f.db['sales_jobs/'+c],id=900;f.remote.ContactHistories[id]={...job.history,id};f.ctx.resolveSalesUnclearHistory({id:c,decision:'resend'});n=posts();assert.equal(f.ctx.runSalesJob(c).state,'synced');assert.equal(posts(),n);
+ f.ctx.resolveSalesUnclearHistory({id:d,decision:'discard'});assert.equal(f.db['sales_jobs/'+d].state,'canceled');
+ assert.throws(()=>f.ctx.resolveSalesUnclearHistory({id:d,decision:'resend'}),/nicht mehr offen/);
+ const e=f.ctx.saveSalesHistory({...input,content:'Synthetic not yet checked'});mode='down';f.ctx.runSalesJob(e.id);mode='ok';assert.throws(()=>f.ctx.resolveSalesUnclearHistory({id:e.id,decision:'resend'}),/sicher nicht gefunden/);
+ f.ctx.resolveSalesUnclearHistory({id:e.id,decision:'exists'});assert.equal(f.db['sales_jobs/'+e.id].state,'synced');assert.equal(f.ctx.listSalesChangeReviews().filter(x=>x.unclear).length,0);
+});
 if(require.main===module){for(const {name,fn} of cases){fn();count++;console.log('PASS',name);}console.log(count+' V1 checks passed.');}
 module.exports={setup};

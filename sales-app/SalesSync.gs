@@ -103,7 +103,14 @@ function salesSyncVerifyStep_(run,task){
     }catch(e){
       if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;
       item.attempts++;
-      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){item.done=true;run.errors.push({kind:'write',id:item.id,label:item.label,message:'Auch nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen im Abstand von '+SALES_SYNC_VERIFY_MINUTES+' Minuten nicht eindeutig in HQ gefunden: '+e.message+' Bitte in HQ nachsehen; nicht erneut anlegen.'});}
+      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){
+        item.done=true;const missing=!!e.salesHistoryMissing||/HTTP 404/.test(e.message||'');
+        // The decision moves to "Meine Änderungen"; nothing is sent again without it.
+        job.verifyResult=missing?'notFound':'unclear';job.verifiedAt=salesNow_();job.updatedAt=job.verifiedAt;
+        job.message=missing?'Nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen nicht in HQ gefunden. Unter „Meine Änderungen“ entscheiden: erneut senden oder verwerfen.':'In HQ nicht eindeutig zuzuordnen ('+String(e.message||e).slice(0,300)+'). Unter „Meine Änderungen“ entscheiden, wie es weitergeht.';
+        salesWrite_('sales_jobs/'+job.id,job);
+        run.errors.push({kind:'write',id:item.id,label:item.label,decision:'reviews',message:job.message});
+      }
       else item.notBefore=new Date(now+SALES_SYNC_VERIFY_MINUTES*60000).toISOString();
     }
   }

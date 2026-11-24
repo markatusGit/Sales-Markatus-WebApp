@@ -1,5 +1,17 @@
 # Änderungsprotokoll
 
+## [v0.40.0]
+
+- Bestandsabgleich für alle HQ-Datenarten (Unternehmen, Ansprechpartner, Projekte, Belege, Planumsätze, Kontakthistorie): Weichen die Gesamtzahlen von HQ und Firebase ab, vergleicht der Abgleich die Kennungen. In HQ gelöschte Datensätze werden nach einzelnem Abruf (HTTP 404) und exakt leerer HQ-Liste auch in Firebase entfernt. In Firebase fehlende Datensätze werden einzeln aus HQ nachgeladen. Projekt-, Kunden- und Ausgabenansichten werden danach neu berechnet.
+- Die Kennungsliste nutzt jetzt die v2-Liste von HQ mit ID-Fortsetzung statt der alten v1-Abfrage `$select=Id`, die wiederholt HTTP 500 lieferte. Eine abgeschnittene HQ-Liste (mehr als 2 % bzw. 50 Abweichungen) löst nie eine Massenlöschung aus.
+- Bleibt nach dem Abgleich eine Mengenabweichung (z. B. weil HQ während des Laufs geändert wurde), gleicht derselbe Lauf die betroffenen Datenarten einmal automatisch erneut ab. Erst danach erscheint ein Hinweis.
+- Datensätze, die HQ einzeln liefert, aber nicht in seiner Gesamtliste zeigt, bleiben erhalten und werden mit Kennung benannt.
+- Ausgabenprüfung: ein Eintrag je betroffener Ausgabe mit Herkunft, Ausgabe und betroffenen Belegnummern bzw. Firmenkennungen. Im „Datenabgleich“ als eigener Abschnitt „Ausgabenprüfung · Hinweise zu HQ-Belegen“, nicht mehr unter den offenen Admin-Punkten.
+- Unklare Historieneinträge: zweite automatische Erkennung über Firma, Kontaktart, Zeitpunkt, Ansprechpartner und Text, falls HQ die App-Kennung nicht zurückgibt. Findet der Abgleich einen Eintrag nach drei Prüfungen sicher nicht, erscheinen unter „Meine Änderungen“ die Schaltflächen „Erneut an HQ senden“, „Ist in HQ vorhanden“ und „Verwerfen“. Vor einem erneuten Senden prüft der Abgleich noch einmal nur lesend.
+- Datensparen: Die begrenzte Einzelprüfung entfällt für die Kontakthistorie, deren Änderungen der Änderungsfilter vollständig erfasst (10 HQ-Abrufe und 10 Firebase-Lesevorgänge weniger je Abgleich).
+- Kennung `2026-11-24-r40`. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
+
 ## [v0.39.0]
 
 - Der HQ-Abgleich verhält sich nach einem manuellen Start wie ein unbeaufsichtigter Lauf. Vorübergehende Fehler von HQ oder Firebase (HTTP 5xx/429, Zeitüberschreitung, Kontingent) halten den Lauf nicht mehr an. Derselbe Abschnitt wird mit Minuten-Timern (2, 5, 10, 15, 30, dann 60 Minuten) erneut versucht. Feste Uhrzeiten und ein Nachtlauf sind nicht eingerichtet.

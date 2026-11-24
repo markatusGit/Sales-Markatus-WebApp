@@ -54,7 +54,7 @@ function salesWorkerSkip_(run,e){
   const record=note=>run.errors.push({kind:task.kind==='write'?'write':task.kind,id:task.id,label:task.label||'HQ-Abgleich',stage:task.stage||'',message:message+' · '+note});
   if(task.kind==='write')record('Auftrag bleibt gespeichert und wird beim nächsten HQ-Abgleich erneut geprüft. Der restliche Abgleich läuft weiter.');
   else if(SALES_SYNC_OPTIONAL_TASKS.includes(task.kind)){
-    if(task.kind==='deltaMissing')for(const key of ['expected','hqIds','lastId','ids','index','pageSize'])delete task[key];
+    if(task.kind==='deltaMissing'){salesDeltaResetScan_(task);run.errors=run.errors.filter(x=>!(x.kind==='deltaMissing'&&x.id===task.id));}
     if(task.kind==='deltaEditions')for(const id of task.editionIds||[]){const edition=salesRead_('sales_editions/'+salesKey_(id));if(edition&&!edition.cacheLinkPending)salesWrite_('sales_editions/'+edition.id,{...edition,cacheLinkPending:true});}
     if(task.kind==='verifyJobs')run.verifyJobs=[];
     record('Prüfung übersprungen; sie wird beim nächsten HQ-Abgleich erneut versucht. Der restliche Abgleich läuft weiter.');

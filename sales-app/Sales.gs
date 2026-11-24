@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r39';
+const SALES_RELEASE = '2026-11-24-r40';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -920,17 +920,28 @@ function salesHistoryDifferences_(actual,expected) {
 function salesConfirmHistory_(job) {
   const rows=job.historyId?[salesOne_('ContactHistories',job.historyId)]:salesCollect_('ContactHistories','companyId eq '+job.hqId,Date.now());
   if(rows.some(h=>Number(h.companyId)!==Number(job.hqId)))throw new Error('Historienprüfung liefert ein fremdes Firmenziel.');
-  const matches=rows.filter(h=>h.syncId==='sales-'+job.id);
-  if(matches.length!==1)throw new Error('Historieneintrag noch nicht eindeutig bestätigt. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.');
-  const differences=salesHistoryDifferences_(matches[0],job.history);
+  let matches=rows.filter(h=>h.syncId==='sales-'+job.id),byContent=false;
+  // Second recognition when HQ does not return the app marker: exactly one entry with the same channel, second, contact and text.
+  if(!matches.length&&!job.historyId){matches=salesHistoryContentMatches_(rows,job.history);byContent=matches.length===1;}
+  if(matches.length!==1)throw Object.assign(new Error('Historieneintrag noch nicht eindeutig bestätigt. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.'),{salesHistoryMissing:matches.length===0,salesHistoryAmbiguous:matches.length>1});
+  const differences=salesHistoryDifferences_(matches[0],byContent?Object.fromEntries(Object.entries(job.history).filter(([k])=>!['syncId','reason','content'].includes(k))):job.history);
+  if(byContent)job.historyMatch='content';
   if(differences.length)throw new Error('Historien-Rückprüfung offen. Abweichende Felder: '+differences.join(', ')+'. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.');
   job.historyId=salesId_(matches[0].id);
   salesWrite_('sales_jobs/'+job.id,job);
   const data=salesRead_('sales_companies/'+job.hqId);
   if(data){data.histories=(data.histories||[]).filter(h=>String(h.id)!==String(job.historyId)&&h.syncId!==job.history.syncId);data.histories.push(salesHistory_(matches[0],[],{}));salesWrite_('sales_companies/'+job.hqId,data);}
 }
+function salesHistoryText_(value){return String(value??'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();}
+function salesHistoryContentMatches_(rows,history){
+  const second=v=>Math.floor(Date.parse(v)/1000);
+  return rows.filter(r=>(!r.syncId||r.syncId===history.syncId)&&r.contactHistoryChannel===history.contactHistoryChannel&&Number.isFinite(Date.parse(r.contactOn))&&second(r.contactOn)===second(history.contactOn)&&
+    salesHistoryText_(r.reason)===salesHistoryText_(history.reason)&&salesHistoryText_(r.content)===salesHistoryText_(history.content)&&(!history.contactPersonId||Number(r.contactPersonId)===Number(history.contactPersonId)));
+}
 function salesRunHistory_(job,draft) {
   salesHistoryTarget_(job,draft);
+  // Released for a second transfer after it was not found in HQ: look once more before sending, never send twice.
+  if(job.resendApproved&&!job.writeAttempted){try{salesConfirmHistory_(job);return;}catch(e){if(!e.salesHistoryMissing)throw e;}}
   if(job.writeAttempted)throw new Error('Schreibversuch bereits erfolgt. Nur HQ-Ergebnis prüfen.');
   const result=salesWriteHq_(job,'/v2/ContactHistories','post',job.history);
   if(result?.id){job.historyId=salesId_(result.id);salesWrite_('sales_jobs/'+job.id,job);}

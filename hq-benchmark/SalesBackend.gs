@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-23-r39';
+const SALES_RELEASE = '2026-11-24-r40';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -920,17 +920,28 @@ function salesHistoryDifferences_(actual,expected) {
 function salesConfirmHistory_(job) {
   const rows=job.historyId?[salesOne_('ContactHistories',job.historyId)]:salesCollect_('ContactHistories','companyId eq '+job.hqId,Date.now());
   if(rows.some(h=>Number(h.companyId)!==Number(job.hqId)))throw new Error('Historienprüfung liefert ein fremdes Firmenziel.');
-  const matches=rows.filter(h=>h.syncId==='sales-'+job.id);
-  if(matches.length!==1)throw new Error('Historieneintrag noch nicht eindeutig bestätigt. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.');
-  const differences=salesHistoryDifferences_(matches[0],job.history);
+  let matches=rows.filter(h=>h.syncId==='sales-'+job.id),byContent=false;
+  // Second recognition when HQ does not return the app marker: exactly one entry with the same channel, second, contact and text.
+  if(!matches.length&&!job.historyId){matches=salesHistoryContentMatches_(rows,job.history);byContent=matches.length===1;}
+  if(matches.length!==1)throw Object.assign(new Error('Historieneintrag noch nicht eindeutig bestätigt. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.'),{salesHistoryMissing:matches.length===0,salesHistoryAmbiguous:matches.length>1});
+  const differences=salesHistoryDifferences_(matches[0],byContent?Object.fromEntries(Object.entries(job.history).filter(([k])=>!['syncId','reason','content'].includes(k))):job.history);
+  if(byContent)job.historyMatch='content';
   if(differences.length)throw new Error('Historien-Rückprüfung offen. Abweichende Felder: '+differences.join(', ')+'. Nur HQ-Ergebnis prüfen, nicht erneut anlegen.');
   job.historyId=salesId_(matches[0].id);
   salesWrite_('sales_jobs/'+job.id,job);
   const data=salesRead_('sales_companies/'+job.hqId);
   if(data){data.histories=(data.histories||[]).filter(h=>String(h.id)!==String(job.historyId)&&h.syncId!==job.history.syncId);data.histories.push(salesHistory_(matches[0],[],{}));salesWrite_('sales_companies/'+job.hqId,data);}
 }
+function salesHistoryText_(value){return String(value??'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();}
+function salesHistoryContentMatches_(rows,history){
+  const second=v=>Math.floor(Date.parse(v)/1000);
+  return rows.filter(r=>(!r.syncId||r.syncId===history.syncId)&&r.contactHistoryChannel===history.contactHistoryChannel&&Number.isFinite(Date.parse(r.contactOn))&&second(r.contactOn)===second(history.contactOn)&&
+    salesHistoryText_(r.reason)===salesHistoryText_(history.reason)&&salesHistoryText_(r.content)===salesHistoryText_(history.content)&&(!history.contactPersonId||Number(r.contactPersonId)===Number(history.contactPersonId)));
+}
 function salesRunHistory_(job,draft) {
   salesHistoryTarget_(job,draft);
+  // Released for a second transfer after it was not found in HQ: look once more before sending, never send twice.
+  if(job.resendApproved&&!job.writeAttempted){try{salesConfirmHistory_(job);return;}catch(e){if(!e.salesHistoryMissing)throw e;}}
   if(job.writeAttempted)throw new Error('Schreibversuch bereits erfolgt. Nur HQ-Ergebnis prüfen.');
   const result=salesWriteHq_(job,'/v2/ContactHistories','post',job.history);
   if(result?.id){job.historyId=salesId_(result.id);salesWrite_('sales_jobs/'+job.id,job);}
@@ -1295,7 +1306,14 @@ function salesSyncVerifyStep_(run,task){
     }catch(e){
       if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;
       item.attempts++;
-      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){item.done=true;run.errors.push({kind:'write',id:item.id,label:item.label,message:'Auch nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen im Abstand von '+SALES_SYNC_VERIFY_MINUTES+' Minuten nicht eindeutig in HQ gefunden: '+e.message+' Bitte in HQ nachsehen; nicht erneut anlegen.'});}
+      if(item.attempts>=SALES_SYNC_VERIFY_ATTEMPTS){
+        item.done=true;const missing=!!e.salesHistoryMissing||/HTTP 404/.test(e.message||'');
+        // The decision moves to "Meine Änderungen"; nothing is sent again without it.
+        job.verifyResult=missing?'notFound':'unclear';job.verifiedAt=salesNow_();job.updatedAt=job.verifiedAt;
+        job.message=missing?'Nach '+SALES_SYNC_VERIFY_ATTEMPTS+' automatischen Prüfungen nicht in HQ gefunden. Unter „Meine Änderungen“ entscheiden: erneut senden oder verwerfen.':'In HQ nicht eindeutig zuzuordnen ('+String(e.message||e).slice(0,300)+'). Unter „Meine Änderungen“ entscheiden, wie es weitergeht.';
+        salesWrite_('sales_jobs/'+job.id,job);
+        run.errors.push({kind:'write',id:item.id,label:item.label,decision:'reviews',message:job.message});
+      }
       else item.notBefore=new Date(now+SALES_SYNC_VERIFY_MINUTES*60000).toISOString();
     }
   }
@@ -1626,7 +1644,7 @@ function salesBulkStepWork_(run){
   if(run.planCleanupPending)salesDeltaResolvePlan_(run);
   const task=run.tasks[run.cursor];let done=false,writeBoundary=false;
   if(task.kind==='write'){const job=salesRead_('sales_jobs/'+salesKey_(task.id));writeBoundary=!!job&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.state)&&!(task.step==='company'&&job.companyConfirmedAt&&job.steps?.company);try{salesSyncWrite_(task,run);run.stats.writes++;}catch(e){if(typeof salesWorkerTransient_==='function'&&salesWorkerTransient_(e))throw e;run.errors.push({kind:'write',id:task.id,label:task.label,message:e.message});}done=true;}
-  else if(task.kind==='deltaProbe')done=salesDeltaProbe_(run,task);
+  else if(task.kind==='deltaProbe'){done=salesDeltaProbe_(run,task);if(done&&task.removed)salesDeltaReconciled_(run,task);}
   else if(task.kind==='deltaMissing')done=salesDeltaMissing_(run,task);
   else if(task.kind==='deltaEditions')done=salesDeltaEditions_(run,task);
   else if(task.kind==='deltaEditionAudit'){salesDeltaCoverage_(run);done=true;}
@@ -1635,9 +1653,11 @@ function salesBulkStepWork_(run){
   else if(task.kind==='bulkProject')done=salesBulkProject_(run,task);
   else if(task.kind==='bulkCompanyPlan'){
     run.tasks.push(...run.dirtyCompanies.map(id=>({kind:'bulkCompany',id,label:'Kundenakten aus Firebase bilden · Gruppe '+id})),...salesDeltaEditionTasks_(run,false));
-    if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
+    // The second reconciliation pass rebuilds only what it changed; lists and unclear entries were already handled.
+    if(run.auditRepeated)run.tasks.push({kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
+    else if(run.full)run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'bulkUnassigned',id:'contacts',label:'Kontakte ohne bekannte Firma sichern'},{kind:'bulkUnassigned',id:'histories',label:'Historie ohne bekannte Firma sichern'});
     else run.tasks.push({kind:'catalog',id:'lists',label:'Auswahllisten aktualisieren'},{kind:'deltaUnassigned',label:'Geänderte Daten ohne Firmenzuordnung prüfen'});
-    if(run.verifyJobs?.length)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
+    if(run.verifyJobs?.length&&!run.auditRepeated)run.tasks.push({kind:'verifyJobs',label:'App → HQ: unklare Historieneinträge nur prüfen'});
     run.tasks.push({kind:'bulkAudit',label:'Gesamtzahlen und Ausgaben prüfen'});done=true;
   }
   else if(task.kind==='verifyJobs')done=salesSyncVerifyStep_(run,task);
@@ -1671,6 +1691,7 @@ function salesDeltaCache_(old){
   if(cache.completedAt&&!SALES_BULK_ENTITIES.every(e=>cache.entities?.[e]?.generation&&Number.isFinite(Date.parse(cache.entities[e].watermark))))throw new Error('Gespeicherte Änderungsmarken unvollständig. Bestand bleibt erhalten; kein automatischer Gesamtimport. Einrichtung prüfen.');
   return cache;
 }
+const SALES_DELTA_PROBE_ENTITIES=['Companies','ContactPersons','Projects','Documents','PlannedRevenues'];
 function salesDeltaPrepare_(old){
   const cache=salesDeltaCache_(old),now=salesNow_(),full=!cache.completedAt;
   // A new database needs one initial baseline. A known database is never silently reset.
@@ -1685,8 +1706,10 @@ function salesDeltaPrepare_(old){
     run.entities[e]={full,generation:full?run.id:prev.generation,previousGeneration:prev?.generation||null,since:full?null:new Date(Date.parse(prev.watermark)-120000).toISOString(),previousWatermark:full?null:prev.watermark,lastId:0,pages:0,seen:0,changed:0,count:full?0:prev.count,ids:[],knownIds:(prev?.ids||[]).slice(),checkOffset:prev?.checkOffset||0,deltaSupported:true};
     tasks.push({kind:'bulkRead',id:e,label:'HQ → Firebase: '+SALES_BULK_LABELS[e]+(full?' erstmals lesen':' · Änderungen lesen')});
   }
-  if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
-  if(!full)for(const e of ['Companies','ContactPersons'])tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · HQ-Löschungen abgleichen'});
+  // Contact histories carry no nested HQ data without a timestamp, so the change filter alone is complete for them.
+  if(!full)for(const e of SALES_DELTA_PROBE_ENTITIES)tasks.push({kind:'deltaProbe',id:e,label:SALES_BULK_LABELS[e]+' · begrenzte Einzelprüfung (höchstens 10)'});
+  // Every HQ data type is reconciled by identifiers, but only when Firebase and HQ report different totals.
+  if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand mit HQ abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
@@ -1751,26 +1774,41 @@ function salesDeltaProbe_(run,task){
   if(task.index>=task.ids.length)return true;
   const id=task.ids[task.index];let raw;
   try{raw=salesHqGet_('/v2/'+task.id+'/'+salesId_(id)+(SALES_BULK_EXPAND[task.id]?'?expand='+encodeURIComponent(SALES_BULK_EXPAND[task.id]):'')).data;}
-  catch(e){if(!/HTTP 404/.test(e.message))throw e;if(['Companies','ContactPersons'].includes(task.id)){salesDeltaMirrorMissing_(run,task,id);return task.index>=task.ids.length;}run.errors.push({label:'HQ-Einzelprüfung · '+SALES_BULK_LABELS[task.id],message:'Kennung '+id+' wurde nicht mehr gefunden. Gespeicherter Datensatz bleibt zur Klärung erhalten; keine automatische Löschung.'});task.index++;return task.index>=task.ids.length;}
+  catch(e){if(!/HTTP 404/.test(e.message))throw e;salesDeltaMirrorMissing_(run,task,id);return task.index>=task.ids.length;}
   if(String(raw.id)!==id)throw new Error('HQ-Einzelprüfung liefert eine andere Kennung.');
   const row=salesBulkSelect_(task.id,raw),path=salesBulkCollection_(task.id)+'/'+id,prior=salesBulkGet_([path])[path],entries=[];
+  // In deltaMissing a stored row that HQ still returns individually is missing only from the HQ list, not deleted.
+  if(task.kind==='deltaMissing'){if(!prior||prior.generation!==m.generation)task.added=(task.added||0)+1;else{task.hidden=(task.hidden||0)+1;task.hiddenIds=(task.hiddenIds||[]).concat(id).slice(0,10);}}
   salesDeltaRecord_(run,task.id,row,prior,entries);m.checked=(m.checked||0)+1;
   if(!entries.length){task.index++;return task.index>=task.ids.length;}
   task.pendingPage='sales_imports/'+run.id+'-probe-'+task.id+'-'+task.index;salesWrite_(task.pendingPage,{entries});salesWrite_('sales_meta/sync',run);
   return salesDeltaProbe_(run,task);
 }
-/** Compare identifiers only when the CRM cache has more rows than HQ. Never imports full entities as a fallback. */
+/** Compare identifiers only when Firebase and HQ report different totals. Totals alone never import or delete:
+ * each differing identifier is confirmed by a single HQ read (found → stored, 404 plus exact empty list → removed). */
 function salesDeltaMissing_(run,task){
-  if(!['Companies','ContactPersons'].includes(task.id))throw Error('HQ-Löschabgleich ist nur für Unternehmen und Ansprechpartner freigegeben.');
-  if(task.ids)return salesDeltaProbe_(run,task);
-  try{return salesDeltaMissingIds_(run,task);}
+  if(!SALES_BULK_ENTITIES.includes(task.id))throw Error('Unbekannte HQ-Datenart für den Bestandsabgleich.');
+  if(task.ids){const done=salesDeltaProbe_(run,task);if(done)salesDeltaReconciled_(run,task);return done;}
+  try{const done=salesDeltaMissingIds_(run,task);if(done)salesDeltaReconciled_(run,task);return done;}
   catch(e){
     // The background worker first retries a temporary HQ fault on a minute timer; only the last attempt keeps the check open.
     if(!salesDeltaHqServerError_(e)||salesDeltaRetriesLeft_())throw e;
-    const read=task.expected===undefined?'HQ-Gesamtzahl':task.hqIds.length===task.expected?'Rückprüfung der HQ-Gesamtzahl':'HQ-Kennungsliste';
-    run.errors.push({label:'HQ-Löschabgleich · '+SALES_BULK_LABELS[task.id],message:read+' vorübergehend nicht verfügbar (HTTP '+e.hqHttpStatus+'). Die Prüfung bleibt offen und wird beim nächsten HQ-Abgleich erneut versucht.'});
-    delete task.hqIds;task.stage='Löschprüfung offen';return true;
+    const read=task.expected===undefined?'HQ-Gesamtzahl':'HQ-Kennungsliste';
+    run.errors=(run.errors||[]).filter(x=>!(x.kind==='deltaMissing'&&x.id===task.id));
+    run.errors.push({kind:'deltaMissing',id:task.id,label:'HQ-Bestandsabgleich · '+SALES_BULK_LABELS[task.id],message:read+' vorübergehend nicht verfügbar (HTTP '+e.hqHttpStatus+'). Die Prüfung bleibt offen und wird beim nächsten HQ-Abgleich erneut versucht.'});
+    salesDeltaResetScan_(task);task.stage='Bestandsabgleich offen';return true;
   }
+}
+function salesDeltaResetScan_(task){for(const key of ['expected','lastId','scanned','missing','unknown','ids','index','restarted'])delete task[key];}
+// A successful reconciliation closes earlier open points of the same data type and reports what it repaired.
+function salesDeltaReconciled_(run,task){
+  const label=SALES_BULK_LABELS[task.id];
+  run.errors=(run.errors||[]).filter(e=>!(e.kind==='deltaMissing'&&e.id===task.id));
+  const parts=[];
+  if(task.removed)parts.push(task.removed+(task.removed===1?' in HQ gelöschter Eintrag':' in HQ gelöschte Einträge')+' auch in Firebase entfernt');
+  if(task.added)parts.push(task.added+(task.added===1?' in Firebase fehlender Eintrag':' in Firebase fehlende Einträge')+' aus HQ nachgeladen');
+  if(task.hidden)run.errors.push({kind:'deltaMissing',id:task.id,label:'HQ-Bestandsabgleich · '+label,message:task.hidden+(task.hidden===1?' Eintrag ist':' Einträge sind')+' in HQ einzeln abrufbar, erscheinen aber nicht in der HQ-Gesamtliste. Sie bleiben in Firebase erhalten; deshalb weichen die Gesamtzahlen ab (HQ-Kennung '+task.hiddenIds.join(', ')+(task.hidden>10?' …':'')+').'});
+  if(parts.length)run.notices=(run.notices||[]).concat({label:'Bestandsabgleich · '+label,message:parts.join(' · ')+'. Jede Kennung wurde vorher einzeln in HQ geprüft.'}).slice(-50);
 }
 function salesDeltaHqServerError_(e){return [500,502,503,504].includes(e.hqHttpStatus);}
 function salesDeltaRetriesLeft_(){return typeof salesWorkerRetriesLeft_==='function'&&salesWorkerRetriesLeft_()>0;}
@@ -1779,43 +1817,60 @@ function salesDeltaWatermark_(run,m){
   if(m.full||!(run.retainWatermarks||m.retainWatermark))return run.startedAt;
   return m.previousWatermark||new Date(Date.parse(m.since)+120000).toISOString();
 }
+const SALES_DELTA_ID_PAGE=200;
+// Identifier pages use the same v2 list and ID cursor as the change reader. The former v1 "$select=Id" list answered HTTP 500.
+function salesDeltaIdPage_(entity,lastId){
+  const r=salesHqGet_('/v2/'+entity+'?$top='+SALES_DELTA_ID_PAGE+'&$skip=0&orderby=id&$filter='+encodeURIComponent('id gt '+lastId));
+  const rows=Array.isArray(r.data)?r.data:r.data?.data||r.data?.value;
+  if(!Array.isArray(rows)||rows.length>SALES_DELTA_ID_PAGE)throw Error('HQ-Kennungsseite hat ein unbekanntes Format oder überschreitet die angeforderte Größe.');
+  const key=Object.keys(r.headers||{}).find(k=>k.toLowerCase()==='hellohq-count'),total=key?Number(r.headers[key]):null;
+  return {ids:rows.map(row=>salesId_(row.id)),done:rows.length===0||total===rows.length};
+}
 function salesDeltaMissingIds_(run,task){
   const m=run.entities[task.id];
   if(task.expected===undefined){
     const total=salesV1Page_(task.id,'',0,1).total;
-    if(total===null)throw Error('HQ-Gesamtzahl für den Löschabgleich nicht bestätigt.');
-    if(total>=m.count)return true;
-    task.expected=total;task.hqIds=[];task.lastId=0;
+    if(total===null)throw Error('HQ-Gesamtzahl für den Bestandsabgleich nicht bestätigt.');
+    if(total===m.count)return true;
+    Object.assign(task,{expected:total,lastId:0,scanned:0,missing:[],unknown:[]});
   }
-    const invalid=message=>{for(const key of ['expected','hqIds','lastId','ids','index','pageSize'])delete task[key];task.stage='Kennungsvergleich nach Prüffehler erneut beginnen';salesWrite_('sales_meta/sync',run);throw Error(message);};
-    const read=size=>salesHqRows_(salesHqGet_('/v1/'+task.id+'?$select=Id&$orderby=Id&$top='+size+'&$skip='+task.hqIds.length).data);
-    let rows;
-    try{rows=read(task.pageSize||200);}catch(e){
-      if(task.pageSize||!salesDeltaHqServerError_(e))throw e;
-      task.pageSize=50;rows=read(task.pageSize);
-    }
-    if(rows.length>(task.pageSize||200))invalid('HQ-Kennungsseite überschreitet die angeforderte Größe.');
-    for(const row of rows){
-      if(Object.keys(row).some(k=>k!=='Id'&&!k.startsWith('@odata.')))invalid('HQ hat die reine Kennungsabfrage nicht eingehalten. Kein Gesamtabruf als Ersatz.');
-      const id=salesId_(row.Id);if(id<=task.lastId)invalid('HQ-Kennungsseiten enthalten doppelte oder ungeordnete Kennungen.');
-      task.lastId=id;task.hqIds.push(String(id));
-    }
-    if(task.hqIds.length>task.expected||task.hqIds.length>100000)invalid('HQ-Kennungsbestand hat sich während der Prüfung geändert. Bitte erneut abgleichen.');
-    task.stage=task.hqIds.length+' von '+task.expected+' HQ-Kennungen geprüft';
-    if(rows.length&&task.hqIds.length<task.expected)return false;
-    if(task.hqIds.length!==task.expected||salesV1Page_(task.id,'',0,1).total!==task.expected)invalid('HQ-Kennungsliste ist unvollständig oder inzwischen geändert. Es wird nichts daraus gelöscht.');
-    const present=new Set(task.hqIds);task.ids=(m.knownIds||[]).filter(id=>!present.has(String(id)));task.index=0;delete task.hqIds;
-    return task.ids.length===0;
+  const invalid=message=>{salesDeltaResetScan_(task);task.stage='Bestandsabgleich nach Prüffehler erneut beginnen';salesWrite_('sales_meta/sync',run);throw Error(message);};
+  const page=salesDeltaIdPage_(task.id,task.lastId);let last=task.lastId;
+  for(const id of page.ids){if(!(id>last))invalid('HQ-Kennungsseiten enthalten doppelte oder ungeordnete Kennungen. Es wird nichts gelöscht.');last=id;}
+  // Both lists are ordered by ID: compare only the range this page covers. The last page covers everything above it.
+  const known=(m.knownIds||[]).map(Number),stored=new Set(known),seen=new Set(page.ids),upper=page.done?Infinity:last;
+  for(const id of known)if(id>task.lastId&&id<=upper&&!seen.has(id))task.missing.push(String(id));
+  for(const id of page.ids)if(!stored.has(id))task.unknown.push(String(id));
+  task.scanned+=page.ids.length;task.lastId=last;
+  // A truncated HQ list must never become a mass deletion.
+  const limit=Math.max(50,Math.ceil(task.expected*0.02)),open=task.missing.length+task.unknown.length;
+  if(open>limit)invalid('Zu viele Abweichungen zwischen HQ und Firebase ('+open+'). Die HQ-Liste wirkt unvollständig; es wird nichts gelöscht oder nachgeladen.');
+  task.stage=task.scanned+' von '+task.expected+' HQ-Kennungen verglichen';
+  if(!page.done)return false;
+  if(task.scanned!==task.expected||salesV1Page_(task.id,'',0,1).total!==task.expected){
+    // HQ changed during the scan: compare once more from the start before reporting anything.
+    if(task.restarted)invalid('HQ-Bestand hat sich während des Abgleichs geändert. Es wird nichts gelöscht; der Abgleich wird erneut versucht.');
+    salesDeltaResetScan_(task);task.restarted=true;return false;
+  }
+  task.ids=[...task.missing,...task.unknown].sort((a,b)=>Number(a)-Number(b));task.index=0;delete task.missing;delete task.unknown;
+  return task.ids.length===0;
 }
-/** A GET 404 plus an exact empty list confirms an upstream CRM deletion. One atomic checkpoint removes its app copies. */
+/** A GET 404 plus an exact empty list confirms an upstream deletion. One atomic checkpoint removes its app copies.
+ * HQ is the only source of projects, documents, planned revenues and imported histories; their copies follow HQ. */
 function salesDeltaMirrorMissing_(run,task,id){
-  const entity=task.id,key=String(salesId_(id));if(!['Companies','ContactPersons'].includes(entity))throw Error('HQ-Löschziel nicht freigegeben.');
+  const entity=task.id,key=String(salesId_(id));if(!SALES_BULK_ENTITIES.includes(entity))throw Error('HQ-Löschziel nicht freigegeben.');
   const page=salesV1Page_(entity,'id eq '+key,0,2);
   if(page.total!==0||page.rows.length||!page.done)throw Error('HQ bestätigt die Löschung nicht eindeutig. Firebase-Datensatz bleibt erhalten.');
   const rawPath=salesBulkCollection_(entity)+'/'+key,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk');
-  if(!raw||raw.generation!==run.entities[entity].generation||raw.generation!==cache?.entities?.[entity]?.generation)throw Error('Gespeicherter HQ-Datensatz oder Generation nicht prüfbar. Keine Löschung.');
   const next=JSON.parse(JSON.stringify(run)),nextCache=JSON.parse(JSON.stringify(cache)),nextTask=next.tasks[next.cursor],now=salesNow_();
   if(nextTask.id!==entity||String(nextTask.ids?.[nextTask.index])!==key)throw Error('Löschprüfpunkt passt nicht zum laufenden Abgleich.');
+  // Only a stale identifier without a stored copy: forget the identifier, counts stay unchanged.
+  if(!raw&&cache?.entities?.[entity]){
+    for(const target of [next,nextCache]){const meta=target.entities[entity];for(const list of ['ids','knownIds'])if(Array.isArray(meta[list]))meta[list]=meta[list].filter(x=>String(x)!==key);}
+    nextTask.index++;next.revision++;next.updatedAt=now;return salesDeltaMirrorCommit_(run,task,next,nextCache,nextTask,[]);
+  }
+  if(!raw||raw.generation!==run.entities[entity].generation||raw.generation!==cache?.entities?.[entity]?.generation)throw Error('Gespeicherter HQ-Datensatz oder Generation nicht prüfbar. Keine Löschung.');
+  if(!['Companies','ContactPersons'].includes(entity))return salesDeltaMirrorHqOnly_(run,task,entity,key,raw,rawPath,next,nextCache,nextTask);
   for(const target of [next,nextCache]){
     const meta=target.entities[entity];if(!Number.isSafeInteger(meta.count)||meta.count<1)throw Error('Gespeicherter Bestandszähler nicht prüfbar. Keine Löschung.');
     meta.count--;for(const list of ['ids','knownIds','touchedIds'])if(Array.isArray(meta[list]))meta[list]=meta[list].filter(x=>String(x)!==key);
@@ -1824,7 +1879,7 @@ function salesDeltaMirrorMissing_(run,task,id){
   const stat=entity==='Companies'?'companies':'contacts';if(Number.isSafeInteger(nextCache.stats?.[stat]))nextCache.stats[stat]=Math.max(0,nextCache.stats[stat]-1);
   // Keep removed IDs as touched so the orphan views also drop deleted contacts.
   const touched=next.entities[entity].touchedIds||(next.entities[entity].touchedIds=[]);if(!touched.includes(key))touched.push(key);
-  salesBulkDirty_(next,entity,raw.row);next.entities[entity].removed=(next.entities[entity].removed||0)+1;nextTask.index++;nextTask.stage=nextTask.index+' fehlende Kennungen geprüft';next.revision++;next.updatedAt=now;
+  salesBulkDirty_(next,entity,raw.row);next.entities[entity].removed=(next.entities[entity].removed||0)+1;nextTask.removed=(nextTask.removed||0)+1;nextTask.index++;nextTask.stage=nextTask.index+' fehlende Kennungen geprüft';next.revision++;next.updatedAt=now;
   const entries=new Map(),deleted=new Set([rawPath]),put=(path,value)=>entries.set(path,value),drop=path=>{entries.delete(path);deleted.add(path);};
   const drafts=salesList_('sales_drafts'),jobs=salesList_('sales_jobs'),companyId=entity==='Companies'?key:String(raw.row.companyId||''),related=new Set([companyId].filter(Boolean));
   if(entity==='ContactPersons')for(const job of jobs)if(String(job.contactId)===key){if(job.companyRef)related.add(String(job.companyRef));if(job.hqId)related.add(String(job.hqId));}
@@ -1866,6 +1921,25 @@ function salesDeltaMirrorMissing_(run,task,id){
   if(entries.size+deleted.size>450)throw Error('Zu viele zugehörige App-Aufträge für einen atomaren Löschabgleich. Gezielte Klärung erforderlich.');
   const writes=[...[...deleted].map(path=>({delete:salesBulkName_(path)})),...[...entries].map(([path,value])=>({update:{name:salesBulkName_(path),fields:{payload:{stringValue:salesBulkPayload_(path,value)}}}}))];
   salesBulkRest_('commit',{writes});if(salesBulkStepCache_){salesBulkStepCache_.documents.clear();salesBulkStepCache_.rows.clear();}
+  Object.assign(task,nextTask);next.tasks[next.cursor]=task;Object.assign(run,next);
+}
+/** HQ-only data (projects, documents, planned revenues, histories): remove the copy and rebuild the affected
+ * project and customer views later in this run. No app jobs refer to these rows, so nothing else changes. */
+function salesDeltaMirrorHqOnly_(run,task,entity,key,raw,rawPath,next,nextCache,nextTask){
+  for(const target of [next,nextCache]){
+    const meta=target.entities[entity];if(!Number.isSafeInteger(meta.count)||meta.count<1)throw Error('Gespeicherter Bestandszähler nicht prüfbar. Keine Löschung.');
+    meta.count--;for(const list of ['ids','knownIds','touchedIds'])if(Array.isArray(meta[list]))meta[list]=meta[list].filter(x=>String(x)!==key);
+  }
+  // A removed history must also leave the list of histories without a known company.
+  if(entity==='ContactHistories'){const touched=next.entities[entity].touchedIds||(next.entities[entity].touchedIds=[]);touched.push(key);}
+  salesBulkDirty_(next,entity,raw.row);next.entities[entity].removed=(next.entities[entity].removed||0)+1;nextTask.removed=(nextTask.removed||0)+1;
+  nextTask.index++;nextTask.stage=nextTask.index+' abweichende Kennungen geprüft';next.revision++;next.updatedAt=salesNow_();
+  return salesDeltaMirrorCommit_(run,task,next,nextCache,nextTask,[rawPath,...(entity==='Projects'?['sales_projectviews/'+key]:[])]);
+}
+function salesDeltaMirrorCommit_(run,task,next,nextCache,nextTask,deleted){
+  const update=(path,value)=>({update:{name:salesBulkName_(path),fields:{payload:{stringValue:salesBulkPayload_(path,value)}}}});
+  salesBulkRest_('commit',{writes:[...deleted.map(path=>({delete:salesBulkName_(path)})),update('sales_meta/bulk',nextCache),update('sales_meta/sync',next),update('sales_meta/lean_sync',salesSyncSummary_(next))]});
+  if(salesBulkStepCache_){salesBulkStepCache_.documents.clear();salesBulkStepCache_.rows.clear();}
   Object.assign(task,nextTask);next.tasks[next.cursor]=task;Object.assign(run,next);
 }
 /** Explicit administrative repair of one missing orphan plan. Runs only inside the resumed central sync. */
@@ -1910,8 +1984,25 @@ function startSalesEditionRefresh(){
   });
 }
 function salesDeltaCoverage_(run){
-  const known=new Set(run.companyIds);run.coverage=salesV1Editions_().filter(e=>e.syncEnabled!==false).map(e=>({id:e.id,label:e.magazine+' #'+e.issue,companies:(e.companyIds||[]).length,missingCompanyIds:(e.companyIds||[]).filter(id=>!known.has(id)),editionLoaded:!!e.loadedAt&&!e.cacheLinkPending,belegsComplete:e.complete===true}));
-  if(run.coverage.some(e=>!e.editionLoaded||e.missingCompanyIds.length||!e.belegsComplete))run.errors.push({label:'Ausgabenprüfung',message:'Mindestens eine Ausgabe hat offene Beleg- oder Firmenzuordnungen. Siehe Ausgabenübersicht.'});
+  const known=new Set(run.companyIds),editions=salesV1Editions_().filter(e=>e.syncEnabled!==false);
+  run.coverage=editions.map(e=>({id:e.id,label:e.magazine+' #'+e.issue,companies:(e.companyIds||[]).length,missingCompanyIds:(e.companyIds||[]).filter(id=>!known.has(id)),editionLoaded:!!e.loadedAt&&!e.cacheLinkPending,belegsComplete:e.complete===true}));
+  run.errors=(run.errors||[]).filter(e=>e.kind!=='editionCheck');
+  // One clearly named entry per edition: where it comes from, which edition and which documents or companies.
+  const open=editions.map((e,i)=>({e,c:run.coverage[i]})).filter(({c})=>!c.editionLoaded||c.missingCompanyIds.length||!c.belegsComplete);
+  const issueIds=open.flatMap(({e,c})=>c.belegsComplete?[]:(e.issues||[]).slice(0,10).map(x=>String(x.id))),numbers={};
+  if(issueIds.length){const docs=salesBulkGet_(issueIds.map(id=>salesBulkCollection_('Documents')+'/'+id));for(const id of issueIds){const row=docs[salesBulkCollection_('Documents')+'/'+id]?.row;if(row?.number)numbers[id]=row.number;}}
+  const list=(ids,more)=>ids.slice(0,10).join(', ')+(more>10?' und '+(more-10)+' weitere':'');
+  for(const {e,c} of open){
+    const parts=[];
+    if(!c.editionLoaded)parts.push(e.loadedAt?'Die Verknüpfung mit den HQ-Belegen wartet auf Aktualisierung':'Die Ausgabe ist noch nicht mit den HQ-Belegen verknüpft');
+    if(c.missingCompanyIds.length)parts.push(c.missingCompanyIds.length+(c.missingCompanyIds.length===1?' Rechnungsempfänger fehlt':' Rechnungsempfänger fehlen')+' im Kundenbestand (HQ-Firmenkennung '+list(c.missingCompanyIds,c.missingCompanyIds.length)+')');
+    if(!c.belegsComplete){
+      const byReason={};for(const x of e.issues||[])(byReason[x.reason]||(byReason[x.reason]=[])).push(numbers[String(x.id)]||'HQ-Kennung '+x.id);
+      for(const [reason,docs] of Object.entries(byReason))parts.push(reason+': '+docs.length+(docs.length===1?' Beleg':' Belege')+' ('+list(docs,docs.length)+')');
+      if(!(e.issues||[]).length)parts.push('Die Belegprüfung dieser Ausgabe ist noch nicht abgeschlossen');
+    }
+    run.errors.push({kind:'editionCheck',id:e.id,label:'Ausgabenprüfung · '+c.label,message:parts.join(' · ')+'. Herkunft: Ausgabenprüfung im HQ-Abgleich. Die Belege selbst werden nur in HQ geändert.'});
+  }
 }
 function salesDeltaUnassigned_(run){
   const known=new Set(run.companyIds);let changed=false;
@@ -1927,16 +2018,27 @@ function salesDeltaUnassigned_(run){
   if(changed)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts??run.previousStats.unassignedContacts??0,histories:run.stats.unassignedHistories??run.previousStats.unassignedHistories??0,updatedAt:salesNow_()});return true;
 }
 function salesDeltaAudit_(run){
-  const warnings=[];for(const e of SALES_BULK_ENTITIES){
+  const warnings=[],totals={};for(const e of SALES_BULK_ENTITIES){
     let total;try{total=salesV1Page_(e,'',0,1).total;}catch(err){
       // Totals are diagnostics only: a temporary fault is retried first, then any HQ fault just leaves the total unconfirmed.
       const temporary=typeof salesWorkerTransient_==='function'?salesWorkerTransient_(err):salesDeltaHqServerError_(err);
       if(temporary&&salesDeltaRetriesLeft_())throw err;
       total=null;warnings.push({label:'HQ-Gesamtzahl · '+SALES_BULK_LABELS[e],message:'HQ konnte die Gesamtzahl nicht bestätigen ('+(err.hqHttpStatus?'HTTP '+err.hqHttpStatus:String(err.message||'unbekannter Fehler').slice(0,200))+'). Der gelesene Änderungsstand ist gespeichert.'});
     }
-    const m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
+    totals[e]=total;
+  }
+  // HQ changed during this run (or a reconciliation was skipped): reconcile the differing data types once more right away.
+  const differing=SALES_BULK_ENTITIES.filter(e=>totals[e]!==null&&totals[e]!==run.entities[e].count);
+  if(differing.length&&!run.full&&!run.auditRepeated){
+    run.auditRepeated=true;run.dirtyCompanies=[];run.dirtyProjects=[];run.changedCompanyIds=[];run.changedProjectIds=[];
+    for(const e of SALES_BULK_ENTITIES)run.entities[e].touchedIds=[];
+    run.tasks.push(...differing.map(e=>({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand erneut mit HQ abgleichen'})),{kind:'bulkPlan',label:'Betroffene Kundenakten erneut zuordnen'});
+    return true;
+  }
+  for(const e of SALES_BULK_ENTITIES){
+    const total=totals[e],m=run.entities[e],key={Companies:'hqCompanies',ContactPersons:'hqContacts',ContactHistories:'hqHistories'}[e];
     if(key)run.stats[key]=total;m.confirmedTotal=total;
-    if(total===null||total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+(total===null?'nicht bestätigt':total)+'. Mengenabweichung bleibt zur Prüfung offen. Änderungsstand gespeichert; kein erneuter Gesamtimport.'});
+    if(total!==null&&total!==m.count)warnings.push({label:'Bestandsprüfung · '+SALES_BULK_LABELS[e],message:'Firebase: '+m.count+' · HQ: '+total+'. Die Abweichung blieb auch nach dem automatischen Bestandsabgleich bestehen. Der nächste HQ-Abgleich gleicht sie erneut ab; es ist nichts zu tun.'});
   }
   salesDeltaCoverage_(run);run.errors.push(...warnings);
   const entities={};for(const e of SALES_BULK_ENTITIES){const m=run.entities[e];entities[e]={generation:m.generation,count:m.count,watermark:salesDeltaWatermark_(run,m),ids:m.full?m.ids:(m.knownIds||[]),checkOffset:m.checkOffset||0};}
@@ -2004,7 +2106,7 @@ function salesWorkerSkip_(run,e){
   const record=note=>run.errors.push({kind:task.kind==='write'?'write':task.kind,id:task.id,label:task.label||'HQ-Abgleich',stage:task.stage||'',message:message+' · '+note});
   if(task.kind==='write')record('Auftrag bleibt gespeichert und wird beim nächsten HQ-Abgleich erneut geprüft. Der restliche Abgleich läuft weiter.');
   else if(SALES_SYNC_OPTIONAL_TASKS.includes(task.kind)){
-    if(task.kind==='deltaMissing')for(const key of ['expected','hqIds','lastId','ids','index','pageSize'])delete task[key];
+    if(task.kind==='deltaMissing'){salesDeltaResetScan_(task);run.errors=run.errors.filter(x=>!(x.kind==='deltaMissing'&&x.id===task.id));}
     if(task.kind==='deltaEditions')for(const id of task.editionIds||[]){const edition=salesRead_('sales_editions/'+salesKey_(id));if(edition&&!edition.cacheLinkPending)salesWrite_('sales_editions/'+edition.id,{...edition,cacheLinkPending:true});}
     if(task.kind==='verifyJobs')run.verifyJobs=[];
     record('Prüfung übersprungen; sie wird beim nächsten HQ-Abgleich erneut versucht. Der restliche Abgleich läuft weiter.');
@@ -2881,9 +2983,29 @@ function salesReviewOverlay_(pending,current){
 function salesReviewOwn_(job,user){return job.actorUid?job.actorUid===user.uid:job.actor===user.email;}
 function listSalesChangeReviews(){
   const user=salesUser_();
-  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user))
-    .map(j=>salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
+  return salesList_('sales_jobs').filter(j=>j.review&&salesReviewOwn_(j,user)||salesUnclearHistory_(j)&&(salesReviewOwn_(j,user)||user.admin))
+    .map(j=>salesUnclearHistory_(j)?{...salesPick_(j,['id','name','state','message','updatedAt','verifyResult']),unclear:true,content:salesHistoryText_(j.history?.content||j.capture?.content||'').slice(0,300),contactOn:j.history?.contactOn||j.capture?.contactOn||'',review:{conversation:[]}}:salesPick_(j,['id','name','state','changeReason','review','message','updatedAt']))
     .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+}
+/** An unclear history entry is never sent twice on its own. Its author or the admin decides here. */
+function salesUnclearHistory_(job){return job?.state==='uncertain'&&['history','communication'].includes(job.kind);}
+function resolveSalesUnclearHistory(input){
+  const user=salesUser_();
+  return salesLock_(()=>{
+    salesAssertPrivate_();const id=salesKey_(input?.id),job=salesRead_('sales_jobs/'+id),decision=input?.decision;
+    if(!salesUnclearHistory_(job)||!(salesReviewOwn_(job,user)||user.admin))throw Error('Dieser Eintrag ist nicht mehr offen oder gehört nicht zu dir. Bitte neu laden.');
+    if(!['resend','discard','exists'].includes(decision))throw Error('Unbekannte Entscheidung.');
+    if(decision==='resend'&&job.verifyResult!=='notFound')throw Error('Erneut senden ist erst möglich, wenn der HQ-Abgleich den Eintrag sicher nicht gefunden hat.');
+    const now=salesNow_();job.updatedAt=now;job.decision={decision,by:user.email,at:now};
+    if(decision==='resend'){
+      // The next central sync looks once more read-only and sends only if HQ still has no such entry.
+      job.state='pending';job.resendApproved=true;delete job.writeAttempted;delete job.phaseWriteAttempted;delete job.historyId;delete job.verifyResult;
+      job.message='Erneut senden freigegeben. Der nächste HQ-Abgleich prüft vorher noch einmal, ob der Eintrag inzwischen in HQ steht.';
+    }else if(decision==='discard'){job.state='canceled';job.message='Verworfen. Der Eintrag wird nicht an HQ übertragen.';}
+    else{job.state='synced';job.message='Als in HQ vorhanden bestätigt. Kein weiterer Schreibversuch.';}
+    salesWrite_('sales_jobs/'+id,job);if(typeof salesCommunicationAfterJob_==='function')salesCommunicationAfterJob_(job);
+    return {message:job.message};
+  });
 }
 function respondSalesChangeReview(input){
   const user=salesUser_();
@@ -3886,7 +4008,7 @@ function salesAuthOwner_(){const user=salesAuthRequest_?.user;if(!user?.admin)th
 
 /** Explicit operation registry. Old public RPCs cannot establish an authenticated context. */
 function salesAuthRule_(method,args){
-  if(['listSalesChangeReviews','respondSalesChangeReview','listSalesReminders'].includes(method))return 'home.read';
+  if(['listSalesChangeReviews','respondSalesChangeReview','resolveSalesUnclearHistory','listSalesReminders'].includes(method))return 'home.read';
   if(method==='saveSalesReminder')return 'communication.create';
   const rules={getSalesLeanState:'home.read',getSalesLeanCompany:'customers.read',getSalesLeanEdition:'magazine.read',saveSalesCompany:'company.create',saveSalesTestCompany:'company.create',saveSalesCompanyChange:'company.edit',saveSalesCommunication:'communication.create',saveSalesHistory:'communication.create',createSalesCustomerContact:'contact.create',getSalesSyncStatus:'sync.read',startSalesSync:'sync.run',pauseSalesSync:'sync.run',runSalesSyncStep:'sync.run',syncSalesLeanCompany:'sync.run',syncSalesLeanHistory:'sync.run',saveSalesLeanEditionSettings:'settings.edit',searchSalesProjects:'settings.edit',searchSalesCompanies:'sync.run',addSalesCompany:'sync.run',saveSalesEditionConfig:'settings.edit',setSalesEditionEnabled:'settings.edit',getSalesUnassigned:'sync.read',getSalesJobPreview:'sync.read',requestSalesCustomerDelete:'customers.read'};
   if(method==='getSalesLeanView')return ({home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',admin:'settings.read',import:'sync.read',new:'company.create',change:'company.edit',test:'owner'})[args[0]]||'deny';
@@ -3910,6 +4032,7 @@ function salesAuthDispatch_(method,args){
   salesAuthRequest_.requiredPermission=rule;
   if(method==='listSalesChangeReviews')return listSalesChangeReviews();
   if(method==='respondSalesChangeReview')return respondSalesChangeReview(...args);
+  if(method==='resolveSalesUnclearHistory')return resolveSalesUnclearHistory(...args);
   if(method==='listSalesReminders')return listSalesReminders();
   if(method==='saveSalesReminder')return saveSalesReminder(...args);
   const methods={getSalesJobInspection,getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,getSalesTestAudit,setupSalesSyncWorker,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh,requestSalesCustomerDelete,listSalesCustomerDeletions,decideSalesCustomerDelete};

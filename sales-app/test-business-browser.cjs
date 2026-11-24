@@ -35,6 +35,16 @@ const {chromium}=require('playwright'),{customerFixture,approveReview}=require('
   await page.getByLabel('Deine Antwort',{exact:true}).fill('Synthetic explanation');
   await page.getByRole('button',{name:'Antwort speichern',exact:true}).click();
   await page.getByText('Synthetic explanation',{exact:true}).waitFor();
+  // An unclear history entry shows decision buttons for its author; nothing is resent without a click.
+  const unclear=Object.values(f.db).find(j=>j.kind==='history'&&j.history?.reason==='Synthetic pending history');
+  f.ctx.salesWrite_('sales_jobs/'+unclear.id,{...unclear,state:'uncertain',writeAttempted:true,verifyResult:'notFound',message:'Nach 3 automatischen Prüfungen nicht in HQ gefunden. Unter „Meine Änderungen“ entscheiden: erneut senden oder verwerfen.'});
+  await page.getByRole('button',{name:'Ansicht aktualisieren',exact:true}).click();
+  await page.locator('[data-unclear]').getByText('Preserve while editing').waitFor();
+  await page.getByRole('button',{name:'Verwerfen',exact:true}).waitFor();await page.getByRole('button',{name:'Ist in HQ vorhanden',exact:true}).waitFor();
+  await page.screenshot({path:require('node:path').join(qaDirectory,'r40-unclear-history.png'),fullPage:true});
+  await page.getByRole('button',{name:'Erneut an HQ senden',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'Erneut senden freigegeben'}).waitFor();
+  assert.equal(f.db['sales_jobs/'+unclear.id].state,'pending');assert.equal(f.db['sales_jobs/'+unclear.id].resendApproved,true);assert.equal(await page.getByRole('button',{name:'Erneut an HQ senden',exact:true}).count(),0);
   await openRequest();
   await page.getByRole('button',{name:'Neuen Wert übernehmen',exact:true}).click();
   await page.getByRole('status').filter({hasText:'Vom Admin freigegeben'}).waitFor();

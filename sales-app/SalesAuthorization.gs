@@ -1,6 +1,6 @@
 /** Explicit operation registry. Old public RPCs cannot establish an authenticated context. */
 function salesAuthRule_(method,args){
-  if(['listSalesChangeReviews','respondSalesChangeReview','listSalesReminders'].includes(method))return 'home.read';
+  if(['listSalesChangeReviews','respondSalesChangeReview','resolveSalesUnclearHistory','listSalesReminders'].includes(method))return 'home.read';
   if(method==='saveSalesReminder')return 'communication.create';
   const rules={getSalesLeanState:'home.read',getSalesLeanCompany:'customers.read',getSalesLeanEdition:'magazine.read',saveSalesCompany:'company.create',saveSalesTestCompany:'company.create',saveSalesCompanyChange:'company.edit',saveSalesCommunication:'communication.create',saveSalesHistory:'communication.create',createSalesCustomerContact:'contact.create',getSalesSyncStatus:'sync.read',startSalesSync:'sync.run',pauseSalesSync:'sync.run',runSalesSyncStep:'sync.run',syncSalesLeanCompany:'sync.run',syncSalesLeanHistory:'sync.run',saveSalesLeanEditionSettings:'settings.edit',searchSalesProjects:'settings.edit',searchSalesCompanies:'sync.run',addSalesCompany:'sync.run',saveSalesEditionConfig:'settings.edit',setSalesEditionEnabled:'settings.edit',getSalesUnassigned:'sync.read',getSalesJobPreview:'sync.read',requestSalesCustomerDelete:'customers.read'};
   if(method==='getSalesLeanView')return ({home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',admin:'settings.read',import:'sync.read',new:'company.create',change:'company.edit',test:'owner'})[args[0]]||'deny';
@@ -24,6 +24,7 @@ function salesAuthDispatch_(method,args){
   salesAuthRequest_.requiredPermission=rule;
   if(method==='listSalesChangeReviews')return listSalesChangeReviews();
   if(method==='respondSalesChangeReview')return respondSalesChangeReview(...args);
+  if(method==='resolveSalesUnclearHistory')return resolveSalesUnclearHistory(...args);
   if(method==='listSalesReminders')return listSalesReminders();
   if(method==='saveSalesReminder')return saveSalesReminder(...args);
   const methods={getSalesJobInspection,getSalesLeanState,getSalesLeanView,getSalesLeanCompany,getSalesLeanEdition,saveSalesCompany,saveSalesTestCompany,saveSalesCompanyChange,saveSalesCommunication,saveSalesHistory,createSalesCustomerContact,getSalesSyncStatus,startSalesSync,pauseSalesSync,runSalesSyncStep,syncSalesLeanCompany,syncSalesLeanHistory,saveSalesLeanEditionSettings,searchSalesProjects,searchSalesCompanies,addSalesCompany,saveSalesEditionConfig,setSalesEditionEnabled,getSalesUnassigned,getSalesJobPreview,getSalesEditor,saveSalesEntityChange,getSalesStorageInventoryPage,getSalesTestAudit,setupSalesSyncWorker,runSalesJob,reconcileSalesJob,resolveSalesConflict,checkSalesHistoryBinding,queueSalesContactEmail,queueSalesMarkerCleanup,bindSalesCompanyResult,bindSalesCustomerContact,listSalesUsers,createSalesUserInvitation,updateSalesUser,logoutSalesUser,getSalesAuthSetup,saveSalesAuthSetup,setSalesDocumentExcluded,startSalesEditionRefresh,requestSalesCustomerDelete,listSalesCustomerDeletions,decideSalesCustomerDelete};
