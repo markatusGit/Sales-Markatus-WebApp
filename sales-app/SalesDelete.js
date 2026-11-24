@@ -1,7 +1,7 @@
   // Customer deletion (R15): any user requests, the admin approves, the central HQ sync deletes. No trash bin.
   // HtmlService strips comments with a simple scanner: keep quoted text out of template placeholders and avoid double slashes in code.
   let deleteFormOpen=null,deletionRows=null,deletionConfirm=null;
-  let deleteBatch=null;
+  let deleteBatch=null,deleteContactOpen=null;
   function deleteCustomerRef(c){return c.localDraftId?'draft_'+c.localDraftId:String(c.id);}
   function deleteBatchMatches(){const q=search.toLocaleLowerCase('de');return q.trim()?v1Companies().filter(c=>String(c.name||'').toLocaleLowerCase('de').includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'de')):[];}
   function deleteBatchPanel(){
@@ -19,7 +19,9 @@
     confirmUncertain:'wird sofort in der App gelöscht. Die HQ-Übertragung war begonnen, aber nicht bestätigt: bitte danach in HQ prüfen, ob die Firma dort angelegt wurde.',
     started:'<p>Die HQ-Übertragung dieses Kunden wurde begonnen, aber noch nicht abschließend bestätigt. Nach der Freigabe durch einen Admin werden seine offenen Aufträge verworfen und der Kunde gelöscht: mit bekannter HQ-ID beim nächsten HQ-Abgleich in HQ und in der App, sonst sofort in der App (dann bitte in HQ prüfen). Es gibt keinen Papierkorb.</p>',
     confirmHq:'wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht, mit Ansprechpartnern und Kontakthistorie.',
-    adminNote:'<p class="m-note">Freigegebene Kunden werden beim nächsten HQ-Abgleich in HQ und in der App endgültig gelöscht, mit Ansprechpartnern und Kontakthistorie. Vorher wird in HQ erneut geprüft, dass keine Projekte, Belege oder Planumsätze bestehen. Noch nicht übertragene Kunden werden nach der Freigabe sofort in der App gelöscht.</p>'
+    contact:'<p>Nach der Freigabe durch einen Admin wird der Ansprechpartner beim nächsten HQ-Abgleich <strong>in HQ und in der App endgültig gelöscht</strong>. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten. Lässt HQ das Löschen wegen Verknüpfungen nicht zu, bleibt er erhalten und der Antrag zeigt den Grund. Es gibt keinen Papierkorb.</p>',
+    confirmContact:'wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten.',
+    adminNote:'<p class="m-note">Freigegebene Ansprechpartner werden beim nächsten HQ-Abgleich einzeln in HQ und in der App gelöscht; die Kontakthistorie des Kunden bleibt. Freigegebene Kunden werden beim nächsten HQ-Abgleich in HQ und in der App endgültig gelöscht, mit Ansprechpartnern und Kontakthistorie. Vorher wird in HQ erneut geprüft, dass keine Projekte, Belege oder Planumsätze bestehen. Noch nicht übertragene Kunden werden nach der Freigabe sofort in der App gelöscht.</p>'
   };
   function deleteCustomerButton(c){
     if(detail?.deletion&&['requested','approved'].includes(detail.deletion.state))return '';
@@ -37,18 +39,29 @@
     }
     return out;
   }
+  // Single contacts (r41): only contacts already in HQ; the status copy comes with the customer file.
+  function deleteContactParts(p,editable){
+    const c=detail?.company,id=String(p.id),d=detail?.contactDeletions?.[id];
+    if(!c||!/^[0-9]+$/.test(id)||editable===false&&!d)return '';
+    let out='';
+    if(d){const extra=d.message&&d.state!=='requested'?'<br>'+esc(d.message):'';out+='<div class="m-note" role="status" data-contact-deletion="'+esc(id)+'"><strong>Löschantrag: '+esc(deleteStates[d.state]||d.state)+'</strong>'+extra+'<br><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+' · Grund: '+esc(d.reason||'')+'</small></div>';}
+    const pending=d&&['requested','approved'].includes(d.state)||detail?.deletion&&['requested','approved'].includes(detail.deletion.state);
+    if(deleteContactOpen===id)out+='<form class="m-section" data-form="delete-contact" data-company="'+esc(deleteCustomerRef(c))+'" data-contact="'+esc(id)+'"><h3>Ansprechpartner löschen</h3>'+deleteTexts.contact+'<label class="m-field">Grund für die Löschung (Pflicht)<textarea name="reason" maxlength="500" required></textarea></label><div class="m-test-actions"><button type="submit" class="m-button m-primary">Löschantrag stellen</button>'+button('Abbrechen','delete-contact-cancel',id)+'</div></form>';
+    else if(!pending&&editable!==false)out+=button('Ansprechpartner löschen','delete-contact',id);
+    return out;
+  }
   function deletionRow(d){
     const discard=d.discardJobCount?'<p class="m-note">Bei der Freigabe werden zusätzlich '+d.discardJobCount+' offene eigene Kontakt- und Stammdatenänderungen verworfen. Neue oder andere offene Aufträge bleiben gesperrt.</p>':'';
     const key=(d.key||d.hqId)+':'+d.revision,open=['requested','failed','blocked'].includes(d.state);
     let actions='';
-    if(open&&deletionConfirm===key)actions='<div class="m-note"><strong>Wirklich endgültig löschen?</strong> '+esc(d.name)+' '+(d.uncertain?deleteTexts.confirmUncertain:d.local?deleteTexts.confirmLocal:deleteTexts.confirmHq)+' Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">'+button('Ja, endgültig löschen','deletion-approve',key,true)+button('Abbrechen','deletion-confirm-cancel',key)+'</div>';
+    if(open&&deletionConfirm===key)actions='<div class="m-note"><strong>Wirklich endgültig löschen?</strong> '+esc(d.name)+' '+(d.type==='contact'?deleteTexts.confirmContact:d.uncertain?deleteTexts.confirmUncertain:d.local?deleteTexts.confirmLocal:deleteTexts.confirmHq)+' Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">'+button('Ja, endgültig löschen','deletion-approve',key,true)+button('Abbrechen','deletion-confirm-cancel',key)+'</div>';
     else if(open)actions='<div class="m-test-actions">'+button(d.state==='requested'?'Löschung freigeben':'Erneut freigeben','deletion-confirm',key,true)+button(d.state==='requested'?'Ablehnen':'Antrag schließen','deletion-reject',key)+'</div>';
-    const place=d.local?'noch nicht in HQ':'HQ-ID '+esc(d.hqId),decided=d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):'',note=d.message&&d.state!=='requested'?'<p class="m-muted">'+esc(d.message)+'</p>':'';
+    const place=d.type==='contact'?'Ansprechpartner bei '+esc(d.companyName||'HQ-Firma '+d.hqId)+' · HQ-ID '+esc(d.contactId):d.local?'noch nicht in HQ':'HQ-ID '+esc(d.hqId),decided=d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):'',note=d.message&&d.state!=='requested'?'<p class="m-muted">'+esc(d.message)+'</p>':'';
     return '<div class="m-row" data-deletion-row="'+esc(d.key||d.hqId)+'"><h3>'+esc(d.name)+' · '+place+'</h3><p>'+esc(deleteStates[d.state]||d.state)+'</p><p>Grund: '+esc(d.reason||'')+'</p><p><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+decided+'</small></p>'+note+discard+actions+'</div>';
   }
   function deletionAdminPanel(){
     const rows=deletionRows,list=!rows?'<p>Die Liste wird nur auf Klick aus Firebase gelesen.</p>':!rows.length?'<p>Keine Löschanträge vorhanden.</p>':rows.map(deletionRow).join('');
-    return '<section class="m-panel m-section" data-deletion-admin><div class="m-panel-head"><h2>Löschanträge für Kunden</h2>'+button(rows?'Neu laden':'Löschanträge anzeigen','deletions-load')+'</div><div class="m-panel-body">'+deleteTexts.adminNote+list+'</div></section>';
+    return '<section class="m-panel m-section" data-deletion-admin><div class="m-panel-head"><h2>Löschanträge für Kunden und Ansprechpartner</h2>'+button(rows?'Neu laden':'Löschanträge anzeigen','deletions-load')+'</div><div class="m-panel-body">'+deleteTexts.adminNote+list+'</div></section>';
   }
   // Approved customers leave the lists in this browser at once, not only after the next HQ sync.
   function deleteForget(ids){
@@ -64,6 +77,8 @@
     if(a==='delete-batch-close'){deleteBatch=null;render();return true;}
     if(a==='delete-customer'){deleteFormOpen=id;render();return true;}
     if(a==='delete-cancel'){deleteFormOpen=null;render();return true;}
+    if(a==='delete-contact'){deleteContactOpen=id;render();return true;}
+    if(a==='delete-contact-cancel'){deleteContactOpen=null;render();return true;}
     if(a==='deletion-confirm'){deletionConfirm=id;render();return true;}
     if(a==='deletion-confirm-cancel'){deletionConfirm=null;render();return true;}
     if(a==='deletions-load'){act(async()=>{deletionRows=(await rpc('listSalesCustomerDeletions')).deletions;deletionConfirm=null;return {message:'Löschanträge aus Firebase geladen.'};});return true;}
@@ -77,6 +92,11 @@
     if(form.dataset.form==='delete-batch'){
       const batch=deleteBatch;if(!batch||batch.results)return true;
       act(async()=>{const results=[];for(const c of batch.rows){try{const r=await rpc('requestSalesCustomerDelete',{companyId:c.id,reason:input.reason});results.push({name:c.name,message:r.message});const cached=companyCache.get(c.id);if(cached&&r.deletion)cached.deletion=r.deletion;}catch(e){if(e.salesAuthHandled)throw e;results.push({name:c.name,message:e.message||String(e)});}}batch.results=results;deleteBatch=batch;return {message:'Löschanträge geprüft. Ergebnisse stehen bei den ausgewählten Kunden. Die Freigabe erfolgt einzeln in der Verwaltung.'};},{preserve:true});return true;
+    }
+    if(form.dataset.form==='delete-contact'){
+      const contactId=form.dataset.contact;
+      act(async()=>{const r=await rpc('requestSalesContactDelete',{companyId:form.dataset.company,contactId,reason:input.reason});deleteContactOpen=null;if(detail&&r.deletion)detail={...detail,contactDeletions:{...(detail.contactDeletions||{}),[contactId]:r.deletion}};return r;},{preserve:true});
+      return true;
     }
     if(form.dataset.form!=='delete-request')return false;
     const id=form.dataset.company;

@@ -71,7 +71,7 @@ function tests() {
   files.push('sales-app/test-business.cjs','sales-app/test-business-browser.cjs');
   files.push('sales-app/test-customer-form-browser.cjs');
   files.push('sales-app/test-communication.cjs','sales-app/test-communication-browser.cjs');
-  files.push('sales-app/test-delete.cjs','sales-app/test-delete-browser.cjs');
+  files.push('sales-app/test-delete.cjs','sales-app/test-delete-browser.cjs','sales-app/test-delete-contact-browser.cjs');
   files.push('sales-app/test-auth.cjs','sales-app/test-auth-browser.cjs');
   // Synthetic Firestore read/write model: keeps the documented consumption figures under regression test.
   files.push('scripts/audit-firestore.cjs','scripts/test-htmlservice.cjs');

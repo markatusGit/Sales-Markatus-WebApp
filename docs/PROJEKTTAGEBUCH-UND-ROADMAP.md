@@ -1,5 +1,14 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 24.11.2026 – r41: Einzelne Ansprechpartner aus der App in HQ löschen
+
+Nutzerauftrag vom 24.11.2026: Die nach r40 noch offenen Punkte sofort umsetzen. Das Löschen einzelner Ansprechpartner aus der App nach HQ gab es bisher nicht (nur Kundenlöschung samt Ansprechpartnern). Der zweite offene Punkt, die Senkung der Firebase-Lesezugriffe im HQ-Abgleich, läuft als eigene Arbeitssitzung im selben Projektordner und erhält eine eigene Versionskennung.
+
+Umsetzung nach dem Muster der Kundenlöschung: Antrag mit Pflichtgrund in der Kundenakte, Freigabe nur durch den Admin mit zweitem Bestätigungsklick, Ausführung ausschließlich im zentralen HQ-Abgleich. Vor dem Löschen wird der Ansprechpartner in HQ gelesen (gehört er noch zur Firma?), danach wird die Löschung per Einzelabruf und exakt leerer HQ-Liste bestätigt. Erst dann werden Kundenakte, Verzeichnis, App-Kontaktkopie, Rohdaten und Bestandszähler in Firebase angepasst, damit keine Mengenabweichung entsteht. Kontakthistorie, Projekte und Belege bleiben. Nur Ansprechpartner, die bereits in HQ sind, erhalten die Schaltfläche. Kennung `2026-11-24-r41`.
+
+**Lokal vorbereitet und geprüft:** alle Prüfdateien bestanden, darunter neue Fälle für Antrag, Sperren, Freigabe, HQ-Löschung mit Bestätigung, HQ-Ablehnung, Wiederholung, bereits in HQ gelöschte und verschobene Ansprechpartner sowie eine Browserprüfung. Veröffentlichung und Live-Test folgen getrennt.
+
+
 ### 24.11.2026 – r40: Bestand zwischen HQ und Firebase vollständig angleichen
 
 Nutzermeldung nach dem r39-Abgleich: unklarer Historieneintrag, HQ-Löschabgleich HTTP 500 für Unternehmen und Ansprechpartner, Ausgabenprüfung und Mengenabweichungen (Unternehmen +1, Ansprechpartner +1, Belege +20, Planumsätze +24 in Firebase). Ursachen: Der Historienfehler stammte noch aus dem vor r39 begonnenen und mit „HQ-Sync fortsetzen“ weitergeführten Lauf. Die HTTP-500-Fehler kamen von HQ auf die alte v1-Kennungsabfrage `$select=Id` unserer App. Die Abweichung bei Unternehmen und Ansprechpartnern folgte daraus. Für Belege und Planumsätze gab es keinen Löschabgleich, deshalb blieben in HQ gelöschte Einträge dauerhaft in Firebase. Keine der Meldungen kam von Firebase.

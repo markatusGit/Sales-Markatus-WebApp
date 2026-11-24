@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## [v0.41.0]
+
+- Einzelne Ansprechpartner löschen: In der Kundenakte hat jeder bereits in HQ vorhandene Ansprechpartner die Schaltfläche „Ansprechpartner löschen“. Jeder Benutzer mit Kundenzugriff stellt einen Löschantrag mit Grund; ein Admin gibt ihn unter „Verwaltung“ → „Löschanträge für Kunden und Ansprechpartner“ mit zweitem Bestätigungsklick frei.
+- Der nächste HQ-Abgleich löscht nur diesen Ansprechpartner in HQ, bestätigt die Löschung per Einzelabruf (HTTP 404) und exakt leerer HQ-Liste und entfernt ihn danach aus Kundenakte, Verzeichnis, Rohdaten und Bestandszähler in Firebase. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten.
+- Offene Aufträge zu diesem Ansprechpartner oder ein offener Löschantrag für den ganzen Kunden sperren den Antrag. Lässt HQ das Löschen nicht zu (z. B. wegen Verknüpfungen) oder gehört der Ansprechpartner inzwischen zu einer anderen Firma, wird nichts gelöscht und der Antrag nennt den Grund. Vorübergehende HQ-Fehler werden bis zu dreimal im nächsten Abgleich wiederholt.
+- Kennung `2026-11-24-r41`. Keine neuen Script Properties oder Bereitstellungseinstellungen.
+
+
 ## [v0.40.0]
 
 - Bestandsabgleich für alle HQ-Datenarten (Unternehmen, Ansprechpartner, Projekte, Belege, Planumsätze, Kontakthistorie): Weichen die Gesamtzahlen von HQ und Firebase ab, vergleicht der Abgleich die Kennungen. In HQ gelöschte Datensätze werden nach einzelnem Abruf (HTTP 404) und exakt leerer HQ-Liste auch in Firebase entfernt. In Firebase fehlende Datensätze werden einzeln aus HQ nachgeladen. Projekt-, Kunden- und Ausgabenansichten werden danach neu berechnet.

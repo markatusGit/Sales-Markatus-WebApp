@@ -1,5 +1,21 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r41: Einzelnen Ansprechpartner löschen prüfen
+
+Keine neuen Script Properties oder Bereitstellungseinstellungen. Nur mit einem Test-Ansprechpartner prüfen, der wirklich gelöscht werden darf.
+
+- Die bekannte App-Adresse neu laden. Erwartet wird „2026-11-24-r41“. Bei anderer Kennung diese melden.
+- „Kunden“ öffnen und den Kunden mit dem Test-Ansprechpartner anklicken.
+- Im Abschnitt „Ansprechpartner“ beim Test-Ansprechpartner „Ansprechpartner löschen“ anklicken.
+- Einen Grund eintragen und „Löschantrag stellen“ anklicken. Erwartet wird „Löschantrag: Wartet auf Freigabe durch einen Admin“ direkt beim Ansprechpartner.
+- „Verwaltung“ öffnen und „Löschanträge anzeigen“ anklicken. Erwartet wird ein Eintrag „Ansprechpartner bei …“.
+- „Löschung freigeben“ und danach „Ja, endgültig löschen“ anklicken. Erwartet wird „Freigegeben · wird beim nächsten HQ-Abgleich gelöscht“.
+- „Datenabgleich“ öffnen und „HQ synchronisieren“ anklicken. Nach dem Lauf „Fortschritt aktualisieren“ anklicken.
+- In HQ prüfen: Der Ansprechpartner ist gelöscht, die Kontakthistorie der Firma ist noch da.
+- In der App die Kundenakte neu öffnen. Erwartet wird: Der Ansprechpartner fehlt, die Zahlen für Ansprechpartner in Firebase und HQ stimmen überein.
+- Steht beim Antrag „Nicht gelöscht · erst aufräumen“ mit „HQ lässt das Löschen nicht zu“, den genauen Wortlaut melden.
+
+
 ## r40: Bestandsabgleich und Entscheidungen prüfen
 
 Keine neuen Script Properties oder Bereitstellungseinstellungen.

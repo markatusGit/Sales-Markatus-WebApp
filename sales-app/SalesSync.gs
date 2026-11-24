@@ -52,6 +52,7 @@ function salesSyncWrite_(task,run){
   if(job.business===1){
     salesRunJobLocked_(job.id);const after=salesRead_('sales_jobs/'+job.id);
     if(after.kind==='deleteCompany'&&after.state==='synced'&&run)salesDeleteApplyCounts_(run,after);
+    if(after.kind==='deleteContact'&&after.state==='synced'&&run)salesContactDeleteApplyCounts_(run,after);
     if(salesSyncVerifiable_(after,run)){salesSyncQueueVerify_(run,after,SALES_SYNC_VERIFY_MINUTES);return;}
     if(after.state!=='synced'&&!(after.kind==='entityChange'&&after.state==='canceled')&&!salesReviewWaiting_(after))throw salesSyncJobError_(after);
     return;

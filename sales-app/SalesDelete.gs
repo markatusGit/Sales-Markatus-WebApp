@@ -85,7 +85,7 @@ function salesDeleteHide_(doc){
 }
 /** One-time repair of approvals made before immediate list removal was introduced. Never approves a request or calls HQ. */
 function salesDeleteMigrateVisibility_(){
-  for(const doc of salesList_('sales_deletions').filter(d=>d.state==='approved')){
+  for(const doc of salesList_('sales_deletions').filter(d=>d.state==='approved'&&d.type!=='contact')){
     salesDeleteHide_(doc);salesWrite_('sales_deletions/'+(doc.key||doc.hqId),doc);
   }
 }
@@ -95,7 +95,7 @@ function salesDeleteRestore_(doc){
   add('sales_meta/lean_names',h.names);add('sales_meta/lean_filters',h.filters);
   if(doc.hqId){const tomb=salesRead_('sales_meta/deleted_companies');if(tomb?.ids?.includes(String(doc.hqId)))salesWrite_('sales_meta/deleted_companies',{ids:tomb.ids.filter(x=>x!==String(doc.hqId))});}
 }
-function salesDeleteView_(d){return d?salesPick_(d,['key','local','uncertain','pendingDraft','hqId','name','reason','state','message','requestedBy','requestedAt','decidedBy','decidedAt','jobId','revision','completedAt','discardJobCount']):null;}
+function salesDeleteView_(d){return d?salesPick_(d,['key','type','contactId','companyName','local','uncertain','pendingDraft','hqId','name','reason','state','message','requestedBy','requestedAt','decidedBy','decidedAt','jobId','revision','completedAt','discardJobCount']):null;}
 function requestSalesCustomerDelete(input){
   const user=salesUser_();return salesLock_(()=>{
     salesAssertPrivate_();const reason=salesText_(input?.reason,500,true),ref=salesDeleteRef_(input?.companyId),path='sales_deletions/'+ref.key,prior=salesRead_(path);
@@ -123,6 +123,7 @@ function decideSalesCustomerDelete(input){
     salesAssertPrivate_();const key=input?.key!==undefined?salesKey_(String(input.key)):String(salesId_(input?.hqId)),path='sales_deletions/'+key,doc=salesRead_(path),hqId=doc?.hqId||null;
     if(!doc||doc.revision!==input.revision)throw Error('Der Löschantrag wurde inzwischen geändert. Bitte die Liste neu laden.');
     if(!['requested','failed','blocked'].includes(doc.state))throw Error('Dieser Löschantrag ist bereits entschieden.');
+    if(doc.type==='contact')return salesContactDeleteDecide_(doc,input,user);
     const now=salesNow_();doc.revision++;doc.decidedBy=user.email;doc.decidedAt=now;
     if(input.approve!==true){doc.state='rejected';doc.message='Vom Admin abgelehnt. Der Kunde bleibt erhalten.';doc.log=[...(doc.log||[]).slice(-20),{action:'rejected',by:user.email,at:now}];salesDeleteSave_(doc,salesDeleteStatusDoc_(doc));return {message:'Löschantrag abgelehnt. Der Kunde bleibt erhalten.',deletion:salesDeleteView_(doc)};}
     let ref={hqId,draftId:doc.draftId||null,key,...(doc.pendingDraft?{pendingDraft:true}:{}),...(doc.discardJobIds?{discardJobIds:doc.discardJobIds}:{})};
@@ -157,16 +158,19 @@ function salesDeleteLocal_(doc,check,user,now){
 function salesDeleteApproved_(job){
   const doc=salesRead_('sales_deletions/'+salesId_(job.hqId));
   if(!doc||doc.state!=='approved'||doc.jobId!==job.id)throw Error('Keine gültige Admin-Freigabe für diese Löschung.');
+  salesDeleteOwnerApproved_(job);return doc;
+}
+function salesDeleteOwnerApproved_(job){
   if(typeof salesAuthEnabled_==='function'&&salesAuthEnabled_()){const cfg=salesAuthConfig_();if(!job.approvedByUid||job.approvedByUid!==cfg.ownerUid)throw Error('Die Löschung wurde nicht vom Admin freigegeben.');}
   else {const owner=String(PropertiesService.getScriptProperties().getProperty('SALES_ADMIN_EMAIL')||SALES.admin).toLowerCase();if(job.approvedBy!==owner)throw Error('Die Löschung wurde nicht vom Admin freigegeben.');}
-  return doc;
 }
 function salesDeleteHq_(job,path){
-  if(job.kind!=='deleteCompany'||job.state!=='running'||!/^\/v2\/(ContactHistories|ContactPersons|Companies)\/\d+$/.test(path))throw Error('HQ-Löschziel nicht freigegeben.');
+  const allowed=job.kind==='deleteCompany'?/^\/v2\/(ContactHistories|ContactPersons|Companies)\/\d+$/.test(path):job.kind==='deleteContact'&&path==='/v2/ContactPersons/'+salesId_(job.contactId);
+  if(job.state!=='running'||!allowed)throw Error('HQ-Löschziel nicht freigegeben.');
   job.writeAttempted=true;
   const r=UrlFetchApp.fetch('https://api.hellohq.io'+path,{method:'delete',headers:{Authorization:'Bearer '+revenueToken_()},muteHttpExceptions:true,followRedirects:false}),code=r.getResponseCode();
   job.lastWrite={method:'DELETE',resource:path.replace(/\/\d+/g,'/{id}'),at:salesNow_(),status:code,fields:[]};
-  if(code!==404&&(code<200||code>=300))throw Error('HQ-Löschen: HTTP '+code+'. Nichts weiter gelöscht; beim nächsten Abgleich wird erneut geprüft.');
+  if(code!==404&&(code<200||code>=300)){const e=Error('HQ-Löschen: HTTP '+code+'. Nichts weiter gelöscht; beim nächsten Abgleich wird erneut geprüft.');e.hqStatus=code;throw e;}
 }
 function salesDeleteMissing_(entity,id){try{salesOne_(entity,id);return false;}catch(e){if(/HTTP 404/.test(e.message||''))return true;throw e;}}
 function salesDeleteRun_(job,verifyOnly){
@@ -231,5 +235,115 @@ function salesDeleteFailed_(job,reason){
   job.failures=(job.failures||0)+1;const stop=job.failures>=3;
   job.state=stop?'canceled':'pending';job.message=(stop?'Löschung nach drei Fehlversuchen angehalten: ':'Löschung nicht abgeschlossen, wird beim nächsten HQ-Abgleich erneut geprüft: ')+reason;
   try{const doc=salesRead_('sales_deletions/'+salesId_(job.hqId));if(doc&&doc.jobId===job.id&&doc.state==='approved'){doc.message=job.message;if(stop){doc.state='failed';doc.revision++;doc.log=[...(doc.log||[]).slice(-20),{action:'failed',by:'HQ-Abgleich',at:salesNow_()}];salesDeleteRestore_(doc);}salesDeleteSave_(doc,salesDeleteStatusDoc_(doc));}}catch(_){}
+  return job;
+}
+/** Single contact deletion (r41). Same flow as for customers: any user requests with a reason, the admin approves,
+ * the central sync deletes in HQ, confirms the deletion (single read 404 and exact empty list) and then removes the contact in the app.
+ * Only contacts already in HQ. Contact histories, projects and documents of the customer stay. HQ decides whether references block the deletion. */
+function salesContactDeleteKey_(contactId){return 'contact_'+salesId_(contactId);}
+function salesContactDeleteName_(c){return [c?.firstName,c?.lastName].filter(Boolean).join(' ')||'Ansprechpartner '+c?.id;}
+function salesContactDeleteStored_(hqId,contactId){
+  const id=String(salesId_(contactId)),stored=salesRead_('sales_companies/'+salesId_(hqId)),contact=(stored?.contacts||[]).find(c=>String(c.id)===id);
+  if(!stored?.company||!contact)throw Error('Ansprechpartner ist in der Kundenakte nicht gespeichert. Bitte die Kundenakte neu laden.');
+  return {stored,contact};
+}
+function salesContactDeleteOpenJobs_(contactId){
+  const key=String(contactId);
+  return salesList_('sales_jobs').filter(j=>j.kind!=='deleteContact'&&!['synced','canceled'].includes(j.state)&&(String(j.contactId)===key||j.entity==='contact'&&String(j.targetId)===key||String(j.capture?.contactRef)===key||String(j.history?.contactPersonId)===key));
+}
+function salesContactDeleteBlockers_(stored,contactId){
+  if(stored.deletion&&['requested','approved'].includes(stored.deletion.state))return 'Für diesen Kunden liegt bereits ein Löschantrag vor. Seine Ansprechpartner werden mit ihm gelöscht.';
+  const n=salesContactDeleteOpenJobs_(contactId).length;
+  return n?'Löschen nicht möglich. Zu diesem Ansprechpartner gibt es noch '+n+(n===1?' offenen Auftrag':' offene Aufträge')+'. Bitte zuerst in der Auftragsübersicht abschließen oder verwerfen.':'';
+}
+/** The status copy lives in the customer file, which opening a customer reads anyway (no extra read). */
+function salesContactDeleteSave_(doc,stored,extra){
+  const writes=[{path:'sales_deletions/'+doc.key,value:doc},...(extra||[])];
+  if(stored?.company){
+    const map={...(stored.contactDeletions||{})};
+    if(['requested','approved','blocked','failed'].includes(doc.state))map[doc.contactId]=salesDeleteView_(doc);else delete map[doc.contactId];
+    if(Object.keys(map).length)stored.contactDeletions=map;else delete stored.contactDeletions;
+    writes.push({path:'sales_companies/'+doc.hqId,value:stored});
+  }
+  salesBulkRest_('commit',{writes:writes.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}}))});
+}
+function requestSalesContactDelete(input){
+  const user=salesUser_();return salesLock_(()=>{
+    salesAssertPrivate_();const reason=salesText_(input?.reason,500,true),ref=salesDeleteRef_(input?.companyId);
+    if(ref.local||!ref.hqId)throw Error('Dieser Kunde ist noch nicht in HQ. Seine Ansprechpartner können erst nach der HQ-Übertragung einzeln gelöscht werden.');
+    const contactId=String(salesId_(input?.contactId)),key=salesContactDeleteKey_(contactId),prior=salesRead_('sales_deletions/'+key);
+    if(prior&&['requested','approved'].includes(prior.state))return {message:prior.state==='requested'?'Für diesen Ansprechpartner liegt bereits ein Löschantrag vor. Er wartet auf die Freigabe durch einen Admin.':'Die Löschung ist bereits freigegeben.',deletion:salesDeleteView_(prior)};
+    const t=salesContactDeleteStored_(ref.hqId,contactId),blocked=salesContactDeleteBlockers_(t.stored,contactId);if(blocked)throw Error(blocked);
+    const now=salesNow_(),value={key,type:'contact',contactId,hqId:ref.hqId,companyName:t.stored.company.name||'',name:salesContactDeleteName_(t.contact),reason,state:'requested',message:'Wartet auf Freigabe durch einen Admin.',requestedBy:user.email,...(user.uid?{requestedByUid:user.uid}:{}),requestedAt:now,revision:(prior?.revision||0)+1,log:[...(prior?.log||[]).slice(-20),{action:'requested',by:user.email,at:now,reason}]};
+    salesContactDeleteSave_(value,t.stored);
+    return {message:'Löschantrag gespeichert. Ein Admin muss ihn freigeben; erst dann wird der Ansprechpartner beim nächsten HQ-Abgleich in HQ und in der App gelöscht.',deletion:salesDeleteView_(value)};
+  });
+}
+function salesContactDeleteDecide_(doc,input,user){
+  const now=salesNow_(),log=action=>{doc.log=[...(doc.log||[]).slice(-20),{action,by:user.email,at:now}];};doc.revision++;doc.decidedBy=user.email;doc.decidedAt=now;
+  if(input.approve!==true){
+    doc.state='rejected';doc.message='Vom Admin abgelehnt. Der Ansprechpartner bleibt erhalten.';log('rejected');salesContactDeleteSave_(doc,salesRead_('sales_companies/'+doc.hqId));
+    return {message:'Löschantrag abgelehnt. Der Ansprechpartner bleibt erhalten.',deletion:salesDeleteView_(doc)};
+  }
+  let t=null,blocked='';try{t=salesContactDeleteStored_(doc.hqId,doc.contactId);blocked=salesContactDeleteBlockers_(t.stored,doc.contactId);}catch(e){blocked=e.message;}
+  if(blocked){doc.state='blocked';doc.message=blocked;log('blocked');salesContactDeleteSave_(doc,t?.stored||salesRead_('sales_companies/'+doc.hqId));return {message:blocked,deletion:salesDeleteView_(doc)};}
+  const id=salesKey_('deletecontact_'+doc.contactId+'_'+doc.revision),job={id,kind:'deleteContact',business:1,hqId:doc.hqId,contactId:doc.contactId,deletionKey:doc.key,name:doc.name,companyName:doc.companyName,state:'pending',actor:user.email,...(user.uid?{actorUid:user.uid,approvedByUid:user.uid}:{}),approvedBy:user.email,requestedBy:doc.requestedBy,createdAt:now,updatedAt:now,message:'Löschung freigegeben. Wird beim nächsten HQ-Abgleich in HQ und danach in der App ausgeführt.'};
+  doc.state='approved';doc.jobId=id;doc.message=job.message;log('approved');
+  salesContactDeleteSave_(doc,t.stored,[{path:'sales_jobs/'+id,value:job}]);
+  return {message:'Löschung freigegeben. Der Ansprechpartner wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht.',deletion:salesDeleteView_(doc),patch:{jobs:[salesJobSummary_(job)]}};
+}
+function salesContactDeleteApproved_(job){
+  const doc=salesRead_('sales_deletions/'+salesKey_(String(job.deletionKey||'')));
+  if(!doc||doc.type!=='contact'||doc.state!=='approved'||doc.jobId!==job.id||String(doc.contactId)!==String(job.contactId))throw Error('Keine gültige Admin-Freigabe für diese Löschung.');
+  salesDeleteOwnerApproved_(job);return doc;
+}
+function salesContactDeleteBlock_(job,doc,message){
+  job.state='canceled';job.message='In HQ nichts gelöscht. '+message;
+  doc.state='blocked';doc.message=job.message;doc.revision++;doc.log=[...(doc.log||[]).slice(-20),{action:'blocked',by:'HQ-Abgleich',at:salesNow_()}];
+  salesContactDeleteSave_(doc,salesRead_('sales_companies/'+doc.hqId));
+}
+function salesContactDeleteRun_(job,verifyOnly){
+  if(verifyOnly)throw Error('Löschaufträge werden nur im zentralen HQ-Abgleich geprüft.');
+  const doc=salesContactDeleteApproved_(job),id=salesId_(job.contactId),companyId=salesId_(job.hqId);
+  let row=null;try{row=salesOne_('ContactPersons',id);}catch(e){if(!/HTTP 404/.test(e.message||''))throw e;}
+  if(row){
+    if(Number(row.companyId)!==companyId)return salesContactDeleteBlock_(job,doc,'HQ ordnet den Ansprechpartner inzwischen einer anderen Firma zu. Er bleibt erhalten; bei Bedarf den Löschantrag in der richtigen Kundenakte neu stellen.');
+    try{salesDeleteHq_(job,'/v2/ContactPersons/'+id);}
+    catch(e){if([400,403,409,422].includes(e.hqStatus))return salesContactDeleteBlock_(job,doc,'HQ lässt das Löschen nicht zu (HTTP '+e.hqStatus+'). Vermutlich ist der Ansprechpartner in HQ noch mit Projekten, Belegen oder Planumsätzen verknüpft. Er bleibt erhalten; die Verknüpfung in HQ lösen und den Antrag danach erneut freigeben.');throw e;}
+  }
+  // Same confirmation as every mirrored deletion: single read 404 and an exact empty HQ list.
+  if(!salesDeleteMissing_('ContactPersons',id))throw Error('HQ meldet den Ansprechpartner nach dem Löschen weiterhin. Beim nächsten Abgleich wird erneut geprüft.');
+  const page=salesV1Page_('ContactPersons','id eq '+id,0,2);if(page.total!==0||page.rows.length||!page.done)throw Error('HQ bestätigt die Löschung nicht eindeutig. Beim nächsten Abgleich wird erneut geprüft.');
+  salesContactDeleteCleanup_(job);
+  job.state='synced';job.message='Ansprechpartner '+job.name+' in HQ und in der App gelöscht. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten.';
+  const now=salesNow_();doc.state='done';doc.message=job.message;doc.completedAt=now;doc.revision++;doc.log=[...(doc.log||[]).slice(-20),{action:'deleted',by:'HQ-Abgleich',at:now}];salesWrite_('sales_deletions/'+doc.key,doc);
+}
+/** App side after HQ confirmed the deletion: customer file, directory, app-created contact copy, raw row, open jobs and the stored HQ counts. */
+function salesContactDeleteCleanup_(job){
+  const id=String(salesId_(job.contactId)),companyId=String(salesId_(job.hqId)),rawPath=salesBulkCollection_('ContactPersons')+'/'+id,raw=salesRead_(rawPath),cache=salesRead_('sales_meta/bulk');
+  const now=salesNow_(),keep=c=>String(c.id)!==id&&String(c.hqId||'')!==id,entries=[],put=(path,value)=>entries.push({path,value});
+  const stored=salesRead_('sales_companies/'+companyId);
+  if(stored){stored.contacts=(stored.contacts||[]).filter(keep);if(stored.contactDeletions){delete stored.contactDeletions[id];if(!Object.keys(stored.contactDeletions).length)delete stored.contactDeletions;}put('sales_companies/'+companyId,stored);}
+  const entry=salesRead_('sales_directory/'+companyId);if(entry?.contacts?.some(c=>!keep(c)))put('sales_directory/'+companyId,{...entry,contacts:entry.contacts.filter(keep)});
+  const draftId=salesDeleteOwnDraft_(companyId),refs=[companyId,...(draftId?['draft_'+draftId]:[])];
+  for(const ref of refs){const data=salesRead_('sales_communication/'+ref);if(data?.contacts?.some(c=>!keep(c)))put('sales_communication/'+ref,{...data,contacts:data.contacts.filter(keep)});}
+  if(draftId){const draft=salesRead_('sales_drafts/'+salesKey_(draftId)),create=salesRead_('sales_jobs/'+salesKey_(draftId));if(draft&&!draft.contactDeletedAt&&String(create?.contactId)===id)put('sales_drafts/'+draft.id,{...draft,contactDeletedAt:now});}
+  for(const j of salesContactDeleteOpenJobs_(id))put('sales_jobs/'+j.id,{...j,state:'canceled',updatedAt:now,message:'Ansprechpartner gelöscht; Auftrag verworfen.'});
+  const writes=[...entries.map(e=>({update:{name:salesBulkName_(e.path),fields:{payload:{stringValue:salesBulkPayload_(e.path,e.value)}}}})),{delete:salesBulkName_(rawPath)}];
+  for(let i=0;i<writes.length;i+=100)salesBulkRest_('commit',{writes:writes.slice(i,i+100)});
+  // Only a raw row of the current generation was counted; a stale identifier only leaves the lists.
+  job.removed={counted:!!raw&&raw.generation===cache?.entities?.ContactPersons?.generation};
+  if(cache){salesContactDeleteApplyCounts_(cache,job);if(job.removed.counted&&Number.isSafeInteger(cache.stats?.contacts))cache.stats.contacts=Math.max(0,cache.stats.contacts-1);salesWrite_('sales_meta/bulk',cache);}
+}
+/** Keeps the stored HQ count and known IDs in line with the removed raw row (cache or an in-memory sync run). */
+function salesContactDeleteApplyCounts_(target,job){
+  const m=target.entities?.ContactPersons;if(!m||!job.removed)return;const key=String(salesId_(job.contactId));
+  for(const list of ['ids','knownIds','touchedIds'])if(Array.isArray(m[list]))m[list]=m[list].filter(x=>String(x)!==key);
+  if(job.removed.counted&&Number.isFinite(m.count))m.count=Math.max(0,m.count-1);
+}
+function salesContactDeleteFailed_(job,reason){
+  job.failures=(job.failures||0)+1;const stop=job.failures>=3;
+  job.state=stop?'canceled':'pending';job.message=(stop?'Löschung nach drei Fehlversuchen angehalten: ':'Löschung nicht abgeschlossen, wird beim nächsten HQ-Abgleich erneut geprüft: ')+reason;
+  try{const doc=salesRead_('sales_deletions/'+salesKey_(String(job.deletionKey||'')));if(doc&&doc.jobId===job.id&&doc.state==='approved'){doc.message=job.message;if(stop){doc.state='failed';doc.revision++;doc.log=[...(doc.log||[]).slice(-20),{action:'failed',by:'HQ-Abgleich',at:salesNow_()}];}salesContactDeleteSave_(doc,salesRead_('sales_companies/'+doc.hqId));}}catch(_){}
   return job;
 }

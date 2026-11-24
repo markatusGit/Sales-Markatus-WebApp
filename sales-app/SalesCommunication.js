@@ -8,7 +8,7 @@
   const historySearchTexts=new WeakMap();
   const customerSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('de').trim();
   function customerContactRow(p,editable=true){
-    return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p></div>';
+    return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p>'+deleteContactParts(p,editable)+'</div>';
   }
   function customerCardList(kind,title,rows,renderRow,emptyText,badge=''){
     const d=communicationDraft();d.lists||={};const saved=d.lists[kind]||{query:'',scroll:0};d.lists[kind]=saved;

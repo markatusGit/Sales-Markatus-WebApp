@@ -25,7 +25,7 @@ const {chromium}=require('playwright'),{fixture,TEAM,ADMIN}=require('./test-dele
   assert.equal(await page.getByRole('button',{name:'Kunde löschen',exact:true}).count(),0,'no second request button while a request is open');
   assert.equal(f.db['sales_deletions/101'].state,'requested');assert.equal(f.calls.filter(c=>c.method==='delete').length,0);
   const out=path.join(__dirname,'../output');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'r34-delete-request.png'),fullPage:true});
-  await page.getByRole('button',{name:'Verwaltung',exact:true}).click();await page.getByRole('heading',{name:'Löschanträge für Kunden',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Verwaltung',exact:true}).click();await page.getByRole('heading',{name:'Löschanträge für Kunden und Ansprechpartner',exact:true}).waitFor();
   assert.equal(calls.filter(c=>c.name==='listSalesCustomerDeletions').length,0,'list only on click');
   await page.getByRole('button',{name:'Löschanträge anzeigen',exact:true}).click();await page.getByText('Grund: Synthetic duplicate',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Löschung freigeben',exact:true}).click();await page.getByText('Wirklich endgültig löschen?',{exact:false}).waitFor();

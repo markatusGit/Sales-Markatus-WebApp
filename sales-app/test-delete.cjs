@@ -40,6 +40,10 @@ function approve(f){const d=f.db['sales_deletions/101'];return f.ctx.decideSales
 function runSync(f){const run={entities:JSON.parse(JSON.stringify(f.db['sales_meta/bulk'].entities)),companyIds:['101','102'],errors:[]};for(const e of Object.values(run.entities))e.knownIds=e.ids.slice();
   const id=f.db['sales_deletions/101'].jobId;try{f.ctx.salesSyncWrite_({kind:'write',id},run);}catch(e){run.error=e.message;}return run;}
 
+function requestContact(f,contactId='202',companyId='101'){f.as(TEAM);try{return f.ctx.requestSalesContactDelete({companyId,contactId,reason:'Synthetic left the company'});}finally{f.as(ADMIN);}}
+function decideContact(f,approve=true,key='contact_202'){const d=f.db['sales_deletions/'+key];return f.ctx.decideSalesCustomerDelete({key,revision:d.revision,approve});}
+function runContact(f,key='contact_202'){const run={entities:JSON.parse(JSON.stringify(f.db['sales_meta/bulk'].entities)),companyIds:['101','102'],errors:[]};for(const e of Object.values(run.entities))e.knownIds=e.ids.slice();
+  try{f.ctx.salesSyncWrite_({kind:'write',id:f.db['sales_deletions/'+key].jobId},run);}catch(e){run.error=e.message;}return run;}
 if(require.main===module){
 test('any user can request a deletion; Firebase only, no HQ call, status visible in the customer file without an extra read',()=>{
   const f=fixture(),n=f.calls.length,r=request(f);
@@ -223,6 +227,57 @@ test('opt-in keeps financial, unknown, foreign and newly added jobs blocked',()=
   }
   const {f,c}=own();f.db['sales_jobs/first']={id:'first',kind:'communication',state:'pending',hqId:101,companyRef:'draft_'+c.id};f.ctx.requestSalesCustomerDelete({companyId:'101',reason:'Synthetic',discardOwnChanges:true});
   f.db['sales_jobs/later']={...f.db['sales_jobs/first'],id:'later'};assert.equal(approve(f).deletion.state,'blocked');assert.equal(f.db['sales_jobs/first'].state,'pending');assert.equal(f.db['sales_jobs/later'].state,'pending');
+});
+test('contact: any user requests a single contact deletion; Firebase only, status in the customer file, open jobs block',()=>{
+  const f=fixture(),n=f.calls.length;assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='202'));
+  const r=requestContact(f);assert.match(r.message,/Admin muss ihn freigeben/);assert.equal(f.calls.length,n,'no HQ request');
+  const doc=f.db['sales_deletions/contact_202'];assert.equal(doc.type,'contact');assert.equal(doc.state,'requested');assert.equal(doc.contactId,'202');assert.equal(doc.hqId,101);assert.equal(doc.requestedBy,TEAM);
+  assert.equal(f.db['sales_companies/101'].contactDeletions['202'].state,'requested');assert.equal(f.ctx.getSalesLeanCompany('101').contactDeletions['202'].state,'requested');
+  assert.match(requestContact(f).message,/bereits ein Löschantrag/);assert.equal(f.db['sales_deletions/contact_202'].revision,1);
+  assert.throws(()=>requestContact(f,'local_x'),/Ungültige HQ-ID/);assert.throws(()=>requestContact(f,'4711'),/nicht gespeichert/);
+  const g=fixture();g.db['sales_jobs/open-contact']={id:'open-contact',kind:'entityChange',business:1,entity:'contact',hqId:101,targetId:202,state:'pending'};
+  assert.throws(()=>requestContact(g),/1 offenen Auftrag/);assert.equal(g.db['sales_deletions/contact_202'],undefined);
+  const h=fixture();request(h);assert.throws(()=>requestContact(h),/Für diesen Kunden liegt bereits ein Löschantrag vor/);
+  assert.equal(f.ctx.salesAuthRule_('requestSalesContactDelete',[{}]),'customers.read');
+});
+test('contact: admin approval queues one job; the sync deletes only this contact in HQ, confirms it and removes it in the app',()=>{
+  const f=fixture();f.db['sales_communication/101'].contacts=[{id:'local_1',hqId:'202',firstName:'Synthetic'}];requestContact(f);
+  const listed=f.ctx.listSalesCustomerDeletions().deletions.find(d=>d.key==='contact_202');assert.equal(listed.type,'contact');assert.equal(listed.contactId,'202');
+  const r=decideContact(f);assert.match(r.message,/freigegeben/);const doc=f.db['sales_deletions/contact_202'],job=f.db['sales_jobs/'+doc.jobId];
+  assert.equal(job.kind,'deleteContact');assert.equal(job.state,'pending');assert.equal(job.approvedBy,ADMIN);assert.equal(f.calls.filter(c=>c.method==='delete').length,0,'approval never touches HQ');
+  const run=runContact(f);assert.equal(run.error,undefined);
+  assert.deepEqual(plain(f.calls.filter(c=>c.method==='delete').map(c=>c.path)),['/v2/ContactPersons/202']);
+  assert.equal(f.remote.ContactPersons[202],undefined);assert.ok(f.remote.ContactHistories[303],'histories stay in HQ');assert.ok(f.remote.Companies[101]);
+  assert.equal(f.db['sales_jobs/'+doc.jobId].state,'synced');assert.equal(f.db['sales_deletions/contact_202'].state,'done');
+  assert.equal(f.db['sales_rawcontacts/202'],undefined);assert.ok(f.db['sales_rawhistories/303']);assert.ok(f.db['sales_rawcontacts/999']);
+  assert.equal(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='202'),false);assert.equal(f.db['sales_companies/101'].contactDeletions,undefined);
+  assert.equal(f.db['sales_directory/101'].contacts.some(c=>String(c.id)==='202'),false);assert.deepEqual(plain(f.db['sales_communication/101'].contacts),[]);
+  const cache=f.db['sales_meta/bulk'];assert.equal(cache.entities.ContactPersons.count,9);assert.deepEqual(plain(cache.entities.ContactPersons.ids),['999']);assert.equal(cache.entities.Companies.count,10);assert.equal(cache.entities.ContactHistories.count,10);
+  assert.equal(run.entities.ContactPersons.count,9);assert.deepEqual(plain(run.entities.ContactPersons.knownIds),['999']);
+  assert.equal(f.ctx.getSalesLeanCompany('101').contacts.some(c=>String(c.id)==='202'),false);
+});
+test('contact: HQ refusing the deletion blocks it with the reason; temporary errors retry and stop after three attempts',()=>{
+  const f=fixture();requestContact(f);decideContact(f);f.deleteStatus=409;
+  const run=runContact(f),doc=f.db['sales_deletions/contact_202'];assert.match(run.error,/HTTP 409/);assert.equal(doc.state,'blocked');assert.equal(f.db['sales_jobs/'+doc.jobId].state,'canceled');
+  assert.ok(f.remote.ContactPersons[202]);assert.ok(f.db['sales_companies/101'].contacts.some(c=>String(c.id)==='202'));assert.equal(f.db['sales_companies/101'].contactDeletions['202'].state,'blocked');
+  f.deleteStatus=500;decideContact(f);for(let i=1;i<=3;i++)assert.match(runContact(f).error,/HTTP 500|angehalten/);
+  assert.equal(f.db['sales_deletions/contact_202'].state,'failed');assert.equal(f.db['sales_rawcontacts/202'].row.id,202);
+  f.deleteStatus=200;decideContact(f);assert.equal(runContact(f).error,undefined);assert.equal(f.db['sales_deletions/contact_202'].state,'done');
+});
+test('contact: a contact already gone in HQ is only confirmed and removed; moved contacts and rejections keep the contact',()=>{
+  const f=fixture();requestContact(f);decideContact(f);delete f.remote.ContactPersons[202];
+  assert.equal(runContact(f).error,undefined);assert.equal(f.calls.filter(c=>c.method==='delete').length,0);assert.equal(f.db['sales_deletions/contact_202'].state,'done');assert.equal(f.db['sales_rawcontacts/202'],undefined);
+  const g=fixture();requestContact(g);decideContact(g);g.remote.ContactPersons[202].companyId=102;
+  assert.match(runContact(g).error,/anderen Firma/);assert.equal(g.calls.filter(c=>c.method==='delete').length,0);assert.equal(g.db['sales_deletions/contact_202'].state,'blocked');
+  const h=fixture();requestContact(h);assert.match(decideContact(h,false).message,/abgelehnt/);assert.equal(h.db['sales_deletions/contact_202'].state,'rejected');assert.equal(h.db['sales_companies/101'].contactDeletions,undefined);
+  assert.equal(Object.keys(h.db).some(k=>k.startsWith('sales_jobs/deletecontact_')),false);
+});
+test('contact: forged jobs and foreign targets are refused',()=>{
+  const f=fixture();requestContact(f);decideContact(f);const doc=f.db['sales_deletions/contact_202'],job=f.db['sales_jobs/'+doc.jobId];
+  f.db['sales_jobs/'+job.id]={...job,approvedBy:TEAM};assert.match(runContact(f).error,/nicht vom Admin freigegeben/);assert.equal(f.calls.filter(c=>c.method==='delete').length,0);
+  assert.throws(()=>f.ctx.salesDeleteHq_({kind:'deleteContact',contactId:'202',state:'running'},'/v2/ContactPersons/999'),/nicht freigegeben/);
+  assert.throws(()=>f.ctx.salesDeleteHq_({kind:'deleteContact',contactId:'202',state:'running'},'/v2/Companies/101'),/nicht freigegeben/);
+  assert.throws(()=>f.ctx.salesContactDeleteRun_({...job,state:'running'},true),/nur im zentralen HQ-Abgleich/);
 });
 console.log(count+' customer deletion checks passed.');
 }

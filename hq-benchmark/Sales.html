@@ -105,7 +105,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-24-r40</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-24-r41</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -116,7 +116,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-24-r40</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-24-r41</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -130,8 +130,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-11-24-r40';
-  const UI_BUILD='2026-11-24-r40';
+  const APP_RELEASE='2026-11-24-r41';
+  const UI_BUILD='2026-11-24-r41';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -785,7 +785,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   const historySearchTexts=new WeakMap();
   const customerSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('de').trim();
   function customerContactRow(p,editable=true){
-    return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p></div>';
+    return '<div class="m-row"><h3>'+esc([p.salutation,p.firstName,p.lastName].filter(Boolean).join(' '))+'</h3>'+(editable&&!String(p.id).startsWith('local_')?button('Ansprechpartner bearbeiten','edit-business','contact:'+p.id):'')+'<p>'+esc(p.position||'')+'</p><p>'+esc(p.eMail||'Keine E-Mail')+' · Mobil: '+esc(p.phoneMobile||'—')+' · Festnetz: '+esc(p.phoneLandline||'—')+'</p>'+deleteContactParts(p,editable)+'</div>';
   }
   function customerCardList(kind,title,rows,renderRow,emptyText,badge=''){
     const d=communicationDraft();d.lists||={};const saved=d.lists[kind]||{query:'',scroll:0};d.lists[kind]=saved;
@@ -1071,7 +1071,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
   // Customer deletion (R15): any user requests, the admin approves, the central HQ sync deletes. No trash bin.
   // HtmlService strips comments with a simple scanner: keep quoted text out of template placeholders and avoid double slashes in code.
   let deleteFormOpen=null,deletionRows=null,deletionConfirm=null;
-  let deleteBatch=null;
+  let deleteBatch=null,deleteContactOpen=null;
   function deleteCustomerRef(c){return c.localDraftId?'draft_'+c.localDraftId:String(c.id);}
   function deleteBatchMatches(){const q=search.toLocaleLowerCase('de');return q.trim()?v1Companies().filter(c=>String(c.name||'').toLocaleLowerCase('de').includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'de')):[];}
   function deleteBatchPanel(){
@@ -1089,7 +1089,9 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     confirmUncertain:'wird sofort in der App gelöscht. Die HQ-Übertragung war begonnen, aber nicht bestätigt: bitte danach in HQ prüfen, ob die Firma dort angelegt wurde.',
     started:'<p>Die HQ-Übertragung dieses Kunden wurde begonnen, aber noch nicht abschließend bestätigt. Nach der Freigabe durch einen Admin werden seine offenen Aufträge verworfen und der Kunde gelöscht: mit bekannter HQ-ID beim nächsten HQ-Abgleich in HQ und in der App, sonst sofort in der App (dann bitte in HQ prüfen). Es gibt keinen Papierkorb.</p>',
     confirmHq:'wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht, mit Ansprechpartnern und Kontakthistorie.',
-    adminNote:'<p class="m-note">Freigegebene Kunden werden beim nächsten HQ-Abgleich in HQ und in der App endgültig gelöscht, mit Ansprechpartnern und Kontakthistorie. Vorher wird in HQ erneut geprüft, dass keine Projekte, Belege oder Planumsätze bestehen. Noch nicht übertragene Kunden werden nach der Freigabe sofort in der App gelöscht.</p>'
+    contact:'<p>Nach der Freigabe durch einen Admin wird der Ansprechpartner beim nächsten HQ-Abgleich <strong>in HQ und in der App endgültig gelöscht</strong>. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten. Lässt HQ das Löschen wegen Verknüpfungen nicht zu, bleibt er erhalten und der Antrag zeigt den Grund. Es gibt keinen Papierkorb.</p>',
+    confirmContact:'wird beim nächsten HQ-Abgleich in HQ und in der App gelöscht. Kontakthistorie, Projekte und Belege des Kunden bleiben erhalten.',
+    adminNote:'<p class="m-note">Freigegebene Ansprechpartner werden beim nächsten HQ-Abgleich einzeln in HQ und in der App gelöscht; die Kontakthistorie des Kunden bleibt. Freigegebene Kunden werden beim nächsten HQ-Abgleich in HQ und in der App endgültig gelöscht, mit Ansprechpartnern und Kontakthistorie. Vorher wird in HQ erneut geprüft, dass keine Projekte, Belege oder Planumsätze bestehen. Noch nicht übertragene Kunden werden nach der Freigabe sofort in der App gelöscht.</p>'
   };
   function deleteCustomerButton(c){
     if(detail?.deletion&&['requested','approved'].includes(detail.deletion.state))return '';
@@ -1107,18 +1109,29 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     }
     return out;
   }
+  // Single contacts (r41): only contacts already in HQ; the status copy comes with the customer file.
+  function deleteContactParts(p,editable){
+    const c=detail?.company,id=String(p.id),d=detail?.contactDeletions?.[id];
+    if(!c||!/^[0-9]+$/.test(id)||editable===false&&!d)return '';
+    let out='';
+    if(d){const extra=d.message&&d.state!=='requested'?'<br>'+esc(d.message):'';out+='<div class="m-note" role="status" data-contact-deletion="'+esc(id)+'"><strong>Löschantrag: '+esc(deleteStates[d.state]||d.state)+'</strong>'+extra+'<br><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+' · Grund: '+esc(d.reason||'')+'</small></div>';}
+    const pending=d&&['requested','approved'].includes(d.state)||detail?.deletion&&['requested','approved'].includes(detail.deletion.state);
+    if(deleteContactOpen===id)out+='<form class="m-section" data-form="delete-contact" data-company="'+esc(deleteCustomerRef(c))+'" data-contact="'+esc(id)+'"><h3>Ansprechpartner löschen</h3>'+deleteTexts.contact+'<label class="m-field">Grund für die Löschung (Pflicht)<textarea name="reason" maxlength="500" required></textarea></label><div class="m-test-actions"><button type="submit" class="m-button m-primary">Löschantrag stellen</button>'+button('Abbrechen','delete-contact-cancel',id)+'</div></form>';
+    else if(!pending&&editable!==false)out+=button('Ansprechpartner löschen','delete-contact',id);
+    return out;
+  }
   function deletionRow(d){
     const discard=d.discardJobCount?'<p class="m-note">Bei der Freigabe werden zusätzlich '+d.discardJobCount+' offene eigene Kontakt- und Stammdatenänderungen verworfen. Neue oder andere offene Aufträge bleiben gesperrt.</p>':'';
     const key=(d.key||d.hqId)+':'+d.revision,open=['requested','failed','blocked'].includes(d.state);
     let actions='';
-    if(open&&deletionConfirm===key)actions='<div class="m-note"><strong>Wirklich endgültig löschen?</strong> '+esc(d.name)+' '+(d.uncertain?deleteTexts.confirmUncertain:d.local?deleteTexts.confirmLocal:deleteTexts.confirmHq)+' Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">'+button('Ja, endgültig löschen','deletion-approve',key,true)+button('Abbrechen','deletion-confirm-cancel',key)+'</div>';
+    if(open&&deletionConfirm===key)actions='<div class="m-note"><strong>Wirklich endgültig löschen?</strong> '+esc(d.name)+' '+(d.type==='contact'?deleteTexts.confirmContact:d.uncertain?deleteTexts.confirmUncertain:d.local?deleteTexts.confirmLocal:deleteTexts.confirmHq)+' Das lässt sich nicht rückgängig machen.</div><div class="m-test-actions">'+button('Ja, endgültig löschen','deletion-approve',key,true)+button('Abbrechen','deletion-confirm-cancel',key)+'</div>';
     else if(open)actions='<div class="m-test-actions">'+button(d.state==='requested'?'Löschung freigeben':'Erneut freigeben','deletion-confirm',key,true)+button(d.state==='requested'?'Ablehnen':'Antrag schließen','deletion-reject',key)+'</div>';
-    const place=d.local?'noch nicht in HQ':'HQ-ID '+esc(d.hqId),decided=d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):'',note=d.message&&d.state!=='requested'?'<p class="m-muted">'+esc(d.message)+'</p>':'';
+    const place=d.type==='contact'?'Ansprechpartner bei '+esc(d.companyName||'HQ-Firma '+d.hqId)+' · HQ-ID '+esc(d.contactId):d.local?'noch nicht in HQ':'HQ-ID '+esc(d.hqId),decided=d.decidedBy?' · entschieden von '+esc(d.decidedBy)+' am '+esc(dateLabel(d.decidedAt)):'',note=d.message&&d.state!=='requested'?'<p class="m-muted">'+esc(d.message)+'</p>':'';
     return '<div class="m-row" data-deletion-row="'+esc(d.key||d.hqId)+'"><h3>'+esc(d.name)+' · '+place+'</h3><p>'+esc(deleteStates[d.state]||d.state)+'</p><p>Grund: '+esc(d.reason||'')+'</p><p><small>Gestellt von '+esc(d.requestedBy||'')+' am '+esc(dateLabel(d.requestedAt))+decided+'</small></p>'+note+discard+actions+'</div>';
   }
   function deletionAdminPanel(){
     const rows=deletionRows,list=!rows?'<p>Die Liste wird nur auf Klick aus Firebase gelesen.</p>':!rows.length?'<p>Keine Löschanträge vorhanden.</p>':rows.map(deletionRow).join('');
-    return '<section class="m-panel m-section" data-deletion-admin><div class="m-panel-head"><h2>Löschanträge für Kunden</h2>'+button(rows?'Neu laden':'Löschanträge anzeigen','deletions-load')+'</div><div class="m-panel-body">'+deleteTexts.adminNote+list+'</div></section>';
+    return '<section class="m-panel m-section" data-deletion-admin><div class="m-panel-head"><h2>Löschanträge für Kunden und Ansprechpartner</h2>'+button(rows?'Neu laden':'Löschanträge anzeigen','deletions-load')+'</div><div class="m-panel-body">'+deleteTexts.adminNote+list+'</div></section>';
   }
   // Approved customers leave the lists in this browser at once, not only after the next HQ sync.
   function deleteForget(ids){
@@ -1134,6 +1147,8 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(a==='delete-batch-close'){deleteBatch=null;render();return true;}
     if(a==='delete-customer'){deleteFormOpen=id;render();return true;}
     if(a==='delete-cancel'){deleteFormOpen=null;render();return true;}
+    if(a==='delete-contact'){deleteContactOpen=id;render();return true;}
+    if(a==='delete-contact-cancel'){deleteContactOpen=null;render();return true;}
     if(a==='deletion-confirm'){deletionConfirm=id;render();return true;}
     if(a==='deletion-confirm-cancel'){deletionConfirm=null;render();return true;}
     if(a==='deletions-load'){act(async()=>{deletionRows=(await rpc('listSalesCustomerDeletions')).deletions;deletionConfirm=null;return {message:'Löschanträge aus Firebase geladen.'};});return true;}
@@ -1147,6 +1162,11 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(form.dataset.form==='delete-batch'){
       const batch=deleteBatch;if(!batch||batch.results)return true;
       act(async()=>{const results=[];for(const c of batch.rows){try{const r=await rpc('requestSalesCustomerDelete',{companyId:c.id,reason:input.reason});results.push({name:c.name,message:r.message});const cached=companyCache.get(c.id);if(cached&&r.deletion)cached.deletion=r.deletion;}catch(e){if(e.salesAuthHandled)throw e;results.push({name:c.name,message:e.message||String(e)});}}batch.results=results;deleteBatch=batch;return {message:'Löschanträge geprüft. Ergebnisse stehen bei den ausgewählten Kunden. Die Freigabe erfolgt einzeln in der Verwaltung.'};},{preserve:true});return true;
+    }
+    if(form.dataset.form==='delete-contact'){
+      const contactId=form.dataset.contact;
+      act(async()=>{const r=await rpc('requestSalesContactDelete',{companyId:form.dataset.company,contactId,reason:input.reason});deleteContactOpen=null;if(detail&&r.deletion)detail={...detail,contactDeletions:{...(detail.contactDeletions||{}),[contactId]:r.deletion}};return r;},{preserve:true});
+      return true;
     }
     if(form.dataset.form!=='delete-request')return false;
     const id=form.dataset.company;
@@ -1241,7 +1261,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(!salesUsesLogin()||!state)return;
     const navRules={home:'home.read',customers:'customers.read',magazine:'magazine.read',contacts:'directory.read',invoices:'finance.read',import:'sync.read',admin:'settings.read',reminders:'home.read',test:'owner',new:'company.create',change:'company.edit'};
     for(const b of root.querySelectorAll('[data-action="nav"]')){const rule=navRules[b.dataset.id];if(rule&&!salesCan(rule)&&!(b.dataset.id==='admin'&&state.user.admin))b.hidden=true;}
-    const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read','delete-customer':'customers.read','delete-batch-open':'customers.read','deletions-load':'owner','deletion-confirm':'owner','deletion-approve':'owner','deletion-reject':'owner'};
+    const actionRules={'edit-business':'company.edit','v1-sync':'sync.run','pause-import':'sync.run','v1-editions':'owner','project-search':'settings.edit','exclude-document':'owner','include-document':'owner','preview':'sync.read','inventory-start':'owner','inventory-next':'owner','sync-company':'sync.run','sync-history':'sync.run','unassigned':'sync.read','delete-customer':'customers.read','delete-contact':'customers.read','delete-batch-open':'customers.read','deletions-load':'owner','deletion-confirm':'owner','deletion-approve':'owner','deletion-reject':'owner'};
     for(const b of root.querySelectorAll('[data-action]')){
       let rule=actionRules[b.dataset.action];if(b.dataset.action==='edit-business'&&b.dataset.id.startsWith('contact:'))rule='contact.edit';
       if(rule&&(rule==='owner'?!state.user.admin:!salesCan(rule)))b.hidden=true;

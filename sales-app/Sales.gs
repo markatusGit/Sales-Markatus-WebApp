@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-24-r40';
+const SALES_RELEASE = '2026-11-24-r41';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -671,6 +671,7 @@ function salesJobFailState_(job,e) {
   const reason=e?.message||'Unbekannter Fehler';
   // Deletions re-read HQ before every step, so a failure never needs a manual reconcile.
   if(job.kind==='deleteCompany')return salesDeleteFailed_(job,reason);
+  if(job.kind==='deleteContact')return salesContactDeleteFailed_(job,reason);
   if(['companyChange','contactEmail','history','entityChange','communication','createContact'].includes(job.kind)&&!job.writeAttempted) {job.state='pending';job.message=e?.message||'HQ-Ziel konnte vor dem Schreiben nicht geprüft werden.';}
   // Without a persisted write marker for this phase, HQ was not contacted: return to the stored stage instead of locking the job.
   else if(job.kind==='createCompany'&&['pending','ready','companyCreated','companyConfirmed','contactCreated'].includes(job.safeStage)&&!job.phaseWriteAttempted) {job.state=job.safeStage;job.message=(job.safeStage==='pending'?'Noch nicht an HQ gesendet: ':'HQ-Rückprüfung noch offen: ')+reason;}

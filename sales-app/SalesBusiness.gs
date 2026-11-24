@@ -472,6 +472,7 @@ function salesBusinessDeferredTarget_(job){
 }
 function salesBusinessRun_(job,verifyOnly){
   if(job.kind==='deleteCompany'){salesDeleteRun_(job,verifyOnly);return;}
+  if(job.kind==='deleteContact'){salesContactDeleteRun_(job,verifyOnly);return;}
   if(['communication','createContact'].includes(job.kind)){salesCommunicationRun_(job,verifyOnly);return;}
   if(job.kind==='history'){
     if(verifyOnly){salesHistoryTarget_(job,null);salesConfirmHistory_(job);return;}
