@@ -1,5 +1,16 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r42.1: Nachkennzeichnung prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
+
+- Heute keinen weiteren HQ-Abgleich starten. Das Firebase-Tageskontingent wird gegen 9:00 Uhr deutscher Zeit zurückgesetzt.
+- Morgen die App-Adresse neu laden. Erwartet wird „2026-11-24-r42.1“. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen.
+- „HQ synchronisieren“ anklicken.
+- Nach Abschluss unter „Automatisch behoben“ den Eintrag „Einmalige Nachkennzeichnung der Rohdaten“ lesen. Erwartet werden „Gezählt: … Rohdaten“, die gekennzeichnete Menge und „Fertige Gruppen: … von 390“. Den Wortlaut melden.
+- In der Firebase-Konsole unter „Nutzung“ die Lese- und Schreibvorgänge dieses Laufs ablesen und melden.
+
 ## r42: Datensparenden Abgleich prüfen
 
 Keine Script Properties von Hand und keine Bereitstellungseinstellungen. Die App legt `SALES_JOBS_ACTIVE_INDEX` beim ersten Aufruf selbst an.

@@ -94,7 +94,7 @@ test('r42: 30 changed firms in 30 groups read only their own raw records after t
  const before=sync('before');assert.equal(before.result.state,'completed');assert.equal(new Set(before.result.dirtyCompanies).size,30);
  assert.equal(f.ctx.salesRead_('sales_companies/1000').company.name,'Changed 1000');
  // One-time tagging, measured: a count query first, then only the two key fields per record.
- assert.equal(budget(),4000);f.ctx.salesKeyTagBudget_=()=>10000;const tag=sync('tagging');f.ctx.salesKeyTagBudget_=budget;const tags=f.ctx.salesRead_('sales_meta/bulk').keyTags;
+ assert.equal(budget(),12000);assert.equal(f.ctx.salesKeyExtraBudget_(),4000);const extra=f.ctx.salesKeyExtraBudget_;f.ctx.salesKeyTagBudget_=budget;f.ctx.salesKeyExtraBudget_=()=>10000;const tag=sync('tagging');f.ctx.salesKeyExtraBudget_=extra;const tags=f.ctx.salesRead_('sales_meta/bulk').keyTags;
  assert.equal(tag.result.state,'completed');assert.ok(Object.values(tags.collections).every(t=>t.complete));assert.equal(tags.written,raw.length-30,'the 30 firms rewritten by the earlier sync already carry keys');assert.ok(raw.every(k=>f.fields[k].companyKey&&f.fields[k].projectKey));assert.equal(tags.measured.total,raw.length);
  assert.ok(tag.result.notices.some(n=>/Abgeschlossen: alle Rohdaten/.test(n.message)));
  change(1100);const after=sync('after');assert.equal(after.result.state,'completed');
@@ -119,5 +119,29 @@ test('r42: open-job lists read open jobs and change requests only; finished jobs
  assert.equal(f.ctx.salesList_('sales_jobs',{active:true}).filter(j=>!['synced','canceled'].includes(j.state)).map(j=>j.id).sort().join(),'new-1,open-2');
  assert.equal(Object.keys(f.fields).filter(k=>k.startsWith('sales_jobs/')).length,all+1);
  console.log('MEASURE r42 open-job list with '+all+' saved jobs: reads before '+before.readsByCollection.sales_jobs+' / after '+after.readsByCollection.sales_jobs+' (one-time flagging: '+first.writesByCollection.sales_jobs+' writes)');
+});
+test('r42.1: groups a sync reads anyway are tagged completely; untouched groups get at most 4,000 extra writes',()=>{
+ const f=bulkFixture(),at='2026-01-01T00:00:00Z';
+ for(let i=0;i<640;i++){const id=1000+i,p=5000+i;
+  f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:at};f.remote.ContactPersons[20000+i]={id:20000+i,companyId:id,firstName:'Synthetic',updatedOn:at};
+  for(const h of [0,1])f.remote.ContactHistories[30000+2*i+h]={id:30000+2*i+h,companyId:id,reason:'Synthetic',content:'Synthetic',contactOn:at,contactHistoryChannel:'Note',updatedOn:at};
+  f.remote.Projects[p]={id:p,companyId:id,name:'Synthetic project',number:'S'+p,status:'InProgress',updatedOn:at};
+  f.remote.Documents[40000+i]={id:40000+i,companyId:id,projectId:p,number:'RE-'+i,date:'2026-01-01',currency:'EUR',documentType:'Invoice',documentStatusEntity:{documentStatusType:'Sent'},netValue:1,updatedOn:at};
+ }
+ f.finishBulk();const raw=Object.keys(f.fields).filter(k=>k.startsWith('sales_raw'));for(const k of raw){delete f.fields[k].companyKey;delete f.fields[k].projectKey;}
+ const bulk=f.ctx.salesRead_('sales_meta/bulk');delete bulk.keyTags;f.ctx.salesWrite_('sales_meta/bulk',bulk);
+ const a=instrument(f),sum=(o,prefix)=>Object.entries(o).filter(([c])=>c.startsWith(prefix)).reduce((n,[,v])=>n+v,0);
+ const change=()=>{for(let i=1000;i<1030;i++){f.remote.Companies[i].name='Changed '+i+Math.random();f.remote.Companies[i].updatedOn=new Date().toISOString();}};
+ const sync=()=>a.measure('sync',()=>{f.ctx.startSalesSync();f.worker();return f.ctx.salesRead_('sales_meta/sync');});
+ // Like the first live r42 sync: many changed groups without keys. Every group read for the customer files is now finished.
+ f.ctx.salesKeyExtraBudget_=()=>1000;change();const first=sync(),tags=f.ctx.salesRead_('sales_meta/bulk').keyTags,groups=Array.from({length:30},(_,i)=>String((1000+i)%64));
+ assert.equal(first.result.state,'completed');
+ for(const c of ['sales_rawcompanies','sales_rawcontacts','sales_rawhistories','sales_rawdocuments','sales_rawprojects'])assert.ok(groups.every(g=>tags.collections[c].done.includes(g)),c);
+ const written=sum(first.writesByCollection,'sales_raw')-30,opportunistic=raw.filter(k=>groups.includes(f.fields[k].companyBucket?.stringValue)&&!k.startsWith('sales_rawplans')).length-30;
+ assert.ok(written>=opportunistic&&written<=Math.max(opportunistic,1000+250),'extra tagging only while this sync wrote fewer than the extra cap');assert.ok(!Object.values(tags.collections).every(t=>t.complete));
+ const note=first.result.notices.find(n=>n.label==='Einmalige Nachkennzeichnung der Rohdaten');assert.match(note.message,new RegExp('Gezählt: '+raw.length+' Rohdaten'));
+ // The same groups change again (no extra tagging this time): now only the changed firms are read.
+ f.ctx.salesKeyExtraBudget_=()=>0;change();const second=sync();assert.equal(second.result.state,'completed');assert.ok(sum(second.readsByCollection,'sales_raw')*4<sum(first.readsByCollection,'sales_raw'));
+ console.log('MEASURE r42.1 first untagged sync over 30 groups: '+sum(first.readsByCollection,'sales_raw')+' raw reads, '+written+' key writes ('+opportunistic+' in groups read anyway); same groups next sync: '+sum(second.readsByCollection,'sales_raw')+' raw reads');
 });
 console.log(count+' performance and inventory tests passed.');

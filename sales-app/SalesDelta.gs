@@ -388,6 +388,7 @@ function salesDeltaAudit_(run){
   // Cache totals include unassigned rows; UI must not add them a second time.
   run.stats.totalsIncludeUnassigned=true;
   if(run.full)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});
+  if(typeof salesBulkKeysNotice_==='function')salesBulkKeysNotice_(run);
   const keyTags=salesDeltaKeyTagsStored_(run);
   salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings,...(keyTags?{keyTags}:{})});return true;
 }

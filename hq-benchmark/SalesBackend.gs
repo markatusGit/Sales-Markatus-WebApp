@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-24-r42';
+const SALES_RELEASE = '2026-11-24-r42.1';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -1724,31 +1724,40 @@ function salesBulkUnassigned_(run,task){
   const all=[];for(const path of task.parts)all.push(...salesRead_(path).rows);
   salesWrite_('sales_meta/unassigned'+task.id,{rows:all,loadedAt:salesNow_()});run.stats[task.id==='contacts'?'unassignedContacts':'unassignedHistories']=all.length;return true;
 }
-const SALES_KEY_TAG_BUDGET=4000,SALES_KEY_STEP_READS=2000;
+// Records a sync reads anyway are tagged right away, group by complete group (up to 12,000 field writes per sync, below the
+// 20,000 daily writes of the Spark plan). Groups nobody touched are read only for tagging while this sync wrote fewer than 4,000.
+const SALES_KEY_TAG_BUDGET=12000,SALES_KEY_EXTRA_BUDGET=4000,SALES_KEY_STEP_READS=2000;
 function salesKeyTagBudget_(){return SALES_KEY_TAG_BUDGET;}
-function salesBulkKeysOpen_(run){return !run.full&&!!run.keyTags?.collections&&(run.keyTags.budget||0)>0&&SALES_BULK_ENTITIES.some(e=>!run.keyTags.collections[salesBulkCollection_(e)]?.complete);}
-/** One-time tagging of records stored before r42, firm group by firm group, at most SALES_KEY_TAG_BUDGET writes per sync.
- * The first call counts the raw records (count query, about one read per 1,000 records) so the total cost is known up front. */
+function salesKeyExtraBudget_(){return SALES_KEY_EXTRA_BUDGET;}
+function salesBulkKeysComplete_(tags){return SALES_BULK_ENTITIES.every(e=>tags?.collections?.[salesBulkCollection_(e)]?.complete);}
+function salesBulkKeysOpen_(run){const t=run.keyTags;return !run.full&&!!t?.collections&&(t.budget||0)>0&&(t.runWritten||0)<salesKeyExtraBudget_()&&!salesBulkKeysComplete_(t);}
+/** Extra one-time tagging of groups this sync did not read anyway: one read and one field write per record. */
 function salesBulkKeys_(run,task){
-  const tags=run.keyTags;
-  if(!tags.measured){
-    const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
-    tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};task.stage='Rohdaten gezählt';return false;
-  }
-  let read=0;
+  const tags=run.keyTags;let read=0;
   for(const e of SALES_BULK_ENTITIES){
     const t=tags.collections[salesBulkCollection_(e)]||(tags.collections[salesBulkCollection_(e)]={done:[],complete:false});
     for(const group of SALES_KEY_GROUPS){
-      if(t.complete||(tags.budget||0)<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
-      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group);read+=docs.length;salesBulkTag_(run,e,docs,group);
+      const room=Math.min(tags.budget||0,salesKeyExtraBudget_()-(tags.runWritten||0));
+      if(t.complete||room<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
+      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group),budget=tags.budget;read+=docs.length;
+      tags.budget=room;const before=tags.runWritten||0;salesBulkTag_(run,e,docs,group);tags.budget=budget-((tags.runWritten||0)-before);
     }
   }
   task.stage=(tags.runWritten||0)+' Rohdaten in diesem Abgleich gekennzeichnet';
-  if(read>=SALES_KEY_STEP_READS&&salesBulkKeysOpen_(run))return false;
-  const done=SALES_BULK_ENTITIES.filter(e=>tags.collections[salesBulkCollection_(e)]?.complete).length,total=tags.measured.total;
-  const left=Math.max(0,total-(tags.written||0)),runs=Math.ceil(left/SALES_KEY_TAG_BUDGET);
-  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:done===SALES_BULK_ENTITIES.length?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':'Gezählt: '+total+' Rohdaten in Firebase. Bisher gekennzeichnet: '+(tags.written||0)+' (in diesem Abgleich '+(tags.runWritten||0)+', höchstens '+SALES_KEY_TAG_BUDGET+' Schreibvorgänge je Abgleich). Fertig gekennzeichnete Datenarten: '+done+' von '+SALES_BULK_ENTITIES.length+'. Voraussichtlich noch etwa '+runs+(runs===1?' Abgleich':' Abgleiche')+'. Es ist nichts zu tun.'}).slice(-50);
-  return true;
+  return !(read>=SALES_KEY_STEP_READS&&salesBulkKeysOpen_(run));
+}
+/** Progress note at the end of every sync until all records are tagged. Counts the raw records once
+ * (count query, about one read per 1,000 records) so the one-time cost is known. */
+function salesBulkKeysNotice_(run){
+  const tags=run.keyTags;if(run.full||!tags?.collections)return;
+  const complete=salesBulkKeysComplete_(tags);if(complete&&!(tags.runWritten>0))return;
+  // The count is informative only: a failed count never holds up the sync's final check.
+  if(!tags.measured)try{
+    const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
+    tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};
+  }catch(_){}
+  const groups=SALES_BULK_ENTITIES.reduce((n,e)=>{const t=tags.collections[salesBulkCollection_(e)];return n+(t?.complete?SALES_KEY_GROUPS.length:(t?.done||[]).length);},0),all=SALES_BULK_ENTITIES.length*SALES_KEY_GROUPS.length;
+  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:complete?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':(tags.measured?'Gezählt: '+tags.measured.total+' Rohdaten in Firebase. ':'')+'Gekennzeichnet bisher: '+(tags.written||0)+', in diesem Abgleich '+(tags.runWritten||0)+'. Fertige Gruppen: '+groups+' von '+all+'. Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet; für noch unberührte Gruppen höchstens '+SALES_KEY_EXTRA_BUDGET+' zusätzliche Schreibvorgänge je Abgleich. Es ist nichts zu tun.'}).slice(-50);
 }
 function salesBulkAudit_(run){
   return salesDeltaAudit_(run);
@@ -2182,6 +2191,7 @@ function salesDeltaAudit_(run){
   // Cache totals include unassigned rows; UI must not add them a second time.
   run.stats.totalsIncludeUnassigned=true;
   if(run.full)salesWrite_('sales_meta/unassignedsummary',{contacts:run.stats.unassignedContacts||0,histories:run.stats.unassignedHistories||0,updatedAt:salesNow_()});
+  if(typeof salesBulkKeysNotice_==='function')salesBulkKeysNotice_(run);
   const keyTags=salesDeltaKeyTagsStored_(run);
   salesWrite_('sales_meta/bulk',{policy:3,entities,companyIds:run.companyIds,stats:run.stats,completedAt:salesNow_(),needsFull:false,warnings,...(keyTags?{keyTags}:{})});return true;
 }

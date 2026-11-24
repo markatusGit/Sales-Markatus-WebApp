@@ -1,5 +1,11 @@
 # Änderungsprotokoll
 
+## [v0.42.1]
+
+- Gruppen, die ein HQ-Abgleich ohnehin vollständig liest, werden sofort vollständig mit Firmen- und Projektkennung versehen (bis 12.000 Feldschreibvorgänge je Abgleich). Noch unberührte Gruppen werden nur zusätzlich gekennzeichnet, solange ein Abgleich weniger als 4.000 Kennzeichnungen geschrieben hat.
+- Zählung und Hinweis „Einmalige Nachkennzeichnung der Rohdaten“ erscheinen am Ende jedes Abgleichs, bis alles gekennzeichnet ist. Eine fehlgeschlagene Zählung hält den Abgleich nicht an.
+- Kennung `2026-11-24-r42.1`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.42.0]
 
 - Datensparender HQ-Abgleich: Rohdaten tragen Firmen- und Projektkennung. Ein Änderungsabgleich liest nur noch die geänderten Firmen und Projekte statt ganzer Gruppen. Bestehende Rohdaten werden einmalig Gruppe für Gruppe nachgekennzeichnet (höchstens 4.000 Schreibvorgänge je Abgleich, vorher gezählt und unter „Automatisch behoben“ angezeigt).

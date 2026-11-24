@@ -1,5 +1,27 @@
 # Projektüberblick – Sales Markatus
 
+### 24.11.2026 – r42.1: Gelesene Gruppen sofort vollständig kennzeichnen
+
+Nutzermeldung: Der erste Abgleich mit r40 bis r42 (Apps-Script-Version 70) verbrauchte etwa 39.000 Lese- und 6.600 Schreibvorgänge. Bisher waren es rund 3.000 je Abgleich. Das Spark-Tageslimit liegt bei 50.000 Lesevorgängen.
+
+Ursache aus dem Laufbericht (124 Abschnitte, Änderungen in allen sechs Datenarten, 46 im Bestandsabgleich bereinigte Abweichungen) und dem Code:
+- Die Änderungen und Bereinigungen verteilten sich auf grob 95 Kunden- und Projektgruppen.
+- Noch nicht gekennzeichnete Gruppen liest der Abgleich vollständig, wie vor r42 (etwa 400 bzw. 200 Lesevorgänge je Gruppe).
+- Die rund 3.000 von früher galten für Abgleiche mit wenigen geänderten Gruppen.
+- Fehler in r42: Die mitlaufende Kennzeichnung durfte nur 4.000 Datensätze schreiben. Der Großteil der ohnehin vollständig gelesenen Gruppen blieb deshalb ungekennzeichnet und wäre beim nächsten Mal erneut ganz gelesen worden.
+- Weil das Budget aufgebraucht war, legte der Lauf außerdem keinen eigenen Kennzeichnungsabschnitt an. Damit fehlten Zählung und Hinweis.
+
+Umsetzung r42.1:
+- Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet, bis zu 12.000 Feldschreibvorgänge je Abgleich (unter dem Spark-Limit von 20.000 je Tag).
+- Gruppen, die niemand berührt hat, werden nur noch zusätzlich gelesen und gekennzeichnet, solange der Abgleich weniger als 4.000 Kennzeichnungen geschrieben hat. Nach einem großen Abgleich kommen also keine zusätzlichen Lesevorgänge dazu.
+- Zählung und Hinweis „Einmalige Nachkennzeichnung der Rohdaten“ stehen jetzt am Ende jedes Abgleichs, bis alles gekennzeichnet ist. Der Hinweis zeigt die gezählten Rohdaten, die gekennzeichnete Menge und die fertigen Gruppen (von 390). Eine fehlgeschlagene Zählung hält den Abgleich nicht an.
+- Kennung `2026-11-24-r42.1`.
+
+Gemessen in `sales-app/test-performance.cjs` (synthetisch, 30 berührte Gruppen ohne Kennzeichen): Der erste Abgleich kennzeichnet alle 1.770 Datensätze dieser Gruppen und liest dafür nichts zusätzlich. Ändern sich dieselben Gruppen erneut, sinken die Rohdaten-Lesevorgänge von 1.877 auf 250.
+
+Erwartung live: Ein Abgleich mit so vielen Änderungen wie am 24.11. kostet beim nächsten Mal noch einmal ähnlich viele Lesevorgänge, weil die Gruppen noch nicht gekennzeichnet sind. Dazu kommen bis zu etwa 12.000 Schreibvorgänge für die Kennzeichnung. Danach sinkt der Verbrauch je geänderter Gruppe auf wenige Lesevorgänge. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
+
 ### 24.11.2026 – r42: Datensparender HQ-Abgleich (Kundenakten gezielt, nur offene Aufträge)
 
 Auftrag aus der r40-Datenverbrauchsanalyse: Die zwei größten Firebase-Verbraucher des zentralen HQ-Abgleichs senken. Der Nutzer wünscht ausdrücklich einen möglichst datensparenden Abgleich.
