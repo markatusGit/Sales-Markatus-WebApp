@@ -139,7 +139,8 @@ const SALES_KEY_TAG_BUDGET=12000,SALES_KEY_EXTRA_BUDGET=4000,SALES_KEY_STEP_READ
 function salesKeyTagBudget_(){return SALES_KEY_TAG_BUDGET;}
 function salesKeyExtraBudget_(){return SALES_KEY_EXTRA_BUDGET;}
 function salesBulkKeysComplete_(tags){return SALES_BULK_ENTITIES.every(e=>tags?.collections?.[salesBulkCollection_(e)]?.complete);}
-function salesBulkKeysOpen_(run){const t=run.keyTags;return !run.full&&!!t?.collections&&(t.budget||0)>0&&(t.runWritten||0)<salesKeyExtraBudget_()&&!salesBulkKeysComplete_(t);}
+// The extra pass is limited in writes and in reads: groups that need no writes any more still cost one read per record.
+function salesBulkKeysOpen_(run){const t=run.keyTags;return !run.full&&!!t?.collections&&(t.budget||0)>0&&(t.runWritten||0)<salesKeyExtraBudget_()&&(t.runExtraRead||0)<salesKeyExtraBudget_()&&!salesBulkKeysComplete_(t);}
 /** Extra one-time tagging of groups this sync did not read anyway: one read and one field write per record. */
 function salesBulkKeys_(run,task){
   const tags=run.keyTags;let read=0;
@@ -147,9 +148,9 @@ function salesBulkKeys_(run,task){
     const t=tags.collections[salesBulkCollection_(e)]||(tags.collections[salesBulkCollection_(e)]={done:[],complete:false});
     for(const group of SALES_KEY_GROUPS){
       const room=Math.min(tags.budget||0,salesKeyExtraBudget_()-(tags.runWritten||0));
-      if(t.complete||room<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
-      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group),budget=tags.budget;read+=docs.length;
-      tags.budget=room;const before=tags.runWritten||0;salesBulkTag_(run,e,docs,group);tags.budget=budget-((tags.runWritten||0)-before);
+      if(t.complete||room<=0||read>=SALES_KEY_STEP_READS||(tags.runExtraRead||0)>=salesKeyExtraBudget_())break;if(t.done.includes(group))continue;
+      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group),budget=tags.budget;read+=docs.length;tags.runExtraRead=(tags.runExtraRead||0)+docs.length;
+      tags.budget=room;const before=tags.runWritten||0;salesBulkTag_(run,e,docs,'companyBucket',group);tags.budget=budget-((tags.runWritten||0)-before);
     }
   }
   task.stage=(tags.runWritten||0)+' Rohdaten in diesem Abgleich gekennzeichnet';
@@ -165,8 +166,8 @@ function salesBulkKeysNotice_(run){
     const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
     tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};
   }catch(_){}
-  const groups=SALES_BULK_ENTITIES.reduce((n,e)=>{const t=tags.collections[salesBulkCollection_(e)];return n+(t?.complete?SALES_KEY_GROUPS.length:(t?.done||[]).length);},0),all=SALES_BULK_ENTITIES.length*SALES_KEY_GROUPS.length;
-  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:complete?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':(tags.measured?'Gezählt: '+tags.measured.total+' Rohdaten in Firebase. ':'')+'Gekennzeichnet bisher: '+(tags.written||0)+', in diesem Abgleich '+(tags.runWritten||0)+'. Fertige Gruppen: '+groups+' von '+all+'. Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet; für noch unberührte Gruppen höchstens '+SALES_KEY_EXTRA_BUDGET+' zusätzliche Schreibvorgänge je Abgleich. Es ist nichts zu tun.'}).slice(-50);
+  const groups=SALES_BULK_ENTITIES.reduce((n,e)=>{const t=tags.collections[salesBulkCollection_(e)];return n+(t?.complete?SALES_KEY_GROUPS.length:Math.max((t?.done||[]).length,(t?.pdone||[]).length));},0),all=SALES_BULK_ENTITIES.length*SALES_KEY_GROUPS.length;
+  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:complete?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':(tags.measured?'Gezählt: '+tags.measured.total+' Rohdaten in Firebase. ':'')+'Gekennzeichnet bisher: '+(tags.written||0)+', in diesem Abgleich '+(tags.runWritten||0)+'. Fertige Gruppen: '+groups+' von '+all+'. Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet; für noch unberührte Gruppen höchstens '+SALES_KEY_EXTRA_BUDGET+' zusätzliche Lese- und Schreibvorgänge je Abgleich. Es ist nichts zu tun.'}).slice(-50);
 }
 function salesBulkAudit_(run){
   return salesDeltaAudit_(run);

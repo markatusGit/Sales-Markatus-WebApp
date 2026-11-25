@@ -1,5 +1,23 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 25.11.2026 – r42.2: Projektgruppen einzeln fertig kennzeichnen, Zusatzlesen begrenzen
+
+Nutzermeldung zum zweiten Abgleich mit r42.1: etwa 33.900 Lese- und 14.000 Schreibvorgänge, 118 Abschnitte. Hinweis im Lauf: 30.400 Rohdaten gezählt, 16.000 gekennzeichnet (in diesem Abgleich 12.000, also die volle Grenze), 99 von 390 Gruppen fertig.
+
+Einordnung: Die Kennzeichnung arbeitete wie vorgesehen. Die Lesevorgänge blieben hoch, weil die Änderungen erneut rund 100 Gruppen berührten und die meisten davon noch nicht fertig gekennzeichnet waren. Grob kostet eine Kundengruppe ohne Kennzeichen etwa 400 und eine Projektgruppe etwa 200 Lesevorgänge.
+
+Gefundene Schwachstelle in r42/r42.1: Projektgruppen (Projekte, Belege, Planumsätze) galten erst als fertig, wenn die ganze Datenart gekennzeichnet war. Planumsätze werden aber nie nach Firmengruppen gelesen. Sie wären nur über den Zusatzschritt fertig geworden, und der entfällt bei großen Abgleichen. Projektgruppen wären dadurch womöglich dauerhaft vollständig gelesen worden. Außerdem war der Zusatzschritt nur bei den Schreib-, nicht bei den Lesevorgängen begrenzt.
+
+Umsetzung r42.2:
+- Jede Projektgruppe wird jetzt einzeln als fertig gekennzeichnet (`pdone` in `sales_meta/bulk.keyTags`), sobald ein Abgleich sie ohnehin liest und alle ihre Datensätze Kennungen tragen. Danach liest der Abgleich dort nur noch die geänderten Projekte.
+- Der Zusatzschritt für noch unberührte Gruppen ist jetzt auch bei den Lesevorgängen auf 4.000 je Abgleich begrenzt.
+- Kennung `2026-11-25-r42.2`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
+Gemessen in `sales-app/test-performance.cjs` (synthetisch): Planumsätze ändern sich in 30 Projektgruppen. Der erste Abgleich liest 2.465 Projekt-Rohdaten und kennzeichnet die Gruppen; ändern sich dieselben Gruppen erneut, sind es nur noch 300. Ein eigener Fall prüft, dass der Zusatzschritt bei der Lesegrenze anhält, auch wenn nichts mehr zu schreiben ist.
+
+Erwartung live: Rund 14.400 Rohdaten sind noch ohne Kennung. Der nächste Abgleich kennzeichnet bis zu 12.000 davon, der übernächste den Rest. Bis dahin bleiben Abgleiche mit vielen Änderungen lese-intensiv; danach kosten geänderte Gruppen nur noch wenige Lesevorgänge. Während dieser Phase höchstens einen HQ-Abgleich pro Tag starten, weil die Kennzeichnung bis zu 12.000 der 20.000 täglichen Schreibvorgänge nutzt.
+
+
 ### 24.11.2026 – r42.1: Gelesene Gruppen sofort vollständig kennzeichnen
 
 Nutzermeldung: Der erste Abgleich mit r40 bis r42 (Apps-Script-Version 70) verbrauchte etwa 39.000 Lese- und 6.600 Schreibvorgänge. Bisher waren es rund 3.000 je Abgleich. Das Spark-Tageslimit liegt bei 50.000 Lesevorgängen.

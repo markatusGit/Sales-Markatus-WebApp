@@ -144,4 +144,41 @@ test('r42.1: groups a sync reads anyway are tagged completely; untouched groups 
  f.ctx.salesKeyExtraBudget_=()=>0;change();const second=sync();assert.equal(second.result.state,'completed');assert.ok(sum(second.readsByCollection,'sales_raw')*4<sum(first.readsByCollection,'sales_raw'));
  console.log('MEASURE r42.1 first untagged sync over 30 groups: '+sum(first.readsByCollection,'sales_raw')+' raw reads, '+written+' key writes ('+opportunistic+' in groups read anyway); same groups next sync: '+sum(second.readsByCollection,'sales_raw')+' raw reads');
 });
+test('r42.2: project groups read anyway become keyed on their own; the extra pass is capped in reads too',()=>{
+ const f=bulkFixture(),at='2026-01-01T00:00:00Z';
+ for(let i=0;i<640;i++){const id=1000+i,p=5000+i;
+  f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:at};
+  f.remote.Projects[p]={id:p,companyId:id,name:'Synthetic project',number:'S'+p,status:'InProgress',updatedOn:at};
+  for(const k of [0,1])f.remote.Documents[40000+2*i+k]={id:40000+2*i+k,companyId:id,projectId:p,number:'RE-'+i+'-'+k,date:'2026-01-01',currency:'EUR',documentType:'Invoice',documentStatusEntity:{documentStatusType:'Sent'},netValue:1,updatedOn:at};
+  for(const k of [0,1])f.remote.PlannedRevenues[60000+2*i+k]={id:60000+2*i+k,companyId:id,projectId:p,netTotal:1,currency:'EUR',startDate:'2026-12-01',estimations:[],updatedOn:at};
+ }
+ f.finishBulk();const raw=Object.keys(f.fields).filter(k=>k.startsWith('sales_raw'));for(const k of raw){delete f.fields[k].companyKey;delete f.fields[k].projectKey;}
+ const bulk=f.ctx.salesRead_('sales_meta/bulk');delete bulk.keyTags;f.ctx.salesWrite_('sales_meta/bulk',bulk);
+ const a=instrument(f),sum=(o,prefix)=>Object.entries(o).filter(([c])=>c.startsWith(prefix)).reduce((n,[,v])=>n+v,0);
+ // Planned revenues change in 30 project groups (the case that never became keyed in r42.1).
+ const change=()=>{for(let i=0;i<30;i++){const r=f.remote.PlannedRevenues[60000+2*i];r.netTotal++;r.updatedOn=new Date().toISOString();}};
+ const sync=()=>a.measure('sync',()=>{f.ctx.startSalesSync();f.worker();return f.ctx.salesRead_('sales_meta/sync');});
+ const extra=f.ctx.salesKeyExtraBudget_;f.ctx.salesKeyExtraBudget_=()=>300;
+ change();const first=sync(),tags=f.ctx.salesRead_('sales_meta/bulk').keyTags,groups=Array.from({length:30},(_,i)=>String((5000+i)%64));
+ assert.equal(first.result.state,'completed');
+ for(const c of ['sales_rawprojects','sales_rawdocuments','sales_rawplans'])assert.ok(groups.every(g=>(tags.collections[c].pdone||[]).includes(g)),c);
+ assert.ok(!tags.collections.sales_rawplans.complete,'plans are not complete, yet their project groups are keyed');
+ f.ctx.salesKeyExtraBudget_=()=>0;change();const second=sync();assert.equal(second.result.state,'completed');
+ const projectReads=m=>sum(m.readsByCollection,'sales_rawprojects')+sum(m.readsByCollection,'sales_rawdocuments')+sum(m.readsByCollection,'sales_rawplans');
+ assert.ok(projectReads(second)*4<projectReads(first),'project groups are read by key the second time');
+ f.ctx.salesKeyExtraBudget_=extra;
+ console.log('MEASURE r42.2 planned revenues changed in 30 project groups: project raw reads first '+projectReads(first)+' / next sync '+projectReads(second));
+});
+test('r42.2: extra tagging reads stop at the cap even when the groups need no writes any more',()=>{
+ const f=bulkFixture(),at='2026-01-01T00:00:00Z';
+ for(let i=0;i<640;i++){const id=1000+i;f.remote.Companies[id]={id,name:'Synthetic '+id,updatedOn:at};f.remote.ContactPersons[20000+i]={id:20000+i,companyId:id,firstName:'Synthetic',updatedOn:at};}
+ f.finishBulk();
+ // Every record already carries keys, but no group is recorded as done (as after a lost progress note).
+ const bulk=f.ctx.salesRead_('sales_meta/bulk');bulk.keyTags={version:1,written:0,collections:{}};f.ctx.salesWrite_('sales_meta/bulk',bulk);
+ const a=instrument(f),sum=(o,prefix)=>Object.entries(o).filter(([c])=>c.startsWith(prefix)).reduce((n,[,v])=>n+v,0);
+ const extra=f.ctx.salesKeyExtraBudget_;f.ctx.salesKeyExtraBudget_=()=>200;
+ const m=a.measure('sync',()=>{f.ctx.startSalesSync();f.worker();return f.ctx.salesRead_('sales_meta/sync');});f.ctx.salesKeyExtraBudget_=extra;
+ assert.equal(m.result.state,'completed');assert.equal(sum(m.writesByCollection,'sales_raw'),0);
+ assert.ok(sum(m.readsByCollection,'sales_raw')<200+120,'extra reads capped near 200 (plus at most one group and the probes)');
+});
 console.log(count+' performance and inventory tests passed.');

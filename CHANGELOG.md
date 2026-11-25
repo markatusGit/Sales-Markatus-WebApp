@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## [v0.42.2]
+
+- Projektgruppen (Projekte, Belege, Planumsätze) werden einzeln als fertig gekennzeichnet, sobald ein Abgleich sie ohnehin liest. Danach liest der Abgleich dort nur noch die geänderten Projekte. Vorher galt das erst, wenn die ganze Datenart gekennzeichnet war; bei Planumsätzen wäre das bei großen Abgleichen nie eingetreten.
+- Der Zusatzschritt für noch unberührte Gruppen ist jetzt auch bei den Lesevorgängen auf 4.000 je Abgleich begrenzt.
+- Gemessen (synthetisch): Planumsätze in 30 Projektgruppen geändert, Projekt-Rohdaten beim nächsten Abgleich 2.465 → 300 Lesevorgänge.
+- Kennung `2026-11-25-r42.2`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.42.1]
 
 - Gruppen, die ein HQ-Abgleich ohnehin vollständig liest, werden sofort vollständig mit Firmen- und Projektkennung versehen (bis 12.000 Feldschreibvorgänge je Abgleich). Noch unberührte Gruppen werden nur zusätzlich gekennzeichnet, solange ein Abgleich weniger als 4.000 Kennzeichnungen geschrieben hat.

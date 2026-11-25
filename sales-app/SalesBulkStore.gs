@@ -74,10 +74,11 @@ function salesBulkRawKeys_(path,row){
   return {companyKey:salesBulkKey_(entity==='Companies'?row.id:row.companyId),projectKey:salesBulkKey_(entity==='Projects'?row.id:row.projectId)};
 }
 const SALES_KEY_GROUPS=[...Array.from({length:64},(_,i)=>String(i)),'none'];
-// A firm-key query is complete once every record of that firm group carries keys; a project-key query needs the whole collection.
+// A key query is complete once every record of that group carries keys. Firm groups are tracked in "done",
+// project groups in "pdone" (r42.2); before that, project-key queries had to wait for the whole collection.
 function salesBulkKeyed_(tags,entity,field,bucket){
   const t=tags?.collections?.[salesBulkCollection_(entity)];if(!t)return false;
-  return !!t.complete||field==='companyBucket'&&(t.done||[]).includes(String(bucket));
+  return !!t.complete||((field==='companyBucket'?t.done:t.pdone)||[]).includes(String(bucket));
 }
 /** Rows of one group. With keys and a fully keyed group, only the records of those firms/projects are read. */
 function salesBulkRows_(run,entity,field,bucket,keys){
@@ -86,16 +87,17 @@ function salesBulkRows_(run,entity,field,bucket,keys){
   const key=[generation,entity,keyed?keyField:field,keyed?wanted.join(','):bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
   let docs;
   if(keyed)docs=salesBulkQueryDocs_(salesBulkCollection_(entity),keyField,wanted);
-  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field==='companyBucket'?String(bucket):null);}
+  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field,String(bucket));}
   const rows=docs.map(d=>d.value).filter(v=>v.generation===generation).map(v=>v.row);
   if(cache)cache.set(key,rows);return rows;
 }
 /** Adds missing keys to records that were read anyway. Only the two key fields are written (no payload), within the
- * run's remaining budget. A firm group counts as done only when every current record of it carries keys. */
-function salesBulkTag_(run,entity,docs,group){
+ * run's remaining budget. A firm or project group counts as done only when every current record of it carries keys. */
+function salesBulkTag_(run,entity,docs,field,group){
   const tags=run.keyTags;if(!tags?.collections||run.full||!run.entities?.[entity])return;
   const collection=salesBulkCollection_(entity),generation=run.entities[entity].generation,t=tags.collections[collection]||(tags.collections[collection]={done:[],complete:false});
-  if(t.complete||group!==null&&t.done.includes(group))return;
+  const list=field==='companyBucket'?'done':'pdone',groups=t[list]||(t[list]=[]);
+  if(t.complete||groups.includes(group))return;
   const missing=docs.filter(d=>{if(d.value?.generation!==generation||!d.value.row)return false;const k=salesBulkRawKeys_(d.path,d.value.row);return d.fields?.companyKey?.stringValue!==k.companyKey||d.fields?.projectKey?.stringValue!==k.projectKey;});
   const allowed=missing.slice(0,Math.max(0,tags.budget||0));
   for(let i=0;i<allowed.length;i+=100){
@@ -103,5 +105,6 @@ function salesBulkTag_(run,entity,docs,group){
     salesBulkRest_('commit',{writes});
   }
   tags.budget=(tags.budget||0)-allowed.length;tags.written=(tags.written||0)+allowed.length;tags.runWritten=(tags.runWritten||0)+allowed.length;
-  if(group!==null&&allowed.length===missing.length){t.done.push(group);if(SALES_KEY_GROUPS.every(g=>t.done.includes(g)))t.complete=true;}
+  // Every record has exactly one firm group and one project group: either list complete means every record is keyed.
+  if(allowed.length===missing.length){groups.push(group);if(SALES_KEY_GROUPS.every(g=>groups.includes(g)))t.complete=true;}
 }

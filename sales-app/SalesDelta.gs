@@ -38,7 +38,7 @@ function salesDeltaPrepare_(old){
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand mit HQ abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
   // Firm/project keys (r42): progress is kept in sales_meta/bulk; an unfinished earlier run may already have tagged more groups.
-  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0};
+  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0,runExtraRead:0};
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
 }
@@ -47,14 +47,14 @@ function salesDeltaKeyTags_(...sources){
   const out={version:1,collections:{},written:0};
   for(const t of sources.filter(x=>x?.collections)){
     out.written=Math.max(out.written,t.written||0);if(t.measured&&!out.measured)out.measured=t.measured;
-    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.complete=o.complete||!!v.complete;}
+    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],pdone:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.pdone=Array.from(new Set([...(o.pdone||[]),...(v.pdone||[])]));o.complete=o.complete||!!v.complete;}
   }
   return out;
 }
 function salesDeltaKeyTagsStored_(run){
   // A full import writes every raw record with keys: all collections are then completely keyed.
-  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),complete:true}]))};
-  if(!run.keyTags)return undefined;const {budget,runWritten,...stored}=run.keyTags;return stored;
+  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),pdone:SALES_KEY_GROUPS.slice(),complete:true}]))};
+  if(!run.keyTags)return undefined;const {budget,runWritten,runExtraRead,...stored}=run.keyTags;return stored;
 }
 function salesDeltaSince_(since){return new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');}
 function salesDeltaFilter_(entity,since){

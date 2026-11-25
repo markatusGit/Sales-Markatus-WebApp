@@ -1,5 +1,15 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r42.2: Weitere Kennzeichnung prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
+
+- Höchstens einen HQ-Abgleich pro Tag starten, bis „Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung“ erscheint.
+- Die App neu laden. Erwartet wird „2026-11-25-r42.2“. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen und „HQ synchronisieren“ anklicken.
+- Nach Abschluss unter „Automatisch behoben“ den Eintrag „Einmalige Nachkennzeichnung der Rohdaten“ abschreiben. Erwartet wird eine höhere Zahl bei „Gekennzeichnet bisher“ und bei „Fertige Gruppen“.
+- In der Firebase-Konsole unter „Nutzung“ die Lese- und Schreibvorgänge dieses Laufs ablesen und melden.
+
 ## r42.1: Nachkennzeichnung prüfen
 
 Keine Script Properties von Hand und keine Bereitstellungseinstellungen.

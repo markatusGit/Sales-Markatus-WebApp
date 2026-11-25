@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-24-r42.1';
+const SALES_RELEASE = '2026-11-25-r42.2';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -1557,10 +1557,11 @@ function salesBulkRawKeys_(path,row){
   return {companyKey:salesBulkKey_(entity==='Companies'?row.id:row.companyId),projectKey:salesBulkKey_(entity==='Projects'?row.id:row.projectId)};
 }
 const SALES_KEY_GROUPS=[...Array.from({length:64},(_,i)=>String(i)),'none'];
-// A firm-key query is complete once every record of that firm group carries keys; a project-key query needs the whole collection.
+// A key query is complete once every record of that group carries keys. Firm groups are tracked in "done",
+// project groups in "pdone" (r42.2); before that, project-key queries had to wait for the whole collection.
 function salesBulkKeyed_(tags,entity,field,bucket){
   const t=tags?.collections?.[salesBulkCollection_(entity)];if(!t)return false;
-  return !!t.complete||field==='companyBucket'&&(t.done||[]).includes(String(bucket));
+  return !!t.complete||((field==='companyBucket'?t.done:t.pdone)||[]).includes(String(bucket));
 }
 /** Rows of one group. With keys and a fully keyed group, only the records of those firms/projects are read. */
 function salesBulkRows_(run,entity,field,bucket,keys){
@@ -1569,16 +1570,17 @@ function salesBulkRows_(run,entity,field,bucket,keys){
   const key=[generation,entity,keyed?keyField:field,keyed?wanted.join(','):bucket].join(':'),cache=salesBulkStepCache_?.rows;if(cache?.has(key))return cache.get(key);
   let docs;
   if(keyed)docs=salesBulkQueryDocs_(salesBulkCollection_(entity),keyField,wanted);
-  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field==='companyBucket'?String(bucket):null);}
+  else {docs=salesBulkQueryDocs_(salesBulkCollection_(entity),field,bucket);salesBulkTag_(run,entity,docs,field,String(bucket));}
   const rows=docs.map(d=>d.value).filter(v=>v.generation===generation).map(v=>v.row);
   if(cache)cache.set(key,rows);return rows;
 }
 /** Adds missing keys to records that were read anyway. Only the two key fields are written (no payload), within the
- * run's remaining budget. A firm group counts as done only when every current record of it carries keys. */
-function salesBulkTag_(run,entity,docs,group){
+ * run's remaining budget. A firm or project group counts as done only when every current record of it carries keys. */
+function salesBulkTag_(run,entity,docs,field,group){
   const tags=run.keyTags;if(!tags?.collections||run.full||!run.entities?.[entity])return;
   const collection=salesBulkCollection_(entity),generation=run.entities[entity].generation,t=tags.collections[collection]||(tags.collections[collection]={done:[],complete:false});
-  if(t.complete||group!==null&&t.done.includes(group))return;
+  const list=field==='companyBucket'?'done':'pdone',groups=t[list]||(t[list]=[]);
+  if(t.complete||groups.includes(group))return;
   const missing=docs.filter(d=>{if(d.value?.generation!==generation||!d.value.row)return false;const k=salesBulkRawKeys_(d.path,d.value.row);return d.fields?.companyKey?.stringValue!==k.companyKey||d.fields?.projectKey?.stringValue!==k.projectKey;});
   const allowed=missing.slice(0,Math.max(0,tags.budget||0));
   for(let i=0;i<allowed.length;i+=100){
@@ -1586,7 +1588,8 @@ function salesBulkTag_(run,entity,docs,group){
     salesBulkRest_('commit',{writes});
   }
   tags.budget=(tags.budget||0)-allowed.length;tags.written=(tags.written||0)+allowed.length;tags.runWritten=(tags.runWritten||0)+allowed.length;
-  if(group!==null&&allowed.length===missing.length){t.done.push(group);if(SALES_KEY_GROUPS.every(g=>t.done.includes(g)))t.complete=true;}
+  // Every record has exactly one firm group and one project group: either list complete means every record is keyed.
+  if(allowed.length===missing.length){groups.push(group);if(SALES_KEY_GROUPS.every(g=>groups.includes(g)))t.complete=true;}
 }
 
 /** Global HQ pages, independent change cursors, Firebase-only joins. No HQ writes here. */
@@ -1730,7 +1733,8 @@ const SALES_KEY_TAG_BUDGET=12000,SALES_KEY_EXTRA_BUDGET=4000,SALES_KEY_STEP_READ
 function salesKeyTagBudget_(){return SALES_KEY_TAG_BUDGET;}
 function salesKeyExtraBudget_(){return SALES_KEY_EXTRA_BUDGET;}
 function salesBulkKeysComplete_(tags){return SALES_BULK_ENTITIES.every(e=>tags?.collections?.[salesBulkCollection_(e)]?.complete);}
-function salesBulkKeysOpen_(run){const t=run.keyTags;return !run.full&&!!t?.collections&&(t.budget||0)>0&&(t.runWritten||0)<salesKeyExtraBudget_()&&!salesBulkKeysComplete_(t);}
+// The extra pass is limited in writes and in reads: groups that need no writes any more still cost one read per record.
+function salesBulkKeysOpen_(run){const t=run.keyTags;return !run.full&&!!t?.collections&&(t.budget||0)>0&&(t.runWritten||0)<salesKeyExtraBudget_()&&(t.runExtraRead||0)<salesKeyExtraBudget_()&&!salesBulkKeysComplete_(t);}
 /** Extra one-time tagging of groups this sync did not read anyway: one read and one field write per record. */
 function salesBulkKeys_(run,task){
   const tags=run.keyTags;let read=0;
@@ -1738,9 +1742,9 @@ function salesBulkKeys_(run,task){
     const t=tags.collections[salesBulkCollection_(e)]||(tags.collections[salesBulkCollection_(e)]={done:[],complete:false});
     for(const group of SALES_KEY_GROUPS){
       const room=Math.min(tags.budget||0,salesKeyExtraBudget_()-(tags.runWritten||0));
-      if(t.complete||room<=0||read>=SALES_KEY_STEP_READS)break;if(t.done.includes(group))continue;
-      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group),budget=tags.budget;read+=docs.length;
-      tags.budget=room;const before=tags.runWritten||0;salesBulkTag_(run,e,docs,group);tags.budget=budget-((tags.runWritten||0)-before);
+      if(t.complete||room<=0||read>=SALES_KEY_STEP_READS||(tags.runExtraRead||0)>=salesKeyExtraBudget_())break;if(t.done.includes(group))continue;
+      const docs=salesBulkQueryDocs_(salesBulkCollection_(e),'companyBucket',group),budget=tags.budget;read+=docs.length;tags.runExtraRead=(tags.runExtraRead||0)+docs.length;
+      tags.budget=room;const before=tags.runWritten||0;salesBulkTag_(run,e,docs,'companyBucket',group);tags.budget=budget-((tags.runWritten||0)-before);
     }
   }
   task.stage=(tags.runWritten||0)+' Rohdaten in diesem Abgleich gekennzeichnet';
@@ -1756,8 +1760,8 @@ function salesBulkKeysNotice_(run){
     const byEntity={};for(const e of SALES_BULK_ENTITIES){const r=salesBulkRest_('runAggregationQuery',{structuredAggregationQuery:{structuredQuery:{from:[{collectionId:salesBulkCollection_(e)}]},aggregations:[{alias:'n',count:{}}]}});byEntity[e]=Number(r?.[0]?.result?.aggregateFields?.n?.integerValue||0);}
     tags.measured={at:salesNow_(),byEntity,total:Object.values(byEntity).reduce((n,x)=>n+x,0)};
   }catch(_){}
-  const groups=SALES_BULK_ENTITIES.reduce((n,e)=>{const t=tags.collections[salesBulkCollection_(e)];return n+(t?.complete?SALES_KEY_GROUPS.length:(t?.done||[]).length);},0),all=SALES_BULK_ENTITIES.length*SALES_KEY_GROUPS.length;
-  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:complete?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':(tags.measured?'Gezählt: '+tags.measured.total+' Rohdaten in Firebase. ':'')+'Gekennzeichnet bisher: '+(tags.written||0)+', in diesem Abgleich '+(tags.runWritten||0)+'. Fertige Gruppen: '+groups+' von '+all+'. Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet; für noch unberührte Gruppen höchstens '+SALES_KEY_EXTRA_BUDGET+' zusätzliche Schreibvorgänge je Abgleich. Es ist nichts zu tun.'}).slice(-50);
+  const groups=SALES_BULK_ENTITIES.reduce((n,e)=>{const t=tags.collections[salesBulkCollection_(e)];return n+(t?.complete?SALES_KEY_GROUPS.length:Math.max((t?.done||[]).length,(t?.pdone||[]).length));},0),all=SALES_BULK_ENTITIES.length*SALES_KEY_GROUPS.length;
+  run.notices=(run.notices||[]).concat({label:'Einmalige Nachkennzeichnung der Rohdaten',message:complete?'Abgeschlossen: alle Rohdaten tragen Firmen- und Projektkennung. Künftige Abgleiche lesen nur noch die geänderten Firmen und Projekte.':(tags.measured?'Gezählt: '+tags.measured.total+' Rohdaten in Firebase. ':'')+'Gekennzeichnet bisher: '+(tags.written||0)+', in diesem Abgleich '+(tags.runWritten||0)+'. Fertige Gruppen: '+groups+' von '+all+'. Gruppen, die ein Abgleich ohnehin liest, werden sofort vollständig gekennzeichnet; für noch unberührte Gruppen höchstens '+SALES_KEY_EXTRA_BUDGET+' zusätzliche Lese- und Schreibvorgänge je Abgleich. Es ist nichts zu tun.'}).slice(-50);
 }
 function salesBulkAudit_(run){
   return salesDeltaAudit_(run);
@@ -1841,7 +1845,7 @@ function salesDeltaPrepare_(old){
   if(!full)for(const e of SALES_BULK_ENTITIES)tasks.push({kind:'deltaMissing',id:e,label:SALES_BULK_LABELS[e]+' · Bestand mit HQ abgleichen'});
   if(full)run.dirtyCompanies=run.dirtyProjects=Array.from({length:64},(_,i)=>String(i));
   // Firm/project keys (r42): progress is kept in sales_meta/bulk; an unfinished earlier run may already have tagged more groups.
-  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0};
+  if(!full)run.keyTags={...salesDeltaKeyTags_(cache.keyTags,old?.keyTags),budget:salesKeyTagBudget_(),runWritten:0,runExtraRead:0};
   tasks.push({kind:'bulkPlan',label:'Geänderte Kundenakten zuordnen'});
   return run;
 }
@@ -1850,14 +1854,14 @@ function salesDeltaKeyTags_(...sources){
   const out={version:1,collections:{},written:0};
   for(const t of sources.filter(x=>x?.collections)){
     out.written=Math.max(out.written,t.written||0);if(t.measured&&!out.measured)out.measured=t.measured;
-    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.complete=o.complete||!!v.complete;}
+    for(const [c,v] of Object.entries(t.collections)){const o=out.collections[c]||(out.collections[c]={done:[],pdone:[],complete:false});o.done=Array.from(new Set([...o.done,...(v.done||[])]));o.pdone=Array.from(new Set([...(o.pdone||[]),...(v.pdone||[])]));o.complete=o.complete||!!v.complete;}
   }
   return out;
 }
 function salesDeltaKeyTagsStored_(run){
   // A full import writes every raw record with keys: all collections are then completely keyed.
-  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),complete:true}]))};
-  if(!run.keyTags)return undefined;const {budget,runWritten,...stored}=run.keyTags;return stored;
+  if(run.full)return {version:1,written:0,collections:Object.fromEntries(SALES_BULK_ENTITIES.map(e=>[salesBulkCollection_(e),{done:SALES_KEY_GROUPS.slice(),pdone:SALES_KEY_GROUPS.slice(),complete:true}]))};
+  if(!run.keyTags)return undefined;const {budget,runWritten,runExtraRead,...stored}=run.keyTags;return stored;
 }
 function salesDeltaSince_(since){return new Date(since).toISOString().replace(/\.\d{3}Z$/,'Z');}
 function salesDeltaFilter_(entity,since){
