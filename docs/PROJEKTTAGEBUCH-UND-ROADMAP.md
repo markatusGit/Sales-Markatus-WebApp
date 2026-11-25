@@ -17,6 +17,8 @@ Gemessen in `sales-app/test-performance.cjs` (synthetisch): Planumsätze ändern
 
 Erwartung live: Rund 14.400 Rohdaten sind noch ohne Kennung. Der nächste Abgleich kennzeichnet bis zu 12.000 davon, der übernächste den Rest. Bis dahin bleiben Abgleiche mit vielen Änderungen lese-intensiv; danach kosten geänderte Gruppen nur noch wenige Lesevorgänge. Während dieser Phase höchstens einen HQ-Abgleich pro Tag starten, weil die Kennzeichnung bis zu 12.000 der 20.000 täglichen Schreibvorgänge nutzt.
 
+Nutzerentscheidung vom 25.11.2026: Planumsätze bleiben in der App. Sie werden weiter aus HQ geladen und bei offenen Projekten in der Kundenakte mit Termin und Betrag angezeigt (Wunsch vom 24.09.2026). Nach Abschluss der Kennzeichnung kosten sie je Abgleich nur noch wenige Firebase-Zugriffe; die rund 3.300 Zugriffe für ihre Kennzeichnung fallen einmalig an.
+
 
 ### 24.11.2026 – r42.1: Gelesene Gruppen sofort vollständig kennzeichnen
 
