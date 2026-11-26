@@ -1,5 +1,14 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r43.1: Eigenes Recht des Admins prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
+
+- Die App neu laden. Erwartet wird „2026-11-26-r43.1“.
+- „Verwaltung“ öffnen, „Benutzer laden“ anklicken und das eigene Admin-Konto aufklappen.
+- Erwartet: Nur das Häkchen „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“ ist schaltbar; es ist gesetzt.
+- Häkchen nach Wunsch setzen oder entfernen und „Rechte speichern“ anklicken. Erwartet: „Einstellung gespeichert …“ und keine Abmeldung.
+
 ## r43: Mehrfach ändern und Freigaben prüfen
 
 Keine Script Properties von Hand und keine Bereitstellungseinstellungen.

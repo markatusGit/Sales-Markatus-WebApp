@@ -146,7 +146,16 @@ if(require.main===module){
  test('atomic business writes verify the current ACL revision',()=>{const f=authFixture(),u=f.user();f.request(u);const writes=f.ctx.salesAuthProtectWrites_([{update:{name:'business'}}]);assert.equal(writes[0].verify.endsWith('/sales_authusers/reader'),true);assert.equal(writes[0].currentDocument.updateTime,u.record._updateTime);f.user('reader',{},'disabled');assert.throws(()=>f.ctx.salesAuthCommit_([{kind:'audit',id:'x',value:{}}],[u.record]),/Precondition/);assert.equal(f.db.has('sales_authaudit/x'),false);});
  test('HQ writes reject revoked authors and unrecognized legacy jobs',()=>{const f=authFixture();f.user('reader',{'contact.create':true});f.ctx.salesAuthSource_({kind:'createContact',actorUid:'reader',actor:'reader@example.invalid'});f.user('reader',{},'disabled');assert.throws(()=>f.ctx.salesAuthSource_({kind:'createContact',actorUid:'reader',actor:'reader@example.invalid'}),/gesperrt/);assert.throws(()=>f.ctx.salesAuthSource_({kind:'createContact',actor:'unknown@example.invalid'}),/Administratorprüfung/);});
  test('gateway always clears its trusted context after errors',()=>{const f=authFixture();f.user();const s=f.session();assert.throws(()=>f.ctx.salesAuthenticatedRpc(s,'saveSalesCompany',[{}]),/AUTH_DENIED/);assert.throws(()=>f.ctx.salesUser_(),/AUTH_REQUIRED/);});
- // --- Audit 17.11.2026 (F-2, F-3, F-8, F-9, F-15) ---
+ test('r43.1: the admin switches "changes.direct" for themselves without losing other rights or the session',()=>{
+ const f=authFixture(),owner=f.user('owner');f.request(owner);const s=f.session('owner');assert.equal(owner.permissions['changes.direct'],true);
+ assert.throws(()=>f.ctx.updateSalesUser({uid:'owner',status:'disabled',permissions:{},revision:1}),/Administratorkonto/);
+ const r=f.ctx.updateSalesUser({uid:'owner',status:'active',permissions:{'changes.direct':false,'sync.run':false},revision:1});assert.equal(r.user.permissions['changes.direct'],false);assert.equal(r.user.revision,2);
+ const again=f.ctx.salesAuthPrincipal_({uid:'owner',email:'owner@example.invalid'});assert.equal(again.permissions['changes.direct'],false);assert.equal(again.permissions['sync.run'],true);assert.equal(again.admin,true);
+ assert.equal(f.ctx.salesAuthVerify_(s).uid,'owner');assert.throws(()=>f.ctx.updateSalesUser({uid:'owner',status:'active',permissions:{'changes.direct':true},revision:1}),/inzwischen/);
+ f.ctx.updateSalesUser({uid:'owner',status:'active',permissions:{'changes.direct':true},revision:2});assert.equal(f.ctx.salesAuthPrincipal_({uid:'owner',email:'owner@example.invalid'}).permissions['changes.direct'],true);
+ const reader=f.user('reader');f.request(reader);assert.throws(()=>f.ctx.updateSalesUser({uid:'owner',status:'active',permissions:{'changes.direct':false},revision:3}),/AUTH_DENIED/);
+});
+// --- Audit 17.11.2026 (F-2, F-3, F-8, F-9, F-15) ---
  test('F-2 unknown session keys above the per-minute limit are rejected without Firestore reads; verified sessions continue',()=>{
   const f=authFixture();f.user();const good=f.session();assert.equal(f.ctx.salesAuthVerify_(good).uid,'reader');
   for(let i=0;i<40;i++)assert.throws(()=>f.ctx.salesAuthVerify_(crypto.randomBytes(32).toString('hex')),/Sitzung beendet/);

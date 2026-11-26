@@ -1,5 +1,10 @@
 # Änderungsprotokoll
 
+## [v0.43.1]
+
+- Der Admin kann „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“ beim eigenen Konto ein- und ausschalten (Voreinstellung: ein). Alle anderen Admin-Rechte bleiben fest; keine Abmeldung.
+- Kennung `2026-11-26-r43.1`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.43.0]
 
 - Kunden- und Kontaktdaten lassen sich vor dem HQ-Abgleich beliebig oft erneut ändern. Jede weitere Änderung wird in den offenen Auftrag eingerechnet; HQ erhält einmal den letzten Stand. Zurückgesetzte Werte entfallen, ein leerer Auftrag wird ohne HQ-Zugriff abgeschlossen.

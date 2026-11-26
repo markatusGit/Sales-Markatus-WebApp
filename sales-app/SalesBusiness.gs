@@ -134,18 +134,17 @@ function salesReviewOverwrite_(base,change){
 }
 function salesReviewInit_(job,reason,user){
   job.changeReason=reason;
-  // r43: users with the right "changes.direct" (and the admin) overwrite existing values without a review.
+  // r43: users with the right "changes.direct" overwrite existing values without a review (the admin by default, switchable).
   if(salesReviewOverwrite_(job.base,job.change)){if(salesChangeDirect_(user))job.direct={by:user.email,at:salesNow_()};else salesReviewHold_(job);}
   return job;
 }
-function salesChangeDirect_(user){return !!(user&&(user.admin||user.permissions?.['changes.direct']));}
+function salesChangeDirect_(user){return user?.permissions?!!user.permissions['changes.direct']:!!user?.admin;}
 /** The right is checked again before HQ is written: a revoked right sends the change to the admin review. */
 function salesChangeDirectValid_(job){
   if(!job?.direct)return false;
   if(typeof salesAuthEnabled_!=='function'||!salesAuthEnabled_())return true;
-  const cfg=salesAuthConfig_();if(job.actorUid&&job.actorUid===cfg.ownerUid)return true;
-  const u=job.actorUid?salesAuthRead_('users',job.actorUid):null;
-  return !!(u&&u.status==='active'&&u.email===job.actor&&salesPermissions_(u.permissions)['changes.direct']);
+  const cfg=salesAuthConfig_(),u=job.actorUid?salesAuthRead_('users',job.actorUid):null;
+  return !!(u&&u.status==='active'&&u.email===job.actor&&salesPermissions_(u.permissions,job.actorUid===cfg.ownerUid)['changes.direct']);
 }
 function salesReviewHold_(job){
   job.review={status:'waiting',revision:1,conversation:[]};

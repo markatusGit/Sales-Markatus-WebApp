@@ -105,7 +105,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-26-r43</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-26-r43.1</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -116,7 +116,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-26-r43</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-26-r43.1</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -130,8 +130,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-11-26-r43';
-  const UI_BUILD='2026-11-26-r43';
+  const APP_RELEASE='2026-11-26-r43.1';
+  const UI_BUILD='2026-11-26-r43.1';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -294,15 +294,17 @@ const SALES_PERMISSION_CATALOG = Object.freeze([
   ['changes.direct','Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern','Freigaben']
 ]);
 const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
+// r43.1: rights the admin switches for themselves (default on); every other right is always on for the admin.
+const SALES_PERMISSION_OWNER_OPTIONAL = Object.freeze(['changes.direct']);
 function salesPermissions_(input,owner=false){
   if(input!==undefined&&(!input||typeof input!=='object'||Array.isArray(input)))throw Error('Ungültige Rechte.');
   const known=new Set(SALES_PERMISSION_CATALOG.map(p=>p[0]));
   for(const [key,value] of Object.entries(input||{}))if(!known.has(key)||typeof value!=='boolean')throw Error('Unbekanntes oder ungültiges Recht: '+key);
-  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
+  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner&&SALES_PERMISSION_OWNER_OPTIONAL.includes(key)?input?.[key]!==false:owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
   for(const [write,read] of [['sync.run','sync.read'],['settings.edit','settings.read'],['company.create','company.read'],['company.edit','company.read'],['contact.create','contact.read'],['contact.edit','contact.read'],['communication.create','communication.read']])if(out[write])out[read]=true;
   return out;
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,salesPermissions_};
+if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,SALES_PERMISSION_OWNER_OPTIONAL,salesPermissions_};
 
   let selectedEditionId='',customerHistoryFilter='all',industryFilter='',cityFilter='',ownerFilter='',projectResults=null,companyResults=null,importLoop=false,stopImport=false;
   function adoptSalesState(value){
@@ -1260,9 +1262,9 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     if(response.identity.revision!==session.revision)throw salesRequireLogin(session,'Deine Rechte wurden geändert. Bitte erneut anmelden.');
     if(state)state.user=response.identity;return response.result;
   }
-  function salesPermissionFields(values={},owner=false){return SALES_PERMISSION_CATALOG.map(([key,label,group],i)=>'<label class="m-check"><input type="checkbox" name="permission:'+key+'" '+(values[key]||SALES_PERMISSION_BASE.includes(key)?'checked':'')+' '+(owner||SALES_PERMISSION_BASE.includes(key)?'disabled':'')+'>'+esc(label)+'</label>').join('');}
+  function salesPermissionFields(values={},owner=false){return SALES_PERMISSION_CATALOG.map(([key,label,group],i)=>{const own=owner&&SALES_PERMISSION_OWNER_OPTIONAL.includes(key);return '<label class="m-check"><input type="checkbox" name="permission:'+key+'" '+((own?values[key]!==false:values[key]||SALES_PERMISSION_BASE.includes(key))?'checked':'')+' '+(owner&&!own||SALES_PERMISSION_BASE.includes(key)?'disabled':'')+'>'+esc(label)+'</label>';}).join('');}
   function salesUsersPanel(){
-    const users=salesUserRows.map(u=>'<details class="m-row"><summary>'+esc(u.email)+' · '+(u.status==='active'?'Aktiv':'Gesperrt')+'</summary><form data-form="auth-user" data-uid="'+esc(u.uid)+'" data-revision="'+u.revision+'">'+salesPermissionFields(u.permissions,u.uid===state.user.uid)+'<label class="m-field">Zugang<select name="status" '+(u.uid===state.user.uid?'disabled':'')+'><option value="active" '+(u.status==='active'?'selected':'')+'>Aktiv</option><option value="disabled" '+(u.status==='disabled'?'selected':'')+'>Gesperrt</option></select></label><button class="m-button" '+(u.uid===state.user.uid?'disabled':'')+'>Rechte speichern</button></form></details>').join('');
+    const users=salesUserRows.map(u=>'<details class="m-row"><summary>'+esc(u.email)+' · '+(u.status==='active'?'Aktiv':'Gesperrt')+'</summary><form data-form="auth-user" data-uid="'+esc(u.uid)+'" data-revision="'+u.revision+'">'+salesPermissionFields(u.permissions,u.uid===state.user.uid)+'<label class="m-field">Zugang<select name="status" '+(u.uid===state.user.uid?'disabled':'')+'><option value="active" '+(u.status==='active'?'selected':'')+'>Aktiv</option><option value="disabled" '+(u.status==='disabled'?'selected':'')+'>Gesperrt</option></select></label><button class="m-button">Rechte speichern</button></form></details>').join('');
     return '<section class="m-panel m-section"><div class="m-panel-head"><h2>Benutzer und Rechte</h2>'+button('Benutzer laden','auth-users')+'</div><div class="m-panel-body"><form data-form="auth-invite"><h3>Benutzer freigeben</h3>'+field('E-Mail-Adresse','email','','email',true)+salesPermissionFields()+'<p class="m-muted">Neue Benutzer lesen zunächst nur Mein Tag und Kunden. Löschen sowie noch nicht vorhandene Funktionen bleiben gesperrt.</p><button class="m-button m-primary">Einladungslink erstellen</button></form>'+(salesInvitationLink?'<label class="m-field">Einladungslink · 48 Stunden gültig<input readonly data-invitation-link value="'+esc(salesInvitationLink)+'"></label>'+button('Einladungslink kopieren','auth-copy'):'')+'</div>'+users+(salesUserCursor?button('Weitere Benutzer','auth-more'):'')+'</section>';
   }
   function salesUiPermissions(){

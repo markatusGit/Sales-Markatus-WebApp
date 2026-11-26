@@ -11,12 +11,14 @@ const SALES_PERMISSION_CATALOG = Object.freeze([
   ['changes.direct','Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern','Freigaben']
 ]);
 const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
+// r43.1: rights the admin switches for themselves (default on); every other right is always on for the admin.
+const SALES_PERMISSION_OWNER_OPTIONAL = Object.freeze(['changes.direct']);
 function salesPermissions_(input,owner=false){
   if(input!==undefined&&(!input||typeof input!=='object'||Array.isArray(input)))throw Error('Ungültige Rechte.');
   const known=new Set(SALES_PERMISSION_CATALOG.map(p=>p[0]));
   for(const [key,value] of Object.entries(input||{}))if(!known.has(key)||typeof value!=='boolean')throw Error('Unbekanntes oder ungültiges Recht: '+key);
-  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
+  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner&&SALES_PERMISSION_OWNER_OPTIONAL.includes(key)?input?.[key]!==false:owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
   for(const [write,read] of [['sync.run','sync.read'],['settings.edit','settings.read'],['company.create','company.read'],['company.edit','company.read'],['contact.create','contact.read'],['contact.edit','contact.read'],['communication.create','communication.read']])if(out[write])out[read]=true;
   return out;
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,salesPermissions_};
+if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,SALES_PERMISSION_OWNER_OPTIONAL,salesPermissions_};

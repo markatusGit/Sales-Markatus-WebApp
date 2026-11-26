@@ -1,5 +1,19 @@
 # Projektüberblick – Sales Markatus
 
+### 26.11.2026 – r43.1: Admin schaltet „ohne Admin-Freigabe ändern“ für sich selbst
+
+Nutzermeldung: In der Verwaltung ließ sich beim eigenen Admin-Konto das Häkchen „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“ nicht setzen. Alle Rechte des Admins waren gesperrt, weil der Admin jedes Recht automatisch hat.
+
+Umsetzung r43.1:
+- Dieses Recht ist beim Admin-Konto jetzt schaltbar. Alle anderen Rechte bleiben für den Admin fest eingeschaltet, und das Konto bleibt aktiv.
+- Voreinstellung für den Admin: eingeschaltet, wie in r43.
+- Ohne Häkchen warten Admin-Änderungen vorhandener Werte auf eine Freigabe. Der Admin gibt sie selbst unter „Meine Änderungen“ frei.
+- Die Einstellung gilt ab der nächsten Aktion. Der Admin wird dabei nicht abgemeldet, weil jeder Aufruf die aktuellen Rechte liest.
+- Vor dem Schreiben in HQ wird auch beim Admin die gespeicherte Einstellung geprüft.
+- Kennung `2026-11-26-r43.1`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
+**Lokal geprüft:** neuer Fall in `sales-app/test-auth.cjs`: Der Admin schaltet das Recht aus und wieder ein. Andere Rechte und die Sitzung bleiben erhalten, eine veraltete Fassung wird abgewiesen, ein anderer Benutzer darf es nicht ändern. `npm test` vollständig bestanden.
+
 ### 26.11.2026 – r43: Mehrfach ändern vor dem Abgleich, Recht „ohne Freigabe ändern“, Admin-Freigabe unter „Meine Änderungen“
 
 Nutzermeldungen:

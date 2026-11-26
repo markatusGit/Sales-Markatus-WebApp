@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-26-r43';
+const SALES_RELEASE = '2026-11-26-r43.1';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -3143,18 +3143,17 @@ function salesReviewOverwrite_(base,change){
 }
 function salesReviewInit_(job,reason,user){
   job.changeReason=reason;
-  // r43: users with the right "changes.direct" (and the admin) overwrite existing values without a review.
+  // r43: users with the right "changes.direct" overwrite existing values without a review (the admin by default, switchable).
   if(salesReviewOverwrite_(job.base,job.change)){if(salesChangeDirect_(user))job.direct={by:user.email,at:salesNow_()};else salesReviewHold_(job);}
   return job;
 }
-function salesChangeDirect_(user){return !!(user&&(user.admin||user.permissions?.['changes.direct']));}
+function salesChangeDirect_(user){return user?.permissions?!!user.permissions['changes.direct']:!!user?.admin;}
 /** The right is checked again before HQ is written: a revoked right sends the change to the admin review. */
 function salesChangeDirectValid_(job){
   if(!job?.direct)return false;
   if(typeof salesAuthEnabled_!=='function'||!salesAuthEnabled_())return true;
-  const cfg=salesAuthConfig_();if(job.actorUid&&job.actorUid===cfg.ownerUid)return true;
-  const u=job.actorUid?salesAuthRead_('users',job.actorUid):null;
-  return !!(u&&u.status==='active'&&u.email===job.actor&&salesPermissions_(u.permissions)['changes.direct']);
+  const cfg=salesAuthConfig_(),u=job.actorUid?salesAuthRead_('users',job.actorUid):null;
+  return !!(u&&u.status==='active'&&u.email===job.actor&&salesPermissions_(u.permissions,job.actorUid===cfg.ownerUid)['changes.direct']);
 }
 function salesReviewHold_(job){
   job.review={status:'waiting',revision:1,conversation:[]};
@@ -4486,9 +4485,21 @@ function createSalesUserInvitation(input){
     return {url:url+'?invite='+invitation,expiresAt,message:'Einladung angelegt. Link persönlich weitergeben.'};
   });
 }
+/** r43.1: the admin switches only their own optional rights (e.g. "changes.direct"). The account stays active
+ * with all other rights; no session is revoked because every call reads the current rights. */
+function salesAuthOwnerOptions_(actor,input){
+  if(input.status!=='active')throw Error('Das Administratorkonto bleibt freigegeben.');
+  const own=Object.fromEntries(SALES_PERMISSION_OWNER_OPTIONAL.map(k=>[k,input?.permissions?.[k]===true]));
+  return salesLock_(()=>{
+    const uid=actor.uid,prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
+    const permissions={...(prior.permissions||{}),...own};salesPermissions_(permissions,true);
+    salesAuthCommit_([{kind:'users',id:uid,prior,value:{...prior,permissions,revision:prior.revision+1}},{kind:'audit',id:salesAuthRandom_(),create:true,value:{action:'owner-options',actor:uid,target:uid,at:salesNow_()}}]);
+    return {user:{uid,email:prior.email,status:prior.status,permissions,revision:prior.revision+1,createdAt:prior.createdAt},message:'Einstellung gespeichert. Sie gilt ab der nächsten Aktion; eine neue Anmeldung ist nicht nötig.'};
+  });
+}
 function updateSalesUser(input){
   const actor=salesAuthOwner_(),cfg=salesAuthConfig_(),uid=input?.uid;if(typeof uid!=='string'||!/^[-\w]{1,128}$/.test(uid))throw Error('Ungültiger Benutzer.');
-  if(uid===cfg.ownerUid)throw Error('Das Administratorkonto bleibt unverändert freigegeben.');
+  if(uid===cfg.ownerUid)return salesAuthOwnerOptions_(actor,input);
   if(!['active','disabled'].includes(input.status))throw Error('Ungültiger Status.');const permissions=salesPermissions_(input.permissions);
   return salesLock_(()=>{
     const prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
@@ -4528,12 +4539,14 @@ const SALES_PERMISSION_CATALOG = Object.freeze([
   ['changes.direct','Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern','Freigaben']
 ]);
 const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
+// r43.1: rights the admin switches for themselves (default on); every other right is always on for the admin.
+const SALES_PERMISSION_OWNER_OPTIONAL = Object.freeze(['changes.direct']);
 function salesPermissions_(input,owner=false){
   if(input!==undefined&&(!input||typeof input!=='object'||Array.isArray(input)))throw Error('Ungültige Rechte.');
   const known=new Set(SALES_PERMISSION_CATALOG.map(p=>p[0]));
   for(const [key,value] of Object.entries(input||{}))if(!known.has(key)||typeof value!=='boolean')throw Error('Unbekanntes oder ungültiges Recht: '+key);
-  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
+  const out=Object.fromEntries(SALES_PERMISSION_CATALOG.map(([key])=>[key,owner&&SALES_PERMISSION_OWNER_OPTIONAL.includes(key)?input?.[key]!==false:owner||SALES_PERMISSION_BASE.includes(key)||input?.[key]===true]));
   for(const [write,read] of [['sync.run','sync.read'],['settings.edit','settings.read'],['company.create','company.read'],['company.edit','company.read'],['contact.create','contact.read'],['contact.edit','contact.read'],['communication.create','communication.read']])if(out[write])out[read]=true;
   return out;
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,salesPermissions_};
+if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_CATALOG,SALES_PERMISSION_BASE,SALES_PERMISSION_OWNER_OPTIONAL,salesPermissions_};

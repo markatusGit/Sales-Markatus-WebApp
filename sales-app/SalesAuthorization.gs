@@ -91,9 +91,21 @@ function createSalesUserInvitation(input){
     return {url:url+'?invite='+invitation,expiresAt,message:'Einladung angelegt. Link persönlich weitergeben.'};
   });
 }
+/** r43.1: the admin switches only their own optional rights (e.g. "changes.direct"). The account stays active
+ * with all other rights; no session is revoked because every call reads the current rights. */
+function salesAuthOwnerOptions_(actor,input){
+  if(input.status!=='active')throw Error('Das Administratorkonto bleibt freigegeben.');
+  const own=Object.fromEntries(SALES_PERMISSION_OWNER_OPTIONAL.map(k=>[k,input?.permissions?.[k]===true]));
+  return salesLock_(()=>{
+    const uid=actor.uid,prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
+    const permissions={...(prior.permissions||{}),...own};salesPermissions_(permissions,true);
+    salesAuthCommit_([{kind:'users',id:uid,prior,value:{...prior,permissions,revision:prior.revision+1}},{kind:'audit',id:salesAuthRandom_(),create:true,value:{action:'owner-options',actor:uid,target:uid,at:salesNow_()}}]);
+    return {user:{uid,email:prior.email,status:prior.status,permissions,revision:prior.revision+1,createdAt:prior.createdAt},message:'Einstellung gespeichert. Sie gilt ab der nächsten Aktion; eine neue Anmeldung ist nicht nötig.'};
+  });
+}
 function updateSalesUser(input){
   const actor=salesAuthOwner_(),cfg=salesAuthConfig_(),uid=input?.uid;if(typeof uid!=='string'||!/^[-\w]{1,128}$/.test(uid))throw Error('Ungültiger Benutzer.');
-  if(uid===cfg.ownerUid)throw Error('Das Administratorkonto bleibt unverändert freigegeben.');
+  if(uid===cfg.ownerUid)return salesAuthOwnerOptions_(actor,input);
   if(!['active','disabled'].includes(input.status))throw Error('Ungültiger Status.');const permissions=salesPermissions_(input.permissions);
   return salesLock_(()=>{
     const prior=salesAuthRead_('users',uid);if(!prior||prior.revision!==input.revision)throw Error('Benutzer inzwischen geändert. Bitte neu laden.');
