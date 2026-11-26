@@ -2006,3 +2006,7 @@ Veröffentlichung v0.42.1: Apps-Script-Version 71, bestehende Bereitstellung bei
 ### Veröffentlichung v0.42.2
 
 Veröffentlichung v0.42.2: Apps-Script-Version 72, bestehende Bereitstellung beibehalten. Quellcommit 0072a31ca61712808a033ffca368a2a93ac94df7. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-25T11:40:56.514Z.
+
+### Veröffentlichung v0.42.3
+
+Veröffentlichung v0.42.3: Apps-Script-Version 73, bestehende Bereitstellung beibehalten. Quellcommit 84f705d7d22d997a0b7478e5372105b04a5206c9. Syntax-, Logik- und Browserprüfungen bestanden; Google-Codevergleich bestanden. GitHub-Sicherung/Tag werden anschließend ausgeführt und durch release:verify geprüft. Keine Skripteigenschaften oder Zugriffs-/Ausführungseinstellungen durch diese Veröffentlichung verändert. Live-Funktionstest gesondert dokumentieren. Zeitpunkt: 2026-11-26T11:08:03.506Z.
