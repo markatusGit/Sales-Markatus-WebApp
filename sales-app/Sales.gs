@@ -1,6 +1,6 @@
 /** Sales pilot. All public RPCs authenticate. HQ write targets derive only from server-created jobs. */
 const SALES = Object.freeze({admin:'pp@markatus.de', edition:'coburger-70', projectNumber:'250334', projectName:'COBURGER Ausgabe #70', maxMs:210000});
-const SALES_RELEASE = '2026-11-25-r42.2';
+const SALES_RELEASE = '2026-11-26-r42.3';
 const SALES_COMPANY_CUSTOM_FIELDS=['Kundenklassifizierung','Kundenherkunft','Grund der Adressanlage','Erstelldatum'];
 const SALES_CUSTOMER_FORM_KEYS=['name','companyTypeId','industrialSector','newIndustry','subsystemId','responsibleUserId','homepage','description','street','houseNumber','zipCode','city','country','erstelldatum','Kundenherkunft','addressCreationReason'];
 const salesCompanyCustomKey_=name=>String(name||'').trim().toLowerCase();
@@ -767,7 +767,7 @@ function salesRunCreate_(job,draft,step) {
   if(!(actual.companyTypes||[]).some(t=>salesCompanyTypeId_(t)===Number(draft.company.companyTypes[0].companyTypeId))) throw new Error('Firmenart wurde in HQ noch nicht bestätigt.');
   if(!(actual.responsibleUsers||[]).some(u=>Number(u.userId||u.id)===Number(draft.company.responsibleUserIds[0]))) throw new Error('Verantwortlicher HQ-Benutzer wurde noch nicht bestätigt.');
   if(!salesSubsystemConfirmed_(actual,draft.company.subsystemIds[0])) throw new Error('HQ-Unternehmensbereich wurde noch nicht bestätigt.');
-  if(!salesBusinessCustomMatches_(actual.customFields,draft.company.customFields)) throw new Error('Eigene Felder stimmen nicht überein.');
+  const customDiff=salesBusinessCustomDifferences_(actual.customFields,draft.company.customFields);if(customDiff.length) throw new Error('Eigene Felder stimmen nicht überein: '+customDiff.join(', ')+'.');
   if(job.markerMode!=='none'){salesCleanMarker_(job,draft);job.steps.descriptionClean=true;salesWrite_('sales_jobs/'+job.id,job);}
   const cleanCompany=salesOne_('Companies',job.hqId);
   if(job.editedFields)salesBusinessVerifyDraft_(job,draft,cleanCompany,job.contactId?salesContactWithAddress_(job.contactId):null);
@@ -900,8 +900,15 @@ function saveSalesHistory(input) {
     }
     const id=Utilities.getUuid();history.syncId='sales-'+id;const job={id,kind:'history',...(general?{business:1}:{}),draftId:draft.id||null,hqId:draft.hqId,name:draft.company.name,state:'pending',history,createdAt:salesNow_(),updatedAt:salesNow_(),actor:user.email,...(user.uid?{actorUid:user.uid}:{}),message:'Kontakt in Firebase gespeichert; HQ-Abgleich offen.'};salesWrite_('sales_jobs/'+id,job);return {id,message:job.message};});
 }
+// A company the app created and HQ confirmed may not have an imported customer file yet (same sync, r42.3).
+function salesHistoryKnownCompany_(job){
+  const ref=String(job.companyRef||'');
+  if(ref.startsWith('draft_')){const draft=salesRead_('sales_drafts/'+salesKey_(ref.slice(6))),creation=draft&&salesRead_('sales_jobs/'+draft.id);
+    if(draft?.company&&!draft.deletedAt&&Number(draft.hqId)===Number(job.hqId)&&creation?.kind==='createCompany'&&creation.steps?.company&&Number(creation.hqId)===Number(job.hqId))return;}
+  salesBusinessKnown_(job.hqId);
+}
 function salesHistoryTarget_(job,draft) {
-  if(job.business===1){salesBusinessKnown_(job.hqId);salesOne_('Companies',job.hqId);}else{
+  if(job.business===1){salesHistoryKnownCompany_(job);salesOne_('Companies',job.hqId);}else{
   const creation=salesRead_('sales_jobs/'+draft.id);
   if(Number(draft.hqId)!==Number(job.hqId))throw new Error('Historienziel ist keine bestätigte eigene Firma.');
   salesCheckHistoryBinding_(draft,creation);}

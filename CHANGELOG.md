@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+## [v0.42.3]
+
+- HTTP 429 oder 5xx bei der Schutzprüfung der Rohdaten gelten als vorübergehend; der Abschnitt wartet und wiederholt, statt übersprungen zu werden.
+- Ausführungen, die mit einer geplanten Wiederholung endeten, zählen nicht mehr als abgebrochen („dreimal ohne Abschluss“).
+- Notizen zu einer in der App angelegten und in HQ bestätigten Firma werden übertragen, auch bevor ihre Kundenakte importiert ist.
+- Eigene Felder werden nach Bedeutung verglichen (Datum mit Zeitzone, Auswahlliste als Text, Zeilenenden); die Meldung nennt abweichende Felder.
+- Kennung `2026-11-26-r42.3`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.42.2]
 
 - Projektgruppen (Projekte, Belege, Planumsätze) werden einzeln als fertig gekennzeichnet, sobald ein Abgleich sie ohnehin liest. Danach liest der Abgleich dort nur noch die geänderten Projekte. Vorher galt das erst, wenn die ganze Datenart gekennzeichnet war; bei Planumsätzen wäre das bei großen Abgleichen nie eingetreten.

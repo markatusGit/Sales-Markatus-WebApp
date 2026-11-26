@@ -1,5 +1,26 @@
 # Projektüberblick – Sales Markatus
 
+### 26.11.2026 – r42.3: Wiederholung bei erschöpftem Kontingent, Notiz zu App-Firma, eigene Felder
+
+Nutzermeldung zum dritten Abgleich mit r42.2: Er wurde am Vorabend gestartet, lief über die Kontingentgrenze und war am 26.11. um 09:31 fertig. 90 Abschnitte. Kennzeichnung: 22.544 von 30.400, in diesem Abgleich 6.544, 213 von 390 Gruppen fertig. Offene Punkte:
+- Kundengruppe 19 „dreimal ohne Abschluss beendet“.
+- Kundengruppe 13 „Firestore-Schutz für den Sammelimport fehlt“.
+- Ansprechpartner-Übertragung „Eigene Felder stimmen nicht überein“.
+- Kommunikationsnotiz „Kundendetails zuerst über den HQ-Sync importieren“.
+
+Live-Test des Nutzers: Eine App-Neuanlage mit Ansprechpartner kam vollständig in HQ an; die Notiz dazu nicht. Eine HQ-Neuanlage mit Ansprechpartner kam vollständig in der App an. Die Wiedervorlage blieb wie vorgesehen nur in Firebase (Entscheidung r38).
+
+Ursachen und Korrekturen r42.3:
+- **Gruppe 13:** Die anonyme Schutzprüfung der Rohdaten-Sammlungen bekam bei erschöpftem Kontingent HTTP 429 statt 401/403. Das wurde als fehlender Schutz gewertet und der Abschnitt übersprungen. Jetzt gelten 429 und 5xx als vorübergehend; der Abschnitt wartet und wiederholt.
+- **Gruppe 19:** Scheiterte eine Ausführung schon beim Lesen des Laufs am Kontingent, ging die Zuordnung der Wiederholung verloren. Die nächste Ausführung zählte das als abgebrochene Ausführung; nach drei solchen Fällen wurde der Abschnitt übersprungen. Jetzt zählen geplante Wiederholungen nicht mehr als Abbruch.
+- **Notiz zur App-Firma:** Notizen setzten eine bereits importierte Kundenakte voraus. Bei einer im selben Abgleich angelegten App-Firma gab es die noch nicht. Jetzt genügt die in HQ bestätigte eigene Anlage der App.
+- **Eigene Felder:** HQ kann denselben Wert in anderer Form zurückgeben, etwa ein Datum mit Zeitzone, eine Auswahlliste als Text oder Text mit anderen Zeilenenden. Verglichen wird jetzt die Bedeutung. Die Meldung nennt die abweichenden Felder. Welches Feld im Live-Test abwich, ist nicht belegt; der Auftrag prüft beim nächsten Abgleich nur lesend erneut.
+- Übersprungene Gruppen und offene Aufträge holt der nächste Abgleich nach; es ist nichts neu anzulegen.
+- Kennung `2026-11-26-r42.3`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
+**Lokal geprüft:** neue Fälle in `test-sales-bulk.cjs` für Schutzprüfung bei 429/503, Zählung abgebrochener Ausführungen, Notiz zur App-Firma und Vergleich eigener Felder. `npm test` vollständig bestanden.
+
+
 ### 25.11.2026 – r42.2: Projektgruppen einzeln fertig kennzeichnen, Zusatzlesen begrenzen
 
 Nutzermeldung zum zweiten Abgleich mit r42.1: etwa 33.900 Lese- und 14.000 Schreibvorgänge, 118 Abschnitte. Hinweis im Lauf: 30.400 Rohdaten gezählt, 16.000 gekennzeichnet (in diesem Abgleich 12.000, also die volle Grenze), 99 von 390 Gruppen fertig.

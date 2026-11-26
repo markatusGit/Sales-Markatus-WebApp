@@ -184,5 +184,36 @@ test('quota during anonymous protection probe is recognized without accepting pu
  const f=bulkFixture(),source=fs.readFileSync(__dirname+'/Sales.gs','utf8');vm.runInContext(source.slice(source.indexOf('function salesAssertPrivate_('),source.indexOf('function getSalesState(')),f.ctx);f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>429});assert.throws(()=>f.ctx.salesAssertPrivate_(),e=>f.ctx.salesWorkerLimited_(e));f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200});assert.throws(()=>f.ctx.salesAssertPrivate_(),/Schutz/);
 });
 
+test('r42.3: quota during the import protection probe waits and retries instead of skipping a customer group',()=>{
+ const f=bulkFixture(),source=fs.readFileSync(__dirname+'/SalesWorker.gs','utf8');vm.runInContext(source.slice(source.indexOf('function salesWorkerPrivate_(')),f.ctx);
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>429});assert.throws(()=>f.ctx.salesWorkerPrivate_(),e=>f.ctx.salesWorkerLimited_(e));
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>503});assert.throws(()=>f.ctx.salesWorkerPrivate_(),e=>f.ctx.salesWorkerTransient_(e));
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>200});assert.throws(()=>f.ctx.salesWorkerPrivate_(),/Schutz für den Sammelimport fehlt/);
+ f.ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>403});f.ctx.salesWorkerPrivate_();
+});
+test('r42.3: executions that ended in a scheduled quota retry are not counted as killed executions',()=>{
+ const f=bulkFixture();f.finishBulk();f.ctx.startSalesSync();const run=f.ctx.salesRead_('sales_meta/sync'),task=run.tasks[run.cursor];
+ const key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':');
+ // Three earlier starts of this section, each followed by a quota fault before the run could even be read.
+ run.inFlight={key,attempts:3};f.ctx.salesWrite_('sales_meta/sync',run);
+ f.props.SALES_SYNC_RETRY=JSON.stringify({key:'worker',runId:null,attempts:2,until:Date.now()-1,at:new Date().toISOString(),label:'HQ-Abgleich',message:'Firestore HTTP 429'});
+ f.worker();const after=f.ctx.salesRead_('sales_meta/sync');
+ assert.ok(!(after.errors||[]).some(e=>/dreimal ohne Abschluss/.test(e.message)));assert.notEqual(after.state,'running');
+});
+test('r42.3: a note for a company the app created is sent before the HQ import built its customer file',()=>{
+ const f=bulkFixture();f.db['sales_drafts/d1']={id:'d1',hqId:101,company:{name:'Synthetic app company'}};f.db['sales_jobs/d1']={id:'d1',kind:'createCompany',hqId:101,steps:{company:true,contact:true},state:'contactCreated'};
+ delete f.db['sales_companies/101'];f.ctx.salesHistoryKnownCompany_({companyRef:'draft_d1',hqId:101});
+ assert.throws(()=>f.ctx.salesHistoryKnownCompany_({companyRef:'draft_d1',hqId:999}),/Kundendetails zuerst/);
+ f.db['sales_jobs/d1'].steps.company=false;assert.throws(()=>f.ctx.salesHistoryKnownCompany_({companyRef:'draft_d1',hqId:101}),/Kundendetails zuerst/);
+ assert.throws(()=>f.ctx.salesHistoryKnownCompany_({companyRef:'101',hqId:101}),/Kundendetails zuerst/);
+});
+test('r42.3: custom fields compare meaning, not shape, and name what differs',()=>{
+ const f=bulkFixture();f.ctx.Utilities.formatDate=(d,tz)=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+ const expected=[{name:'Erstelldatum',type:'Date',value:'2026-11-25T00:00:00Z'},{name:'Kundenherkunft',type:'DropdownCheckbox',value:['Medienhaus']},{name:'Grund der Adressanlage',type:'TextMultiline',value:'Zeile 1\nZeile 2'},{name:'Kundenklassifizierung',type:'Dropdown',value:'A'}];
+ const actual=[{name:'Erstelldatum',type:'Date',value:'2026-11-24T23:00:00Z'},{name:'Kundenherkunft',type:'DropdownCheckbox',value:'Medienhaus'},{name:'Grund der Adressanlage',type:'TextMultiline',value:'Zeile 1\r\nZeile 2 '},{name:'Kundenklassifizierung',type:'Dropdown',value:'A'}];
+ assert.equal(f.ctx.salesBusinessCustomDifferences_(actual,expected).length,0);
+ actual[3].value='B';actual[0].value='2026-11-20T00:00:00Z';assert.equal(f.ctx.salesBusinessCustomDifferences_(actual,expected).join(),'Erstelldatum,Kundenklassifizierung');
+});
+
 for(const c of cases){c.fn();console.log('PASS',c.name);count++;}console.log(count+' bulk/worker checks passed.');}
 module.exports={bulkFixture};

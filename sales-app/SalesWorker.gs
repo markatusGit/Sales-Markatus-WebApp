@@ -132,7 +132,7 @@ function salesSyncWorker_(event){
       const task=run.tasks[run.cursor],key=[run.cursor,task.stage||'',task.bucket||0,run.entities[task.id]?.lastId||0,task.pendingPage||''].join(':'),retryKey=run.id+'|'+key;
       if(task.waitUntil&&Date.parse(task.waitUntil)>Date.now()){salesWorkerWait_(run,task,retryKey);return;}
       // A caught, scheduled retry is not an unfinished (killed) execution.
-      const previous=salesWorkerRetryState_(),caught=previous?.key===retryKey,tried=caught&&!previous.wait?previous.attempts:0;
+      const previous=salesWorkerRetryState_(),caught=previous?.key===retryKey||!previous?.wait&&(previous?.key==='worker'||previous?.runId===run.id),tried=previous?.key===retryKey&&!previous.wait?previous.attempts:0;
       let writeBoundary=false;try{
         const attempts=!caught&&run.inFlight?.key===key?run.inFlight.attempts+1:1;
         if(attempts>3){const e=new Error('Derselbe Abschnitt wurde dreimal ohne Abschluss beendet, möglicherweise durch Googles Laufzeitgrenze. Bitte den Fehler unter Apps Script → Ausführungen prüfen. Keine Schreibaufträge neu anlegen.');e.salesFatal=true;throw e;}
@@ -167,5 +167,8 @@ function salesSyncWorker_(event){
   }finally{salesWorkerRetriesLeftValue_=0;if(typeof salesAuthRequest_!=='undefined')salesAuthRequest_=null;}
 }
 function salesWorkerPrivate_(){
-  const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});if(![401,403].includes(r.getResponseCode()))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}
+  const c=salesContext_();for(const col of [...SALES_BULK_ENTITIES.map(salesBulkCollection_),'sales_projectviews']){const r=UrlFetchApp.fetch(pilotUrl_(c.project,col+'/security-probe'),{method:'get',muteHttpExceptions:true,followRedirects:false});const code=r.getResponseCode();
+    // Quota or server faults say nothing about the protection: retry later instead of skipping a section (r42.3).
+    if(code===429||code>=500)throw new Error('Firestore HTTP '+code+' bei Schutzprüfung.');
+    if(![401,403].includes(code))throw new Error('Firestore-Schutz für den Sammelimport fehlt.');}
 }

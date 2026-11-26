@@ -1,5 +1,15 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r42.3: Offene Punkte des letzten Abgleichs prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
+
+- Die App neu laden. Erwartet wird „2026-11-26-r42.3“. Bei anderer Kennung diese melden.
+- „Datenabgleich“ öffnen und „HQ synchronisieren“ anklicken.
+- Nach Abschluss die „Offenen Punkte für den Admin“ lesen. Erwartet: keine Meldungen zu Gruppe 13 oder 19 und keine Meldung „Kundendetails zuerst über den HQ-Sync importieren“.
+- In HQ beim Testkunden „Test Sales Firebase 1“ die Kontakthistorie öffnen. Erwartet wird die Notiz „ich war hier“.
+- Steht weiter „Eigene Felder stimmen nicht überein: …“, die genannten Feldnamen melden.
+
 ## r42.2: Weitere Kennzeichnung prüfen
 
 Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
