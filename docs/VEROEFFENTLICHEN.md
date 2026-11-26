@@ -1,5 +1,17 @@
 # Geprüft nach Google veröffentlichen und nach GitHub sichern
 
+## r43: Mehrfach ändern und Freigaben prüfen
+
+Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
+
+- Die App neu laden. Erwartet wird „2026-11-26-r43“. Bei anderer Kennung diese melden.
+- Beim Testkunden die Firmendaten ändern und speichern. Erwartet wird der neue Wert sofort in der Kundenakte.
+- Dieselben Firmendaten sofort noch einmal ändern und speichern. Erwartet wird keine Meldung „Stammdatenänderungen offen“ und der zweite Wert in der Kundenakte.
+- Beim Ansprechpartner die E-Mail dreimal hintereinander ändern. Erwartet wird jeweils der zuletzt eingegebene Wert.
+- Nach dem nächsten HQ-Abgleich in HQ nachsehen. Erwartet wird nur der zuletzt eingegebene Wert.
+- Mit dem Admin-Konto vorhandene Werte ändern. Erwartet wird keine Wartezeit auf eine Freigabe.
+- Optional: In der Verwaltung einem Benutzer das Recht „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“ geben. Ohne dieses Recht erscheinen seine Änderungen vorhandener Werte beim Admin unter „Meine Änderungen“ mit „Neuen Wert übernehmen“ und „Alten Wert behalten“.
+
 ## r42.3: Offene Punkte des letzten Abgleichs prüfen
 
 Keine Script Properties von Hand und keine Bereitstellungseinstellungen.
@@ -270,7 +282,7 @@ Das Skript sichert zuvor den Google-Editor und die aktive Version unter `.releas
 | `npm run release:preflight -- v0.19.2` | Vollständige lokale Prüfungen, Git-/Google-Zugriff, Tag, Changelog, Sicherung und Einstellungen prüfen; nichts nach Google schreiben |
 | `npm run release:publish -- v0.19.2` | Geprüften Stand veröffentlichen, Versionsnachweis/Dokumentation committen, Tag und main gemeinsam ohne Force-Push sichern |
 | `npm run release:verify` | Feste Google-Version und Editor mit dem Git-Tag vergleichen und dessen Existenz auf GitHub/main bestätigen |
-| `npm run release:recover` | Ausschließlich bereits dokumentierte Veröffentlichung nach unterbrochener GitHub-Sicherung abschließen; keinen erneuten Google-Upload auslösen |
+| `npm run release:recover` | Unterbrochene Veröffentlichung ab `deployment-updated` oder `metadata-written` abschließen; keinen erneuten Google-Upload auslösen |
 
 ## Ablauf bei einer künftigen Appänderung
 
@@ -317,6 +329,8 @@ Google und GitHub lassen sich nicht als gemeinsame atomare Transaktion aktualisi
 
 - Bei Fehlern den ausgegebenen technischen Text sichern; keine Tokens oder echten Daten weitergeben.
 - `.release/pending.json` öffnen, falls die Datei vorhanden ist; erwartet wird der letzte erreichte Schritt mit Google-Versionsnummer, soweit bereits erzeugt.
+- Google meldet die Umstellung der Bereitstellung manchmal verzögert. Das Skript prüft deshalb bis zu neunmal im Abstand von 15 Sekunden, also etwa 2 Minuten, bevor es mit „Bestehende Bereitstellung verwendet die neue Version noch nicht“ abbricht.
+- Bei `deployment-updated` später `npm run release:recover` ausführen; er prüft nur lesend, ob die Bereitstellung die neue Version verwendet, und schließt dann Nachweis, Commit, Tag und GitHub-Sicherung ohne erneuten Google-Upload ab.
 - Bei `metadata-written` den Befehl `npm run release:recover` ausführen; er wiederholt den Codevergleich und die GitHub-Sicherung ohne erneuten Google-Upload.
 - Bei früheren Schritten den technischen Stand im Chat nennen; Editor/Bereitstellung und Sicherung müssen zuerst lesend abgeglichen werden.
 - Bei einem Hinweis auf `publish.lock` prüfen lassen, ob noch ein Veröffentlichungslauf arbeitet; die Sperre nicht während eines laufenden Vorgangs entfernen.

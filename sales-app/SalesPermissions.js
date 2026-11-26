@@ -7,7 +7,8 @@ const SALES_PERMISSION_CATALOG = Object.freeze([
   ['settings.read','Fachliche Verwaltung ansehen','Bereiche'],['settings.edit','Ausgabeziele und Termine ändern','Bereiche'],
   ['company.read','Firmendaten lesen','Firmen'],['company.create','Firma hinzufügen','Firmen'],['company.edit','Firmendaten und Adressen ändern','Firmen'],
   ['contact.read','Ansprechpartner lesen','Ansprechpartner'],['contact.create','Ansprechpartner hinzufügen','Ansprechpartner'],['contact.edit','Ansprechpartner ändern','Ansprechpartner'],
-  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation']
+  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation'],
+  ['changes.direct','Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern','Freigaben']
 ]);
 const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
 function salesPermissions_(input,owner=false){

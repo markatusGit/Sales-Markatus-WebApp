@@ -1,5 +1,14 @@
 # Änderungsprotokoll
 
+## [v0.43.0]
+
+- Kunden- und Kontaktdaten lassen sich vor dem HQ-Abgleich beliebig oft erneut ändern. Jede weitere Änderung wird in den offenen Auftrag eingerechnet; HQ erhält einmal den letzten Stand. Zurückgesetzte Werte entfallen, ein leerer Auftrag wird ohne HQ-Zugriff abgeschlossen.
+- Formulare starten mit den Werten, die die App anzeigt. Gesperrt bleibt nur ein Auftrag, der gerade übertragen wird oder im Datenabgleich geklärt werden muss.
+- Neues Benutzerrecht „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“; der Admin hat es immer. Vor dem HQ-Schreiben wird es erneut geprüft.
+- Freigegebene Änderungen sind sofort in der App sichtbar. Der Admin entscheidet unter „Meine Änderungen“ über eigene und wartende Anträge.
+- Veröffentlichungsskript wartet bis etwa 2 Minuten auf Googles Umstellung; `release:recover` setzt auch nach `deployment-updated` fort.
+- Kennung `2026-11-26-r43`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen.
+
 ## [v0.42.3]
 
 - HTTP 429 oder 5xx bei der Schutzprüfung der Rohdaten gelten als vorübergehend; der Abschnitt wartet und wiederholt, statt übersprungen zu werden.

@@ -110,7 +110,19 @@ function publish(tag) {
   same(remoteSnapshot(state.config, pending.version, 'new-version').files, state.files, 'Neue Google-Version');
   claspJson(['create-deployment', '--deploymentId', state.config.deploymentId, '--versionNumber', String(pending.version), '--description', tag]);
   pending.step = 'deployment-updated'; save(pendingPath, pending);
-  if (deployment(state.config).versionNumber !== pending.version) throw Error('Bestehende Bereitstellung verwendet die neue Version noch nicht.');
+  completeDeployment(state.config, pending);
+}
+// Google sometimes reports the switched deployment only after a short delay; wait before failing.
+function waitForDeployment(read, version, {tries = 9, delayMs = 15000, sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms), log = console.log} = {}) {
+  for (let i = 1; i <= tries; i++) {
+    if (read() === version) return;
+    if (i < tries) { log(`Google stellt die Bereitstellung noch um (Prüfung ${i} von ${tries}); neuer Versuch in ${delayMs / 1000} s.`); sleep(delayMs); }
+  }
+  throw Error('Bestehende Bereitstellung verwendet die neue Version noch nicht.');
+}
+function completeDeployment(config, pending) {
+  waitForDeployment(() => deployment(config).versionNumber, pending.version);
+  const tag = pending.tag, state = {config, sourceCommit: pending.sourceCommit, files: pending.files};
   const now = new Date().toISOString();
   const changedAccess=state.config.webappAccessTransition?.status==='approved';
   save(path.join(root, 'deployment.json'), {...state.config, ...(changedAccess?{webappAccessTransition:{...state.config.webappAccessTransition,status:'applied',toVersion:pending.version}}:{}),gitTag: tag, appsScriptVersion: pending.version, sourceCommit: state.sourceCommit, status: 'google-version-verified', files: state.files, googleCodeVerifiedAt: now, note: 'Codegleichheit der festen Google-Version geprüft. GitHub-Nachweis durch release:verify; Live-Funktionstest gesondert.'});
@@ -133,12 +145,13 @@ function main() {
     else if (command === 'publish') publish(process.argv[3]);
     else if (command === 'recover') {
       const pending = JSON.parse(fs.readFileSync(pendingPath, 'utf8'));
-      if (pending.step !== 'metadata-written') throw Error(`Unterbrochen bei ${pending.step}. Google-Stand und Sicherung zuerst lesend prüfen; keine automatische erneute Veröffentlichung.`);
-      finalize(pending);
+      if (pending.step === 'deployment-updated') completeDeployment(readConfig(), pending);
+      else if (pending.step !== 'metadata-written') throw Error(`Unterbrochen bei ${pending.step}. Google-Stand und Sicherung zuerst lesend prüfen; keine automatische erneute Veröffentlichung.`);
+      else finalize(pending);
     } else throw Error('Erlaubt: preflight [vX.Y.Z], publish vX.Y.Z, verify, recover');
   } finally { fs.closeSync(fd); fs.unlinkSync(lock); }
 }
 if (require.main === module) {
   try { main(); } catch (error) { console.error(error.message); console.error('Kein Erfolg behauptet. Bei Teilveröffentlichung .release/pending.json prüfen; keine Version/kein Tag blind erneut erstellen.'); process.exitCode = 1; }
 }
-module.exports = {tagValid, trackedHashes};
+module.exports = {tagValid, trackedHashes, waitForDeployment};

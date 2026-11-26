@@ -1,5 +1,27 @@
 # Projekttagebuch und Roadmap – Magazinvertrieb Markatus
 
+### 26.11.2026 – r43: Mehrfach ändern vor dem Abgleich, Recht „ohne Freigabe ändern“, Admin-Freigabe unter „Meine Änderungen“
+
+Nutzermeldungen:
+- Nach einer gespeicherten Änderung an Kundendaten ließ sich derselbe Kunde vor dem nächsten HQ-Abgleich nicht erneut ändern: „Für diesen Kunden sind Stammdatenänderungen offen. Bitte zuerst den HQ-Abgleich abschließen.“
+- Eine Änderung mit dem Admin-Konto wartete auf eine Admin-Freigabe. Unter „Meine Änderungen“ ließ sie sich nicht freigeben.
+
+Entscheidung des Nutzers: Alles, was in der App geändert wird, ist sofort sichtbar und erneut änderbar. Der Abgleich überträgt den Stand zum Zeitpunkt des Abgleichs, egal wie oft der Wert vorher geändert wurde. Einzelne Benutzer dürfen vorhandene Werte ohne Admin-Freigabe ändern.
+
+Umsetzung r43:
+- Eine weitere Änderung an denselben Daten (Firma, Adresse, Firmenart, Zuständigkeiten, Ansprechpartner) wird in den offenen Auftrag eingerechnet, solange HQ für ihn noch nicht beschrieben wurde. Je Datenbereich gibt es weiter höchstens einen Auftrag; HQ erhält einmal den letzten Stand. Als Vergleichswert bleibt der HQ-Stand vor der ersten Änderung.
+- Wird ein Wert in der App auf den HQ-Stand zurückgesetzt, entfällt er im Auftrag. Bleibt nichts übrig, wird der Auftrag ohne HQ-Zugriff abgeschlossen.
+- Formulare starten mit den Werten, die die App anzeigt, also einschließlich offener Änderungen.
+- Gesperrt bleibt nur ein Auftrag, der gerade übertragen wird, dessen Ausgang unklar ist oder der im Datenabgleich als Konflikt geklärt werden muss. Die Meldung sagt das.
+- Neues Recht „Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern“ (`changes.direct`) in der Benutzerverwaltung. Der Admin hat es immer. Vor dem Schreiben in HQ wird es erneut geprüft; ist es inzwischen entzogen, geht die Änderung zur Admin-Freigabe.
+- Benötigt die zusammengeführte Änderung eine Freigabe, wartet sie wieder auf den Admin, mit neuer Antragsfassung und erhaltenem Verlauf.
+- Freigegebene Änderungen und Änderungen mit dem neuen Recht sind sofort in der App sichtbar, nicht erst nach dem Abgleich.
+- Der Admin sieht unter „Meine Änderungen“ eigene Anträge und alle wartenden Anträge, mit bisherigem und vorgeschlagenem Wert, und entscheidet dort mit „Neuen Wert übernehmen“ oder „Alten Wert behalten“.
+- Veröffentlichungsskript: Google meldet die Umstellung der Bereitstellung manchmal verzögert. Das Skript prüft bis zu etwa 2 Minuten lang alle 15 Sekunden. `release:recover` schließt eine bei `deployment-updated` unterbrochene Veröffentlichung ohne erneuten Upload ab.
+- Kennung `2026-11-26-r43`. Keine Script Properties von Hand, keine Bereitstellungseinstellungen. Bestehende Benutzer erhalten das neue Recht nicht automatisch.
+
+**Lokal geprüft:** neue Fälle in `sales-app/test-business.cjs`: drei Änderungen am selben Ansprechpartner mit nur einem HQ-Schreibvorgang, Zurücknehmen ohne HQ-Zugriff, zweimal gespeichertes Kundenformular, erneute Freigabe nach Zusammenführung, Admin-Entscheidung unter „Meine Änderungen“, entzogenes Recht, gesperrter Konfliktfall. In `scripts/test-release.cjs` die verzögerte Google-Umstellung. Ältere Freigabetests laufen als Benutzer ohne das neue Recht.
+
 ### 26.11.2026 – r42.3: Wiederholung bei erschöpftem Kontingent, Notiz zu App-Firma, eigene Felder
 
 Nutzermeldung zum dritten Abgleich mit r42.2: Er wurde am Vorabend gestartet, lief über die Kontingentgrenze und war am 26.11. um 09:31 fertig. 90 Abschnitte. Kennzeichnung: 22.544 von 30.400, in diesem Abgleich 6.544, 213 von 390 Gruppen fertig. Offene Punkte:

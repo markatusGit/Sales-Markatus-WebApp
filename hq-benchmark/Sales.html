@@ -105,7 +105,7 @@ body.sales-customer-open{padding:0;height:100dvh;overflow:hidden}
 <style>
 body{margin:0;background:#111315;color:#f4f2ed;font-family:Arial,sans-serif}#magazin-vertrieb{max-width:1500px;margin:auto;min-height:100vh;border-radius:0}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}#magazin-vertrieb[aria-busy="true"] button:disabled{cursor:wait}.m-history-content{white-space:pre-wrap;overflow-wrap:anywhere}.m-history-content p{margin:0 0 .65em}.m-history-content p:last-child{margin-bottom:0}.m-history-content table{border-collapse:collapse;max-width:100%;display:block;overflow:auto}.m-history-content td,.m-history-content th{padding:6px;border:1px solid var(--m-line)}.m-history-content blockquote{border-left:3px solid var(--m-line);margin:10px 0;padding-left:12px}.m-nav button{min-height:42px}.m-data-table{display:block;overflow-x:auto}.m-data-table td{min-width:100px}.m-detail{white-space:pre-wrap;overflow-wrap:anywhere}.m-status{padding:12px 20px;border-bottom:1px solid var(--m-line)}.m-error{color:var(--m-warn)}.m-test-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.m-value{overflow-wrap:anywhere}.m-jobs pre{max-height:300px;overflow:auto;white-space:pre-wrap}.m-check input{width:auto}.m-login{padding:40px}a{color:inherit}.m-form select{min-height:43px}#magazin-vertrieb input{background:var(--m-surface);color:var(--m-text);border:1px solid var(--m-line);border-radius:6px;padding:11px 12px;width:100%;min-width:0}#magazin-vertrieb .m-dl{grid-template-columns:minmax(110px,160px) minmax(0,1fr)}#magazin-vertrieb .m-dl dt{overflow-wrap:anywhere}@media(max-width:500px){#magazin-vertrieb .m-dl{grid-template-columns:1fr;gap:4px}#magazin-vertrieb .m-dl dd{margin-bottom:12px}}
 input[type="checkbox"]{width:auto!important}.m-project-current{display:flex;align-items:center;gap:8px;grid-column:1/-1}details>summary{cursor:pointer;line-height:1.5;padding:8px 0}details[open]>summary{margin-bottom:8px}.m-plan{margin:12px 0;padding:12px;border:1px solid var(--m-line);border-radius:8px}.m-row h3,.m-plan,.m-row details{overflow-wrap:anywhere}.m-plan ul{padding-left:20px}.m-plan li{margin:6px 0}
-</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-26-r42.3</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
+</style></head><body><div id="magazin-vertrieb" data-theme="dark"><div class="m-login"><h1>Sales Markatus</h1><p>App startet · Oberfläche 2026-11-26-r43</p><p>Falls diese Anzeige stehen bleibt, bitte diesen Text einschließlich Versionskennung melden.</p></div></div>
 <script>
 // This small, independent guard remains usable when the main application script fails to start.
 window.__salesStarted=false;
@@ -116,7 +116,7 @@ window.__salesStarted=false;
     var root=document.getElementById('magazin-vertrieb');
     if(!root)return;
     reported=true;
-    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-26-r42.3</p></div>';
+    root.innerHTML='<div class="m-login"><h1>App-Start fehlgeschlagen</h1><p>Bitte die folgende technische Meldung einschließlich Versionskennung mitteilen.</p><pre class="m-detail"></pre><p>Oberfläche 2026-11-26-r43</p></div>';
     root.querySelector('pre').textContent=message;
   }
   window.addEventListener('error',function(event){
@@ -130,8 +130,8 @@ window.__salesStarted=false;
 (() => {
   'use strict';
   const root=document.getElementById('magazin-vertrieb');
-  const APP_RELEASE='2026-11-26-r42.3';
-  const UI_BUILD='2026-11-26-r42.3';
+  const APP_RELEASE='2026-11-26-r43';
+  const UI_BUILD='2026-11-26-r43';
   // Keep protocol slashes separate: HtmlService can misread them as a comment after template literals.
   function normalizeHomepageInput(value){const trimmed=value.trim();return !trimmed||/^https?:[/][/]/i.test(trimmed)?trimmed:['https:','',trimmed].join('/');}
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -290,7 +290,8 @@ const SALES_PERMISSION_CATALOG = Object.freeze([
   ['settings.read','Fachliche Verwaltung ansehen','Bereiche'],['settings.edit','Ausgabeziele und Termine ändern','Bereiche'],
   ['company.read','Firmendaten lesen','Firmen'],['company.create','Firma hinzufügen','Firmen'],['company.edit','Firmendaten und Adressen ändern','Firmen'],
   ['contact.read','Ansprechpartner lesen','Ansprechpartner'],['contact.create','Ansprechpartner hinzufügen','Ansprechpartner'],['contact.edit','Ansprechpartner ändern','Ansprechpartner'],
-  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation']
+  ['communication.read','Kommunikation lesen','Kommunikation'],['communication.create','Gespräch / Nicht erreicht hinzufügen','Kommunikation'],
+  ['changes.direct','Vorhandene Firmen- und Kontaktdaten ohne Admin-Freigabe ändern','Freigaben']
 ]);
 const SALES_PERMISSION_BASE = Object.freeze(['home.read','customers.read','company.read','contact.read','communication.read']);
 function salesPermissions_(input,owner=false){
@@ -580,9 +581,15 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
     return review.conversation.map(item=>'<p><strong>'+esc(item.kind==='ask'?'Rückfrage des Admins':'Antwort des Mitarbeiters')+'</strong><br><span>'+esc(item.text)+'</span></p>').join('');
   }
   function reviewInput(id,review){return '<input type="hidden" name="reviewId" value="'+esc(id)+'"><input type="hidden" name="revision" value="'+esc(review.revision)+'">';}
+  // r43: the admin decides on waiting requests right here, own ones included.
+  function reviewDecision(item){
+    if(!state.user.admin||item.state!=='awaitingApproval')return '';
+    return '<h4>Bisheriger Wert</h4><dl class="m-dl">'+reviewValues(item.previousValue)+'</dl><h4>Vorgeschlagener Wert</h4><dl class="m-dl">'+reviewValues(item.change)+'</dl>'+
+      '<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+(item.own?'':reviewText(item.changeReason?'Rückfrage an den Mitarbeiter':'Rückfrage oder Grund für den älteren Auftrag','note'))+'<div class="m-full m-test-actions"><button class="m-button m-primary" name="decision" value="approve" '+(item.changeReason?'formnovalidate':'')+'>Neuen Wert übernehmen</button><button class="m-button" name="decision" value="keep" formnovalidate>Alten Wert behalten</button>'+(item.own?'':'<button class="m-button" name="decision" value="ask">Rückfrage stellen</button>')+'</div></form>';
+  }
   function reviewListPage(){
-    return head('Meine Änderungen','Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
-      '<section class="m-panel">'+(ownReviews.map(item=>item.unclear?unclearHistoryRow(item):'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+(item.state==='awaitingAnswer'?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
+    return head('Meine Änderungen',state.user.admin?'Hier findest du deine Änderungsanträge und alle Anträge, die auf deine Freigabe warten.':'Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
+      '<section class="m-panel">'+(ownReviews.map(item=>item.unclear?unclearHistoryRow(item):'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeAuthor&&!item.own?'<p>Eingereicht von '+esc(item.changeAuthor)+'</p>':'')+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+reviewDecision(item)+(item.state==='awaitingAnswer'&&item.own!==false?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
   }
   // Unclear HQ history entries: the sync never sends them twice; the author or admin decides with one click.
   function unclearHistoryRow(item){
@@ -749,7 +756,8 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SALES_PERMISSION_
       const input=Object.fromEntries(new FormData(e.target)),decision=e.submitter.value;
       act(async()=>{const result=await rpc('respondSalesChangeReview',{id:input.reviewId,revision:Number(input.revision),decision,note:input.note});
         if(view==='reviews')ownReviews=await rpc('listSalesChangeReviews');
-        else {preview=await rpc('getSalesJobPreview',input.reviewId);loadedViews.delete('test');viewCache.delete('test');companyCache.clear();}
+        else preview=await rpc('getSalesJobPreview',input.reviewId);
+        loadedViews.delete('test');viewCache.delete('test');companyCache.clear();
         return result;
       },{preserve:true});return;
     }

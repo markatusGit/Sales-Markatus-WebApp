@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {canonical, digest, hashes, same, checkSettings, checkRemoteBaseline, appFiles} = require('./release-lib.cjs');
-const {tagValid, trackedHashes} = require('./release.cjs');
+const {tagValid, trackedHashes, waitForDeployment} = require('./release.cjs');
 const {appsScriptSyntax} = require('./check.cjs');
 let count = 0;
 function test(name, fn) { fn(); count++; console.log('PASS ' + name); }
@@ -30,5 +30,9 @@ test('Sicherungen beziehen zusätzliche Remote-Dateien ein und ignorieren clasp-
  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'markatus-release-test-'));
  try { fs.writeFileSync(path.join(dir, '.clasp.json'), '{}'); fs.writeFileSync(path.join(dir, 'Extra.gs'), 'test\n'); assert.deepEqual(Object.keys(hashes(dir)), ['Extra.gs']); }
  finally { fs.rmSync(dir, {recursive: true}); }
+});
+test('Verzögerte Google-Umstellung wird abgewartet, dauerhaft fehlende abgewiesen',()=>{
+ const quiet={delayMs:1,sleep:()=>{},log:()=>{}};let seen=[71,71,72];waitForDeployment(()=>seen.shift(),72,quiet);assert.equal(seen.length,0);
+ let reads=0;assert.throws(()=>waitForDeployment(()=>{reads++;return 71;},72,{...quiet,tries:4}),/noch nicht/);assert.equal(reads,4);
 });
 console.log(`${count} Release-Prüfungen bestanden.`);

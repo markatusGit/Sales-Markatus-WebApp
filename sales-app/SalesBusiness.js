@@ -7,9 +7,15 @@
     return review.conversation.map(item=>'<p><strong>'+esc(item.kind==='ask'?'Rückfrage des Admins':'Antwort des Mitarbeiters')+'</strong><br><span>'+esc(item.text)+'</span></p>').join('');
   }
   function reviewInput(id,review){return '<input type="hidden" name="reviewId" value="'+esc(id)+'"><input type="hidden" name="revision" value="'+esc(review.revision)+'">';}
+  // r43: the admin decides on waiting requests right here, own ones included.
+  function reviewDecision(item){
+    if(!state.user.admin||item.state!=='awaitingApproval')return '';
+    return '<h4>Bisheriger Wert</h4><dl class="m-dl">'+reviewValues(item.previousValue)+'</dl><h4>Vorgeschlagener Wert</h4><dl class="m-dl">'+reviewValues(item.change)+'</dl>'+
+      '<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+(item.own?'':reviewText(item.changeReason?'Rückfrage an den Mitarbeiter':'Rückfrage oder Grund für den älteren Auftrag','note'))+'<div class="m-full m-test-actions"><button class="m-button m-primary" name="decision" value="approve" '+(item.changeReason?'formnovalidate':'')+'>Neuen Wert übernehmen</button><button class="m-button" name="decision" value="keep" formnovalidate>Alten Wert behalten</button>'+(item.own?'':'<button class="m-button" name="decision" value="ask">Rückfrage stellen</button>')+'</div></form>';
+  }
   function reviewListPage(){
-    return head('Meine Änderungen','Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
-      '<section class="m-panel">'+(ownReviews.map(item=>item.unclear?unclearHistoryRow(item):'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+(item.state==='awaitingAnswer'?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
+    return head('Meine Änderungen',state.user.admin?'Hier findest du deine Änderungsanträge und alle Anträge, die auf deine Freigabe warten.':'Hier findest du den Status und Rückfragen zu deinen Änderungsanträgen.',button('Ansicht aktualisieren','reload'))+
+      '<section class="m-panel">'+(ownReviews.map(item=>item.unclear?unclearHistoryRow(item):'<div class="m-row"><h2>'+esc(item.name)+'</h2><p>'+esc(reviewLabels[item.state]||item.message)+'</p>'+(item.changeAuthor&&!item.own?'<p>Eingereicht von '+esc(item.changeAuthor)+'</p>':'')+(item.changeReason?'<p><strong>Änderungsgrund</strong><br>'+esc(item.changeReason)+'</p>':'')+reviewConversation(item.review)+reviewDecision(item)+(item.state==='awaitingAnswer'&&item.own!==false?'<form data-form="change-review" class="m-form">'+reviewInput(item.id,item.review)+reviewText('Deine Antwort','note')+'<button class="m-button m-primary" name="decision" value="answer">Antwort speichern</button></form>':'')+'</div>').join('')||empty('Du hast noch keine Änderungsanträge.'))+'</section>';
   }
   // Unclear HQ history entries: the sync never sends them twice; the author or admin decides with one click.
   function unclearHistoryRow(item){
@@ -176,7 +182,8 @@
       const input=Object.fromEntries(new FormData(e.target)),decision=e.submitter.value;
       act(async()=>{const result=await rpc('respondSalesChangeReview',{id:input.reviewId,revision:Number(input.revision),decision,note:input.note});
         if(view==='reviews')ownReviews=await rpc('listSalesChangeReviews');
-        else {preview=await rpc('getSalesJobPreview',input.reviewId);loadedViews.delete('test');viewCache.delete('test');companyCache.clear();}
+        else preview=await rpc('getSalesJobPreview',input.reviewId);
+        loadedViews.delete('test');viewCache.delete('test');companyCache.clear();
         return result;
       },{preserve:true});return;
     }
